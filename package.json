@@ -1,0 +1,26 @@
+{
+  "name": "live-mutex",
+  "version": "0.0.10001",
+  "description": "Simple mutex that uses Node.js process and IPC instead of Redis",
+  "main": "broker.js",
+  "scripts": {
+    "test": "suman"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ORESoftware/live-mutex.git"
+  },
+  "author": "Olegzandr",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ORESoftware/live-mutex/issues"
+  },
+  "homepage": "https://github.com/ORESoftware/live-mutex#readme",
+  "dependencies": {
+    "async": "^2.1.4",
+    "colors": "^1.1.2",
+    "siamese": "^2.0.4",
+    "uuid": "^3.0.1",
+    "ws": "^1.1.1"
+  }
+}
