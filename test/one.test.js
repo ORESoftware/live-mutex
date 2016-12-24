@@ -1,55 +1,56 @@
-/**
- * Created by oleg on 12/23/16.
- */
-
-
+'use strict';
 
 const client = require('../client');
 const colors = require('colors/safe');
 
 
-client.lock('a', {}).then(function(data){
+client.lock('a', {}).then(function (data) {
 
-    console.log(" ONE lock acquired!!! => \n", data);
+    console.log('\n', colors.blue(' ONE lock acquired =>'), '\n', data);
 
-    return client.unlock('a').then(function(data){
-          console.log('\n',colors.green(' => unlock data success! => '),'\n', data,'\n');
-          return data;
-    });
-
-}, function(err){
-
-    console.error(err.stack || err);
-
-});
+    setTimeout(function () {
+        client.unlock('a').then(function (data) {
+            console.log('\n', colors.green(' => ONE unlock data success! => '), '\n', data, '\n');
+        });
+    }, 1000);
 
 
-client.lock('a', {}).then(function(data){
-
-    console.log(" TWO lock acquired!!! => \n", data);
-
-    return client.unlock('a').then(function(data){
-        console.log('\n',colors.green(' => unlock data success! => '),'\n', data,'\n');
-        return data;
-    });
-
-}, function(err){
+}, function (err) {
 
     console.error(err.stack || err);
 
 });
 
 
-client.lock('a', {}).then(function(data){
+client.lock('a', {}).then(function (data) {
 
-    console.log(" THREE lock acquired!!! => \n", data);
+    console.log('\n', colors.blue(' TWO lock acquired!!! => '), '\n', data);
 
-    return client.unlock('a').then(function(data){
-        console.log('\n',colors.green(' => unlock data success! => '),'\n', data,'\n');
-        return data;
-    });
+    setTimeout(function () {
+        client.unlock('a').then(function (data) {
+            console.log('\n', colors.green(' => TWO unlock data success! => '), '\n', data, '\n');
+        });
+    }, 1000);
 
-}, function(err){
+
+}, function (err) {
+
+    console.error(err.stack || err);
+
+});
+
+
+client.lock('a', {}).then(function (data) {
+
+    console.log('\n', colors.blue(' THREE lock acquired!!! =>'), '\n', data);
+
+    setTimeout(function () {
+        client.unlock('a').then(function (data) {
+            console.log('\n', colors.green(' => THREE unlock data success! => '), '\n', data, '\n');
+        });
+    }, 1000);
+
+}, function (err) {
 
     console.error(err.stack || err);
 

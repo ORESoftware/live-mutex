@@ -1,24 +1,28 @@
-/**
- * Created by oleg on 12/23/16.
- */
-
+'use strict';
 
 const WebSocket = require('ws');
-const ws = new WebSocket('ws://localhost:6970');
 const ijson = require('siamese');
 const uuidV4 = require('uuid/v4');
 const colors = require('colors/safe');
 const util = require('util');
 
-
-ws.on('open', function open() {
-    ws.isOpen = true;
-});
+/////////////////////////////////////////////////////////////////////////
 
 
-exports.lock = function _lock(key, opts) {
+function Client(opts) {
 
-    return new Promise(function (resolve, reject) {
+    const ws = this.ws = new WebSocket('ws://localhost:6970');
+    ws.on('open', () => {
+        ws.isOpen = true;
+    });
+
+}
+
+Client.prototype.lock = function _lock(key, opts) {
+
+    return new Promise((resolve, reject) => {
+
+        const ws = this.ws;
 
         const uuid = uuidV4();
 
@@ -28,7 +32,7 @@ exports.lock = function _lock(key, opts) {
 
             ijson.parse(msg).then(function (data) {
 
-                console.log('\n', ' => onMessage in lock => \n', data, '\n');
+                console.log('\n', ' => onMessage in lock => ', '\n', colors.blue(util.inspect(data)), '\n');
 
                 if (String(data.uuid) === String(uuid)) {
 
@@ -41,17 +45,14 @@ exports.lock = function _lock(key, opts) {
                         ws.removeListener('message', onMessage);
                         resolve(data);
                     }
+                    else if (data.acquired === false) {
+                        console.log(colors.magenta(' => Lock could not be immediately acquired for uuid => '), uuid);
+                    }
 
                 }
                 else {
-                    console.log(colors.yellow('uuid did not match (lock) , expected => ', uuid, 'actual => ', data.uuid));
-
-                    if (String(key) === String(data.key)) {
-                        if (data.acquired === true) {
-                            ws.removeListener('message', onMessage);
-                            resolve(data);
-                        }
-                    }
+                    console.log(colors.yellow('uuid did not match (lock) , expected => ', colors.gray(uuid), 'actual => ',
+                        colors.gray(data.uuid)));
                 }
             });
 
@@ -62,7 +63,7 @@ exports.lock = function _lock(key, opts) {
             ws.send(JSON.stringify({
                 uuid: uuid,
                 key: key,
-                lock: true
+                type: 'lock'
             }));
         }
 
@@ -78,11 +79,12 @@ exports.lock = function _lock(key, opts) {
 };
 
 
-exports.unlock = function _unlock(key, opts) {
+Client.prototype.unlock = function _unlock(key, opts) {
 
-    return new Promise(function (resolve, reject) {
+    return new Promise((resolve, reject) => {
 
         const uuid = uuidV4();
+        const ws = this.ws;
 
         const to = setTimeout(function () {
             ws.removeListener('message', onMessage);
@@ -96,7 +98,7 @@ exports.unlock = function _unlock(key, opts) {
 
             ijson.parse(msg).then(function (data) {
 
-                console.log('\n', ' onMessage in unlock =>', data, '\n');
+                console.log('\n', ' onMessage in unlock =>', '\n', colors.blue(util.inspect(data)), '\n');
 
                 if (String(data.uuid) === String(uuid)) {
 
@@ -107,7 +109,6 @@ exports.unlock = function _unlock(key, opts) {
                     }
 
                     clearTimeout(to);
-                    console.log('\n',' =====> unlock data ===> \n', colors.magenta(util.inspect(data)), '\n');
 
                     if (data.unlocked === true) {
                         ws.removeListener('message', onMessage);
@@ -125,7 +126,7 @@ exports.unlock = function _unlock(key, opts) {
             ws.send(JSON.stringify({
                 uuid: uuid,
                 key: key,
-                unlock: true
+                type: 'unlock'
             }));
         }
 
@@ -140,3 +141,5 @@ exports.unlock = function _unlock(key, opts) {
 
 };
 
+
+module.exports = Client;
