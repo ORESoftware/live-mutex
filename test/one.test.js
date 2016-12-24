@@ -4,58 +4,70 @@ const Client = require('../client');
 const colors = require('colors/safe');
 
 const Broker = require('../broker');
-const broker = new Broker({port: 7002});
-const client = new Client({port: 7002});
+const broker = new Broker({port: 7003});
+const client = new Client({port: 7003});
 
 
-client.lock('a', {}).then(function (data) {
+const suman = require('suman');
+const Test = suman.init(module);
 
-    console.log('\n', colors.blue(' ONE lock acquired =>'), '\n', data);
-
-    setTimeout(function () {
-        client.unlock('a').then(function (data) {
-            console.log('\n', colors.green(' => ONE unlock data success! => '), '\n', data, '\n');
-        });
-    }, 6000);
+Test.create(__filename, {}, function(it){
 
 
-}, function (err) {
+    it.cb('locks/unlocks', t => {
+        client.lock('a', {}).then(function (data) {
 
-    console.error(err.stack || err);
+            console.log('\n', colors.blue(' ONE lock acquired =>'), '\n', data);
 
-});
-
-
-client.lock('a', {}).then(function (data) {
-
-    console.log('\n', colors.blue(' TWO lock acquired!!! => '), '\n', data);
-
-    setTimeout(function () {
-        client.unlock('a').then(function (data) {
-            console.log('\n', colors.green(' => TWO unlock data success! => '), '\n', data, '\n');
-        });
-    }, 1000);
+            setTimeout(function () {
+                client.unlock('a').then(function (data) {
+                   t.done();
+                }, t);
+            }, 4000);
 
 
-}, function (err) {
+        }, t);
 
-    console.error(err.stack || err);
-
-});
+    });
 
 
-client.lock('a', {}).then(function (data) {
 
-    console.log('\n', colors.blue(' THREE lock acquired!!! =>'), '\n', data);
 
-    setTimeout(function () {
-        client.unlock('a').then(function (data) {
-            console.log('\n', colors.green(' => THREE unlock data success! => '), '\n', data, '\n');
-        });
-    }, 1000);
+    it.cb('locks/unlocks', t => {
 
-}, function (err) {
+        client.lock('a', {}).then(function (data) {
 
-    console.error(err.stack || err);
+            console.log('\n', colors.blue(' TWO lock acquired!!! => '), '\n', data);
+
+            setTimeout(function () {
+                client.unlock('a').then(function (data) {
+                    t.done();
+                },t);
+            }, 1000);
+
+
+        }, t);
+
+    });
+
+
+
+    it.cb('locks/unlocks', t => {
+
+
+        client.lock('a', {}).then(function (data) {
+
+            console.log('\n', colors.blue(' THREE lock acquired!!! =>'), '\n', data);
+
+            setTimeout(function () {
+                client.unlock('a').then(function (data) {
+                    t.done();
+                }, t);
+            }, 1000);
+
+        }, t);
+    });
+
+
 
 });

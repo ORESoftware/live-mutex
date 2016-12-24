@@ -2,16 +2,38 @@
 
 ### Suman runner start ###
 
-Beginning of run at 1482570239199 = [Sat Dec 24 2016 01:03:59 GMT-0800 (PST)]
+Beginning of run at 1482612738105 = [Sat Dec 24 2016 12:52:18 GMT-0800 (PST)]
 Command issued from the following directory "/home/oleg/WebstormProjects/oresoftware/live-mutex"
-Command = ["/home/oleg/.nvm/versions/node/v7.2.1/bin/node","/home/oleg/WebstormProjects/oresoftware/live-mutex/node_modules/suman/cli.js","--runner","test/two.test.js"]
+Command = ["/home/oleg/.nvm/versions/node/v7.2.1/bin/node","/home/oleg/WebstormProjects/oresoftware/live-mutex/node_modules/suman/cli.js"]
 
+
+[four.test.js]  => Suman usage warning: no suman.once.pre.js file found. 
+
+[three.test.js]  => Suman usage warning: no suman.once.pre.js file found. 
 
 [two.test.js]  => Suman usage warning: no suman.once.pre.js file found. 
+
+[one.test.js]  => Suman usage warning: no suman.once.pre.js file found. 
+
+[four.test.js] Warning: callback mode is set, but a non-null value was returned by the hook
+
+[four.test.js]     at TestSuite.<anonymous> (/home/oleg/WebstormProjects/oresoftware/live-mutex/test/four.test.js:40:8)
+
+[four.test.js]  ### Suman end run ### 
+
+[four.test.js] true
+
+[three.test.js]  ### Suman end run ### 
+
+[three.test.js] true
 
 [two.test.js]  ### Suman end run ### 
 
 [two.test.js] true
+
+[one.test.js]  ### Suman end run ### 
+
+[one.test.js] true
 
 
 ### Suman runner end ###

@@ -9,6 +9,7 @@ const WebSocketServer = require('ws').Server;
 const ijson = require('siamese');
 const async = require('async');
 const colors = require('colors/safe');
+const debug = require('debug')('live-mutex');
 
 //project
 
@@ -55,20 +56,20 @@ function Server(opts) {
 
     wss.on('connection', function connection(ws) {
 
-        console.log(' client is connected!');
+        debug(' client is connected!');
 
         ws.on('message', function (msg) {
 
             ijson.parse(msg).then(function (data) {
 
-                console.log('\n', colors.blue(' => broker received this data => '), '\n', data, '\n');
+                debug('\n', colors.blue(' => broker received this data => '), '\n', data, '\n');
 
                 if (data.type === 'unlock') {
-                    console.log(colors.blue(' => broker is attempting to run unlock...'));
+                    debug(colors.blue(' => broker is attempting to run unlock...'));
                     self.unlock(data, ws);
                 }
                 else if (data.type === 'lock') {
-                    console.log(colors.blue(' => broker attempting to get lock...'));
+                    debug(colors.blue(' => broker attempting to get lock...'));
                     self.lock(data, ws);
                 }
                 else {
@@ -100,12 +101,12 @@ Server.prototype.ensureNewLockHolder = function _ensureNewLockHolder(lck, data, 
 
     const key = data.key;
 
-    console.log('\n', colors.blue.bold(' => Notify list length => '), colors.blue(notifyList.length), '\n');
+    debug('\n', colors.blue.bold(' => Notify list length => '), colors.blue(notifyList.length), '\n');
 
     var obj;
     if (obj = notifyList.shift()) {
 
-        console.log(colors.cyan.bold(' => Sending ws client the acquired message.'));
+        debug(colors.cyan.bold(' => Sending ws client the acquired message.'));
 
         lck.to = setTimeout(() => {
             console.error(colors.red.bold(' => Warning, lock timed out for key => '), colors.red('"' + key + '"'));
@@ -125,7 +126,7 @@ Server.prototype.ensureNewLockHolder = function _ensureNewLockHolder(lck, data, 
     else {
         //only delete lock if no client is remaining to claim it
         delete locks[key];
-        console.log(colors.red.bold(' => No other connections waiting for lock, so we deleted the lock.'));
+        debug(colors.red.bold(' => No other connections waiting for lock, so we deleted the lock.'));
     }
 
 };
@@ -142,8 +143,6 @@ Server.prototype.unlock = function _unlock(data, ws) {
 
         clearTimeout(lck.to);
 
-
-
         if (uuid && ws) {
             // if no uuid is defined, then unlock was called by something other than the client
             ws.send(JSON.stringify({
@@ -154,7 +153,7 @@ Server.prototype.unlock = function _unlock(data, ws) {
         }
 
         this.ensureNewLockHolder(lck, data, function () {
-            console.log(' => All done notifying.')
+            debug(' => All done notifying.')
         });
     }
     else {
@@ -184,7 +183,7 @@ Server.prototype.lock = function _lock(data, ws) {
 
     if (lck) {
 
-        console.log(' => Lock exists, adding ws to list of to be notified.');
+        debug(' => Lock exists, adding ws to list of to be notified.');
 
         lck.notify.push({
             ws: ws,
@@ -200,7 +199,7 @@ Server.prototype.lock = function _lock(data, ws) {
     }
     else {
 
-        console.log(' => Lock does not exist, creating new lock.');
+        debug(' => Lock does not exist, creating new lock.');
 
         locks[key] = {
             pid: pid,

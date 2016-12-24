@@ -8,8 +8,8 @@ const _ = require('lodash');
 
 const Client = require('../client');
 const Broker = require('../broker');
-const broker = new Broker({port: 7002});
-const client = new Client({port: 7002});
+const broker = new Broker({port: 7000});
+const client = new Client({port: 7000});
 
 const Promise = require('bluebird');
 
