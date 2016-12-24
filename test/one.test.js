@@ -1,7 +1,11 @@
 'use strict';
 
-const client = require('../client');
+const Client = require('../client');
 const colors = require('colors/safe');
+
+const Broker = require('../broker');
+const broker = new Broker({port: 7002});
+const client = new Client({port: 7002});
 
 
 client.lock('a', {}).then(function (data) {
@@ -12,7 +16,7 @@ client.lock('a', {}).then(function (data) {
         client.unlock('a').then(function (data) {
             console.log('\n', colors.green(' => ONE unlock data success! => '), '\n', data, '\n');
         });
-    }, 1000);
+    }, 6000);
 
 
 }, function (err) {

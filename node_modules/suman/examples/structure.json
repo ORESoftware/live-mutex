@@ -1,0 +1,129 @@
+{
+  "00-about": {
+    "title": "About Suman",
+    "children": []
+  },
+  "01-getting-started": {
+    "title": "Getting Started with Suman",
+    "children": []
+  },
+  "02-simple-examples": {
+    "title": "Simple Examples",
+    "children": [
+      "simple-example-a",
+      "simple-example-b",
+      "simple-example-es6",
+      "simple-parallel-example"
+    ]
+  },
+  "simple-example-a":{
+    "title": "Simple 100% synchronous test example"
+  },
+  "simple-example-b":{
+    "title": "Another simple 100% synchronous test example with beforeEach/afterEach"
+  },
+  "simple-example-es6":{
+    "title": "Another simple 100% synchronous test example with beforeEach/afterEach"
+  },
+  "simple-parallel-example":{
+    "title": "Simple example"
+  },
+  "03-high-level-overview": {
+    "title": "Higher Level Overview"
+  },
+  "04-command-line-options": {
+    "title": "Command line options"
+  },
+  "05-advanced-use": {
+    "title": "Advanced Use",
+    "children": [
+      "usage-with-gulp",
+      "suman-groups",
+      "suman-globals",
+      "suman-ioc",
+      "suman-order",
+      "suman-once-pre",
+      "suman-once-post"
+    ]
+  },
+  "07-suman-patterns-and-recipes": {
+    "title": "Suman Patterns and Recipes"
+  },
+  "08-suman-anti-patterns": {
+    "title": "Suman Anti-Patterns"
+  },
+  "09-suman-reporters": {
+    "title": "Suman reporters and creating custom reporters"
+  },
+  "11-advanced-installation": {
+    "title": "Advanced installation of Suman"
+  },
+  "12-using-suman-with-babel": {
+    "title": "Using Suman with Babel"
+  },
+  "13-test-dir-organization": {
+    "title": "How to organize your test directory"
+  },
+  "14-debugging-suman": {
+    "title": "How to debug Suman tests"
+  },
+  "15-testing-child-processes-with-suman": {
+    "title": "Testing and debugging processes that spawn child processes"
+  },
+  "16-using-spies-with-suman": {
+    "title": "Using test spies with Suman"
+  },
+  "17-suman-server-and-web-reporter": {
+    "title": "About Suman server and built-in web reporter"
+  },
+  "18-tips-and-tricks": {
+    "title": "Tips and tricks"
+  },
+  "19-converting-from-mocha": {
+    "title": "Converting from Mocha to Suman"
+  },
+  "41-suman-exit-codes": {
+    "title": "List of Suman exit codes"
+  },
+  "42-hidden-secret-features": {
+    "title": "Some secret / hidden features of Suman"
+  },
+  "50-suman-parallelism": {
+    "title": "Complete explanation of Suman parallelism"
+  },
+  "example-a": {
+    "title": "Example A"
+  },
+  "example-es6": {
+    "title": "Example ES6"
+  },
+
+  "60-usage-with-gulp": {
+    "title": "Usage with Gulp.js"
+  },
+  "70-usage-with-code-coverage-tools": {
+    "title": "Usage with code coverage tools (namely Istanbul)"
+  },
+  "90-roadmap": {
+    "title": "Suman roadmap and upcoming efforts"
+  },
+
+  "30-anatomy-of-suman-suite": {
+    "title": "Anatomy of Suman Test Suites"
+  },
+  "31-workflows-with-suman": {
+    "title": "Workflows with Suman => Watchers and transpilation"
+  },
+  "32-using-spies-with-suman": {
+    "title": "Using test spies with Suman"
+  },
+  "40-integrating-with-ci-cd": {
+    "title": "Integrating with CI/CD"
+  },
+  "27-suman-best-practices": {
+    "title": "Best practices with Suman"
+  },
+  "99-faq": {
+    "title": "FAQ"
+  }
+}

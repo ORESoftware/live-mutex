@@ -1,0 +1,1 @@
+start powershell.exe -NoExit "Get-Content C:\Users\denman\WebstormProjects\suman-private\suman\logs\runner-debug.log -Wait"

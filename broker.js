@@ -1,6 +1,7 @@
 'use strict';
 
 //core
+const assert = require('assert');
 const util = require('util');
 
 //npm
@@ -14,10 +15,35 @@ const colors = require('colors/safe');
 
 ///////////////////////////////////////////////////////////////////
 
-function Server(){
+function Server(opts) {
 
-    const wss = this.wss = new WebSocketServer({port: 6970});
-    const locks = this.locks  = {
+    this.opts = opts || {};
+    assert(typeof this.opts === 'object', ' => Bad arguments to live-mutex server constructor.');
+
+    if (this.opts.expiresAfter) {
+        assert(Number.isInteger(this.opts.expiresAfter), ' => "expiresAfter" option needs to be an integer (milliseconds)');
+        assert(this.opts.expiresAfter > 20, ' => "expiresAfter" should be an integer greater than 20 milliseconds.');
+    }
+
+    if (this.opts.host) {
+        assert(typeof this.opts.host === 'string', ' => "host" option needs to be a string.');
+    }
+
+    if (this.opts.port) {
+        assert(Number.isInteger(this.opts.port), ' => "port" option needs to be an integer.');
+        assert(this.opts.port < 64000, ' => "port" integer needs to be in range.');
+    }
+
+    this.expiresAfter = this.opts.expiresAfter || 5000;
+    this.host = this.opts.host || 'localhost';
+    this.port = this.opts.port || '6970';
+
+
+    const wss = this.wss = new WebSocketServer({
+        port: this.port
+    });
+
+    const locks = this.locks = {
         /*
 
          key: { key: key, pid: pid, notify: []}
@@ -72,9 +98,22 @@ Server.prototype.ensureNewLockHolder = function _ensureNewLockHolder(lck, data, 
     const locks = this.locks;
     const notifyList = lck.notify;
 
+    const key = data.key;
+
+    console.log('\n', colors.blue.bold(' => Notify list length => '), colors.blue(notifyList.length), '\n');
+
     var obj;
     if (obj = notifyList.shift()) {
+
         console.log(colors.cyan.bold(' => Sending ws client the acquired message.'));
+
+        lck.to = setTimeout(() => {
+            console.error(colors.red.bold(' => Warning, lock timed out for key => '), colors.red('"' + key + '"'));
+            this.unlock({
+                key: key
+            });
+        }, this.expiresAfter);
+
         obj.ws.send(JSON.stringify({
                 key: data.key,
                 uuid: obj.uuid,
@@ -85,7 +124,7 @@ Server.prototype.ensureNewLockHolder = function _ensureNewLockHolder(lck, data, 
     }
     else {
         //only delete lock if no client is remaining to claim it
-        delete locks[data.key];
+        delete locks[key];
         console.log(colors.red.bold(' => No other connections waiting for lock, so we deleted the lock.'));
     }
 
@@ -101,11 +140,18 @@ Server.prototype.unlock = function _unlock(data, ws) {
 
     if (lck) {
 
-        ws.send(JSON.stringify({
-            uuid: uuid,
-            key: key,
-            unlocked: true
-        }));
+        clearTimeout(lck.to);
+
+
+
+        if (uuid && ws) {
+            // if no uuid is defined, then unlock was called by something other than the client
+            ws.send(JSON.stringify({
+                uuid: uuid,
+                key: key,
+                unlocked: true
+            }));
+        }
 
         this.ensureNewLockHolder(lck, data, function () {
             console.log(' => All done notifying.')
@@ -113,14 +159,17 @@ Server.prototype.unlock = function _unlock(data, ws) {
     }
     else {
 
-        console.error(colors.red.bold(' => no lock with key => '), key);
-        ws.send(JSON.stringify({
-            uuid: uuid,
-            key: key,
-            unlocked: true,
-            error: 'no lock with key = > ' + key
-        }));
+        console.error(colors.red.bold(' => Usage error => this should not happen => no lock with key => '),
+            colors.red('"' + key + '"'));
 
+        if (ws) {
+            ws.send(JSON.stringify({
+                uuid: uuid,
+                key: key,
+                unlocked: true,
+                error: 'no lock with key = > ' + key
+            }));
+        }
     }
 
 };
@@ -158,6 +207,12 @@ Server.prototype.lock = function _lock(data, ws) {
             uuid: uuid,
             notify: [],
             key: key,
+            to: setTimeout(() => {
+                console.error(colors.red.bold(' => Warning, lock timed out for key => '), colors.red('"' + key + '"'));
+                this.unlock({
+                    key: key
+                });
+            }, this.expiresAfter)
         };
 
         ws.send(JSON.stringify({

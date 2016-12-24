@@ -1,0 +1,5 @@
+parse to object fails when using object destructuring
+
+=>
+	TypeError: 'caller', 'callee', and 'arguments' properties may not be accessed on strict mode functions or the arguments objects for calls to them
+        at Object.parse (/Users/Olegzandr/WebstormProjects/oresoftware/pragmatik/index.js:147:28)

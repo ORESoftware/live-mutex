@@ -1,19 +1,46 @@
 'use strict';
 
+//core
+const assert = require('assert');
+const util = require('util');
+
+//npm
 const WebSocket = require('ws');
 const ijson = require('siamese');
 const uuidV4 = require('uuid/v4');
 const colors = require('colors/safe');
-const util = require('util');
+
 
 /////////////////////////////////////////////////////////////////////////
 
 
 function Client(opts) {
 
-    const ws = this.ws = new WebSocket('ws://localhost:6970');
+    this.opts = opts || {};
+    assert(typeof this.opts === 'object', ' => Bad arguments to live-mutex client constructor.');
+
+    if (this.opts.host) {
+        assert(typeof this.opts.host === 'string', ' => "host" option needs to be a string.');
+    }
+
+    if (this.opts.port) {
+        assert(Number.isInteger(this.opts.port), ' => "port" option needs to be an integer.');
+        assert(this.opts.port < 64000, ' => "port" integer needs to be in range.');
+    }
+
+    this.host = this.opts.host || 'localhost';
+    this.port = this.opts.port || '6970';
+
+    const ws = this.ws = new WebSocket(['ws://', this.host, ':', this.port].join(''));
+
+    ws.setMaxListeners(100);
+
     ws.on('open', () => {
         ws.isOpen = true;
+    });
+
+    ws.on('close', () => {
+        ws.isOpen = false;
     });
 
 }
@@ -71,7 +98,7 @@ Client.prototype.lock = function _lock(key, opts) {
             send();
         }
         else {
-            ws.on('open', send);
+            ws.once('open', send);
         }
 
     });
@@ -91,7 +118,7 @@ Client.prototype.unlock = function _unlock(key, opts) {
             reject(new Error(' => Unlocking timed out.'))
         }, 2000);
 
-        ws.on('message', function onMessage(msg, flags) {
+        function onMessage(msg, flags) {
 
             // flags.binary will be set if a binary data is received.
             // flags.masked will be set if the data was masked.
@@ -119,7 +146,9 @@ Client.prototype.unlock = function _unlock(key, opts) {
                     console.log(colors.yellow('uuid did not match (unlock) , expected => ', uuid, 'actual => ', data.uuid));
                 }
             });
-        });
+        }
+
+        ws.on('message', onMessage);
 
 
         function send() {
@@ -134,7 +163,7 @@ Client.prototype.unlock = function _unlock(key, opts) {
             send();
         }
         else {
-            ws.on('open', send);
+            ws.once('open', send);
         }
 
     });

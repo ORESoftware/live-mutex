@@ -22,5 +22,10 @@
     "siamese": "^2.0.4",
     "uuid": "^3.0.1",
     "ws": "^1.1.1"
+  },
+  "devDependencies": {
+    "bluebird": "^3.4.7",
+    "lodash": "^4.17.2",
+    "suman": "github:oresoftware/suman#dev"
   }
 }

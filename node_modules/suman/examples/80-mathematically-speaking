@@ -1,0 +1,20 @@
+
+
+// Mathematically speaking Suman tests run according to these time rules
+
+if all tests are run in parallel processes, all starting all the same time, where x is the time it takes to complete
+a particular test
+
+```
+time to complete approaches MAX(x,...X)
+```
+
+if all tests are run in series (you can do this two ways, using your suman.conf.js file you can specify
+a maximum of one process running at a time, *or* you can use your suman.order.js configuration file to handle
+blocking between processes running particular tests.).
+
+```
+time to complete approaches SUM(x,...X)
+```
+
+
