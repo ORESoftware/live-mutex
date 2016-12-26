@@ -11,12 +11,19 @@ const strangeloop = require('strangeloop');
 
 exports.conditionallyLaunchSocketServer = function (obj, cb) {
 
+    if(typeof obj === 'function'){
+        cb = obj;
+        obj = {};
+    }
+
+    obj = obj || {};
+
     const host = obj.host || 'localhost';
-    const port = obj.host || 'port';
+    const port = obj.port || 6970;
 
 
     function fn(cb) {
-        ping.probe('localhost', 6970, function (err, available) {
+        ping.probe(host, port, function (err, available) {
 
             if (err) {
                 return cb(err)
@@ -25,8 +32,11 @@ exports.conditionallyLaunchSocketServer = function (obj, cb) {
                 return cb(null);
             }
             else {
-                new Broker(obj);
-                return process.nextTick(cb);
+                process.nextTick(cb);
+                new Broker({
+                    host:host,
+                    port:port
+                });
             }
 
         });

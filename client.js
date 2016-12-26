@@ -33,8 +33,41 @@ function Client(opts) {
     this.port = this.opts.port || '6970';
 
     const ws = this.ws = new WebSocket(['ws://', this.host, ':', this.port].join(''));
+    ws.setMaxListeners(50);
 
-    ws.setMaxListeners(100);
+    this.resolutions = {};
+
+    ws.on('message', (msg, flags) => {
+
+        ijson.parse(msg).then(data => {
+
+            debug('\n', ' => onMessage in lock => ', '\n', colors.blue(util.inspect(data)), '\n');
+
+            const uuid = data.uuid;
+            if (uuid) {
+                const fn = this.resolutions[uuid];
+                delete this.resolutions[uuid];
+
+                if (fn) {
+                    fn.apply(this, [null, data]);
+                }
+                else {
+                    throw new Error(' => No fn with that uuid in the resolutions hash => \n' + util.inspect(data));
+                }
+            }
+            else {
+                console.error(colors.yellow(' => message did not contain uuid =>'), msg);
+            }
+
+        }, function (err) {
+            console.error(' => Message could not be JSON.parsed => ', msg, '\n', err.stack || err);
+        });
+
+    });
+
+    ws.on('error', err => {
+        console.error('\n', err.stack || err, '\n');
+    });
 
     ws.on('open', () => {
         ws.isOpen = true;
@@ -48,7 +81,7 @@ function Client(opts) {
 
 Client.prototype.lock = function _lock(key, opts, cb) {
 
-    assert(typeof key,'string',' => Key passed to live-mutex#lock needs to be a string.');
+    assert(typeof key, 'string', ' => Key passed to live-mutex#lock needs to be a string.');
 
     if (typeof opts === 'function') {
         cb = opts;
@@ -64,39 +97,31 @@ Client.prototype.lock = function _lock(key, opts, cb) {
 
         const uuid = uuidV4();
 
-        ws.on('message', function onMessage(msg, flags) {
+        this.resolutions[uuid] = function (err, data) {
+
             // flags.binary will be set if a binary data is received.
             // flags.masked will be set if the data was masked.
 
-            ijson.parse(msg).then(function (data) {
+            if (String(data.uuid) !== String(uuid)) {
+                throw new Error('uuid did not match (lock) , expected => ' + colors.gray(uuid) + 'actual => ' +
+                    data.uuid);
+            }
 
-                debug('\n', ' => onMessage in lock => ', '\n', colors.blue(util.inspect(data)), '\n');
+            if (String(key) !== String(data.key)) {
+                console.error(colors.bgRed(new Error(' !!! bad key !!!').stack));
+                return cb(new Error(' => Implementation error.'))
+            }
 
-                if (String(data.uuid) === String(uuid)) {
+            if (data.acquired === true) {
+                cb(null, data);
+            }
+            else if (data.acquired === false) {
+                throw new Error(' => Lock could not be immediately acquired for uuid => acquired was equal to false, ' +
+                    'and this should not happen.');
+            }
 
-                    if (String(key) !== String(data.key)) {
-                        ws.removeListener('message', onMessage);
-                        console.error(colors.bgRed(new Error(' !!! bad key !!!').stack));
-                        return cb(new Error(' => Implementation error.'))
-                    }
 
-                    if (data.acquired === true) {
-                        ws.removeListener('message', onMessage);
-                        cb(null, data);
-                    }
-                    else if (data.acquired === false) {
-                        debug(colors.magenta(' => Lock could not be immediately acquired for uuid => '), uuid);
-                    }
-
-                }
-                else {
-                    debug(colors.yellow('uuid did not match (lock) , expected => ', colors.gray(uuid), 'actual => ',
-                        colors.gray(data.uuid)));
-                }
-
-            }, cb);
-
-        });
+        };
 
 
         function send() {
@@ -126,7 +151,7 @@ Client.prototype.lock = function _lock(key, opts, cb) {
 
 Client.prototype.unlock = function _unlock(key, opts, cb) {
 
-    assert(typeof key,'string',' => Key passed to live-mutex#unlock needs to be a string.');
+    assert(typeof key, 'string', ' => Key passed to live-mutex#unlock needs to be a string.');
 
     if (typeof opts === 'function') {
         cb = opts;
@@ -135,48 +160,40 @@ Client.prototype.unlock = function _unlock(key, opts, cb) {
 
     opts = opts || {};
 
-   const fn = (cb) => {
+    const fn = (cb) => {
 
         const uuid = uuidV4();
         const ws = this.ws;
 
         const to = setTimeout(function () {
-            ws.removeListener('message', onMessage);
             cb(new Error(' => Unlocking timed out.'))
         }, 2000);
 
-        function onMessage(msg, flags) {
+        this.resolutions[uuid] = function (err, data) {
 
             // flags.binary will be set if a binary data is received.
             // flags.masked will be set if the data was masked.
 
-            ijson.parse(msg).then(function (data) {
+            debug('\n', ' onMessage in unlock =>', '\n', colors.blue(util.inspect(data)), '\n');
 
-                debug('\n', ' onMessage in unlock =>', '\n', colors.blue(util.inspect(data)), '\n');
+            if (String(data.uuid) === String(uuid)) {
 
-                if (String(data.uuid) === String(uuid)) {
+                clearTimeout(to);
 
-                    if (String(key) !== String(data.key)) {
-                        ws.removeListener('message', onMessage);
-                        console.error(colors.bgRed(new Error(' !!! bad key !!!').stack));
-                        return cb(new Error(' => Implementation error.'))
-                    }
-
-                    clearTimeout(to);
-
-                    if (data.unlocked === true) {
-                        ws.removeListener('message', onMessage);
-                        cb(null, data);
-                    }
-                }
-                else {
-                    debug(colors.yellow('uuid did not match (unlock) , expected => ', uuid, 'actual => ', data.uuid));
+                if (String(key) !== String(data.key)) {
+                    console.error(colors.bgRed(new Error(' !!! bad key !!!').stack));
+                    return cb(new Error(' => Implementation error.'))
                 }
 
-            }, cb);
-        }
+                if (data.unlocked === true) {
+                    cb(null, data);
+                }
+            }
+            else {
+                console.error(colors.yellow('uuid did not match (unlock) , expected => ', uuid, 'actual => ', data.uuid));
+            }
 
-        ws.on('message', onMessage);
+        };
 
 
         function send() {
@@ -196,7 +213,7 @@ Client.prototype.unlock = function _unlock(key, opts, cb) {
 
     };
 
-    return strangeloop.conditionalReturn(fn,cb);
+    return strangeloop.conditionalReturn(fn, cb);
 
 };
 

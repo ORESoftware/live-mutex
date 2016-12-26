@@ -31,7 +31,7 @@ function Server(opts) {
     }
 
     if (this.opts.port) {
-        assert(Number.isInteger(this.opts.port), ' => "port" option needs to be an integer.');
+        assert(Number.isInteger(this.opts.port), ' => "port" option needs to be an integer => ' + this.opts.port);
         assert(this.opts.port < 64000, ' => "port" integer needs to be in range.');
     }
 
@@ -145,6 +145,7 @@ Server.prototype.unlock = function _unlock(data, ws) {
 
         if (uuid && ws) {
             // if no uuid is defined, then unlock was called by something other than the client
+            // aka this library called unlock when there was a timeout
             ws.send(JSON.stringify({
                 uuid: uuid,
                 key: key,
@@ -190,11 +191,11 @@ Server.prototype.lock = function _lock(data, ws) {
             uuid: uuid
         });
 
-        ws.send(JSON.stringify({
-            key: key,
-            uuid: uuid,
-            acquired: false
-        }));
+        // ws.send(JSON.stringify({
+        //     key: key,
+        //     uuid: uuid,
+        //     acquired: false
+        // }));
 
     }
     else {
