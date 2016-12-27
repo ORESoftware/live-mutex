@@ -187,7 +187,17 @@ Server.prototype.unlock = function _unlock(data, ws) {
     // _uuid is the uuid of the original lockholder call
     // the unlock caller can be given right to unlock only if it holds
     // the uuid from the original lock call, as a safeguard
-    if (lck && ((_uuid ? lck.uuid === _uuid : true) || force)) {
+    // this prevents a function from being called at the wrong time, or more than once, etc.
+
+    var same = true;
+
+    if(_uuid){
+        console.log('___uuid is defined');
+        same = lck.uuid === _uuid;
+        console.log('same is => ', same);
+    }
+
+    if (lck && (same || force)) {
 
         clearTimeout(lck.to);
 

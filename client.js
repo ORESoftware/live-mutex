@@ -149,7 +149,7 @@ Client.prototype.lock = function _lock(key, opts, cb) {
                 type: 'lock-received'
             }));
 
-            cb(null, data.uuid);
+            cb(null, this.unlock.bind(this, key, {_uuid: uuid}), data.uuid);
         }
         else if (data.retry === true) {
             ++opts._retryCount;
@@ -251,6 +251,7 @@ Client.prototype.unlock = function _unlock(key, opts, cb) {
         ws.send(JSON.stringify({
             uuid: uuid,
             key: key,
+            _uuid: opts._uuid,
             force: opts.force,
             type: 'unlock'
         }));

@@ -16,16 +16,16 @@ const Test = suman.init(module);
 Test.create(__filename, {}, function(it){
 
     it.cb('locks/unlocks', t => {
-        client.lock('a', {}, function (err, data) {
+        client.lock('a', {}, function (err, unlock) {
 
             if(err){
                 return t.fail(err);
             }
 
-            console.log('\n', colors.yellow(' ONE lock acquired!!! => '), '\n', data);
+            console.log('\n', colors.yellow(' ONE lock acquired!!! => '), '\n');
 
             setTimeout(function () {
-                client.unlock('a', function(err){
+                unlock(function(err){
                     if(err){
                         return t.fail(err);
                     }

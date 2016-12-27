@@ -48,19 +48,13 @@ lmUtils.conditionallyLaunchSocketServer().then(function(){
       // you don't need to use this utility method, you can easily write your own
       
       const client = new Client(opts);
+     
       
-      // > use promises
-      client.lock(<key>).then(function(){
-            return client.unlock(<key>)
-      }, function(err){
-           // errors are unlikely, just log something
-           // if an error is passed, the lock was not had, so no need to call unlock
-           console.error(err.stack || err);
-      });
-      
-      // > use promises
-       client.lock(<key>, function(){
-          return client.unlock(<key>)
+      // > use callbacks
+       client.lock(<key>, {}, function(err, uuid){
+           client.unlock(<key>, {}, function(){
+           
+           });
        });
       
 });
