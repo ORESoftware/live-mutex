@@ -20,17 +20,29 @@ function Client(opts) {
     this.opts = opts || {};
     assert(typeof this.opts === 'object', ' => Bad arguments to live-mutex client constructor.');
 
-    if (this.opts.host) {
+    if (this.opts.host in opts) {
         assert(typeof this.opts.host === 'string', ' => "host" option needs to be a string.');
     }
 
-    if (this.opts.port) {
+    if (this.opts.port in opts) {
         assert(Number.isInteger(this.opts.port), ' => "port" option needs to be an integer.');
         assert(this.opts.port < 64000, ' => "port" integer needs to be in range.');
     }
 
+    if (this.opts.unlockTimeout in opts) {
+        assert(Number.isInteger(this.opts.unlockTimeout), ' => "unlockTimeout" option needs to be an integer (representing milliseconds).');
+        assert(this.opts.unlockTimeout >= 20 && this.opts.unlockTimeout <= 800000, ' => "unlockTimeout" needs to be integer between 20 and 800000 millis.');
+    }
+
+    if (this.opts.lockTimeout in opts) {
+        assert(Number.isInteger(this.opts.lockTimeout), ' => "unlockTimeout" option needs to be an integer (representing milliseconds).');
+        assert(this.opts.lockTimeout >= 30 && this.opts.lockTimeout <= 800000, ' => "unlockTimeout" needs to be integer between 20 and 800000 millis.');
+    }
+
     this.host = this.opts.host || 'localhost';
     this.port = this.opts.port || '6970';
+    this.unlockTimeout = this.opts.unlockTimeout || 1000;
+    this.lockTimeout = this.opts.lockTimeout || 15000;
 
     const ws = this.ws = new WebSocket(['ws://', this.host, ':', this.port].join(''));
     ws.setMaxListeners(50);
@@ -39,6 +51,9 @@ function Client(opts) {
 
     ws.on('message', (msg, flags) => {
 
+        // flags.binary will be set if a binary data is received.
+        // flags.masked will be set if the data was masked.
+
         ijson.parse(msg).then(data => {
 
             debug('\n', ' => onMessage in lock => ', '\n', colors.blue(util.inspect(data)), '\n');
@@ -46,7 +61,6 @@ function Client(opts) {
             const uuid = data.uuid;
             if (uuid) {
                 const fn = this.resolutions[uuid];
-                delete this.resolutions[uuid];
 
                 if (fn) {
                     fn.apply(this, [null, data]);
@@ -87,63 +101,79 @@ Client.prototype.lock = function _lock(key, opts, cb) {
         cb = opts;
         opts = {};
     }
+    else if (typeof opts === 'boolean') {
+        opts = {
+            force: opts
+        };
+    }
 
     opts = opts || {};
+    opts._retryCount = opts._retryCount || 0;
+
+    const ws = this.ws;
+    const uuid = opts._uuid || uuidV4();
+
+    const to = setTimeout(() => {
+        delete  this.resolutions[uuid];
+        cb(new Error(' => Acquiring lock timed out.'));
+    }, this.lockTimeout);
 
 
-    const fn = (cb) => {
+    this.resolutions[uuid] = (err, data) => {
 
-        const ws = this.ws;
+        // => always clear timeout
+        clearTimeout(to);
 
-        const uuid = uuidV4();
+        if (String(key) !== String(data.key)) {
+            delete this.resolutions[uuid];
+            console.error(colors.bgRed(new Error(' !!! bad key !!!').stack));
+            return cb(new Error(' => Implementation error.'))
+        }
 
-        this.resolutions[uuid] = function (err, data) {
+        if (data.error) {
+            console.error('\n', colors.bgRed(data.error), '\n');
+        }
 
-            // flags.binary will be set if a binary data is received.
-            // flags.masked will be set if the data was masked.
+        if ([data.acquired, data.retry].filter(i => i).length > 1) {
+            throw new Error(' => Live-Mutex implementation error.');
+        }
 
-            if (String(data.uuid) !== String(uuid)) {
-                throw new Error('uuid did not match (lock) , expected => ' + colors.gray(uuid) + 'actual => ' +
-                    data.uuid);
-            }
+        if (data.acquired === true) {
 
-            if (String(key) !== String(data.key)) {
-                console.error(colors.bgRed(new Error(' !!! bad key !!!').stack));
-                return cb(new Error(' => Implementation error.'))
-            }
+            delete this.resolutions[uuid];
 
-            if (data.acquired === true) {
-                cb(null, data);
-            }
-            else if (data.acquired === false) {
-                throw new Error(' => Lock could not be immediately acquired for uuid => acquired was equal to false, ' +
-                    'and this should not happen.');
-            }
-
-
-        };
-
-
-        function send() {
             ws.send(JSON.stringify({
                 uuid: uuid,
                 key: key,
-                type: 'lock'
+                pid: process.pid,
+                type: 'lock-received'
             }));
-        }
 
-        if (ws.isOpen) {
-            send();
+            cb(null, data.uuid);
         }
-        else {
-            ws.once('open', send);
+        else if (data.retry === true) {
+            ++opts._retryCount;
+            opts._uuid = uuid;
+            this.lock(key, opts, cb);
         }
-
 
     };
 
 
-    return strangeloop.conditionalReturn(fn, cb);
+    function send() {
+        ws.send(JSON.stringify({
+            uuid: uuid,
+            key: key,
+            type: 'lock'
+        }));
+    }
+
+    if (ws.isOpen) {
+        send();
+    }
+    else {
+        ws.once('open', send);
+    }
 
 
 };
@@ -157,63 +187,82 @@ Client.prototype.unlock = function _unlock(key, opts, cb) {
         cb = opts;
         opts = {};
     }
+    else if (typeof opts === 'boolean') {
+        opts = {
+            force: opts
+        };
+    }
 
     opts = opts || {};
+    opts._retryCount = opts._retryCount || 0;
 
-    const fn = (cb) => {
+    if (opts._retryCount > 3) {
+        return cb(new Error(' => Maximum retries breached.'));
+    }
 
-        const uuid = uuidV4();
-        const ws = this.ws;
+    const uuid = uuidV4();
+    const ws = this.ws;
 
-        const to = setTimeout(function () {
-            cb(new Error(' => Unlocking timed out.'))
-        }, 2000);
+    const to = setTimeout(() => {
 
-        this.resolutions[uuid] = function (err, data) {
+        delete this.resolutions[uuid];
+        cb(new Error(' => Unlocking timed out.'));
 
-            // flags.binary will be set if a binary data is received.
-            // flags.masked will be set if the data was masked.
-
-            debug('\n', ' onMessage in unlock =>', '\n', colors.blue(util.inspect(data)), '\n');
-
-            if (String(data.uuid) === String(uuid)) {
-
-                clearTimeout(to);
-
-                if (String(key) !== String(data.key)) {
-                    console.error(colors.bgRed(new Error(' !!! bad key !!!').stack));
-                    return cb(new Error(' => Implementation error.'))
-                }
-
-                if (data.unlocked === true) {
-                    cb(null, data);
-                }
-            }
-            else {
-                console.error(colors.yellow('uuid did not match (unlock) , expected => ', uuid, 'actual => ', data.uuid));
-            }
-
-        };
+    }, this.unlockTimeout);
 
 
-        function send() {
+    this.resolutions[uuid] = (err, data) => {
+
+        debug('\n', ' onMessage in unlock =>', '\n', colors.blue(util.inspect(data)), '\n');
+
+        clearTimeout(to);
+
+        if (String(key) !== String(data.key)) {
+            console.error(colors.bgRed(new Error(' !!! bad key !!!').stack));
+            return cb(new Error(' => Implementation error.'))
+        }
+
+        if ([data.unlocked].filter(i => i).length > 1) {
+            throw new Error(' => Live-Mutex implementation error.');
+        }
+
+        if (data.error) {
+            console.error('\n', colors.bgRed(data.error), '\n');
+        }
+
+        if (data.unlocked === true) {
+
+            delete this.resolutions[uuid];
+
             ws.send(JSON.stringify({
                 uuid: uuid,
                 key: key,
-                type: 'unlock'
+                pid: process.pid,
+                type: 'unlock-received'
             }));
-        }
 
-        if (ws.isOpen) {
-            send();
-        }
-        else {
-            ws.once('open', send);
+            cb(null, data.uuid);
         }
 
     };
 
-    return strangeloop.conditionalReturn(fn, cb);
+
+    function send() {
+        ws.send(JSON.stringify({
+            uuid: uuid,
+            key: key,
+            force: opts.force,
+            type: 'unlock'
+        }));
+    }
+
+    if (ws.isOpen) {
+        send();
+    }
+    else {
+        ws.once('open', send);
+    }
+
 
 };
 

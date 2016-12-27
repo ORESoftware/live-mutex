@@ -44,6 +44,13 @@ function Server(opts) {
         port: this.port
     });
 
+    this.bookkeepping = {
+
+    };
+
+    this.callbacks = {};
+    this.timeouts = {};
+
     const locks = this.locks = {
         /*
 
@@ -71,6 +78,14 @@ function Server(opts) {
                 else if (data.type === 'lock') {
                     debug(colors.blue(' => broker attempting to get lock...'));
                     self.lock(data, ws);
+                }
+                else if (data.type === 'lock-received') {
+                    clearTimeout(self.timeouts[data.key]);
+                    delete self.timeouts[data.key];
+                }
+                else if (data.type === 'unlock-received') {
+                    clearTimeout(self.timeouts[data.key]);
+                    delete self.timeouts[data.key];
                 }
                 else {
                     console.error(colors.red.bold(' bad data sent to broker.'));
@@ -108,14 +123,40 @@ Server.prototype.ensureNewLockHolder = function _ensureNewLockHolder(lck, data, 
 
         debug(colors.cyan.bold(' => Sending ws client the acquired message.'));
 
+        // set the timeout for the next ws to acquire lock, if not within alloted time, we simple call unlock
         lck.to = setTimeout(() => {
             console.error(colors.red.bold(' => Warning, lock timed out for key => '), colors.red('"' + key + '"'));
+
             this.unlock({
                 key: key
             });
+
         }, this.expiresAfter);
 
-        obj.ws.send(JSON.stringify({
+        clearTimeout(this.timeouts[key]);
+        delete this.timeouts[key];
+
+        this.timeouts[key] = setTimeout(() => {
+
+            delete this.timeouts[key];
+            // if this timeout occurs, that is because the first item in the notify list did not receive the
+            // acquire lock message, so we push the object back onto the notify list and send a retry message to all
+            // if a client receives a retry message, they will all retry to acquire the lock on this key
+
+            notifyList.push(obj);
+            notifyList.forEach(function (obj) {
+                obj.ws.send(JSON.stringify({
+                    key: data.key,
+                    uuid: obj.uuid,
+                    retry: true
+                }));
+            });
+
+        }, 2000);
+
+
+        obj.ws.send(
+            JSON.stringify({
                 key: data.key,
                 uuid: obj.uuid,
                 acquired: true,
@@ -124,9 +165,10 @@ Server.prototype.ensureNewLockHolder = function _ensureNewLockHolder(lck, data, 
             cb);
     }
     else {
-        //only delete lock if no client is remaining to claim it
+        // => only delete lock if no client is remaining to claim it
         delete locks[key];
         debug(colors.red.bold(' => No other connections waiting for lock, so we deleted the lock.'));
+        process.nextTick(cb);
     }
 
 };
@@ -137,9 +179,15 @@ Server.prototype.unlock = function _unlock(data, ws) {
     const locks = this.locks;
     const key = data.key;
     const uuid = data.uuid;
+    const _uuid = data._uuid;
+    const force = data.force;
     const lck = locks[key];
 
-    if (lck) {
+    // if the user passed _uuid, then we check it, other true
+    // _uuid is the uuid of the original lockholder call
+    // the unlock caller can be given right to unlock only if it holds
+    // the uuid from the original lock call, as a safeguard
+    if (lck && ((_uuid ? lck.uuid === _uuid : true) || force)) {
 
         clearTimeout(lck.to);
 
@@ -157,9 +205,23 @@ Server.prototype.unlock = function _unlock(data, ws) {
             debug(' => All done notifying.')
         });
     }
+    else if(lck){
+
+        if (uuid && ws) {
+            // if no uuid is defined, then unlock was called by something other than the client
+            // aka this library called unlock when there was a timeout
+            ws.send(JSON.stringify({
+                uuid: uuid,
+                key: key,
+                error: ' => You need to pass the correct uuid, or use force.',
+                unlocked: false
+            }));
+        }
+
+    }
     else {
 
-        console.error(colors.red.bold(' => Usage error => this should not happen => no lock with key => '),
+        console.error(colors.red.bold(' => Usage / implementation error => this should not happen => no lock with key => '),
             colors.red('"' + key + '"'));
 
         if (ws) {
@@ -186,16 +248,24 @@ Server.prototype.lock = function _lock(data, ws) {
 
         debug(' => Lock exists, adding ws to list of to be notified.');
 
-        lck.notify.push({
-            ws: ws,
-            uuid: uuid
+        // if we retrying, we may attempt to call lock() more than once
+        // we don't want to push the same ws object / same uuid combo to array
+        const alreadyAdded = lck.notify.some(function(item){
+              return String(item.uuid) === String(uuid);
         });
 
-        // ws.send(JSON.stringify({
-        //     key: key,
-        //     uuid: uuid,
-        //     acquired: false
-        // }));
+        if(!alreadyAdded){
+            lck.notify.push({
+                ws: ws,
+                uuid: uuid
+            });
+        }
+
+        ws.send(JSON.stringify({
+            key: key,
+            uuid: uuid,
+            acquired: false
+        }));
 
     }
     else {
