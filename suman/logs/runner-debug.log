@@ -2,38 +2,86 @@
 
 ### Suman runner start ###
 
-Beginning of run at 1482612738105 = [Sat Dec 24 2016 12:52:18 GMT-0800 (PST)]
+Beginning of run at 1482966363081 = [Wed Dec 28 2016 15:06:03 GMT-0800 (PST)]
 Command issued from the following directory "/home/oleg/WebstormProjects/oresoftware/live-mutex"
 Command = ["/home/oleg/.nvm/versions/node/v7.2.1/bin/node","/home/oleg/WebstormProjects/oresoftware/live-mutex/node_modules/suman/cli.js"]
 
 
 [four.test.js]  => Suman usage warning: no suman.once.pre.js file found. 
 
-[three.test.js]  => Suman usage warning: no suman.once.pre.js file found. 
-
 [two.test.js]  => Suman usage warning: no suman.once.pre.js file found. 
+
+[three.test.js]  => Suman usage warning: no suman.once.pre.js file found. 
 
 [one.test.js]  => Suman usage warning: no suman.once.pre.js file found. 
 
-[four.test.js] Warning: callback mode is set, but a non-null value was returned by the hook
+[three.test.js]     ⚑  => Suman fatal error  => making a graceful exit => 
 
-[four.test.js]     at TestSuite.<anonymous> (/home/oleg/WebstormProjects/oresoftware/live-mutex/test/four.test.js:40:8)
+[three.test.js]    Error: Cannot find module './fixtures/corruptible.txt'
 
-[four.test.js]  ### Suman end run ### 
+[three.test.js]        at Function.Module._resolveFilename (module.js:470:15)
 
-[four.test.js] true
+[three.test.js]        at Function.resolve (internal/module.js:27:19)
+
+[three.test.js]        at TestSuite.<anonymous> (/home/oleg/WebstormProjects/oresoftware/live-mutex/test/test-src/three.test.js:17:23)
+
+[three.test.js]        at /home/oleg/WebstormProjects/oresoftware/sumanjs/suman/lib/exec-suite.js:290:20
+
+[three.test.js]        at _combinedTickCallback (internal/process/next_tick.js:67:7)
+
+[three.test.js]        at process._tickDomainCallback (internal/process/next_tick.js:122:9)
+
+[three.test.js]    
+
+[three.test.js]    
+
+[three.test.js]    
+
+[three.test.js] Error: Cannot find module './fixtures/corruptible.txt'
+
+[three.test.js]     at Function.Module._resolveFilename (module.js:470:15)
+
+[three.test.js]     at Function.resolve (internal/module.js:27:19)
+
+[three.test.js]     at TestSuite.<anonymous> (/home/oleg/WebstormProjects/oresoftware/live-mutex/test/test-src/three.test.js:17:23)
+
+[three.test.js]     at /home/oleg/WebstormProjects/oresoftware/sumanjs/suman/lib/exec-suite.js:290:20
+
+[three.test.js]     at _combinedTickCallback (internal/process/next_tick.js:67:7)
+
+[three.test.js]     at process._tickDomainCallback (internal/process/next_tick.js:122:9)
+
+[three.test.js] Error: Cannot find module './fixtures/corruptible.txt'
+
+[three.test.js]     at Function.Module._resolveFilename (module.js:470:15)
+
+[three.test.js]     at Function.resolve (internal/module.js:27:19)
+
+[three.test.js]     at TestSuite.<anonymous> (/home/oleg/WebstormProjects/oresoftware/live-mutex/test/test-src/three.test.js:17:23)
+
+[three.test.js]     at /home/oleg/WebstormProjects/oresoftware/sumanjs/suman/lib/exec-suite.js:290:20
+
+[three.test.js]     at _combinedTickCallback (internal/process/next_tick.js:67:7)
+
+[three.test.js]     at process._tickDomainCallback (internal/process/next_tick.js:122:9)
 
 [three.test.js]  ### Suman end run ### 
 
 [three.test.js] true
 
+[one.test.js]  ### Suman end run ### 
+
+[one.test.js] true
+
 [two.test.js]  ### Suman end run ### 
 
 [two.test.js] true
 
-[one.test.js]  ### Suman end run ### 
+[four.test.js]  => Warning, lock timed out for key =>  "z"
 
-[one.test.js] true
+[four.test.js]  ### Suman end run ### 
+
+[four.test.js] true
 
 
 ### Suman runner end ###

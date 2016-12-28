@@ -6,8 +6,8 @@ const colors = require('colors/safe');
 const async = require('async');
 const _ = require('lodash');
 
-const Client = require('../client');
-const Broker = require('../broker');
+const Client = require('../../client');
+const Broker = require('../../broker');
 const broker = new Broker({port: 7004});
 const client = new Client({port: 7004});
 

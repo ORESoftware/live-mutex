@@ -1,9 +1,9 @@
 'use strict';
 
-const Client = require('../client');
+const Client = require('../../client');
 const colors = require('colors/safe');
 
-const Broker = require('../broker');
+const Broker = require('../../broker');
 const broker = new Broker({port: 7003});
 const client = new Client({port: 7003});
 
