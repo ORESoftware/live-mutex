@@ -20,6 +20,11 @@ const weAreDebugging = require('./lib/we-are-debugging');
 
 /////////////////////////////////////////////////////////////////////////
 
+
+process.on('warning', function(w){
+   console.error('\n',' => Live-Mutex warning => ', w.stack || w,'\n');
+});
+
 const validOptions = [
 
     'host',
@@ -88,7 +93,7 @@ function Client($opts) {
     this.unlockRetryMax = opts.unlockRetryMax || 3;
 
     const ws = this.ws = new WebSocket(['ws://', this.host, ':', this.port].join(''));
-    ws.setMaxListeners(150);
+    ws.setMaxListeners(350);
 
     this.bookkeeping = {
         keys: {}

@@ -1,28 +1,27 @@
-
 const path = require('path');
 const async = require('async');
 const lf = require('lockfile');
 
 
 const a = Array.apply(null, {length: 300});
-const file = path.resolve('../fixtures/speed-test.lock');
+const file = path.resolve(process.env.HOME + '/speed-test.lock');
 
 const start = Date.now();
 
-async.eachSeries(a, function(val, cb){
+async.eachSeries(a, function (val, cb) {
 
-    lf.lock(file, function(err){
-        if(err){
+    lf.lock(file, function (err) {
+        if (err) {
             cb(err);
         }
-        else{
+        else {
             lf.unlock(file, cb);
         }
     });
 
-}, function complete(err){
+}, function complete(err) {
 
-    if(err){
+    if (err) {
         throw err;
     }
 

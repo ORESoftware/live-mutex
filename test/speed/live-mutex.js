@@ -6,8 +6,8 @@
 const path = require('path');
 const async = require('async');
 
-const lmUtils = require('../../utils');
-const Client = require('../../client');
+const lmUtils = require('live-mutex/utils');
+const Client = require('live-mutex/client');
 
 return lmUtils.conditionallyLaunchSocketServer({})
     .then(function (data) {
