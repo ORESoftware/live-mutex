@@ -11,7 +11,6 @@ const Client = require('../../client');
 
 return lmUtils.conditionallyLaunchSocketServer({})
     .then(function (data) {
-        console.log('data from conditionallyLaunchSocketServer => ', data);
 
         const a = Array.apply(null, {length: 300});
         const start = Date.now();
