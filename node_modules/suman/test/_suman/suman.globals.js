@@ -1,3 +1,0 @@
-
-
-global.sassy = 5;

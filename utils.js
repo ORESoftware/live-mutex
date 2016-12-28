@@ -1,14 +1,14 @@
-/**
- * Created by oleg on 12/24/16.
- */
+'use strict';
 
-
+//core
 const util = require('util');
+
+//npm
 const ping = require('tcp-ping');
-const Broker = require('./broker');
 const strangeloop = require('strangeloop');
 
-
+//project
+const Broker = require('./broker');
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////

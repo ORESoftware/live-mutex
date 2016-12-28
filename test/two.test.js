@@ -11,10 +11,8 @@ const Broker = require('../broker');
 const broker = new Broker({port: 7000});
 const client = new Client({port: 7000});
 
-const Promise = require('bluebird');
 
-
-Test.create(__filename, {}, function (assert, describe) {
+Test.create(__filename, function (assert, describe) {
 
     const arrays = [
         [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
@@ -32,13 +30,20 @@ Test.create(__filename, {}, function (assert, describe) {
 
             async.map(a, function (val, cb) {
 
-                process.nextTick(function () {
-                    cb(null, t => {
-                        return client.lock(String(val)).then(function () {
-                            return Promise.delay(100);
-                        }).then(function () {
-                            return client.unlock(String(val));
-                        });
+                cb(null, t => {
+                    client.lock(String(val), function (err, unlock, id) {
+                        if (err) {
+                            t.fail(err);
+                        }
+                        else {
+                            setTimeout(function () {
+                                client.unlock(String(val), {
+                                    force: false,
+                                    _uuid: id
+                                }, t.done);
+                                // client.unlock(String(val), id, t.done);
+                            }, 100);
+                        }
                     });
                 });
 
@@ -58,7 +63,7 @@ Test.create(__filename, {}, function (assert, describe) {
 
                 fns.forEach(fn => {
 
-                    this.it('locks/unlocks', fn);
+                    this.it.cb('locks/unlocks', fn);
 
                 });
 

@@ -10,15 +10,37 @@ const ijson = require('siamese');
 const uuidV4 = require('uuid/v4');
 const colors = require('colors/safe');
 const strangeloop = require('strangeloop');
+
+//project
 const debug = require('debug')('live-mutex');
 
 /////////////////////////////////////////////////////////////////////////
 
+const weAreDebugging = require('./lib/we-are-debugging');
+
+/////////////////////////////////////////////////////////////////////////
+
+const validOptions = [
+
+    'host',
+    'port',
+    'unlockTimeout',
+    'lockTimeout',
+    'unlockRetryMax',
+    'lockRetryMax'
+
+];
 
 function Client(opts) {
 
     this.opts = opts || {};
     assert(typeof this.opts === 'object', ' => Bad arguments to live-mutex client constructor.');
+
+    Object.keys(this.opts).forEach(function (key) {
+        if (validOptions.indexOf(key) < 0) {
+            throw new Error(' => Option passed to Live-Mutex#Client constructor is not a recognized option => "' + key + '"');
+        }
+    });
 
     if (this.opts.host in opts) {
         assert(typeof this.opts.host === 'string', ' => "host" option needs to be a string.');
@@ -26,26 +48,51 @@ function Client(opts) {
 
     if (this.opts.port in opts) {
         assert(Number.isInteger(this.opts.port), ' => "port" option needs to be an integer.');
-        assert(this.opts.port < 64000, ' => "port" integer needs to be in range.');
+        assert(this.opts.port > 1024 && this.opts.port < 49152,
+            ' => "port" integer needs to be in range (1025-49151).');
+    }
+
+    if (this.opts.unlockRetryMax in opts) {
+        assert(Number.isInteger(this.opts.unlockRetryMax),
+            ' => "unlockRetryMax" option needs to be an integer.');
+        assert(this.opts.unlockRetryMax >= 0 && this.opts.unlockRetryMax <= 100,
+            ' => "unlockRetryMax" integer needs to be in range (0-100).');
+    }
+
+    if (this.opts.lockRetryMax in opts) {
+        assert(Number.isInteger(this.opts.lockRetryMax),
+            ' => "lockRetryMax" option needs to be an integer.');
+        assert(this.opts.lockRetryMax >= 0 && this.opts.lockRetryMax <= 100,
+            ' => "lockRetryMax" integer needs to be in range (0-100).');
     }
 
     if (this.opts.unlockTimeout in opts) {
-        assert(Number.isInteger(this.opts.unlockTimeout), ' => "unlockTimeout" option needs to be an integer (representing milliseconds).');
-        assert(this.opts.unlockTimeout >= 20 && this.opts.unlockTimeout <= 800000, ' => "unlockTimeout" needs to be integer between 20 and 800000 millis.');
+        assert(Number.isInteger(this.opts.unlockTimeout),
+            ' => "unlockTimeout" option needs to be an integer (representing milliseconds).');
+        assert(this.opts.unlockTimeout >= 30 && this.opts.unlockTimeout <= 800000,
+            ' => "unlockTimeout" needs to be integer between 20 and 800000 millis.');
     }
 
     if (this.opts.lockTimeout in opts) {
-        assert(Number.isInteger(this.opts.lockTimeout), ' => "unlockTimeout" option needs to be an integer (representing milliseconds).');
-        assert(this.opts.lockTimeout >= 30 && this.opts.lockTimeout <= 800000, ' => "unlockTimeout" needs to be integer between 20 and 800000 millis.');
+        assert(Number.isInteger(this.opts.lockTimeout),
+            ' => "unlockTimeout" option needs to be an integer (representing milliseconds).');
+        assert(this.opts.lockTimeout >= 30 && this.opts.lockTimeout <= 800000,
+            ' => "unlockTimeout" needs to be integer between 20 and 800000 millis.');
     }
 
     this.host = this.opts.host || 'localhost';
     this.port = this.opts.port || '6970';
-    this.unlockTimeout = this.opts.unlockTimeout || 1000;
-    this.lockTimeout = this.opts.lockTimeout || 15000;
+    this.unlockTimeout = weAreDebugging ? 5000000 : (this.opts.unlockTimeout || 1000);
+    this.lockTimeout = weAreDebugging ? 5000000 : (this.opts.lockTimeout || 15000);
+    this.lockRetryMax = this.opts.lockRetryMax || 3;
+    this.unlockRetryMax = this.opts.unlockRetryMax || 3;
 
     const ws = this.ws = new WebSocket(['ws://', this.host, ':', this.port].join(''));
-    ws.setMaxListeners(50);
+    ws.setMaxListeners(150);
+
+    this.bookkeeping = {
+        keys: {}
+    };
 
     this.resolutions = {};
 
@@ -60,6 +107,7 @@ function Client(opts) {
 
             const uuid = data.uuid;
             if (uuid) {
+
                 const fn = this.resolutions[uuid];
 
                 if (fn) {
@@ -70,17 +118,17 @@ function Client(opts) {
                 }
             }
             else {
-                console.error(colors.yellow(' => message did not contain uuid =>'), msg);
+                console.error(colors.yellow(' => Live-Mutex internal issue => message did not contain uuid =>'), '\n', msg);
             }
 
         }, function (err) {
-            console.error(' => Message could not be JSON.parsed => ', msg, '\n', err.stack || err);
+            console.error(colors.red.bold(' => Message could not be JSON.parsed => '), msg, '\n', err.stack || err);
         });
 
     });
 
     ws.on('error', err => {
-        console.error('\n', err.stack || err, '\n');
+        console.error('\n', ' => Websocket client error => ', err.stack || err, '\n');
     });
 
     ws.on('open', () => {
@@ -97,6 +145,16 @@ Client.prototype.lock = function _lock(key, opts, cb) {
 
     assert(typeof key, 'string', ' => Key passed to live-mutex#lock needs to be a string.');
 
+    this.bookkeeping.keys[key] = this.bookkeeping.keys[key] || {
+            rawLockCount: 0,
+            rawUnlockCount: 0,
+            lockCount: 0,
+            unlockCount: 0
+        };
+
+    this.bookkeeping.keys[key].rawLockCount++;
+
+
     if (typeof opts === 'function') {
         cb = opts;
         opts = {};
@@ -108,6 +166,11 @@ Client.prototype.lock = function _lock(key, opts, cb) {
     }
 
     opts = opts || {};
+
+    if (opts._retryCount > this.lockRetryMax) {
+        return cb(new Error(' => Maximum retries breached.'));
+    }
+
     opts._retryCount = opts._retryCount || 0;
 
     const ws = this.ws;
@@ -141,6 +204,7 @@ Client.prototype.lock = function _lock(key, opts, cb) {
         if (data.acquired === true) {
 
             delete this.resolutions[uuid];
+            this.bookkeeping.keys[key].lockCount++;
 
             ws.send(JSON.stringify({
                 uuid: uuid,
@@ -149,11 +213,18 @@ Client.prototype.lock = function _lock(key, opts, cb) {
                 type: 'lock-received'
             }));
 
-            cb(null, this.unlock.bind(this, key, {_uuid: uuid}), data.uuid);
+            if (data.uuid !== uuid) {
+                console.error(' => Something went very wrong.');
+                cb(new Error(' => Something went wrong.'));
+            }
+            else {
+                cb(null, this.unlock.bind(this, key, {_uuid: uuid}), data.uuid);
+            }
         }
         else if (data.retry === true) {
+            clearTimeout(to);
             ++opts._retryCount;
-            opts._uuid = uuid;
+            opts._uuid = opts._uuid || uuid;
             this.lock(key, opts, cb);
         }
 
@@ -183,6 +254,15 @@ Client.prototype.unlock = function _unlock(key, opts, cb) {
 
     assert(typeof key, 'string', ' => Key passed to live-mutex#unlock needs to be a string.');
 
+    this.bookkeeping.keys[key] = this.bookkeeping.keys[key] || {
+            rawLockCount: 0,
+            rawUnlockCount: 0,
+            lockCount: 0,
+            unlockCount: 0
+        };
+
+    this.bookkeeping.keys[key].rawUnlockCount++;
+
     if (typeof opts === 'function') {
         cb = opts;
         opts = {};
@@ -192,11 +272,16 @@ Client.prototype.unlock = function _unlock(key, opts, cb) {
             force: opts
         };
     }
+    else if (typeof opts === 'string') {
+        opts = {
+            _uuid: opts
+        };
+    }
 
     opts = opts || {};
     opts._retryCount = opts._retryCount || 0;
 
-    if (opts._retryCount > 3) {
+    if (opts._retryCount > this.unlockRetryMax) {
         return cb(new Error(' => Maximum retries breached.'));
     }
 
@@ -232,6 +317,11 @@ Client.prototype.unlock = function _unlock(key, opts, cb) {
 
         if (data.unlocked === true) {
 
+            this.bookkeeping.keys[key].unlockCount++;
+
+            debug('\n', ' => Lock unlock count (client), key => ', '"' + key + '"', '\n',
+                util.inspect(this.bookkeeping.keys[key]), '\n');
+
             delete this.resolutions[uuid];
 
             ws.send(JSON.stringify({
@@ -243,6 +333,15 @@ Client.prototype.unlock = function _unlock(key, opts, cb) {
 
             cb(null, data.uuid);
         }
+        else if (data.retry === true) {
+
+            debug(' => Retrying the unlock call.');
+            clearTimeout(to);
+            return; //TODO
+            ++opts._retryCount;
+            opts._uuid = opts._uuid || uuid;
+            this.unlock(key, opts, cb);
+        }
 
     };
 
@@ -252,7 +351,8 @@ Client.prototype.unlock = function _unlock(key, opts, cb) {
             uuid: uuid,
             key: key,
             _uuid: opts._uuid,
-            force: opts.force,
+            // we only use force if we have to retry
+            force: (opts._retryCount > 0) ? opts.force : false,
             type: 'unlock'
         }));
     }

@@ -16,6 +16,7 @@ const Test = suman.init(module);
 Test.create(__filename, {}, function(it){
 
     it.cb('locks/unlocks', t => {
+
         client.lock('a', {}, function (err, unlock) {
 
             if(err){
@@ -35,8 +36,7 @@ Test.create(__filename, {}, function(it){
                     }
 
                 });
-            }, 3000);
-
+            }, 1500);
 
         });
 
@@ -47,16 +47,17 @@ Test.create(__filename, {}, function(it){
 
     it.cb('locks/unlocks', t => {
 
-        client.lock('a', {}, function (err, data) {
+        client.lock('a', {}, function (err, unlock, id) {
 
             if(err){
                 return t.fail(err);
             }
 
-            console.log('\n', colors.blue(' TWO lock acquired!!! => '), '\n', data);
+            console.log('\n', colors.blue(' TWO lock acquired!!! => '), '\n', id);
 
             setTimeout(function () {
-                client.unlock('a', function(err){
+
+                client.unlock('a', id, function(err){
                     if(err){
                         return t.fail(err);
                     }
@@ -66,6 +67,7 @@ Test.create(__filename, {}, function(it){
                     }
 
                 });
+
             }, 1000);
 
 
@@ -78,13 +80,13 @@ Test.create(__filename, {}, function(it){
     it.cb('locks/unlocks', t => {
 
 
-        client.lock('a', {}, function (err, data) {
+        client.lock('a', {}, function (err, unlock, id) {
 
             if(err){
                 return t.fail(err);
             }
 
-            console.log('\n', colors.green(' THREE lock acquired!!! => '), '\n', data);
+            console.log('\n', colors.green(' THREE lock acquired!!! => '), '\n', id);
 
             setTimeout(function () {
                 client.unlock('a', function(err){
