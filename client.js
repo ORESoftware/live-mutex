@@ -31,61 +31,61 @@ const validOptions = [
 
 ];
 
-function Client(opts) {
+function Client($opts) {
 
-    this.opts = opts || {};
-    assert(typeof this.opts === 'object', ' => Bad arguments to live-mutex client constructor.');
+    const opts = this.opts = $opts || {};
+    assert(typeof opts === 'object', ' => Bad arguments to live-mutex client constructor.');
 
-    Object.keys(this.opts).forEach(function (key) {
+    Object.keys(opts).forEach(function (key) {
         if (validOptions.indexOf(key) < 0) {
             throw new Error(' => Option passed to Live-Mutex#Client constructor is not a recognized option => "' + key + '"');
         }
     });
 
-    if (this.opts.host in opts) {
-        assert(typeof this.opts.host === 'string', ' => "host" option needs to be a string.');
+    if ('host' in opts) {
+        assert(typeof opts.host === 'string', ' => "host" option needs to be a string.');
     }
 
-    if (this.opts.port in opts) {
-        assert(Number.isInteger(this.opts.port), ' => "port" option needs to be an integer.');
-        assert(this.opts.port > 1024 && this.opts.port < 49152,
+    if ('port' in opts) {
+        assert(Number.isInteger(opts.port), ' => "port" option needs to be an integer.');
+        assert(opts.port > 1024 && opts.port < 49152,
             ' => "port" integer needs to be in range (1025-49151).');
     }
 
-    if (this.opts.unlockRetryMax in opts) {
-        assert(Number.isInteger(this.opts.unlockRetryMax),
+    if ('unlockRetryMax' in opts) {
+        assert(Number.isInteger(opts.unlockRetryMax),
             ' => "unlockRetryMax" option needs to be an integer.');
-        assert(this.opts.unlockRetryMax >= 0 && this.opts.unlockRetryMax <= 100,
+        assert(this.opts.unlockRetryMax >= 0 && opts.unlockRetryMax <= 100,
             ' => "unlockRetryMax" integer needs to be in range (0-100).');
     }
 
-    if (this.opts.lockRetryMax in opts) {
-        assert(Number.isInteger(this.opts.lockRetryMax),
+    if ('lockRetryMax' in opts) {
+        assert(Number.isInteger(opts.lockRetryMax),
             ' => "lockRetryMax" option needs to be an integer.');
-        assert(this.opts.lockRetryMax >= 0 && this.opts.lockRetryMax <= 100,
+        assert(opts.lockRetryMax >= 0 && opts.lockRetryMax <= 100,
             ' => "lockRetryMax" integer needs to be in range (0-100).');
     }
 
-    if (this.opts.unlockTimeout in opts) {
-        assert(Number.isInteger(this.opts.unlockTimeout),
+    if ('unlockTimeout' in opts) {
+        assert(Number.isInteger(opts.unlockTimeout),
             ' => "unlockTimeout" option needs to be an integer (representing milliseconds).');
-        assert(this.opts.unlockTimeout >= 30 && this.opts.unlockTimeout <= 800000,
+        assert(opts.unlockTimeout >= 30 && opts.unlockTimeout <= 800000,
             ' => "unlockTimeout" needs to be integer between 20 and 800000 millis.');
     }
 
-    if (this.opts.lockTimeout in opts) {
-        assert(Number.isInteger(this.opts.lockTimeout),
+    if ('lockTimeout' in opts) {
+        assert(Number.isInteger(opts.lockTimeout),
             ' => "unlockTimeout" option needs to be an integer (representing milliseconds).');
-        assert(this.opts.lockTimeout >= 30 && this.opts.lockTimeout <= 800000,
+        assert(opts.lockTimeout >= 30 && opts.lockTimeout <= 800000,
             ' => "unlockTimeout" needs to be integer between 20 and 800000 millis.');
     }
 
-    this.host = this.opts.host || 'localhost';
-    this.port = this.opts.port || '6970';
-    this.unlockTimeout = weAreDebugging ? 5000000 : (this.opts.unlockTimeout || 1000);
-    this.lockTimeout = weAreDebugging ? 5000000 : (this.opts.lockTimeout || 15000);
-    this.lockRetryMax = this.opts.lockRetryMax || 3;
-    this.unlockRetryMax = this.opts.unlockRetryMax || 3;
+    this.host = opts.host || 'localhost';
+    this.port = opts.port || '6970';
+    this.unlockTimeout = weAreDebugging ? 5000000 : (opts.unlockTimeout || 1000);
+    this.lockTimeout = weAreDebugging ? 5000000 : (opts.lockTimeout || 6000);
+    this.lockRetryMax = opts.lockRetryMax || 3;
+    this.unlockRetryMax = opts.unlockRetryMax || 3;
 
     const ws = this.ws = new WebSocket(['ws://', this.host, ':', this.port].join(''));
     ws.setMaxListeners(150);
@@ -178,14 +178,11 @@ Client.prototype.lock = function _lock(key, opts, cb) {
 
     const to = setTimeout(() => {
         delete  this.resolutions[uuid];
-        cb(new Error(' => Acquiring lock timed out.'));
+        cb(new Error(' => Acquiring lock operation timed out. (Client-side timeout fired).'));
     }, this.lockTimeout);
 
 
     this.resolutions[uuid] = (err, data) => {
-
-        // => always clear timeout
-        clearTimeout(to);
 
         if (String(key) !== String(data.key)) {
             delete this.resolutions[uuid];
@@ -202,7 +199,7 @@ Client.prototype.lock = function _lock(key, opts, cb) {
         }
 
         if (data.acquired === true) {
-
+            clearTimeout(to);
             delete this.resolutions[uuid];
             this.bookkeeping.keys[key].lockCount++;
 

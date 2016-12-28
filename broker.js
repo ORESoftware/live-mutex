@@ -19,40 +19,40 @@ const weAreDebugging = require('./lib/we-are-debugging');
 
 ///////////////////////////////////////////////////////////////////
 
-function Broker(opts) {
+function Broker($opts) {
 
-    this.opts = opts || {};
-    assert(typeof this.opts === 'object', ' => Bad arguments to live-mutex server constructor.');
+    const opts = this.opts = $opts || {};
+    assert(typeof opts === 'object', ' => Bad arguments to live-mutex server constructor.');
 
-    if (this.opts.lockExpiresAfter) {
-        assert(Number.isInteger(this.opts.lockExpiresAfter),
+    if ('lockExpiresAfter' in opts) {
+        assert(Number.isInteger(opts.lockExpiresAfter),
             ' => "expiresAfter" option needs to be an integer (milliseconds)');
-        assert(this.opts.lockExpiresAfter > 20 && this.opts.lockExpiresAfter < 4000000,
+        assert(opts.lockExpiresAfter > 20 && opts.lockExpiresAfter < 4000000,
             ' => "expiresAfter" is not in range (20 to 4000000 ms).');
     }
 
-    if (this.opts.timeoutToFindNewLockholder) {
-        assert(Number.isInteger(this.opts.timeoutToFindNewLockholder),
+    if ('timeoutToFindNewLockholder' in opts) {
+        assert(Number.isInteger(opts.timeoutToFindNewLockholder),
             ' => "timeoutToFindNewLockholder" option needs to be an integer (milliseconds)');
-        assert(this.opts.timeoutToFindNewLockholder > 20 && this.opts.timeoutToFindNewLockholder < 4000000,
+        assert(opts.timeoutToFindNewLockholder > 20 && opts.timeoutToFindNewLockholder < 4000000,
             ' => "timeoutToFindNewLockholder" is not in range (20 to 4000000 ms).');
     }
 
-    if (this.opts.host) {
-        assert(typeof this.opts.host === 'string', ' => "host" option needs to be a string.');
+    if ('host' in opts) {
+        assert(typeof opts.host === 'string', ' => "host" option needs to be a string.');
     }
 
-    if (this.opts.port) {
-        assert(Number.isInteger(this.opts.port),
-            ' => "port" option needs to be an integer => ' + this.opts.port);
-        assert(this.opts.port > 1024 && this.opts.port < 49152,
+    if ('port' in opts) {
+        assert(Number.isInteger(opts.port),
+            ' => "port" option needs to be an integer => ' + opts.port);
+        assert(opts.port > 1024 && opts.port < 49152,
             ' => "port" integer needs to be in range (1025-49151).');
     }
 
-    this.lockExpiresAfter = weAreDebugging ? 5000000 : (this.opts.lockExpiresAfter || 25000);
-    this.timeoutToFindNewLockholder = weAreDebugging ? 5000000 : (this.opts.timeoutToFindNewLockholder || 4500);
-    this.host = this.opts.host || '127.0.0.1';
-    this.port = this.opts.port || '6970';
+    this.lockExpiresAfter = weAreDebugging ? 5000000 : (opts.lockExpiresAfter || 5000);
+    this.timeoutToFindNewLockholder = weAreDebugging ? 5000000 : (opts.timeoutToFindNewLockholder || 4500);
+    this.host = opts.host || '127.0.0.1';
+    this.port = opts.port || '6970';
 
 
     const wss = this.wss = new WebSocketServer({
@@ -126,7 +126,7 @@ Broker.prototype.ensureNewLockHolder = function _ensureNewLockHolder(lck, data, 
     const locks = this.locks;
     const notifyList = lck.notify;
 
-    //currently there is no lock-holder;
+    // currently there is no lock-holder;
     // before we delete the lock object, let's try to find a new lock-holder
     lck.uuid = null;
     lck.pid = null;
@@ -153,7 +153,6 @@ Broker.prototype.ensureNewLockHolder = function _ensureNewLockHolder(lck, data, 
 
         lck.uuid = obj.uuid;
         lck.pid = obj.pid;
-
 
         clearTimeout(this.timeouts[key]);
         delete this.timeouts[key];
