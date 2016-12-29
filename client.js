@@ -87,7 +87,7 @@ function Client($opts) {
 
     this.host = opts.host || 'localhost';
     this.port = opts.port || '6970';
-    this.unlockTimeout = weAreDebugging ? 5000000 : (opts.unlockTimeout || 1000);
+    this.unlockTimeout = weAreDebugging ? 5000000 : (opts.unlockTimeout || 3000);
     this.lockTimeout = weAreDebugging ? 5000000 : (opts.lockTimeout || 6000);
     this.lockRetryMax = opts.lockRetryMax || 3;
     this.unlockRetryMax = opts.unlockRetryMax || 3;

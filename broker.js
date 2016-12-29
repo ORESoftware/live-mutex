@@ -19,6 +19,30 @@ const weAreDebugging = require('./lib/we-are-debugging');
 
 ///////////////////////////////////////////////////////////////////
 
+
+function addWsLockKey(broker, ws, key) {
+    var temp;
+    if (!( temp = broker.wsLock[ws.wsClientId])) {
+        temp = broker.wsLock[ws.wsClientId] = [];
+    }
+    if (temp.indexOf(key) < 0) {
+        temp.push(key);
+    }
+
+}
+
+function removeWsLockKey(broker, ws, key) {
+    var temp;
+    if (temp = broker.wsLock[ws.wsClientId]) {
+        const i = temp.indexOf(key);
+        if (i >= 0) {
+            temp.splice(i, 1);
+            return true;
+        }
+    }
+}
+
+
 function Broker($opts) {
 
     const opts = this.opts = $opts || {};
@@ -55,6 +79,26 @@ function Broker($opts) {
     this.port = opts.port || '6970';
 
 
+    const send = this.send = function (ws, data, cb) {
+        ws.send(JSON.stringify(data), err => {
+            if (err) {
+                console.error(err.stack || err);
+                const key = data.key;
+                if (key) {
+                    const isOwnsKey = removeWsLockKey(this, ws, key);
+                    if (isOwnsKey) {
+                        this.unlock({
+                            key: key,
+                            force: true
+                        }, ws);
+                    }
+                }
+
+            }
+        });
+    };
+
+
     const wss = this.wss = new WebSocketServer({
         port: this.port,
         host: this.host
@@ -68,10 +112,47 @@ function Broker($opts) {
     this.timeouts = {};
     this.locks = {};
 
+    this.wsLock = {
+        // keys are wsClientIds, values are lock keys
+    };
+
+    var wsIdCounter = 1;
 
     wss.on('connection', (ws) => {
 
         debug(' client is connected!');
+
+        if (!ws.wsClientId) {
+            ws.wsClientId = String(wsIdCounter++);
+        }
+
+        ws.on('close', () => {
+
+            //TODO: unlock any locks that this ws owns
+
+            console.log('CLOSED.');
+            console.log('CLOSED.');
+            console.log('CLOSED.');
+            console.log('CLOSED.');
+            console.log('CLOSED.');
+
+            var keys;
+            if (keys = this.wsLock[ws.wsClientId]) {
+                keys.forEach(k => {
+                    removeWsLockKey(this, ws, k);
+                    var lck;
+                    if (lck = this.locks[k]) {
+                        this.unlock({
+                            force: true,
+                            key: k
+                        }, ws);
+                    }
+
+                });
+            }
+
+
+        });
 
         ws.on('message', (msg) => {
 
@@ -114,7 +195,7 @@ function Broker($opts) {
 
                     for (var i = 0; i < lck.notify.length; i++) {
                         if (lck.notify[i].uuid === uuid) {
-                            console.log('\n\n',colors.blue(' => Removing item from notify array at index => '), i,'\n');
+                            console.log('\n\n', colors.blue(' => Removing item from notify array at index => '), i, '\n');
                             lck.notify.splice(i, 1);
                             break;
                         }
@@ -134,18 +215,20 @@ function Broker($opts) {
                 }
                 else {
                     console.error(colors.red.bold(' bad data sent to broker.'));
-                    ws.send(JSON.stringify({
+
+                    this.send(ws,{
                         key: data.key,
                         uuid: data.uuid,
                         error: new Error(' => Bad data sent to web socket server =>').stack
-                    }));
+                    });
                 }
 
-            }, function (err) {
+            },  (err) => {
                 console.error(colors.red.bold(err.stack || err));
-                ws.send(JSON.stringify({
+
+                this.send(ws,{
                     error: err.stack
-                }));
+                });
             });
 
         });
@@ -168,7 +251,6 @@ Broker.prototype.ensureNewLockHolder = function _ensureNewLockHolder(lck, data, 
 
     debug('\n', colors.blue.bold(' => Notify list length => '), colors.blue(notifyList.length), '\n');
 
-
     clearTimeout(lck.to);
     delete lck.to;
 
@@ -180,6 +262,10 @@ Broker.prototype.ensureNewLockHolder = function _ensureNewLockHolder(lck, data, 
 
         // set the timeout for the next ws to acquire lock, if not within alloted time, we simple call unlock
 
+        var ws = obj.ws;
+
+        addWsLockKey(this, ws, key);
+
         lck.uuid = obj.uuid;
         lck.pid = obj.pid;
 
@@ -187,7 +273,8 @@ Broker.prototype.ensureNewLockHolder = function _ensureNewLockHolder(lck, data, 
 
             console.error(colors.red.bold(' => Warning, lock timed out for key => '), colors.red('"' + key + '"'));
             this.unlock({
-                key: key
+                key: key,
+                force: true
             });
 
         }, this.lockExpiresAfter);
@@ -196,6 +283,8 @@ Broker.prototype.ensureNewLockHolder = function _ensureNewLockHolder(lck, data, 
         delete this.timeouts[key];
 
         this.timeouts[key] = setTimeout(() => {
+
+            removeWsLockKey(this, ws, key);
 
             delete this.timeouts[key];
 
@@ -219,38 +308,36 @@ Broker.prototype.ensureNewLockHolder = function _ensureNewLockHolder(lck, data, 
                 notifyList.push(obj);
             }
 
-            notifyList.forEach(function (obj) {
-                obj.ws.send(JSON.stringify({
+            notifyList.forEach( (obj) => {
+                this.send(obj.ws,{
                     key: data.key,
                     uuid: obj.uuid,
                     type: 'lock',
                     lockRequestCount: count,
                     retry: true
-                }));
+                });
             });
 
         }, this.timeoutToFindNewLockholder);
 
         var count = lck.notify.length;
 
-        obj.ws.send(
-            JSON.stringify({
-                key: data.key,
-                uuid: obj.uuid,
-                type: 'lock',
-                lockRequestCount: count,
-                acquired: true
-            }),
-            cb);
+        this.send(obj.ws, {
+            key: data.key,
+            uuid: obj.uuid,
+            type: 'lock',
+            lockRequestCount: count,
+            acquired: true
+        });
     }
     else {
         // => only delete lock if no client is remaining to claim it
         delete locks[key];
         debug(colors.red.bold(' => No other connections waiting for lock, so we deleted the lock.'));
-        process.nextTick(cb);
     }
 
 };
+
 
 Broker.prototype.lock = function _lock(data, ws) {
 
@@ -290,32 +377,37 @@ Broker.prototype.lock = function _lock(data, ws) {
                 });
             }
 
-            ws.send(JSON.stringify({
+            this.send(ws,{
                 key: key,
                 uuid: uuid,
                 lockRequestCount: count,
                 type: 'lock',
                 acquired: false
-            }));
+            });
         }
         else {
 
             lck.pid = pid;
             lck.uuid = uuid;
 
-            ws.send(JSON.stringify({
+
+            addWsLockKey(this, ws, key);
+
+            this.send(ws,{
                 uuid: uuid,
                 key: key,
                 lockRequestCount: count,
                 type: 'lock',
                 acquired: true
-            }));
+            });
         }
 
     }
     else {
 
         const count = 1;
+
+        addWsLockKey(this, ws, key);
 
         debug(' => Lock does not exist, creating new lock.');
 
@@ -327,18 +419,20 @@ Broker.prototype.lock = function _lock(data, ws) {
             to: setTimeout(() => {
                 console.error(colors.red.bold(' => Warning, lock timed out for key => '), colors.red('"' + key + '"'));
                 this.unlock({
-                    key: key
+                    key: key,
+                    force: true
                 });
             }, this.lockExpiresAfter)
         };
 
-        ws.send(JSON.stringify({
+
+        this.send(ws,{
             uuid: uuid,
             lockRequestCount: count,
             key: key,
             type: 'lock',
             acquired: true
-        }));
+        });
     }
 
 };
@@ -387,32 +481,45 @@ Broker.prototype.unlock = function _unlock(data, ws) {
         if (uuid && ws) {
             // if no uuid is defined, then unlock was called by something other than the client
             // aka this library called unlock when there was a timeout
-            ws.send(JSON.stringify({
+
+            this.send(ws,{
                 uuid: uuid,
                 key: key,
                 type: 'unlock',
                 unlocked: true
-            }));
+            });
         }
+
+        Object.keys(this.wsLock).forEach((k) => {
+            const keys = this.wsLock[k];
+            if (keys) {
+                const i = keys.indexOf[key];
+                if (i >= 0) {
+                    keys.splice(i, 1);
+                }
+            }
+        });
 
 
         this.ensureNewLockHolder(lck, data, function () {
             debug(' => All done notifying.')
         });
+
     }
     else if (lck) {
 
         if (uuid && ws) {
             // if no uuid is defined, then unlock was called by something other than the client
             // aka this library called unlock when there was a timeout
-            ws.send(JSON.stringify({
+
+            this.send(ws,{
                 uuid: uuid,
                 key: key,
                 type: 'unlock',
                 error: ' => You need to pass the correct uuid, or use force.',
                 unlocked: false,
                 retry: true
-            }));
+            });
         }
 
     }
@@ -421,14 +528,26 @@ Broker.prototype.unlock = function _unlock(data, ws) {
         console.error(colors.red.bold(' => Usage / implementation error => this should not happen => no lock with key => '),
             colors.red('"' + key + '"'));
 
+        // since the lock no longer exists for this key, remove ownership of this key
+        //
+        Object.keys(this.wsLock).forEach((k) => {
+            const keys = this.wsLock[k];
+            if (keys) {
+                const i = keys.indexOf[key];
+                if (i >= 0) {
+                    keys.splice(i, 1);
+                }
+            }
+        });
+
         if (ws) {
-            ws.send(JSON.stringify({
+            this.send(ws,{
                 uuid: uuid,
                 key: key,
                 type: 'unlock',
                 unlocked: true,
                 error: 'no lock with key = > ' + key
-            }));
+            });
         }
     }
 
