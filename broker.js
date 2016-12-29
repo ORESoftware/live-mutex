@@ -371,7 +371,7 @@ Broker.prototype.unlock = function _unlock(data, ws) {
 
     var same = true;
 
-    if (_uuid && lck !== undefined) {
+    if (_uuid && lck && lck.uuid !== undefined) {
         same = (String(lck.uuid) === String(_uuid));
         if (!same) {
             console.error('! => same is => ', same);

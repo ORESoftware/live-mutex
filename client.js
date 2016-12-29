@@ -360,6 +360,7 @@ Client.prototype.unlock = function _unlock(key, opts, cb) {
 
         if (data.unlocked === true) {
 
+            clearTimeout(to);
             this.bookkeeping.keys[key].unlockCount++;
 
             debug('\n', ' => Lock unlock count (client), key => ', '"' + key + '"', '\n',
