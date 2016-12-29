@@ -1,19 +1,17 @@
 'use strict';
 
-const Client = require('../../client');
-const colors = require('colors/safe');
-
-const Broker = require('../../broker');
-const broker = new Broker({port: 7003});
-const client = new Client({port: 7003});
-
 
 const suman = require('suman');
 const Test = suman.init(module);
 
 
+const colors = require('colors/safe');
 
-Test.create(__filename, {}, function(it){
+
+Test.create(__filename, {}, function(it,Broker,Client){
+
+    const broker = new Broker({port: 7003});
+    const client = new Client({port: 7003});
 
     it.cb('locks/unlocks', t => {
 

@@ -1,0 +1,5 @@
+This (temporary) directory was created because you have yet to create a suman helpers directory,
+or it was deleted. When running "suman --init", a directory called "suman" is created at the root of your project.
+You can move this directory as desired, as long as you update suman.conf.js accordingly.
+Please see these instructions on how to remedy the situation:
+=> http://oresoftware.github.io/suman/init.html

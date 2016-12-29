@@ -1,0 +1,30 @@
+
+
+
+
+
+
+
+ ### Suman start run @Wed Dec 28 2016 15:15:42 GMT-0800 (PST)
+
+ ### Filename => /home/oleg/WebstormProjects/oresoftware/live-mutex/test/test-src/three.test.js
+
+ ### Command => ["/home/oleg/.nvm/versions/node/v7.2.1/bin/node","/home/oleg/WebstormProjects/oresoftware/live-mutex/test/test-src/three.test.js"]
+
+Error:  => Suman usage error => Error acquiring IOC deps => 
+Error: The following desired dependency is not in your suman.ioc.js file: "Client"
+ => ...your available dependencies are: [ "example" , "example_dot_com" , "fs_search" ]
+    at deps.forEach.dep (/home/oleg/WebstormProjects/oresoftware/sumanjs/suman/lib/acquire-deps-original.js:58:15)
+    at Array.forEach (native)
+    at acquireDepsOriginal (/home/oleg/WebstormProjects/oresoftware/sumanjs/suman/lib/acquire-deps-original.js:28:8)
+    at /home/oleg/WebstormProjects/oresoftware/sumanjs/suman/lib/exec-suite.js:179:13
+    at _combinedTickCallback (internal/process/next_tick.js:67:7)
+
+
+
+
+ ### Suman end run ### 
+
+
+
+

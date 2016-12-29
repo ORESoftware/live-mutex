@@ -2,10 +2,8 @@ const suman = require('suman');
 const Test = suman.init(module, {});
 
 
-Test.create(__filename, {mode: 'parallel'}, function (assert, before, it) {
+Test.create(__filename, {mode: 'parallel'}, function (assert, before, it, Client, lmUtils) {
 
-    const Client = require('../../client');
-    const lmUtils = require('../../utils');
 
     before('promise', function () {
 
@@ -30,7 +28,7 @@ Test.create(__filename, {mode: 'parallel'}, function (assert, before, it) {
         const client = new Client();
         client.lock('z', function (err) {
             if (err) return t(err);
-            t() // client.unlock('z', t);
+            t(); // client.unlock('z', t);
         });
     });
 

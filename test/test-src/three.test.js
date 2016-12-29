@@ -6,15 +6,14 @@ const colors = require('colors/safe');
 const async = require('async');
 const _ = require('lodash');
 
-const Client = require('../../client');
-const Broker = require('../../broker');
-const broker = new Broker({port: 7004});
-const client = new Client({port: 7004});
+
+Test.create(__filename, {}, function (assert, fs, path, Client, Broker) {
+
+    const broker = new Broker({port: 7004});
+    const client = new Client({port: 7004});
 
 
-Test.create(__filename, {}, function (assert, fs, path) {
-
-    const f = require.resolve('./fixtures/corruptible.txt');
+    const f = require.resolve('../fixtures/corruptible.txt');
 
     this.before.cb('remove file', function (t) {
         fs.unlink(f, t);

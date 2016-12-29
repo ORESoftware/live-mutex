@@ -95,10 +95,19 @@ function Client($opts) {
     const ws = this.ws = new WebSocket(['ws://', this.host, ':', this.port].join(''));
     ws.setMaxListeners(350);
 
+    process.once('exit', function(){
+        ws.close();
+    });
+
+    this.close = function(){
+       ws.close();
+    };
+
     this.bookkeeping = {
         keys: {}
     };
 
+    this.timeouts = {};
     this.resolutions = {};
 
     ws.on('message', (msg, flags) => {
@@ -114,9 +123,27 @@ function Client($opts) {
             if (uuid) {
 
                 const fn = this.resolutions[uuid];
+                const to = this.timeouts[uuid];
 
+                if(fn && to){
+                    throw new Error(' => Fn and to both exists => Live-Mutex implementation error.');
+                }
                 if (fn) {
                     fn.apply(this, [null, data]);
+                }
+                else if(to){
+                    console.error(' => Client side lock/unlock request timed-out.');
+
+                    delete this.timeouts[uuid];
+
+                    if(data.type === 'lock'){
+                        ws.send(JSON.stringify({
+                            uuid: uuid,
+                            key: data.key,
+                            pid: process.pid,
+                            type: 'lock-received-rejected'
+                        }));
+                    }
                 }
                 else {
                     throw new Error(' => No fn with that uuid in the resolutions hash => \n' + util.inspect(data));
@@ -182,14 +209,28 @@ Client.prototype.lock = function _lock(key, opts, cb) {
     const uuid = opts._uuid || uuidV4();
 
     const to = setTimeout(() => {
+
+        this.timeouts[uuid] = true;
         delete  this.resolutions[uuid];
+
+        ws.send(JSON.stringify({
+            uuid: uuid,
+            key: key,
+            pid: process.pid,
+            type: 'lock-client-timeout'
+        }));
+
         cb(new Error(' => Acquiring lock operation timed out. (Client-side timeout fired).'));
+
     }, this.lockTimeout);
 
 
     this.resolutions[uuid] = (err, data) => {
 
+        console.log(' => Requestor count => ', data.lockRequestCount);
+
         if (String(key) !== String(data.key)) {
+            clearTimeout(to);
             delete this.resolutions[uuid];
             console.error(colors.bgRed(new Error(' !!! bad key !!!').stack));
             return cb(new Error(' => Implementation error.'))
@@ -222,6 +263,9 @@ Client.prototype.lock = function _lock(key, opts, cb) {
             else {
                 cb(null, this.unlock.bind(this, key, {_uuid: uuid}), data.uuid);
             }
+        }
+        else if (data.acquired === false) {
+            //TODO
         }
         else if (data.retry === true) {
             clearTimeout(to);
@@ -291,18 +335,15 @@ Client.prototype.unlock = function _unlock(key, opts, cb) {
     const ws = this.ws;
 
     const to = setTimeout(() => {
-
         delete this.resolutions[uuid];
+        this.timeouts[uuid] = true;
         cb(new Error(' => Unlocking timed out.'));
-
     }, this.unlockTimeout);
 
 
     this.resolutions[uuid] = (err, data) => {
 
         debug('\n', ' onMessage in unlock =>', '\n', colors.blue(util.inspect(data)), '\n');
-
-        clearTimeout(to);
 
         if (String(key) !== String(data.key)) {
             console.error(colors.bgRed(new Error(' !!! bad key !!!').stack));

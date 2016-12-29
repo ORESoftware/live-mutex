@@ -63,41 +63,74 @@ function Broker($opts) {
     this.bookkeeping = {
         keys: {}
     };
+
+    this.rejected = {};
     this.timeouts = {};
     this.locks = {};
 
-    const self = this;
 
-    wss.on('connection', function connection(ws) {
+    wss.on('connection', (ws) => {
 
         debug(' client is connected!');
 
-        ws.on('message', function (msg) {
+        ws.on('message', (msg) => {
 
-            ijson.parse(msg).then(function (data) {
+            ijson.parse(msg).then((data) => {
 
                 debug('\n', colors.blue(' => broker received this data => '), '\n', data, '\n');
 
+                const key = data.key;
+
                 if (data.type === 'unlock') {
                     debug(colors.blue(' => broker is attempting to run unlock...'));
-                    self.unlock(data, ws);
+                    this.unlock(data, ws);
                 }
                 else if (data.type === 'lock') {
                     debug(colors.blue(' => broker attempting to get lock...'));
-                    self.lock(data, ws);
+                    this.lock(data, ws);
                 }
                 else if (data.type === 'lock-received') {
-                    self.bookkeeping.keys[data.key].lockCount++;
-                    clearTimeout(self.timeouts[data.key]);
-                    delete self.timeouts[data.key];
+                    this.bookkeeping.keys[data.key].lockCount++;
+                    clearTimeout(this.timeouts[data.key]);
+                    delete this.timeouts[data.key];
                 }
                 else if (data.type === 'unlock-received') {
                     const key = data.key;
-                    clearTimeout(self.timeouts[key]);
-                    delete self.timeouts[key];
-                    self.bookkeeping.keys[key].unlockCount++;
-                    debug('\n', ' => Lock/unlock count (broker), key => ', '"' + key + '"','\n',
-                        util.inspect(self.bookkeeping.keys[key]), '\n');
+                    clearTimeout(this.timeouts[key]);
+                    delete this.timeouts[key];
+                    this.bookkeeping.keys[key].unlockCount++;
+                    debug('\n', ' => Lock/unlock count (broker), key => ', '"' + key + '"', '\n',
+                        util.inspect(this.bookkeeping.keys[key]), '\n');
+                }
+                else if (data.type === 'lock-client-timeout') {
+
+                    // if the client times out, we don't want to send them any more messages
+                    const lck = this.locks[key];
+                    const uuid = data.uuid;
+                    if (!lck) {
+                        console.error(' => Lock must have expired.');
+                        return;
+                    }
+
+                    for (var i = 0; i < lck.notify.length; i++) {
+                        if (lck.notify[i].uuid === uuid) {
+                            console.log('\n\n',colors.blue(' => Removing item from notify array at index => '), i,'\n');
+                            lck.notify.splice(i, 1);
+                            break;
+                        }
+                    }
+
+                }
+                else if (data.type === 'lock-received-rejected') {
+                    const lck = this.locks[key];
+                    if (!lck) {
+                        console.error(' => Lock must have expired.');
+                        return;
+                    }
+                    this.rejected[data.uuid] = true;
+                    this.ensureNewLockHolder(lck, data, function (err) {
+                        console.log(' => new lock-holder ensured.');
+                    });
                 }
                 else {
                     console.error(colors.red.bold(' bad data sent to broker.'));
@@ -135,12 +168,21 @@ Broker.prototype.ensureNewLockHolder = function _ensureNewLockHolder(lck, data, 
 
     debug('\n', colors.blue.bold(' => Notify list length => '), colors.blue(notifyList.length), '\n');
 
+
+    clearTimeout(lck.to);
+    delete lck.to;
+
+
     var obj;
     if (obj = notifyList.shift()) {
 
         debug(colors.cyan.bold(' => Sending ws client the acquired message.'));
 
         // set the timeout for the next ws to acquire lock, if not within alloted time, we simple call unlock
+
+        lck.uuid = obj.uuid;
+        lck.pid = obj.pid;
+
         lck.to = setTimeout(() => {
 
             console.error(colors.red.bold(' => Warning, lock timed out for key => '), colors.red('"' + key + '"'));
@@ -149,10 +191,6 @@ Broker.prototype.ensureNewLockHolder = function _ensureNewLockHolder(lck, data, 
             });
 
         }, this.lockExpiresAfter);
-
-
-        lck.uuid = obj.uuid;
-        lck.pid = obj.pid;
 
         clearTimeout(this.timeouts[key]);
         delete this.timeouts[key];
@@ -166,30 +204,42 @@ Broker.prototype.ensureNewLockHolder = function _ensureNewLockHolder(lck, data, 
             // if a client receives a retry message, they will all retry to acquire the lock on this key
 
             var _lck;
+            var count;
             // if this timeout happens, then we can no longer cross-verify uuid's
-            if(_lck = locks[key]){
+            if (_lck = locks[key]) {
                 _lck.uuid = undefined;
                 _lck.pid = undefined;
+                count = lck.notify.length;
+            }
+            else {
+                count = 0;
             }
 
-            notifyList.push(obj);
+            if (!this.rejected[obj.uuid]) {
+                notifyList.push(obj);
+            }
+
             notifyList.forEach(function (obj) {
                 obj.ws.send(JSON.stringify({
                     key: data.key,
                     uuid: obj.uuid,
+                    type: 'lock',
+                    lockRequestCount: count,
                     retry: true
                 }));
             });
 
         }, this.timeoutToFindNewLockholder);
 
+        var count = lck.notify.length;
 
         obj.ws.send(
             JSON.stringify({
                 key: data.key,
                 uuid: obj.uuid,
-                acquired: true,
-                ready: true
+                type: 'lock',
+                lockRequestCount: count,
+                acquired: true
             }),
             cb);
     }
@@ -203,7 +253,6 @@ Broker.prototype.ensureNewLockHolder = function _ensureNewLockHolder(lck, data, 
 };
 
 Broker.prototype.lock = function _lock(data, ws) {
-
 
     const locks = this.locks;
     const key = data.key;
@@ -221,6 +270,8 @@ Broker.prototype.lock = function _lock(data, ws) {
     this.bookkeeping.keys[key].rawLockCount++;
 
     if (lck) {
+
+        const count = lck.notify.length;
 
         if (lck.uuid) {
             debug(' => Lock exists, and already has a lockholder, adding ws to list of to be notified.');
@@ -242,6 +293,8 @@ Broker.prototype.lock = function _lock(data, ws) {
             ws.send(JSON.stringify({
                 key: key,
                 uuid: uuid,
+                lockRequestCount: count,
+                type: 'lock',
                 acquired: false
             }));
         }
@@ -253,12 +306,16 @@ Broker.prototype.lock = function _lock(data, ws) {
             ws.send(JSON.stringify({
                 uuid: uuid,
                 key: key,
+                lockRequestCount: count,
+                type: 'lock',
                 acquired: true
             }));
         }
 
     }
     else {
+
+        const count = 1;
 
         debug(' => Lock does not exist, creating new lock.');
 
@@ -277,7 +334,9 @@ Broker.prototype.lock = function _lock(data, ws) {
 
         ws.send(JSON.stringify({
             uuid: uuid,
+            lockRequestCount: count,
             key: key,
+            type: 'lock',
             acquired: true
         }));
     }
@@ -301,7 +360,7 @@ Broker.prototype.unlock = function _unlock(data, ws) {
         };
 
     this.bookkeeping.keys[key].rawUnlockCount++;
-    debug('\n',' => Raw counts in broker => key => ', key, util.inspect(this.bookkeeping.keys[key]),'\n');
+    debug('\n', ' => Raw counts in broker => key => ', key, util.inspect(this.bookkeeping.keys[key]), '\n');
 
 
     // if the user passed _uuid, then we check it, other true
@@ -331,6 +390,7 @@ Broker.prototype.unlock = function _unlock(data, ws) {
             ws.send(JSON.stringify({
                 uuid: uuid,
                 key: key,
+                type: 'unlock',
                 unlocked: true
             }));
         }
@@ -348,6 +408,7 @@ Broker.prototype.unlock = function _unlock(data, ws) {
             ws.send(JSON.stringify({
                 uuid: uuid,
                 key: key,
+                type: 'unlock',
                 error: ' => You need to pass the correct uuid, or use force.',
                 unlocked: false,
                 retry: true
@@ -364,6 +425,7 @@ Broker.prototype.unlock = function _unlock(data, ws) {
             ws.send(JSON.stringify({
                 uuid: uuid,
                 key: key,
+                type: 'unlock',
                 unlocked: true,
                 error: 'no lock with key = > ' + key
             }));

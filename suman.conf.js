@@ -20,7 +20,7 @@ module.exports = Object.freeze({
   testDir: 'test',
   testSrcDir: 'test/test-src',                        // recommended that you create a test/test-src directory
   testTargetDir: 'test/test-target',              // recommended to transpile to test/test-target directory
-  sumanHelpersDir: 'suman',
+  sumanHelpersDir: 'test/.suman',
   uniqueAppName: '<your-app-name-here>',
   browser: 'Firefox',                 // browser to open test results with
 

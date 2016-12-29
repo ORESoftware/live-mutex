@@ -1,0 +1,43 @@
+
+
+### Suman runner start ###
+
+Beginning of run at 1482967217785 = [Wed Dec 28 2016 15:20:17 GMT-0800 (PST)]
+Command issued from the following directory "/home/oleg/WebstormProjects/oresoftware/live-mutex"
+Command = ["/home/oleg/.nvm/versions/node/v7.2.1/bin/node","/home/oleg/WebstormProjects/oresoftware/live-mutex/node_modules/suman/cli.js","--concurrency=1"]
+
+
+[four.test.js]  => Suman usage warning: no suman.once.pre.js file found. 
+
+[four.test.js]  => Warning, lock timed out for key =>  "z"
+
+[four.test.js]  ### Suman end run ### 
+
+[four.test.js] true
+
+[one.test.js]  => Suman usage warning: no suman.once.pre.js file found. 
+
+[one.test.js]  ### Suman end run ### 
+
+[one.test.js] true
+
+[three.test.js]  => Suman usage warning: no suman.once.pre.js file found. 
+
+[three.test.js]  ### Suman end run ### 
+
+[three.test.js] true
+
+[two.test.js]  => Suman usage warning: no suman.once.pre.js file found. 
+
+[two.test.js]  ### Suman end run ### 
+
+[two.test.js] true
+
+
+### Suman runner end ###
+
+
+
+
+
+
