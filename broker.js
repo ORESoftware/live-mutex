@@ -5,7 +5,8 @@ const assert = require('assert');
 const util = require('util');
 
 //npm
-const WebSocketServer = require('ws').Server;
+const WebSocket = require('ws');
+const WebSocketServer = WebSocket.Server;
 const ijson = require('siamese');
 const async = require('async');
 const colors = require('colors/safe');
@@ -96,6 +97,11 @@ function Broker($opts) {
 
 
     const send = this.send = function (ws, data, cb) {
+        if(ws.readyState !== WebSocket.OPEN){
+            cb && cb(' => Socket is not OPEN.');
+            return
+        }
+
         ws.send(JSON.stringify(data), err => {
             if (err) {
                 console.error(err.stack || err);
@@ -150,7 +156,6 @@ function Broker($opts) {
             first = false;
             this.sendStatsMessageToAllClients();
         }
-
 
         debug(' client is connected!');
 

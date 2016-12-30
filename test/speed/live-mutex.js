@@ -12,18 +12,20 @@ const Client = require('live-mutex/client');
 return lmUtils.conditionallyLaunchSocketServer({})
     .then(function (data) {
 
-        const a = Array.apply(null, {length: 300});
+        const a = Array.apply(null, {length: 100});
         const start = Date.now();
 
         const client = new Client();
 
-        async.eachSeries(a, function (val, cb) {
+        var i = 0;
+        async.each(a, function (val, cb) {
 
             client.lock('foo', function (err, unlock) {
                 if (err) {
                     cb(err);
                 }
                 else {
+                    console.log('unlocking...' + i++);
                     unlock(cb);
                 }
             });

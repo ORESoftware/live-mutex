@@ -3,18 +3,19 @@ const async = require('async');
 const lf = require('lockfile');
 
 
-const a = Array.apply(null, {length: 300});
+const a = Array.apply(null, {length: 100});
 const file = path.resolve(process.env.HOME + '/speed-test.lock');
 
 const start = Date.now();
 
-async.eachSeries(a, function (val, cb) {
+async.each(a, function (val, cb) {
 
-    lf.lock(file, function (err) {
+    lf.lock(file, {wait: 3000, retries: 5, stale: 50}, function (err) {
         if (err) {
             cb(err);
         }
         else {
+            console.log('unlocking...');
             lf.unlock(file, cb);
         }
     });
