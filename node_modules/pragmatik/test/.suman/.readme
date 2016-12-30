@@ -1,1 +1,0 @@
-Readme file here primarily for version control stability. Treat it like a .gitignore file.

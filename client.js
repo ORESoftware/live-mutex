@@ -21,12 +21,14 @@ const weAreDebugging = require('./lib/we-are-debugging');
 /////////////////////////////////////////////////////////////////////////
 
 
-process.on('warning', function(w){
-   console.error('\n',' => Live-Mutex warning => ', w.stack || w,'\n');
+process.on('warning', function (w) {
+    console.error('\n', ' => Live-Mutex warning => ', w.stack || w, '\n');
 });
 
 const validOptions = [
 
+    'key',
+    'listener',
     'host',
     'port',
     'unlockTimeout',
@@ -57,6 +59,11 @@ function Client($opts) {
             ' => "port" integer needs to be in range (1025-49151).');
     }
 
+    if ('listener' in opts) {
+        assert(typeof opts.listener === 'function', ' => Listener should be a function.');
+        assert(typeof opts.key === 'string', ' => You must pass in a key to use listener functionality.');
+    }
+
     if ('unlockRetryMax' in opts) {
         assert(Number.isInteger(opts.unlockRetryMax),
             ' => "unlockRetryMax" option needs to be an integer.');
@@ -85,6 +92,13 @@ function Client($opts) {
             ' => "unlockTimeout" needs to be integer between 20 and 800000 millis.');
     }
 
+    this.listeners = {};
+
+    if (opts.listener) {
+        const a = this.listeners[opts.key] = [];
+        a.push(opts.listener);
+    }
+
     this.host = opts.host || 'localhost';
     this.port = opts.port || '6970';
     this.unlockTimeout = weAreDebugging ? 5000000 : (opts.unlockTimeout || 3000);
@@ -95,18 +109,19 @@ function Client($opts) {
     const ws = this.ws = new WebSocket(['ws://', this.host, ':', this.port].join(''));
     ws.setMaxListeners(350);
 
-    process.once('exit', function(){
+    process.once('exit', function () {
         ws.close();
     });
 
-    this.close = function(){
-       ws.close();
+    this.close = function () {
+        ws.close();
     };
 
     this.bookkeeping = {
         keys: {}
     };
 
+    this.lockholderCount = {};
     this.timeouts = {};
     this.resolutions = {};
 
@@ -119,24 +134,29 @@ function Client($opts) {
 
             debug('\n', ' => onMessage in lock => ', '\n', colors.blue(util.inspect(data)), '\n');
 
+            if (data.type === 'stats') {
+                this.setLockRequestorCount(data.key, data.lockRequestCount);
+                return;
+            }
+
             const uuid = data.uuid;
             if (uuid) {
 
                 const fn = this.resolutions[uuid];
                 const to = this.timeouts[uuid];
 
-                if(fn && to){
+                if (fn && to) {
                     throw new Error(' => Fn and to both exists => Live-Mutex implementation error.');
                 }
                 if (fn) {
                     fn.apply(this, [null, data]);
                 }
-                else if(to){
+                else if (to) {
                     console.error(' => Client side lock/unlock request timed-out.');
 
                     delete this.timeouts[uuid];
 
-                    if(data.type === 'lock'){
+                    if (data.type === 'lock') {
                         ws.send(JSON.stringify({
                             uuid: uuid,
                             key: data.key,
@@ -172,6 +192,28 @@ function Client($opts) {
     });
 
 }
+
+
+Client.prototype.addListener = function (key, fn) {
+    assert.equal(typeof key, 'string', ' => Key is not a string.');
+    assert.equal(typeof fn, 'function', ' => fn is not a function type.');
+    const a = this.listeners[key] = this.listeners[key] || [];
+    a.push(fn);
+};
+
+
+Client.prototype.setLockRequestorCount = function (key, val) {
+    this.lockholderCount[key] = val;
+    debug(' => Requestor count => key =>', key, ' => value =>', val);
+    const a = this.listeners[key] = this.listeners[key] || [];
+    for (var i = 0; i < a.length; i++) {
+        a[i].apply(null, [val]);
+    }
+};
+
+Client.prototype.getLockholderCount = function (key) {
+    return this.lockholderCount[key] || 0;
+};
 
 Client.prototype.lock = function _lock(key, opts, cb) {
 
@@ -227,7 +269,7 @@ Client.prototype.lock = function _lock(key, opts, cb) {
 
     this.resolutions[uuid] = (err, data) => {
 
-        console.log(' => Requestor count => ', data.lockRequestCount);
+        this.setLockRequestorCount(key, data.lockRequestCount);
 
         if (String(key) !== String(data.key)) {
             clearTimeout(to);
@@ -343,6 +385,8 @@ Client.prototype.unlock = function _unlock(key, opts, cb) {
 
     this.resolutions[uuid] = (err, data) => {
 
+        this.setLockRequestorCount(key, data.lockRequestCount);
+
         debug('\n', ' onMessage in unlock =>', '\n', colors.blue(util.inspect(data)), '\n');
 
         if (String(key) !== String(data.key)) {
@@ -381,7 +425,6 @@ Client.prototype.unlock = function _unlock(key, opts, cb) {
 
             debug(' => Retrying the unlock call.');
             clearTimeout(to);
-            return; //TODO
             ++opts._retryCount;
             opts._uuid = opts._uuid || uuid;
             this.unlock(key, opts, cb);

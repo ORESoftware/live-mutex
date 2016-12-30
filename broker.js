@@ -9,6 +9,8 @@ const WebSocketServer = require('ws').Server;
 const ijson = require('siamese');
 const async = require('async');
 const colors = require('colors/safe');
+const _ = require('lodash');
+const uuidV4 = require('uuid/v4');
 
 //project
 const debug = require('debug')('live-mutex');
@@ -42,11 +44,25 @@ function removeWsLockKey(broker, ws, key) {
     }
 }
 
+const validOptions = [
+
+    'lockExpiresAfter',
+    'timeoutToFindNewLockholder',
+    'host',
+    'port'
+];
 
 function Broker($opts) {
 
     const opts = this.opts = $opts || {};
     assert(typeof opts === 'object', ' => Bad arguments to live-mutex server constructor.');
+
+    Object.keys(opts).forEach(function (key) {
+        if (validOptions.indexOf(key) < 0) {
+            throw new Error(' => Option passed to Live-Mutex#Broker constructor ' +
+                'is not a recognized option => "' + key + '"');
+        }
+    });
 
     if ('lockExpiresAfter' in opts) {
         assert(Number.isInteger(opts.lockExpiresAfter),
@@ -95,6 +111,7 @@ function Broker($opts) {
                 }
 
             }
+            cb && cb();
         });
     };
 
@@ -108,6 +125,9 @@ function Broker($opts) {
         keys: {}
     };
 
+    //maps uuids to ws clients
+    this.uuids = {};
+
     this.rejected = {};
     this.timeouts = {};
     this.locks = {};
@@ -116,14 +136,29 @@ function Broker($opts) {
         // keys are wsClientIds, values are lock keys
     };
 
+    this.clientIdsToKeys = {
+        // wsClientId: { ws:ws, keys: []}
+    };
+
+
+    var first = true;
     var wsIdCounter = 1;
 
     wss.on('connection', (ws) => {
 
+        if (first) {
+            first = false;
+            this.sendStatsMessageToAllClients();
+        }
+
+
         debug(' client is connected!');
 
         if (!ws.wsClientId) {
-            ws.wsClientId = String(wsIdCounter++);
+            ws.wsClientId = uuidV4();
+            var a = this.clientIdsToKeys[ws.wsClientId] = this.clientIdsToKeys[ws.wsClientId] || {};
+            a.ws = a.ws || ws;
+            a.keys = a.keys || [];
         }
 
         ws.on('close', () => {
@@ -150,8 +185,6 @@ function Broker($opts) {
 
                 });
             }
-
-
         });
 
         ws.on('message', (msg) => {
@@ -161,6 +194,16 @@ function Broker($opts) {
                 debug('\n', colors.blue(' => broker received this data => '), '\n', data, '\n');
 
                 const key = data.key;
+
+                if (key) {
+                    var a = this.clientIdsToKeys[ws.wsClientId] = this.clientIdsToKeys[ws.wsClientId] || {};
+                    a.ws = a.ws || ws;
+                    a.keys = a.keys || [];
+                    var index = a.keys.indexOf(key);
+                    if (index < 0) {
+                        a.keys.push(key);
+                    }
+                }
 
                 if (data.type === 'unlock') {
                     debug(colors.blue(' => broker is attempting to run unlock...'));
@@ -216,17 +259,17 @@ function Broker($opts) {
                 else {
                     console.error(colors.red.bold(' bad data sent to broker.'));
 
-                    this.send(ws,{
+                    this.send(ws, {
                         key: data.key,
                         uuid: data.uuid,
                         error: new Error(' => Bad data sent to web socket server =>').stack
                     });
                 }
 
-            },  (err) => {
+            }, (err) => {
                 console.error(colors.red.bold(err.stack || err));
 
-                this.send(ws,{
+                this.send(ws, {
                     error: err.stack
                 });
             });
@@ -236,6 +279,73 @@ function Broker($opts) {
     });
 
 }
+
+
+Broker.prototype.sendStatsMessageToAllClients = function () {
+
+    const time = Date.now();
+
+    // for each client and for each key, we send a message
+
+    const clients = Object.keys(this.clientIdsToKeys);
+
+    async.mapSeries(clients, (k, cb) => {
+
+        const obj = this.clientIdsToKeys[k];
+
+        const keys = obj.keys;
+        const ws = obj.ws;
+
+        async.mapSeries(keys, (k, cb) => {
+
+            const lck = this.locks[k];
+
+            var len;
+
+            if(!lck){
+               len = 0;
+            }
+            else{
+                len = lck.notify;
+            }
+
+            this.send(ws, {
+
+                type: 'stats',
+                key: k,
+                lockRequestCount: len
+
+            }, (err) => {
+                cb(null, {
+                    error: err
+                })
+            });
+
+        }, cb);
+
+    }, (err, results) => {
+
+        if (err) {
+            throw err;
+        }
+
+        results.filter(function (r) {
+            return r && r.error;
+        }).forEach(function (err) {
+            console.error(err.stack || err);
+        });
+
+        const diff = Date.now() - time;
+        const wait = Math.max(1, 1000 - diff);
+
+        setTimeout(() => {
+            this.sendStatsMessageToAllClients();
+        }, wait);
+
+    });
+
+};
+
 
 Broker.prototype.ensureNewLockHolder = function _ensureNewLockHolder(lck, data, cb) {
 
@@ -308,8 +418,8 @@ Broker.prototype.ensureNewLockHolder = function _ensureNewLockHolder(lck, data, 
                 notifyList.push(obj);
             }
 
-            notifyList.forEach( (obj) => {
-                this.send(obj.ws,{
+            notifyList.forEach((obj) => {
+                this.send(obj.ws, {
                     key: data.key,
                     uuid: obj.uuid,
                     type: 'lock',
@@ -347,12 +457,14 @@ Broker.prototype.lock = function _lock(data, ws) {
     const uuid = data.uuid;
     const pid = data.pid;
 
-    this.bookkeeping.keys[key] = this.bookkeeping.keys[key] || {
+    this.bookkeeping.keys[key] = this.bookkeeping.keys[key] ||
+        {
             rawLockCount: 0,
             rawUnlockCount: 0,
             lockCount: 0,
             unlockCount: 0
         };
+
 
     this.bookkeeping.keys[key].rawLockCount++;
 
@@ -377,7 +489,7 @@ Broker.prototype.lock = function _lock(data, ws) {
                 });
             }
 
-            this.send(ws,{
+            this.send(ws, {
                 key: key,
                 uuid: uuid,
                 lockRequestCount: count,
@@ -393,7 +505,7 @@ Broker.prototype.lock = function _lock(data, ws) {
 
             addWsLockKey(this, ws, key);
 
-            this.send(ws,{
+            this.send(ws, {
                 uuid: uuid,
                 key: key,
                 lockRequestCount: count,
@@ -404,8 +516,6 @@ Broker.prototype.lock = function _lock(data, ws) {
 
     }
     else {
-
-        const count = 1;
 
         addWsLockKey(this, ws, key);
 
@@ -426,9 +536,9 @@ Broker.prototype.lock = function _lock(data, ws) {
         };
 
 
-        this.send(ws,{
+        this.send(ws, {
             uuid: uuid,
-            lockRequestCount: count,
+            lockRequestCount: 0,
             key: key,
             type: 'lock',
             acquired: true
@@ -476,15 +586,17 @@ Broker.prototype.unlock = function _unlock(data, ws) {
 
     if (lck && (same || force)) {
 
+        const count = lck.notify.length;
         clearTimeout(lck.to);
 
         if (uuid && ws) {
             // if no uuid is defined, then unlock was called by something other than the client
             // aka this library called unlock when there was a timeout
 
-            this.send(ws,{
+            this.send(ws, {
                 uuid: uuid,
                 key: key,
+                lockRequestCount: count,
                 type: 'unlock',
                 unlocked: true
             });
@@ -508,13 +620,16 @@ Broker.prototype.unlock = function _unlock(data, ws) {
     }
     else if (lck) {
 
+        const count = lck.notify.length;
+
         if (uuid && ws) {
             // if no uuid is defined, then unlock was called by something other than the client
             // aka this library called unlock when there was a timeout
 
-            this.send(ws,{
+            this.send(ws, {
                 uuid: uuid,
                 key: key,
+                lockRequestCount: count,
                 type: 'unlock',
                 error: ' => You need to pass the correct uuid, or use force.',
                 unlocked: false,
@@ -541,9 +656,10 @@ Broker.prototype.unlock = function _unlock(data, ws) {
         });
 
         if (ws) {
-            this.send(ws,{
+            this.send(ws, {
                 uuid: uuid,
                 key: key,
+                lockRequestCount: 0,
                 type: 'unlock',
                 unlocked: true,
                 error: 'no lock with key = > ' + key
