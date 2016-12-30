@@ -306,7 +306,7 @@ Broker.prototype.sendStatsMessageToAllClients = function () {
                len = 0;
             }
             else{
-                len = lck.notify;
+                len = lck.notify.length;
             }
 
             this.send(ws, {
