@@ -40,7 +40,8 @@ firstEnsureKeyIsUnlocked()
         const start = Date.now();
 
         var i = 0;
-        async.each(a, function (val, cb) {
+
+        async.eachSeries(a, function (val, cb) {
 
             warlock.lock('foo', ttl, function (err, unlock) {
                 if (err) {
@@ -48,12 +49,13 @@ firstEnsureKeyIsUnlocked()
                 }
                 else {
 
-                    if (unlock) {
+                    if (typeof unlock === 'function') {
                         console.log('unlocking...' + i++);
                         unlock(cb);
                     }
                     else {
-                        console.error('error => Could not acquire lock.')
+                        console.error('error => Could not acquire lock.');
+                        process.nextTick(cb);
                     }
                 }
             });
@@ -64,7 +66,7 @@ firstEnsureKeyIsUnlocked()
                 throw err;
             }
 
-            console.log(' => Time required for live-mutex => ', Date.now() - start);
+            console.log(' => Time required for warlock => ', Date.now() - start);
             process.exit(0);
         });
 
