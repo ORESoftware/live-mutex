@@ -2,6 +2,8 @@
 
 # Live-Mutex
 
+http://antirez.com/news/77
+
 ## About
 
 This library is useful for developers who need a multi-process locking mechanism, but may find it

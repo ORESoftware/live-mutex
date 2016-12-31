@@ -386,7 +386,9 @@ Broker.prototype.ensureNewLockHolder = function _ensureNewLockHolder(lck, data, 
 
         lck.to = setTimeout(() => {
 
-            console.error(colors.red.bold(' => Warning, lock timed out for key => '), colors.red('"' + key + '"'));
+            // delete locks[key]; => no, this.unlock will take care of that
+
+            console.error(colors.red.bold(' => Warning, lock object timed out for key => '), colors.red('"' + key + '"'));
             this.unlock({
                 key: key,
                 force: true
@@ -448,7 +450,8 @@ Broker.prototype.ensureNewLockHolder = function _ensureNewLockHolder(lck, data, 
     else {
         // => only delete lock if no client is remaining to claim it
         delete locks[key];
-        debug(colors.red.bold(' => No other connections waiting for lock, so we deleted the lock.'));
+        debug(colors.red.bold(' => No other connections waiting for lock with key => "' + key + '"' +
+            ', so we deleted the lock.'));
     }
 
 };
@@ -532,6 +535,7 @@ Broker.prototype.lock = function _lock(data, ws) {
             notify: [],
             key: key,
             to: setTimeout(() => {
+                // delete locks[key];  => no, this.unlock will take care of that
                 console.error(colors.red.bold(' => Warning, lock timed out for key => '), colors.red('"' + key + '"'));
                 this.unlock({
                     key: key,

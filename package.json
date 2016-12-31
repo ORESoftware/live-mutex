@@ -31,6 +31,8 @@
   "devDependencies": {
     "bluebird": "^3.4.7",
     "lodash": "^4.17.2",
+    "node-redis-warlock": "^0.2.0",
+    "redis": "^2.6.3",
     "suman": "github:oresoftware/suman#dev"
   }
 }

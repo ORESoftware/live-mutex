@@ -4,9 +4,6 @@
 
 
 
-const a = [1,2,3,4,5];
-
-
-console.log(a.splice(3,1));
-
-console.log(a);
+for(var i = 0; i < 10; i++){
+    console.log(10 % i);
+}
