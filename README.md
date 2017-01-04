@@ -110,6 +110,10 @@ lmUtils.conditionallyLaunchSocketServer(opts, function(err){
        });
       
       
+      
+      
+      
+      
       // using the unlock callback is basically equivalent to doing this:
       
        client.lock('<key>', function(err, unlock, id){

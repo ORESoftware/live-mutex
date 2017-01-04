@@ -12,7 +12,7 @@ const warlock = Warlock(client);
 
 // Set a lock
 const key = 'test-lock';
-const ttl = 200; // Lifetime of the lock
+const ttl = 10; // Lifetime of the lock
 
 
 function firstEnsureKeyIsUnlocked() {

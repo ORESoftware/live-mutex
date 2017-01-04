@@ -2,22 +2,42 @@
 
 ### Suman runner start ###
 
-Beginning of run at 1483089463372 = [Fri Dec 30 2016 01:17:43 GMT-0800 (PST)]
-Command issued from the following directory "/home/oleg/WebstormProjects/oresoftware/live-mutex"
+Beginning of run at 1483435587207 = [Tue Jan 03 2017 01:26:27 GMT-0800 (PST)]
+Command issued from the following directory "/home/oleg/WebstormProjects/oresoftware/live-mutex/lib"
 Command = ["/home/oleg/.nvm/versions/node/v7.2.1/bin/node","/home/oleg/WebstormProjects/oresoftware/live-mutex/node_modules/suman/cli.js"]
 
+
+[three.test.js]  => Suman usage warning: no suman.once.pre.js file found. 
+
+[alphabet.test.js]  => Suman usage warning: no suman.once.pre.js file found. 
 
 [four.test.js]  => Suman usage warning: no suman.once.pre.js file found. 
 
 [one.test.js]  => Suman usage warning: no suman.once.pre.js file found. 
-
-[three.test.js]  => Suman usage warning: no suman.once.pre.js file found. 
 
 [two.test.js]  => Suman usage warning: no suman.once.pre.js file found. 
 
 [three.test.js]  ### Suman end run ### 
 
 [three.test.js] true
+
+[alphabet.test.js] Warning: the following test callback was invoked twice by your code for the following test/hook => 10 chars of each, in order
+
+[alphabet.test.js]  ### Suman end run ### 
+
+[alphabet.test.js] true
+
+[one.test.js]  => Warning, lock timed out for key =>  "a"
+
+[one.test.js]  => Usage / implementation error => this should not happen => no lock with key =>  "a"
+
+[one.test.js]   => Live-Mutex warning => no lock with key => "a" 
+
+[four.test.js]  => Warning, lock timed out for key =>  "z"
+
+[four.test.js]  ### Suman end run ### 
+
+[four.test.js] true
 
 [one.test.js]  ### Suman end run ### 
 
@@ -26,12 +46,6 @@ Command = ["/home/oleg/.nvm/versions/node/v7.2.1/bin/node","/home/oleg/WebstormP
 [two.test.js]  ### Suman end run ### 
 
 [two.test.js] true
-
-[four.test.js]  => Warning, lock timed out for key =>  "z"
-
-[four.test.js]  ### Suman end run ### 
-
-[four.test.js] true
 
 
 ### Suman runner end ###

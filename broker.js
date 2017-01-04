@@ -19,6 +19,9 @@ const debug = require('debug')('live-mutex');
 ///////////////////////////////////////////////////////////////////
 
 const weAreDebugging = require('./lib/we-are-debugging');
+if(weAreDebugging){
+    console.log(' => Live-Mutex broker is in debug mode. Timeouts are turned off.');
+}
 
 ///////////////////////////////////////////////////////////////////
 
@@ -99,7 +102,7 @@ function Broker($opts) {
     const send = this.send = function (ws, data, cb) {
         if(ws.readyState !== WebSocket.OPEN){
             cb && cb(' => Socket is not OPEN.');
-            return
+            return;
         }
 
         ws.send(JSON.stringify(data), err => {
@@ -150,6 +153,9 @@ function Broker($opts) {
     var first = true;
     var wsIdCounter = 1;
 
+    //TODO: on disconnection we could delete wsClientId key/val from this.clientIdsToKeys
+    // but there should be no need to do that since we won't have that many clients
+
     wss.on('connection', (ws) => {
 
         if (first) {
@@ -170,11 +176,7 @@ function Broker($opts) {
 
             //TODO: unlock any locks that this ws owns
 
-            console.log('CLOSED.');
-            console.log('CLOSED.');
-            console.log('CLOSED.');
-            console.log('CLOSED.');
-            console.log('CLOSED.');
+            console.log(' => Client connection closed, with wsClientId = "' + ws.wsClientId + '".');
 
             var keys;
             if (keys = this.wsLock[ws.wsClientId]) {
@@ -378,23 +380,22 @@ Broker.prototype.ensureNewLockHolder = function _ensureNewLockHolder(lck, data, 
         // set the timeout for the next ws to acquire lock, if not within alloted time, we simple call unlock
 
         var ws = obj.ws;
+        var ttl = weAreDebugging ? 50000000 : (obj.ttl || this.lockExpiresAfter);
 
         addWsLockKey(this, ws, key);
 
         lck.uuid = obj.uuid;
         lck.pid = obj.pid;
-
         lck.to = setTimeout(() => {
 
             // delete locks[key]; => no, this.unlock will take care of that
-
             console.error(colors.red.bold(' => Warning, lock object timed out for key => '), colors.red('"' + key + '"'));
             this.unlock({
                 key: key,
                 force: true
             });
 
-        }, this.lockExpiresAfter);
+        }, ttl);
 
         clearTimeout(this.timeouts[key]);
         delete this.timeouts[key];
@@ -406,7 +407,7 @@ Broker.prototype.ensureNewLockHolder = function _ensureNewLockHolder(lck, data, 
             delete this.timeouts[key];
 
             // if this timeout occurs, that is because the first item in the notify list did not receive the
-            // acquire lock message, so we push the object back onto the notify list and send a retry message to all
+            // acquire lock message, so we push the object back onto the end of notify list and send a retry message to all
             // if a client receives a retry message, they will all retry to acquire the lock on this key
 
             var _lck;
@@ -464,6 +465,9 @@ Broker.prototype.lock = function _lock(data, ws) {
     const lck = locks[key];
     const uuid = data.uuid;
     const pid = data.pid;
+    const ttl = weAreDebugging ? 500000000 : (data.ttl || this.lockExpiresAfter);
+    const force = data.force;
+
 
     this.bookkeeping.keys[key] = this.bookkeeping.keys[key] ||
         {
@@ -481,10 +485,12 @@ Broker.prototype.lock = function _lock(data, ws) {
         const count = lck.notify.length;
 
         if (lck.uuid) {
-            debug(' => Lock exists, and already has a lockholder, adding ws to list of to be notified.');
 
-            // if we retrying, we may attempt to call lock() more than once
+            debug(' => Lock exists *and* already has a lockholder; adding ws to list of to be notified.');
+
+            // if we are retrying, we may attempt to call lock() more than once
             // we don't want to push the same ws object / same uuid combo to array
+
             const alreadyAdded = lck.notify.some(function (item) {
                 return String(item.uuid) === String(uuid);
             });
@@ -493,7 +499,8 @@ Broker.prototype.lock = function _lock(data, ws) {
                 lck.notify.push({
                     ws: ws,
                     uuid: uuid,
-                    pid: pid
+                    pid: pid,
+                    ttl:ttl
                 });
             }
 
@@ -509,6 +516,16 @@ Broker.prototype.lock = function _lock(data, ws) {
 
             lck.pid = pid;
             lck.uuid = uuid;
+
+            clearTimeout(lck.to);
+            lck.to = setTimeout(() => {
+                // delete locks[key];  => no, this.unlock will take care of that
+                console.error(colors.red.bold(' => Warning, lock timed out for key => '), colors.red('"' + key + '"'));
+                this.unlock({
+                    key: key,
+                    force: true
+                });
+            }, ttl);
 
 
             addWsLockKey(this, ws, key);
@@ -541,7 +558,7 @@ Broker.prototype.lock = function _lock(data, ws) {
                     key: key,
                     force: true
                 });
-            }, this.lockExpiresAfter)
+            }, ttl)
         };
 
 
@@ -671,7 +688,7 @@ Broker.prototype.unlock = function _unlock(data, ws) {
                 lockRequestCount: 0,
                 type: 'unlock',
                 unlocked: true,
-                error: 'no lock with key = > ' + key
+                error: ' => Live-Mutex warning => no lock with key => "' + key + '"'
             });
         }
     }

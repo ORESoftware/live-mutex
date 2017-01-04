@@ -10,8 +10,8 @@ const colors = require('colors/safe');
 
 Test.create(__filename, {}, function (it, Broker, Client) {
 
-    const broker = new Broker({port: 7003});
-    const client = new Client({port: 7003});
+    const broker = new Broker({port: 7033});
+    const client = new Client({port: 7033});
 
     it.cb('locks/unlocks', t => {
 
@@ -43,7 +43,7 @@ Test.create(__filename, {}, function (it, Broker, Client) {
 
     it.cb('locks/unlocks', t => {
 
-        client.lock('a', {}, function (err, unlock, id) {
+        client.lock('a', 10, function (err, unlock, id) {
 
             if (err) {
                 return t.fail(err);

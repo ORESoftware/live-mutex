@@ -2,6 +2,11 @@
 /home/oleg/WebstormProjects/oresoftware/live-mutex/test/test-src/one.test.js
  => Suman usage warning: no suman.once.pre.js file found. 
 
+ => Warning, lock timed out for key =>  "a"
+ => Usage / implementation error => this should not happen => no lock with key =>  "a"
+
+  => Live-Mutex warning => no lock with key => "a" 
+
 
 
  ### Suman end run ### 

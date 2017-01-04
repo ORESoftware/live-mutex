@@ -17,6 +17,9 @@ const debug = require('debug')('live-mutex');
 /////////////////////////////////////////////////////////////////////////
 
 const weAreDebugging = require('./lib/we-are-debugging');
+if(weAreDebugging){
+    console.log(' => Live-Mutex client is in debug mode. Timeouts are turned off.');
+}
 
 /////////////////////////////////////////////////////////////////////////
 
@@ -31,8 +34,8 @@ const validOptions = [
     'listener',
     'host',
     'port',
-    'unlockTimeout',
-    'lockTimeout',
+    'unlockRequestTimeout',
+    'lockRequestTimeout',
     'unlockRetryMax',
     'lockRetryMax'
 
@@ -78,18 +81,25 @@ function Client($opts) {
             ' => "lockRetryMax" integer needs to be in range (0-100).');
     }
 
-    if ('unlockTimeout' in opts) {
-        assert(Number.isInteger(opts.unlockTimeout),
-            ' => "unlockTimeout" option needs to be an integer (representing milliseconds).');
-        assert(opts.unlockTimeout >= 30 && opts.unlockTimeout <= 800000,
-            ' => "unlockTimeout" needs to be integer between 20 and 800000 millis.');
+    if ('unlockRequestTimeout' in opts) {
+        assert(Number.isInteger(opts.unlockRequestTimeout),
+            ' => "unlockRequestTimeout" option needs to be an integer (representing milliseconds).');
+        assert(opts.unlockRequestTimeout >= 20 && opts.unlockRequestTimeout <= 800000,
+            ' => "unlockRequestTimeout" needs to be integer between 20 and 800000 millis.');
     }
 
-    if ('lockTimeout' in opts) {
-        assert(Number.isInteger(opts.lockTimeout),
-            ' => "unlockTimeout" option needs to be an integer (representing milliseconds).');
-        assert(opts.lockTimeout >= 30 && opts.lockTimeout <= 800000,
-            ' => "unlockTimeout" needs to be integer between 20 and 800000 millis.');
+    if ('lockRequestTimeout' in opts) {
+        assert(Number.isInteger(opts.lockRequestTimeout),
+            ' => "lockRequestTimeout" option needs to be an integer (representing milliseconds).');
+        assert(opts.lockRequestTimeout >= 20 && opts.lockRequestTimeout <= 800000,
+            ' => "lockRequestTimeout" needs to be integer between 20 and 800000 millis.');
+    }
+
+    if ('ttl' in opts) {
+        assert(Number.isInteger(opts.ttl),
+            ' => "ttl" option needs to be an integer (representing milliseconds).');
+        assert(opts.ttl >= 3 && opts.ttl <= 800000,
+            ' => "ttl" needs to be integer between 3 and 800000 millis.');
     }
 
     this.listeners = {};
@@ -101,8 +111,9 @@ function Client($opts) {
 
     this.host = opts.host || 'localhost';
     this.port = opts.port || '6970';
-    this.unlockTimeout = weAreDebugging ? 5000000 : (opts.unlockTimeout || 3000);
-    this.lockTimeout = weAreDebugging ? 5000000 : (opts.lockTimeout || 6000);
+    this.ttl = weAreDebugging ? 5000000 : ( opts.ttl || 3000);
+    this.unlockTimeout = weAreDebugging ? 5000000 : (opts.unlockRequestTimeout || 3000);
+    this.lockTimeout = weAreDebugging ? 5000000 : (opts.lockRequestTimeout || 6000);
     this.lockRetryMax = opts.lockRetryMax || 3;
     this.unlockRetryMax = opts.unlockRetryMax || 3;
 
@@ -238,8 +249,33 @@ Client.prototype.lock = function _lock(key, opts, cb) {
             force: opts
         };
     }
+    else if (typeof opts === 'number') {
+        opts = {
+            ttl: opts
+        };
+    }
 
     opts = opts || {};
+
+    if ('force' in opts) {
+        assert.equal(typeof opts.force, 'boolean', ' => Live-Mutex usage error => ' +
+            '"force" option must be a boolean value. Coerce it on your side, for safety.');
+    }
+
+    if ('ttl' in opts) {
+        assert(Number.isInteger(opts.ttl),
+            ' => Live-Mutex usage error => Please pass an integer representing milliseconds as the value for "ttl".');
+        assert(opts.ttl >= 3 && opts.ttl <= 800000,
+            ' => Live-Mutex usage error => "ttl" for a lock needs to be integer between 3 and 800000 millis.');
+    }
+
+    if ('lockRequestTimeout' in opts) {
+        assert(Number.isInteger(opts.lockRequestTimeout),
+            ' => Please pass an integer representing milliseconds as the value for "ttl".');
+        assert(opts.lockRequestTimeout >= 20 && opts.lockRequestTimeout <= 800000,
+            ' => "ttl" for a lock needs to be integer between 3 and 800000 millis.');
+    }
+
 
     if (opts._retryCount > this.lockRetryMax) {
         return cb(new Error(' => Maximum retries breached.'));
@@ -249,6 +285,8 @@ Client.prototype.lock = function _lock(key, opts, cb) {
 
     const ws = this.ws;
     const uuid = opts._uuid || uuidV4();
+    const ttl = opts.ttl || this.ttl;
+    const lockTimeout = opts.lockRequestTimeout || this.lockTimeout;
 
     const to = setTimeout(() => {
 
@@ -260,11 +298,11 @@ Client.prototype.lock = function _lock(key, opts, cb) {
             key: key,
             pid: process.pid,
             type: 'lock-client-timeout'
-        }));
+        }), function(err){
+            cb(new Error(' => Acquiring lock operation timed out. (Client-side timeout fired) ' + err ? ('\n' + (err.stack || err)) : ''));
+        });
 
-        cb(new Error(' => Acquiring lock operation timed out. (Client-side timeout fired).'));
-
-    }, this.lockTimeout);
+    }, lockTimeout);
 
 
     this.resolutions[uuid] = (err, data) => {
@@ -323,7 +361,8 @@ Client.prototype.lock = function _lock(key, opts, cb) {
         ws.send(JSON.stringify({
             uuid: uuid,
             key: key,
-            type: 'lock'
+            type: 'lock',
+            ttl: ttl
         }));
     }
 
@@ -367,6 +406,22 @@ Client.prototype.unlock = function _unlock(key, opts, cb) {
     }
 
     opts = opts || {};
+
+
+    if ('force' in opts) {
+        assert.equal(typeof opts.force, 'boolean', ' => Live-Mutex usage error => ' +
+            '"force" option must be a boolean value. Coerce it on your side, for safety.');
+    }
+
+
+    if ('unlockRequestTimeout' in opts) {
+        assert(Number.isInteger(opts.lockRequestTimeout),
+            ' => Please pass an integer representing milliseconds as the value for "ttl".');
+        assert(opts.lockRequestTimeout >= 20 && opts.lockRequestTimeout <= 800000,
+            ' => "ttl" for a lock needs to be integer between 3 and 800000 millis.');
+    }
+
+
     opts._retryCount = opts._retryCount || 0;
 
     if (opts._retryCount > this.unlockRetryMax) {
@@ -375,12 +430,15 @@ Client.prototype.unlock = function _unlock(key, opts, cb) {
 
     const uuid = uuidV4();
     const ws = this.ws;
+    const unlockTimeout = opts.unlockRequestTimeout || this.unlockTimeout;
 
     const to = setTimeout(() => {
+
         delete this.resolutions[uuid];
         this.timeouts[uuid] = true;
         cb(new Error(' => Unlocking timed out.'));
-    }, this.unlockTimeout);
+
+    }, unlockTimeout);
 
 
     this.resolutions[uuid] = (err, data) => {
