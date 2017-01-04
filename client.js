@@ -299,7 +299,8 @@ Client.prototype.lock = function _lock(key, opts, cb) {
             pid: process.pid,
             type: 'lock-client-timeout'
         }), function(err){
-            cb(new Error(' => Acquiring lock operation timed out. (Client-side timeout fired) ' + err ? ('\n' + (err.stack || err)) : ''));
+            cb(new Error(' => Acquiring lock operation timed out. (Client-side timeout fired) ' +
+                (err ? ('\n' + (err.stack || err)) : '')));
         });
 
     }, lockTimeout);
