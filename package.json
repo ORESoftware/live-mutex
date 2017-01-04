@@ -1,7 +1,7 @@
 {
   "name": "live-mutex",
   "version": "0.0.10008",
-  "description": "Simple mutex that uses Node.js process and IPC instead of Redis",
+  "description": "Simple mutex that uses Node.js process + websockets, instead of Redis; useful if you cannot install Redis etc.",
   "main": "broker.js",
   "scripts": {
     "test": "suman"
