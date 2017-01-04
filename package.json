@@ -1,6 +1,6 @@
 {
   "name": "live-mutex",
-  "version": "0.0.10006",
+  "version": "0.0.10007",
   "description": "Simple mutex that uses Node.js process and IPC instead of Redis",
   "main": "broker.js",
   "scripts": {
