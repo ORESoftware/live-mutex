@@ -19,7 +19,7 @@ const debug = require('debug')('live-mutex');
 ///////////////////////////////////////////////////////////////////
 
 const weAreDebugging = require('./lib/we-are-debugging');
-if(weAreDebugging){
+if (weAreDebugging) {
     console.log(' => Live-Mutex broker is in debug mode. Timeouts are turned off.');
 }
 
@@ -100,7 +100,7 @@ function Broker($opts) {
 
 
     const send = this.send = function (ws, data, cb) {
-        if(ws.readyState !== WebSocket.OPEN){
+        if (ws.readyState !== WebSocket.OPEN) {
             cb && cb(' => Socket is not OPEN.');
             return;
         }
@@ -263,6 +263,9 @@ function Broker($opts) {
                         console.log(' => new lock-holder ensured.');
                     });
                 }
+                else if(data.type === 'lock-info-request'){
+                    this.retrieveLockInfo(data, ws);
+                }
                 else {
                     console.error(colors.red.bold(' bad data sent to broker.'));
 
@@ -309,10 +312,10 @@ Broker.prototype.sendStatsMessageToAllClients = function () {
 
             var len;
 
-            if(!lck){
-               len = 0;
+            if (!lck) {
+                len = 0;
             }
-            else{
+            else {
                 len = lck.notify.length;
             }
 
@@ -389,7 +392,8 @@ Broker.prototype.ensureNewLockHolder = function _ensureNewLockHolder(lck, data, 
         lck.to = setTimeout(() => {
 
             // delete locks[key]; => no, this.unlock will take care of that
-            console.error(colors.red.bold(' => Warning, lock object timed out for key => '), colors.red('"' + key + '"'));
+            process.emit('warning', ' => Live-Mutex warning, lock object timed out for key => "' + key + '"');
+
             this.unlock({
                 key: key,
                 force: true
@@ -457,6 +461,34 @@ Broker.prototype.ensureNewLockHolder = function _ensureNewLockHolder(lck, data, 
 
 };
 
+Broker.prototype.retrieveLockInfo = function _retrieveLockInfo(data,ws){
+
+    const locks = this.locks;
+    const key = data.key;
+    const lck = locks[key];
+    const uuid = data.uuid;
+
+    const isLocked = lck && lck.uuid && true;
+    const lockholderUUID = isLocked ? lck.uuid : null;
+    const lockRequestCount = lck ? lck.notify.length : -1;
+
+    if(isLocked && lockRequestCount > 0){
+        console.error(' => Live-Mutex implementation warning, lock is unlocked but ' +
+            'notify array has at least one item, for key => ', key);
+    }
+
+    this.send(ws, {
+        key: key,
+        uuid: uuid,
+        lockholderUUID: lockholderUUID,
+        isLocked: !!isLocked,
+        lockRequestCount: lockRequestCount,
+        lockInfo: true,
+        type: 'lock-info-response'
+    });
+
+};
+
 
 Broker.prototype.lock = function _lock(data, ws) {
 
@@ -500,7 +532,7 @@ Broker.prototype.lock = function _lock(data, ws) {
                     ws: ws,
                     uuid: uuid,
                     pid: pid,
-                    ttl:ttl
+                    ttl: ttl
                 });
             }
 
@@ -520,7 +552,7 @@ Broker.prototype.lock = function _lock(data, ws) {
             clearTimeout(lck.to);
             lck.to = setTimeout(() => {
                 // delete locks[key];  => no, this.unlock will take care of that
-                console.error(colors.red.bold(' => Warning, lock timed out for key => '), colors.red('"' + key + '"'));
+                process.emit('warning', ' => Live-Mutex warning, lock object timed out for key => "' + key + '"');
                 this.unlock({
                     key: key,
                     force: true
@@ -553,7 +585,7 @@ Broker.prototype.lock = function _lock(data, ws) {
             key: key,
             to: setTimeout(() => {
                 // delete locks[key];  => no, this.unlock will take care of that
-                console.error(colors.red.bold(' => Warning, lock timed out for key => '), colors.red('"' + key + '"'));
+                process.emit('warning', ' => Live-Mutex warning, lock object timed out for key => "' + key + '"');
                 this.unlock({
                     key: key,
                     force: true
@@ -682,6 +714,9 @@ Broker.prototype.unlock = function _unlock(data, ws) {
         });
 
         if (ws) {
+
+            process.emit('warning', ' => Live-Mutex warning, => no lock with key => "' + key + '"');
+
             this.send(ws, {
                 uuid: uuid,
                 key: key,

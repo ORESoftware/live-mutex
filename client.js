@@ -25,7 +25,9 @@ if(weAreDebugging){
 
 
 process.on('warning', function (w) {
-    console.error('\n', ' => Live-Mutex warning => ', w.stack || w, '\n');
+    if(!String(w).match(/DEBUG_FD/) && !String(w).match(/Live.*Mutex/i)){
+        console.error('\n', ' => Live-Mutex warning => ', w.stack || w, '\n');
+    }
 });
 
 const validOptions = [
@@ -226,6 +228,63 @@ Client.prototype.getLockholderCount = function (key) {
     return this.lockholderCount[key] || 0;
 };
 
+
+
+Client.prototype.requestLockInfo = function _lock(key, opts, cb) {
+
+    assert(typeof key, 'string', ' => Key passed to live-mutex#lock needs to be a string.');
+
+    if (typeof opts === 'function') {
+        cb = opts;
+        opts = {};
+    }
+
+    opts = opts || {};
+
+    const ws = this.ws;
+    const uuid = opts._uuid || uuidV4();
+
+    this.resolutions[uuid] = (err, data) => {
+
+        if (String(key) !== String(data.key)) {
+            delete this.resolutions[uuid];
+            throw new Error(' => Live-Mutex implementation error => bad key.');
+        }
+
+        if (data.error) {
+            console.error('\n', colors.bgRed(data.error), '\n');
+        }
+
+        if ([data.acquired, data.retry].filter(i => i).length > 1) {
+            throw new Error(' => Live-Mutex implementation error.');
+        }
+
+        if (data.lockInfo === true) {
+            delete this.resolutions[uuid];
+            cb(null, {data: data});
+        }
+
+    };
+
+
+    function send() {
+        ws.send(JSON.stringify({
+            uuid: uuid,
+            key: key,
+            type: 'lock-info-request',
+        }));
+    }
+
+    if (ws.isOpen) {
+        send();
+    }
+    else {
+        ws.once('open', send);
+    }
+
+};
+
+
 Client.prototype.lock = function _lock(key, opts, cb) {
 
     assert(typeof key, 'string', ' => Key passed to live-mutex#lock needs to be a string.');
@@ -257,6 +316,11 @@ Client.prototype.lock = function _lock(key, opts, cb) {
 
     opts = opts || {};
 
+    if ('append' in opts) {
+        assert.equal(typeof opts.append, 'string', ' => Live-Mutex usage error => ' +
+            '"append" option must be a string value.');
+    }
+
     if ('force' in opts) {
         assert.equal(typeof opts.force, 'boolean', ' => Live-Mutex usage error => ' +
             '"force" option must be a boolean value. Coerce it on your side, for safety.');
@@ -283,8 +347,9 @@ Client.prototype.lock = function _lock(key, opts, cb) {
 
     opts._retryCount = opts._retryCount || 0;
 
+    const append = opts.append || '';
     const ws = this.ws;
-    const uuid = opts._uuid || uuidV4();
+    const uuid = opts._uuid || (append + uuidV4());
     const ttl = opts.ttl || this.ttl;
     const lockTimeout = opts.lockRequestTimeout || this.lockTimeout;
 

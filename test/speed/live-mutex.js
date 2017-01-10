@@ -9,16 +9,16 @@ const async = require('async');
 const lmUtils = require('live-mutex/utils');
 const Client = require('live-mutex/client');
 
-return lmUtils.conditionallyLaunchSocketServer({})
-    .then(function (data) {
+// return lmUtils.conditionallyLaunchSocketServer({})
+//     .then(function (data) {
 
-        const a = Array.apply(null, {length: 100});
+        const a = Array.apply(null, {length: 300});
         const start = Date.now();
 
         const client = new Client();
 
         var i = 0;
-        async.each(a, function (val, cb) {
+        async.eachSeries(a, function (val, cb) {
 
             client.lock('foo', function (err, unlock) {
                 if (err) {
@@ -41,6 +41,6 @@ return lmUtils.conditionallyLaunchSocketServer({})
         });
 
 
-    });
+    // });
 
 
