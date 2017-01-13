@@ -1,10 +1,7 @@
  => Beginning of stderr log for test with full path => 
 /home/oleg/WebstormProjects/oresoftware/live-mutex/test/test-src/alphabet.test.js
+
  => Suman usage warning: no suman.once.pre.js file found. 
 
+
 Warning: the following test callback was invoked twice by your code for the following test/hook => 10 chars of each, in order
-
- ### Suman end run ### 
-
-
-

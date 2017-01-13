@@ -1,10 +1,6 @@
  => Beginning of stderr log for test with full path => 
 /home/oleg/WebstormProjects/oresoftware/live-mutex/test/test-src/two.test.js
+
  => Suman usage warning: no suman.once.pre.js file found. 
-
-
-
- ### Suman end run ### 
-
 
 
