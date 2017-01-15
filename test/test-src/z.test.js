@@ -7,10 +7,10 @@ Test.create(__filename, {mode: 'parallel'}, function (assert, before, it, Client
 
     var intt = 0;
 
-    function work(cb){
+    function work(cb) {
 
-        if(intt > 0){
-            return cb(new Error('hunny'));
+        if (intt > 0) {
+            return cb(new Error('=> Live-Mutex implementation test error.'));
         }
 
 
@@ -39,7 +39,7 @@ Test.create(__filename, {mode: 'parallel'}, function (assert, before, it, Client
         const client = new Client();
         client.lock('z', function (err) {
             if (err) return t(err);
-            t(); // client.unlock('z', t);
+            client.unlock('z', t);
         });
     });
 

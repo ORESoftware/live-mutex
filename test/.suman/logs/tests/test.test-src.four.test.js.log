@@ -1,11 +1,12 @@
  => Beginning of stderr log for test with full path => 
 /home/oleg/WebstormProjects/oresoftware/live-mutex/test/test-src/four.test.js
+
  => Suman usage warning: no suman.once.pre.js file found. 
 
- => Warning, lock timed out for key =>  "z"
 
 
- ### Suman end run ### 
+  => Suman warning =>   => Live-Mutex warning, lock object timed out for key => "z" 
 
 
+ => Live-Mutex warning, lock object timed out for key => "z"
 

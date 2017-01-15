@@ -1,6 +1,5 @@
-
-
 const net = require('net');
+
 const server = net.createServer((c) => {
     // 'connection' listener
     console.log('client connected');
@@ -19,8 +18,8 @@ server.listen((data) => {
     console.log('server bound => ', data);
 });
 
-server.on('listening', function(data){
+server.on('listening', function (data) {
 
-    console.log('server address => ', server.address())
-   console.log('data => ',data);
+    console.log('server address => ', server.address());
+    console.log('data => ', data);
 });

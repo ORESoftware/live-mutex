@@ -2,24 +2,22 @@
 
 ### Suman runner start ###
 
-Beginning of run at 1483435587207 = [Tue Jan 03 2017 01:26:27 GMT-0800 (PST)]
-Command issued from the following directory "/home/oleg/WebstormProjects/oresoftware/live-mutex/lib"
+Beginning of run at 1484344242808 = [Fri Jan 13 2017 13:50:42 GMT-0800 (PST)]
+Command issued from the following directory "/home/oleg/WebstormProjects/oresoftware/live-mutex"
 Command = ["/home/oleg/.nvm/versions/node/v7.2.1/bin/node","/home/oleg/WebstormProjects/oresoftware/live-mutex/node_modules/suman/cli.js"]
 
 
-[three.test.js]  => Suman usage warning: no suman.once.pre.js file found. 
-
 [alphabet.test.js]  => Suman usage warning: no suman.once.pre.js file found. 
-
-[four.test.js]  => Suman usage warning: no suman.once.pre.js file found. 
-
-[one.test.js]  => Suman usage warning: no suman.once.pre.js file found. 
 
 [two.test.js]  => Suman usage warning: no suman.once.pre.js file found. 
 
-[three.test.js]  ### Suman end run ### 
+[one.test.js]  => Suman usage warning: no suman.once.pre.js file found. 
 
-[three.test.js] true
+[four.test.js]  => Suman usage warning: no suman.once.pre.js file found. 
+
+[three.test.js]  => Suman usage warning: no suman.once.pre.js file found. 
+
+[z.test.js]  => Suman usage warning: no suman.once.pre.js file found. 
 
 [alphabet.test.js] Warning: the following test callback was invoked twice by your code for the following test/hook => 10 chars of each, in order
 
@@ -27,13 +25,25 @@ Command = ["/home/oleg/.nvm/versions/node/v7.2.1/bin/node","/home/oleg/WebstormP
 
 [alphabet.test.js] true
 
-[one.test.js]  => Warning, lock timed out for key =>  "a"
+[three.test.js]  ### Suman end run ### 
+
+[three.test.js] true
+
+[one.test.js]   => Suman warning =>   => Live-Mutex warning, lock object timed out for key => "a" 
+
+[one.test.js]  => Live-Mutex warning, lock object timed out for key => "a"
 
 [one.test.js]  => Usage / implementation error => this should not happen => no lock with key =>  "a"
 
+[one.test.js]   => Suman warning =>   => Live-Mutex warning, => no lock with key => "a" 
+
+[one.test.js]  => Live-Mutex warning, => no lock with key => "a"
+
 [one.test.js]   => Live-Mutex warning => no lock with key => "a" 
 
-[four.test.js]  => Warning, lock timed out for key =>  "z"
+[four.test.js]   => Suman warning =>   => Live-Mutex warning, lock object timed out for key => "z" 
+
+[four.test.js]  => Live-Mutex warning, lock object timed out for key => "z"
 
 [four.test.js]  ### Suman end run ### 
 
@@ -46,6 +56,10 @@ Command = ["/home/oleg/.nvm/versions/node/v7.2.1/bin/node","/home/oleg/WebstormP
 [two.test.js]  ### Suman end run ### 
 
 [two.test.js] true
+
+[z.test.js]  ### Suman end run ### 
+
+[z.test.js] true
 
 
 ### Suman runner end ###
