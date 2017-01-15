@@ -2,22 +2,82 @@
 
 ### Suman runner start ###
 
-Beginning of run at 1484344242808 = [Fri Jan 13 2017 13:50:42 GMT-0800 (PST)]
+Beginning of run at 1484447915580 = [Sat Jan 14 2017 18:38:35 GMT-0800 (PST)]
 Command issued from the following directory "/home/oleg/WebstormProjects/oresoftware/live-mutex"
 Command = ["/home/oleg/.nvm/versions/node/v7.2.1/bin/node","/home/oleg/WebstormProjects/oresoftware/live-mutex/node_modules/suman/cli.js"]
 
 
-[alphabet.test.js]  => Suman usage warning: no suman.once.pre.js file found. 
-
 [two.test.js]  => Suman usage warning: no suman.once.pre.js file found. 
 
-[one.test.js]  => Suman usage warning: no suman.once.pre.js file found. 
+[alphabet.test.js]  => Suman usage warning: no suman.once.pre.js file found. 
 
 [four.test.js]  => Suman usage warning: no suman.once.pre.js file found. 
+
+[one.test.js]  => Suman usage warning: no suman.once.pre.js file found. 
 
 [three.test.js]  => Suman usage warning: no suman.once.pre.js file found. 
 
 [z.test.js]  => Suman usage warning: no suman.once.pre.js file found. 
+
+[z.test.js]    
+
+[z.test.js]    ⚑  => Suman fatal error  => making a graceful exit => 
+
+[z.test.js]    Error: => fatal error in hook => (to continue even in the event of an error in a hook use option {fatal:false}) => 
+
+[z.test.js]    	Error: listen EADDRINUSE 127.0.0.1:6970
+
+[z.test.js]    	    at Object.exports._errnoException (util.js:1022:11)
+
+[z.test.js]    	    at exports._exceptionWithHostPort (util.js:1045:20)
+
+[z.test.js]    	    at Server._listen2 (net.js:1262:14)
+
+[z.test.js]    	    at listen (net.js:1298:10)
+
+[z.test.js]    	    at doListening (net.js:1397:7)
+
+[z.test.js]    
+
+[z.test.js]    
+
+[z.test.js]    
+
+[z.test.js] Error: => fatal error in hook => (to continue even in the event of an error in a hook use option {fatal:false}) => 
+
+[z.test.js] 	Error: listen EADDRINUSE 127.0.0.1:6970
+
+[z.test.js] 	    at Object.exports._errnoException (util.js:1022:11)
+
+[z.test.js] 	    at exports._exceptionWithHostPort (util.js:1045:20)
+
+[z.test.js] 	    at Server._listen2 (net.js:1262:14)
+
+[z.test.js] 	    at listen (net.js:1298:10)
+
+[z.test.js] 	    at doListening (net.js:1397:7)
+
+[z.test.js] Error: => fatal error in hook => (to continue even in the event of an error in a hook use option {fatal:false}) => 
+
+[z.test.js] 	Error: listen EADDRINUSE 127.0.0.1:6970
+
+[z.test.js] 	    at Object.exports._errnoException (util.js:1022:11)
+
+[z.test.js] 	    at exports._exceptionWithHostPort (util.js:1045:20)
+
+[z.test.js] 	    at Server._listen2 (net.js:1262:14)
+
+[z.test.js] 	    at listen (net.js:1298:10)
+
+[z.test.js] 	    at doListening (net.js:1397:7)
+
+[z.test.js]  ### Suman end run ### 
+
+[z.test.js] true
+
+[three.test.js]  ### Suman end run ### 
+
+[three.test.js] true
 
 [alphabet.test.js] Warning: the following test callback was invoked twice by your code for the following test/hook => 10 chars of each, in order
 
@@ -25,47 +85,6 @@ Command = ["/home/oleg/.nvm/versions/node/v7.2.1/bin/node","/home/oleg/WebstormP
 
 [alphabet.test.js] true
 
-[three.test.js]  ### Suman end run ### 
-
-[three.test.js] true
-
 [one.test.js]   => Suman warning =>   => Live-Mutex warning, lock object timed out for key => "a" 
 
 [one.test.js]  => Live-Mutex warning, lock object timed out for key => "a"
-
-[one.test.js]  => Usage / implementation error => this should not happen => no lock with key =>  "a"
-
-[one.test.js]   => Suman warning =>   => Live-Mutex warning, => no lock with key => "a" 
-
-[one.test.js]  => Live-Mutex warning, => no lock with key => "a"
-
-[one.test.js]   => Live-Mutex warning => no lock with key => "a" 
-
-[four.test.js]   => Suman warning =>   => Live-Mutex warning, lock object timed out for key => "z" 
-
-[four.test.js]  => Live-Mutex warning, lock object timed out for key => "z"
-
-[four.test.js]  ### Suman end run ### 
-
-[four.test.js] true
-
-[one.test.js]  ### Suman end run ### 
-
-[one.test.js] true
-
-[two.test.js]  ### Suman end run ### 
-
-[two.test.js] true
-
-[z.test.js]  ### Suman end run ### 
-
-[z.test.js] true
-
-
-### Suman runner end ###
-
-
-
-
-
-

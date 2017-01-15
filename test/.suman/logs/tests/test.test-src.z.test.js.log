@@ -4,3 +4,16 @@
  => Suman usage warning: no suman.once.pre.js file found. 
 
 
+   
+   ⚑  => Suman fatal error  => making a graceful exit => 
+   Error: => fatal error in hook => (to continue even in the event of an error in a hook use option {fatal:false}) => 
+   	Error: listen EADDRINUSE 127.0.0.1:6970
+   	    at Object.exports._errnoException (util.js:1022:11)
+   	    at exports._exceptionWithHostPort (util.js:1045:20)
+   	    at Server._listen2 (net.js:1262:14)
+   	    at listen (net.js:1298:10)
+   	    at doListening (net.js:1397:7)
+   
+   
+   
+
