@@ -2,3 +2,5 @@
 
 allow lock-requestors to force their way to obtaining a lock
 similar to unlock-requestors being able to force unlock even if they don't have the key
+
+https://github.com/uWebSockets/uWebSockets

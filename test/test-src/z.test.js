@@ -16,9 +16,11 @@ Test.create(__filename, {mode: 'parallel'}, function (assert, before, it, Client
 
     }
 
+    const conf = {port:7888};
+
     before('promise', function () {
 
-        return lmUtils.conditionallyLaunchSocketServer({})
+        return lmUtils.conditionallyLaunchSocketServer(conf)
             .then(function (data) {
                 console.log('data from conditionallyLaunchSocketServer => ', data);
             }, function (err) {
@@ -36,7 +38,7 @@ Test.create(__filename, {mode: 'parallel'}, function (assert, before, it, Client
 
     it.cb('yes', {timeout: 30000}, t => {
 
-        const client = new Client();
+        const client = new Client(conf);
         client.lock('z', function (err) {
             if (err) return t(err);
             client.unlock('z', t);
@@ -46,7 +48,7 @@ Test.create(__filename, {mode: 'parallel'}, function (assert, before, it, Client
 
     it.cb('yes', {timeout: 30000}, t => {
 
-        const client = new Client();
+        const client = new Client(conf);
         client.lock('z', function (err) {
             if (err) return t(err);
             client.unlock('z', t.done);
@@ -55,7 +57,7 @@ Test.create(__filename, {mode: 'parallel'}, function (assert, before, it, Client
 
     it.cb('yes', {timeout: 30000}, t => {
 
-        const client = new Client();
+        const client = new Client(conf);
         client.lock('z', function (err) {
             if (err) return t(err);
             client.unlock('z', t);
@@ -64,7 +66,7 @@ Test.create(__filename, {mode: 'parallel'}, function (assert, before, it, Client
 
     it.cb('yes', {timeout: 30000}, t => {
 
-        const client = new Client();
+        const client = new Client(conf);
         client.lock('z', function (err) {
             if (err) return t(err);
             client.unlock('z', t.done);

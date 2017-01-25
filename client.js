@@ -5,7 +5,7 @@ const assert = require('assert');
 const util = require('util');
 
 //npm
-const WebSocket = require('ws');
+const WebSocket = require('uws');
 const ijson = require('siamese');
 const uuidV4 = require('uuid/v4');
 const colors = require('colors/safe');
@@ -120,7 +120,7 @@ function Client($opts) {
     this.unlockRetryMax = opts.unlockRetryMax || 3;
 
     const ws = this.ws = new WebSocket(['ws://', this.host, ':', this.port].join(''));
-    ws.setMaxListeners(350);
+    // ws.setMaxListeners(350);
 
     process.once('exit', function () {
         ws.close();
@@ -275,12 +275,14 @@ Client.prototype.requestLockInfo = function _lock(key, opts, cb) {
         }));
     }
 
-    if (ws.isOpen) {
-        send();
-    }
-    else {
-        ws.once('open', send);
-    }
+    process.nextTick(send);
+
+    // if (ws.isOpen) {
+    //     send();
+    // }
+    // else {
+    //     ws.once('open', send);
+    // }
 
 };
 
@@ -432,12 +434,14 @@ Client.prototype.lock = function _lock(key, opts, cb) {
         }));
     }
 
-    if (ws.isOpen) {
-        send();
-    }
-    else {
-        ws.once('open', send);
-    }
+    process.nextTick(send);
+
+    // if (ws.isOpen) {
+    //     send();
+    // }
+    // else {
+    //     ws.once('open', send);
+    // }
 
 
 };
@@ -568,12 +572,15 @@ Client.prototype.unlock = function _unlock(key, opts, cb) {
         }));
     }
 
-    if (ws.isOpen) {
-        send();
-    }
-    else {
-        ws.once('open', send);
-    }
+
+    process.nextTick(send);
+
+    // if (ws.isOpen) {
+    //     send();
+    // }
+    // else {
+    //     ws.once('open', send);
+    // }
 
 
 };

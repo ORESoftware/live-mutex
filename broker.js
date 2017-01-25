@@ -5,7 +5,7 @@ const assert = require('assert');
 const util = require('util');
 
 //npm
-const WebSocket = require('ws');
+const WebSocket = require('uws');
 const WebSocketServer = WebSocket.Server;
 const ijson = require('siamese');
 const async = require('async');
@@ -130,6 +130,10 @@ function Broker($opts) {
         host: this.host
     });
 
+    wss.on('error', function(err){
+       console.error(' => WSS error => ', err.stack || err);
+    });
+
     this.bookkeeping = {
         keys: {}
     };
@@ -162,6 +166,10 @@ function Broker($opts) {
             first = false;
             this.sendStatsMessageToAllClients();
         }
+
+        ws.on('error', function(err){
+            console.error(' => ws error => ', err.stack || err);
+        });
 
         debug(' client is connected!');
 
