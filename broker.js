@@ -5,7 +5,7 @@ const assert = require('assert');
 const util = require('util');
 
 //npm
-const WebSocket = require('uws');
+const WebSocket = require('ws');
 const WebSocketServer = WebSocket.Server;
 const ijson = require('siamese');
 const async = require('async');

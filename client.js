@@ -5,7 +5,7 @@ const assert = require('assert');
 const util = require('util');
 
 //npm
-const WebSocket = require('uws');
+const WebSocket = require('ws');
 const ijson = require('siamese');
 const uuidV4 = require('uuid/v4');
 const colors = require('colors/safe');
@@ -275,14 +275,14 @@ Client.prototype.requestLockInfo = function _lock(key, opts, cb) {
         }));
     }
 
-    process.nextTick(send);
+    // process.nextTick(send);
 
-    // if (ws.isOpen) {
-    //     send();
-    // }
-    // else {
-    //     ws.once('open', send);
-    // }
+    if (ws.isOpen) {
+        send();
+    }
+    else {
+        ws.once('open', send);
+    }
 
 };
 
@@ -434,14 +434,14 @@ Client.prototype.lock = function _lock(key, opts, cb) {
         }));
     }
 
-    process.nextTick(send);
+    // process.nextTick(send);
 
-    // if (ws.isOpen) {
-    //     send();
-    // }
-    // else {
-    //     ws.once('open', send);
-    // }
+    if (ws.isOpen) {
+        send();
+    }
+    else {
+        ws.once('open', send);
+    }
 
 
 };
