@@ -3,9 +3,10 @@
 //core
 const assert = require('assert');
 const util = require('util');
+const EE  = require('events');
 
 //npm
-const WebSocket = require('ws');
+const WebSocket = require('uws');
 const ijson = require('siamese');
 const uuidV4 = require('uuid/v4');
 const colors = require('colors/safe');
@@ -29,6 +30,11 @@ process.on('warning', function (w) {
         console.error('\n', ' => Live-Mutex warning => ', w.stack || w, '\n');
     }
 });
+
+
+const noop = function(cb){
+    cb && process.nextTick(cb);
+};
 
 const validOptions = [
 
@@ -122,6 +128,37 @@ function Client($opts) {
     const ws = this.ws = new WebSocket(['ws://', this.host, ':', this.port].join(''));
     // ws.setMaxListeners(350);
 
+    ws.on('error', err => {
+        console.error('\n', ' => Websocket client error => ', err.stack || err, '\n');
+    });
+
+    const ee = new EE();
+
+    ws.on('open', () => {
+        ws.isOpen = true;
+        ee.emit('open',true);
+    });
+
+    this.init = function(cb){
+
+        cb = cb.bind(this);
+
+        if(ws.isOpen){
+            process.nextTick(cb);
+        }
+        else{
+            ee.once('open', function(){
+                process.nextTick(cb);
+            })
+        }
+
+        return this;
+    };
+
+    ws.on('close', () => {
+        ws.isOpen = false;
+    });
+
     process.once('exit', function () {
         ws.close();
     });
@@ -192,17 +229,7 @@ function Client($opts) {
 
     });
 
-    ws.on('error', err => {
-        console.error('\n', ' => Websocket client error => ', err.stack || err, '\n');
-    });
 
-    ws.on('open', () => {
-        ws.isOpen = true;
-    });
-
-    ws.on('close', () => {
-        ws.isOpen = false;
-    });
 
 }
 
@@ -275,14 +302,14 @@ Client.prototype.requestLockInfo = function _lock(key, opts, cb) {
         }));
     }
 
-    // process.nextTick(send);
+    process.nextTick(send);
 
-    if (ws.isOpen) {
-        send();
-    }
-    else {
-        ws.once('open', send);
-    }
+    // if (ws.isOpen) {
+    //     send();
+    // }
+    // else {
+    //     ws.once('open', send);
+    // }
 
 };
 
@@ -367,7 +394,7 @@ Client.prototype.lock = function _lock(key, opts, cb) {
             type: 'lock-client-timeout'
         }), function(err){
             cb(new Error(' => Acquiring lock operation timed out. (Client-side timeout fired) ' +
-                (err ? ('\n' + (err.stack || err)) : '')));
+                (err ? ('\n' + (err.stack || err)) : '')),noop);
         });
 
     }, lockTimeout);
@@ -434,14 +461,18 @@ Client.prototype.lock = function _lock(key, opts, cb) {
         }));
     }
 
-    // process.nextTick(send);
+    // setTimeout(function(){
+    //     send();
+    // },500);
 
-    if (ws.isOpen) {
-        send();
-    }
-    else {
-        ws.once('open', send);
-    }
+    process.nextTick(send);
+
+    // if (ws.isOpen) {
+    //     send();
+    // }
+    // else {
+    //     ws.once('open', send);
+    // }
 
 
 };
@@ -572,6 +603,10 @@ Client.prototype.unlock = function _unlock(key, opts, cb) {
         }));
     }
 
+
+    // setTimeout(function(){
+    //     send();
+    // },500);
 
     process.nextTick(send);
 

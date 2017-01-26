@@ -12,8 +12,17 @@ Test.create(__filename, function (assert, before, it, path, Client, Broker, lmUt
 
 
     const num = 100;
-    const broker = new Broker({port: 7003});
-    const client = new Client({port: 7003});
+
+    let broker, client;
+
+    before.cb('yes',t => {
+        broker = new Broker({port: 7003}).init(t);
+    });
+
+    before.cb('yes',t => {
+         client = new Client({port: 7003}).init(t);
+    });
+
 
     const p = path.resolve(process.env.HOME + '/alphabet.test');
     const file = fs.createWriteStream(p);

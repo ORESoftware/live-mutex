@@ -41,7 +41,7 @@ firstEnsureKeyIsUnlocked()
 
         var i = 0;
 
-        async.each(a, function (val, cb) {
+        async.eachSeries(a, function (val, cb) {
 
             warlock.lock('foo', ttl, function (err, unlock) {
                 if (err) {

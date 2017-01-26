@@ -8,7 +8,7 @@ const file = path.resolve(process.env.HOME + '/speed-test.lock');
 
 const start = Date.now();
 
-async.each(a, function (val, cb) {
+async.eachSeries(a, function (val, cb) {
 
     lf.lock(file, {wait: 3000, retries: 5, stale: 50}, function (err) {
         if (err) {

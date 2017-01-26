@@ -3,9 +3,10 @@
 //core
 const assert = require('assert');
 const util = require('util');
+const EE = require('events');
 
 //npm
-const WebSocket = require('ws');
+const WebSocket = require('uws');
 const WebSocketServer = WebSocket.Server;
 const ijson = require('siamese');
 const async = require('async');
@@ -99,7 +100,7 @@ function Broker($opts) {
     this.port = opts.port || '6970';
 
 
-    const send = this.send = function (ws, data, cb) {
+    this.send = function (ws, data, cb) {
         if (ws.readyState !== WebSocket.OPEN) {
             cb && cb(' => Socket is not OPEN.');
             return;
@@ -129,6 +130,31 @@ function Broker($opts) {
         port: this.port,
         host: this.host
     });
+
+    const ee = new EE();
+
+    wss.on('open',() => {
+        wss.isOpen = true;
+        ee.emit('open', true);
+    });
+
+    this.init = function(cb){
+
+        cb = cb.bind(this);
+
+        if(wss.isOpen){
+            process.nextTick(cb);
+        }
+        else{
+
+            setTimeout(cb,100);
+            // ee.once('open', function(){
+            //     process.nextTick(cb);
+            // });
+        }
+
+        return this;
+    };
 
     wss.on('error', function(err){
        console.error(' => WSS error => ', err.stack || err);
@@ -161,6 +187,8 @@ function Broker($opts) {
     // but there should be no need to do that since we won't have that many clients
 
     wss.on('connection', (ws) => {
+
+        console.log('connection made!!');
 
         if (first) {
             first = false;
@@ -206,7 +234,7 @@ function Broker($opts) {
 
             ijson.parse(msg).then((data) => {
 
-                debug('\n', colors.blue(' => broker received this data => '), '\n', data, '\n');
+                // console.log('\n', colors.blue(' => broker received this data => '), '\n', data, '\n');
 
                 const key = data.key;
 

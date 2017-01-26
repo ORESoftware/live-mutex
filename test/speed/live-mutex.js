@@ -9,38 +9,45 @@ const async = require('async');
 const lmUtils = require('live-mutex/utils');
 const Client = require('live-mutex/client');
 
-// return lmUtils.conditionallyLaunchSocketServer({})
-//     .then(function (data) {
 
-        const a = Array.apply(null, {length: 300});
-        const start = Date.now();
+new Client({port: 7003}).init(function () {
 
-        const client = new Client();
+    const client = this;
 
-        var i = 0;
-        async.eachSeries(a, function (val, cb) {
+    const a = Array.apply(null, {length: 300});
+    const start = Date.now();
 
-            client.lock('foo', function (err, unlock) {
-                if (err) {
-                    cb(err);
-                }
-                else {
-                    console.log('unlocking...' + i++);
-                    unlock(cb);
-                }
-            });
 
-        }, function complete(err) {
+    var i = 0;
+    async.each(a, function (val, cb) {
 
+        client.lock('foo', function (err, unlock) {
             if (err) {
-                throw err;
+                cb(err);
             }
-
-            console.log(' => Time required for live-mutex => ', Date.now() - start);
-            process.exit(0);
+            else {
+                // console.log('unlocking...' + i++);
+                unlock(cb);
+            }
         });
 
+    }, function complete(err) {
 
-    // });
+        if (err) {
+            throw err;
+        }
+
+        console.log(' => Time required for live-mutex => ', Date.now() - start);
+        process.exit(0);
+    });
+
+
+});
+
+
+
+
+
+
 
 
