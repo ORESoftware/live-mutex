@@ -26,7 +26,6 @@ if (weAreDebugging) {
 
 ///////////////////////////////////////////////////////////////////
 
-
 function addWsLockKey(broker, ws, key) {
     var temp;
     if (!( temp = broker.wsLock[ws.wsClientId])) {
@@ -99,7 +98,6 @@ function Broker($opts) {
     this.host = opts.host || '127.0.0.1';
     this.port = opts.port || '6970';
 
-
     this.send = function (ws, data, cb) {
         if (ws.readyState !== WebSocket.OPEN) {
             cb && cb(' => Socket is not OPEN.');
@@ -125,7 +123,6 @@ function Broker($opts) {
         });
     };
 
-
     const wss = this.wss = new WebSocketServer({
         port: this.port,
         host: this.host
@@ -133,31 +130,45 @@ function Broker($opts) {
 
     const ee = new EE();
 
-    wss.on('open',() => {
+    wss.on('open', () => {
         wss.isOpen = true;
         ee.emit('open', true);
     });
 
-    this.init = function(cb){
+    this.ensure = function (cb) {
 
-        cb = cb.bind(this);
+        if (cb) {
+            cb = cb.bind(this);
 
-        if(wss.isOpen){
-            process.nextTick(cb);
+            if (wss.isOpen) {
+                process.nextTick(cb);
+            }
+            else {
+
+                setTimeout(cb, 100);
+                // ee.once('open', function(){
+                //     process.nextTick(cb);
+                // });
+            }
         }
-        else{
-
-            setTimeout(cb,100);
-            // ee.once('open', function(){
-            //     process.nextTick(cb);
-            // });
+        else {
+            return new Promise((resolve) => {
+                console.log('resolving...');
+                if (wss.isOpen) {
+                    resolve(this);
+                }
+                else {
+                    setTimeout(() => {
+                        resolve(this);
+                    }, 100);
+                    // ee.once('open', resolve);
+                }
+            });
         }
-
-        return this;
     };
 
-    wss.on('error', function(err){
-       console.error(' => WSS error => ', err.stack || err);
+    wss.on('error', function (err) {
+        console.error(' => WSS error => ', err.stack || err);
     });
 
     this.bookkeeping = {
@@ -179,7 +190,6 @@ function Broker($opts) {
         // wsClientId: { ws:ws, keys: []}
     };
 
-
     var first = true;
     var wsIdCounter = 1;
 
@@ -195,7 +205,7 @@ function Broker($opts) {
             this.sendStatsMessageToAllClients();
         }
 
-        ws.on('error', function(err){
+        ws.on('error', function (err) {
             console.error(' => ws error => ', err.stack || err);
         });
 
@@ -299,7 +309,7 @@ function Broker($opts) {
                         console.log(' => new lock-holder ensured.');
                     });
                 }
-                else if(data.type === 'lock-info-request'){
+                else if (data.type === 'lock-info-request') {
                     this.retrieveLockInfo(data, ws);
                 }
                 else {
@@ -325,7 +335,6 @@ function Broker($opts) {
     });
 
 }
-
 
 Broker.prototype.sendStatsMessageToAllClients = function () {
 
@@ -392,7 +401,6 @@ Broker.prototype.sendStatsMessageToAllClients = function () {
 
 };
 
-
 Broker.prototype.ensureNewLockHolder = function _ensureNewLockHolder(lck, data, cb) {
 
     const locks = this.locks;
@@ -409,7 +417,6 @@ Broker.prototype.ensureNewLockHolder = function _ensureNewLockHolder(lck, data, 
 
     clearTimeout(lck.to);
     delete lck.to;
-
 
     var obj;
     if (obj = notifyList.shift()) {
@@ -497,7 +504,7 @@ Broker.prototype.ensureNewLockHolder = function _ensureNewLockHolder(lck, data, 
 
 };
 
-Broker.prototype.retrieveLockInfo = function _retrieveLockInfo(data,ws){
+Broker.prototype.retrieveLockInfo = function _retrieveLockInfo(data, ws) {
 
     const locks = this.locks;
     const key = data.key;
@@ -508,7 +515,7 @@ Broker.prototype.retrieveLockInfo = function _retrieveLockInfo(data,ws){
     const lockholderUUID = isLocked ? lck.uuid : null;
     const lockRequestCount = lck ? lck.notify.length : -1;
 
-    if(isLocked && lockRequestCount > 0){
+    if (isLocked && lockRequestCount > 0) {
         console.error(' => Live-Mutex implementation warning, lock is unlocked but ' +
             'notify array has at least one item, for key => ', key);
     }
@@ -525,7 +532,6 @@ Broker.prototype.retrieveLockInfo = function _retrieveLockInfo(data,ws){
 
 };
 
-
 Broker.prototype.lock = function _lock(data, ws) {
 
     const locks = this.locks;
@@ -536,7 +542,6 @@ Broker.prototype.lock = function _lock(data, ws) {
     const ttl = weAreDebugging ? 500000000 : (data.ttl || this.lockExpiresAfter);
     const force = data.force;
 
-
     this.bookkeeping.keys[key] = this.bookkeeping.keys[key] ||
         {
             rawLockCount: 0,
@@ -544,7 +549,6 @@ Broker.prototype.lock = function _lock(data, ws) {
             lockCount: 0,
             unlockCount: 0
         };
-
 
     this.bookkeeping.keys[key].rawLockCount++;
 
@@ -595,7 +599,6 @@ Broker.prototype.lock = function _lock(data, ws) {
                 });
             }, ttl);
 
-
             addWsLockKey(this, ws, key);
 
             this.send(ws, {
@@ -629,7 +632,6 @@ Broker.prototype.lock = function _lock(data, ws) {
             }, ttl)
         };
 
-
         this.send(ws, {
             uuid: uuid,
             lockRequestCount: 0,
@@ -659,7 +661,6 @@ Broker.prototype.unlock = function _unlock(data, ws) {
 
     this.bookkeeping.keys[key].rawUnlockCount++;
     debug('\n', ' => Raw counts in broker => key => ', key, util.inspect(this.bookkeeping.keys[key]), '\n');
-
 
     // if the user passed _uuid, then we check it, other true
     // _uuid is the uuid of the original lockholder call
@@ -705,7 +706,6 @@ Broker.prototype.unlock = function _unlock(data, ws) {
                 }
             }
         });
-
 
         this.ensureNewLockHolder(lck, data, function () {
             debug(' => All done notifying.')
@@ -765,7 +765,6 @@ Broker.prototype.unlock = function _unlock(data, ws) {
     }
 
 };
-
 
 module.exports = Broker;
 

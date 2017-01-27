@@ -9,14 +9,12 @@ const async = require('async');
 const lmUtils = require('live-mutex/utils');
 const Client = require('live-mutex/client');
 
+const client = new Client({port: 7003});
 
-new Client({port: 7003}).init(function () {
+client.ensure().then(function () {
 
-    const client = this;
-
-    const a = Array.apply(null, {length: 300});
+    const a = Array.apply(null, {length: 1000});
     const start = Date.now();
-
 
     var i = 0;
     async.each(a, function (val, cb) {
@@ -41,8 +39,9 @@ new Client({port: 7003}).init(function () {
         process.exit(0);
     });
 
-
 });
+
+
 
 
 

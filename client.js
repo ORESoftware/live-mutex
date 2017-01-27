@@ -3,7 +3,7 @@
 //core
 const assert = require('assert');
 const util = require('util');
-const EE  = require('events');
+const EE = require('events');
 
 //npm
 const WebSocket = require('uws');
@@ -18,21 +18,19 @@ const debug = require('debug')('live-mutex');
 /////////////////////////////////////////////////////////////////////////
 
 const weAreDebugging = require('./lib/we-are-debugging');
-if(weAreDebugging){
+if (weAreDebugging) {
     console.log(' => Live-Mutex client is in debug mode. Timeouts are turned off.');
 }
 
 /////////////////////////////////////////////////////////////////////////
 
-
 process.on('warning', function (w) {
-    if(!String(w).match(/DEBUG_FD/) && !String(w).match(/Live.*Mutex/i)){
+    if (!String(w).match(/DEBUG_FD/) && !String(w).match(/Live.*Mutex/i)) {
         console.error('\n', ' => Live-Mutex warning => ', w.stack || w, '\n');
     }
 });
 
-
-const noop = function(cb){
+const noop = function (cb) {
     cb && process.nextTick(cb);
 };
 
@@ -136,23 +134,37 @@ function Client($opts) {
 
     ws.on('open', () => {
         ws.isOpen = true;
-        ee.emit('open',true);
+        ee.emit('open', true);
     });
 
-    this.init = function(cb){
+    this.ensure = function (cb) {
 
-        cb = cb.bind(this);
+        if (cb) {
+            cb = cb.bind(this);
 
-        if(ws.isOpen){
-            process.nextTick(cb);
-        }
-        else{
-            ee.once('open', function(){
+            if (ws.isOpen) {
                 process.nextTick(cb);
-            })
+            }
+            else {
+                ee.once('open', function () {
+                    process.nextTick(cb);
+                })
+            }
+        }
+        else {
+            return new Promise((resolve) => {
+                console.log('resolving client...');
+                if (ws.isOpen) {
+                    resolve(this);
+                }
+                else {
+                    ee.once('open', () => {
+                        resolve(this);
+                    });
+                }
+            });
         }
 
-        return this;
     };
 
     ws.on('close', () => {
@@ -229,10 +241,7 @@ function Client($opts) {
 
     });
 
-
-
 }
-
 
 Client.prototype.addListener = function (key, fn) {
     assert.equal(typeof key, 'string', ' => Key is not a string.');
@@ -240,7 +249,6 @@ Client.prototype.addListener = function (key, fn) {
     const a = this.listeners[key] = this.listeners[key] || [];
     a.push(fn);
 };
-
 
 Client.prototype.setLockRequestorCount = function (key, val) {
     this.lockholderCount[key] = val;
@@ -254,8 +262,6 @@ Client.prototype.setLockRequestorCount = function (key, val) {
 Client.prototype.getLockholderCount = function (key) {
     return this.lockholderCount[key] || 0;
 };
-
-
 
 Client.prototype.requestLockInfo = function _lock(key, opts, cb) {
 
@@ -293,7 +299,6 @@ Client.prototype.requestLockInfo = function _lock(key, opts, cb) {
 
     };
 
-
     function send() {
         ws.send(JSON.stringify({
             uuid: uuid,
@@ -313,7 +318,6 @@ Client.prototype.requestLockInfo = function _lock(key, opts, cb) {
 
 };
 
-
 Client.prototype.lock = function _lock(key, opts, cb) {
 
     assert(typeof key, 'string', ' => Key passed to live-mutex#lock needs to be a string.');
@@ -326,7 +330,6 @@ Client.prototype.lock = function _lock(key, opts, cb) {
         };
 
     this.bookkeeping.keys[key].rawLockCount++;
-
 
     if (typeof opts === 'function') {
         cb = opts;
@@ -369,7 +372,6 @@ Client.prototype.lock = function _lock(key, opts, cb) {
             ' => "ttl" for a lock needs to be integer between 3 and 800000 millis.');
     }
 
-
     if (opts._retryCount > this.lockRetryMax) {
         return cb(new Error(' => Maximum retries breached.'));
     }
@@ -392,13 +394,12 @@ Client.prototype.lock = function _lock(key, opts, cb) {
             key: key,
             pid: process.pid,
             type: 'lock-client-timeout'
-        }), function(err){
+        }), function (err) {
             cb(new Error(' => Acquiring lock operation timed out. (Client-side timeout fired) ' +
-                (err ? ('\n' + (err.stack || err)) : '')),noop);
+                (err ? ('\n' + (err.stack || err)) : '')), noop);
         });
 
     }, lockTimeout);
-
 
     this.resolutions[uuid] = (err, data) => {
 
@@ -451,7 +452,6 @@ Client.prototype.lock = function _lock(key, opts, cb) {
 
     };
 
-
     function send() {
         ws.send(JSON.stringify({
             uuid: uuid,
@@ -474,9 +474,7 @@ Client.prototype.lock = function _lock(key, opts, cb) {
     //     ws.once('open', send);
     // }
 
-
 };
-
 
 Client.prototype.unlock = function _unlock(key, opts, cb) {
 
@@ -508,12 +506,10 @@ Client.prototype.unlock = function _unlock(key, opts, cb) {
 
     opts = opts || {};
 
-
     if ('force' in opts) {
         assert.equal(typeof opts.force, 'boolean', ' => Live-Mutex usage error => ' +
             '"force" option must be a boolean value. Coerce it on your side, for safety.');
     }
-
 
     if ('unlockRequestTimeout' in opts) {
         assert(Number.isInteger(opts.lockRequestTimeout),
@@ -521,7 +517,6 @@ Client.prototype.unlock = function _unlock(key, opts, cb) {
         assert(opts.lockRequestTimeout >= 20 && opts.lockRequestTimeout <= 800000,
             ' => "ttl" for a lock needs to be integer between 3 and 800000 millis.');
     }
-
 
     opts._retryCount = opts._retryCount || 0;
 
@@ -540,7 +535,6 @@ Client.prototype.unlock = function _unlock(key, opts, cb) {
         cb(new Error(' => Unlocking timed out.'));
 
     }, unlockTimeout);
-
 
     this.resolutions[uuid] = (err, data) => {
 
@@ -591,7 +585,6 @@ Client.prototype.unlock = function _unlock(key, opts, cb) {
 
     };
 
-
     function send() {
         ws.send(JSON.stringify({
             uuid: uuid,
@@ -602,7 +595,6 @@ Client.prototype.unlock = function _unlock(key, opts, cb) {
             type: 'unlock'
         }));
     }
-
 
     // setTimeout(function(){
     //     send();
@@ -617,8 +609,6 @@ Client.prototype.unlock = function _unlock(key, opts, cb) {
     //     ws.once('open', send);
     // }
 
-
 };
-
 
 module.exports = Client;
