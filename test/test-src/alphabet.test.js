@@ -10,15 +10,17 @@ Test.create(__filename, function (assert, before, describe, it, path, Client, Br
 
     const num = 100;
 
+    const conf = Object.freeze({port:7028});
+
     inject('yes', () => {
         return {
-            broker: new Broker({port: 7003}).ensure()
+            broker: new Broker(conf).ensure()
         }
     });
 
     inject('yes', () => {
         return {
-            client: new Client({port: 7003}).ensure()
+            client: new Client(conf).ensure()
         }
     });
 

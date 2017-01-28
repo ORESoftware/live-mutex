@@ -1,65 +1,96 @@
 const suman = require('suman');
 const Test = suman.init(module, {});
 
-
 Test.create(__filename, {mode: 'parallel'}, function (assert, before, it, Client, lmUtils) {
 
-
-    const conf = {port: 7987};
+    const conf = Object.freeze({port: 7987});
 
     before('promise', function () {
 
         return lmUtils.conditionallyLaunchSocketServer(conf)
-            .then(function (data) {
-                console.log('data from conditionallyLaunchSocketServer => ', data);
-            }, function (err) {
-                if (err) {
-                    console.error(err.stack);
-                }
-                else {
-                    throw new Error('no error passed to reject handler');
-                }
+        .then(function (data) {
+            console.log('data from conditionallyLaunchSocketServer => ', data);
+        }, function (err) {
+            if (err) {
+                console.error(err.stack);
+            }
+            else {
+                throw new Error('no error passed to reject handler');
+            }
 
+        });
+
+    });
+
+
+    it.cb('yes', {timeout: 30000}, t => {
+
+        Client.create(conf, (err, c) => {
+            if(err) return t.fail(err);
+            c.lock('z', function (err) {
+                if (err) return t(err);
+                c.unlock('z', t);
             });
-
-    });
-
-
-    it.cb('yes', {timeout: 30000}, t => {
-
-        const client = new Client(conf);
-        client.lock('z', function (err) {
-            if (err) return t(err);
-            client.unlock('z', t);
         });
-    });
 
+        // const c = new Client(conf);
+        // c.ensure().then(function () {
+        //     c.lock('z', function (err) {
+        //         if (err) return t(err);
+        //         c.unlock('z', t);
+        //     });
+        // });
+
+    });
 
     it.cb('yes', {timeout: 30000}, t => {
 
-        const client = new Client(conf);
-        client.lock('z', function (err) {
-            if (err) return t(err);
-            client.unlock('z', t.done);
-        });
-    });
+        const c = new Client(conf);
 
-    it.cb('yes', {timeout: 30000}, t => {
-
-        const client = new Client(conf);
-        client.lock('z', function (err) {
-            if (err) return t(err);
-            client.unlock('z', t);
+        c.ensure().then(function () {
+            c.lock('z', function (err) {
+                if (err) return t(err);
+                c.unlock('z', t);
+            });
         });
     });
 
     it.cb('yes', {timeout: 30000}, t => {
 
-        const client = new Client(conf);
-        client.lock('z', function (err) {
-            if (err) return t(err);
-            client.unlock('z', t.done);
+        return Client.create(conf).then(c => {
+            c.lock('z', function (err) {
+                if (err) return t(err);
+                c.unlock('z', t);
+            });
         });
+
+        // const c = new Client(conf);
+        //
+        // c.ensure().then(function () {
+        //     c.lock('z', function (err) {
+        //         if (err) return t(err);
+        //         c.unlock('z', t);
+        //     });
+        // });
+    });
+
+    it.cb('yes', {timeout: 30000}, t => {
+
+        Client.create(conf).then(c => {
+            c.lock('z', function (err) {
+                if (err) return t(err);
+                c.unlock('z', t);
+            });
+        });
+
+        // const c = new Client(conf);
+        //
+        // c.ensure().then(function () {
+        //     c.lock('z', function (err) {
+        //         if (err) return t(err);
+        //         c.unlock('z', t);
+        //     });
+        // });
     });
 
 });

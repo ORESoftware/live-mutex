@@ -1,106 +1,110 @@
 'use strict';
 
-
 const suman = require('suman');
 const Test = suman.init(module);
 
-
 const colors = require('colors/safe');
 
+Test.create(__filename, {}, function (it, Broker, Client, inject, describe) {
 
-Test.create(__filename, {}, function (it, Broker, Client) {
+    const conf = Object.freeze({port: 7034});
 
-    const broker = new Broker({port: 7033});
+    inject('yes', () => {
+        return {
+            broker: new Broker(conf).ensure()
+        }
+    });
 
+    inject('yes', () => {
+        return {
+            c: new Client(conf).ensure()
+        }
+    });
 
-    const client = new Client({port: 7033});
+    describe('injected', function (it, c) {
 
-    it.cb('locks/unlocks', t => {
+        it.cb('locks/unlocks', t => {
 
-        client.lock('a', {}, function (err, unlock) {
+            c.lock('a', {}, function (err, unlock) {
 
-            if (err) {
-                return t.fail(err);
-            }
+                if (err) {
+                    return t.fail(err);
+                }
 
-            console.log('\n', colors.yellow(' ONE lock acquired!!! => '), '\n');
+                console.log('\n', colors.yellow(' ONE lock acquired!!! => '), '\n');
 
-            setTimeout(function () {
-                unlock(function (err) {
-                    if (err) {
-                        return t.fail(err);
-                    }
-                    else {
-                        console.log(colors.yellow(' ONE lock released!!! => '));
-                        t.done();
-                    }
+                setTimeout(function () {
+                    unlock(function (err) {
+                        if (err) {
+                            return t.fail(err);
+                        }
+                        else {
+                            console.log(colors.yellow(' ONE lock released!!! => '));
+                            t.done();
+                        }
 
-                });
-            }, 1500);
+                    });
+                }, 1500);
+
+            });
 
         });
 
-    });
+        it.cb('locks/unlocks', t => {
 
+            c.lock('a', 10, function (err, unlock, id) {
 
-    it.cb('locks/unlocks', t => {
+                if (err) {
+                    return t.fail(err);
+                }
 
-        client.lock('a', 10, function (err, unlock, id) {
+                console.log('\n', colors.blue(' TWO lock acquired!!! => '), '\n', id);
 
-            if (err) {
-                return t.fail(err);
-            }
+                setTimeout(function () {
 
-            console.log('\n', colors.blue(' TWO lock acquired!!! => '), '\n', id);
+                    c.unlock('a', id, function (err) {
+                        if (err) {
+                            return t.fail(err);
+                        }
+                        else {
+                            console.log(colors.blue(' TWO lock released!!! => '));
+                            t.done();
+                        }
 
-            setTimeout(function () {
+                    });
 
-                client.unlock('a', id, function (err) {
-                    if (err) {
-                        return t.fail(err);
-                    }
-                    else {
-                        console.log(colors.blue(' TWO lock released!!! => '));
-                        t.done();
-                    }
+                }, 1000);
 
-                });
-
-            }, 1000);
-
+            });
 
         });
 
-    });
+        it.cb('locks/unlocks', t => {
 
+            c.lock('a', {}, function (err, unlock, id) {
 
-    it.cb('locks/unlocks', t => {
+                if (err) {
+                    return t.fail(err);
+                }
 
+                console.log('\n', colors.green(' THREE lock acquired!!! => '), '\n', id);
 
-        client.lock('a', {}, function (err, unlock, id) {
+                setTimeout(function () {
+                    c.unlock('a', function (err) {
+                        if (err) {
+                            t.fail(err);
+                        }
+                        else {
+                            console.log(colors.green(' THREE lock released!!! => '));
+                            t.done();
+                        }
 
-            if (err) {
-                return t.fail(err);
-            }
+                    });
+                }, 1000);
 
-            console.log('\n', colors.green(' THREE lock acquired!!! => '), '\n', id);
-
-            setTimeout(function () {
-                client.unlock('a', function (err) {
-                    if (err) {
-                        t.fail(err);
-                    }
-                    else {
-                        console.log(colors.green(' THREE lock released!!! => '));
-                        t.done();
-                    }
-
-                });
-            }, 1000);
-
-
+            });
         });
-    });
 
+    });
 
 });

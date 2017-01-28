@@ -6,13 +6,8 @@ const colors = require('colors/safe');
 const async = require('async');
 const _ = require('lodash');
 
-const Client = require('../../client');
-const Broker = require('../../broker');
-const broker = new Broker({port: 7000});
-const client = new Client({port: 7000});
 
-
-Test.create(__filename, function (assert, describe) {
+Test.create(__filename, function (assert, describe, Client, Broker, inject) {
 
     const arrays = [
         [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
@@ -21,54 +16,73 @@ Test.create(__filename, function (assert, describe) {
         [1, 2, 3, 4, 5, 6, 7, 8, 9]
     ];
 
+    const conf = Object.freeze({port: 7037});
+
+    inject('yes', () => {
+        return {
+            broker: new Broker(conf).ensure()
+        }
+    });
+
+    inject('yes', () => {
+        return {
+            c: new Client(conf).ensure()
+        }
+    });
+
     const l = _.flattenDeep(arrays).length;
     console.log(' => length => ', l);
 
-    arrays.forEach(a => {
+    describe('inject', function(c, describe){
 
-        describe.delay('resumes', function (resume, describe) {
+        arrays.forEach(a => {
 
-            async.map(a, function (val, cb) {
+            describe.delay('resumes', function (resume, describe) {
 
-                cb(null, t => {
-                    client.lock(String(val), function (err, unlock, id) {
-                        if (err) {
-                            t.fail(err);
-                        }
-                        else {
-                            setTimeout(function () {
-                                client.unlock(String(val), {
-                                    force: false,
-                                    _uuid: id
-                                }, t.done);
-                                // client.unlock(String(val), id, t.done);
-                            }, 100);
-                        }
+                async.map(a, function (val, cb) {
+
+                    cb(null, t => {
+                        c.lock(String(val), function (err, unlock, id) {
+                            if (err) {
+                                t.fail(err);
+                            }
+                            else {
+                                setTimeout(function () {
+                                    c.unlock(String(val), {
+                                        force: false,
+                                        _uuid: id
+                                    }, t.done);
+                                    // client.unlock(String(val), id, t.done);
+                                }, 100);
+                            }
+                        });
                     });
+
+
+                }, function (err, results) {
+                    if (err) {
+                        throw err;
+                    }
+
+                    resume(results);
                 });
 
 
-            }, function (err, results) {
-                if (err) {
-                    throw err;
-                }
+                describe('handles results', {parallel: true}, function () {
 
-                resume(results);
-            });
+                    const fns = this.getResumeValue();
 
+                    fns.forEach(fn => {
 
-            describe('handles results', {parallel: true}, function () {
+                        this.it.cb('locks/unlocks', fn);
 
-                const fns = this.getResumeValue();
+                    });
 
-                fns.forEach(fn => {
-
-                    this.it.cb('locks/unlocks', fn);
 
                 });
 
-
             });
+
 
         });
 

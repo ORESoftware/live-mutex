@@ -56,7 +56,7 @@ const validOptions = [
     'port'
 ];
 
-function Broker($opts) {
+function Broker($opts, cb) {
 
     const opts = this.opts = $opts || {};
     assert(typeof opts === 'object', ' => Bad arguments to live-mutex server constructor.');
@@ -124,44 +124,43 @@ function Broker($opts) {
     };
 
     const wss = this.wss = new WebSocketServer({
-        port: this.port,
-        host: this.host
-    });
+            port: this.port,
+            host: this.host
+        },
+        () => {
+            wss.isOpen = true;
+            process.nextTick(function () {
+                ee.emit('open', true);
+                cb && cb();
+            });
+
+        });
 
     const ee = new EE();
-
-    wss.on('open', () => {
-        wss.isOpen = true;
-        ee.emit('open', true);
-    });
 
     this.ensure = function (cb) {
 
         if (cb) {
             cb = cb.bind(this);
-
             if (wss.isOpen) {
                 process.nextTick(cb);
             }
             else {
 
-                setTimeout(cb, 100);
-                // ee.once('open', function(){
-                //     process.nextTick(cb);
-                // });
+                ee.once('open', () => {
+                    process.nextTick(cb);
+                });
             }
         }
         else {
             return new Promise((resolve) => {
-                console.log('resolving...');
                 if (wss.isOpen) {
                     resolve(this);
                 }
                 else {
-                    setTimeout(() => {
-                        resolve(this);
-                    }, 100);
-                    // ee.once('open', resolve);
+                    ee.once('open', () => {
+                        resolve(this)
+                    });
                 }
             });
         }
@@ -197,8 +196,6 @@ function Broker($opts) {
     // but there should be no need to do that since we won't have that many clients
 
     wss.on('connection', (ws) => {
-
-        console.log('connection made!!');
 
         if (first) {
             first = false;
@@ -242,7 +239,7 @@ function Broker($opts) {
 
         ws.on('message', (msg) => {
 
-            ijson.parse(msg).then((data) => {
+            ijson.parse(msg).then(data => {
 
                 // console.log('\n', colors.blue(' => broker received this data => '), '\n', data, '\n');
 
@@ -335,6 +332,30 @@ function Broker($opts) {
     });
 
 }
+
+Broker.create = function (opts, cb) {
+    try {
+        const b = new Broker(opts);
+        return b.ensure().then(() => {
+            if (cb) {
+                cb(null, b);
+            }
+            else {
+                return b;
+            }
+        });
+    }
+    catch (err) {
+        if (cb) {
+            process.nextTick(function () {
+                cb(err);
+            });
+        }
+        else {
+            return Promise.reject(err);
+        }
+    }
+};
 
 Broker.prototype.sendStatsMessageToAllClients = function () {
 

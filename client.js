@@ -47,10 +47,14 @@ const validOptions = [
 
 ];
 
-function Client($opts) {
+function Client($opts, cb) {
 
     const opts = this.opts = $opts || {};
     assert(typeof opts === 'object', ' => Bad arguments to live-mutex client constructor.');
+
+    if(cb){
+        cb = cb.bind(this);
+    }
 
     Object.keys(opts).forEach(function (key) {
         if (validOptions.indexOf(key) < 0) {
@@ -124,7 +128,6 @@ function Client($opts) {
     this.unlockRetryMax = opts.unlockRetryMax || 3;
 
     const ws = this.ws = new WebSocket(['ws://', this.host, ':', this.port].join(''));
-    // ws.setMaxListeners(350);
 
     ws.on('error', err => {
         console.error('\n', ' => Websocket client error => ', err.stack || err, '\n');
@@ -134,7 +137,10 @@ function Client($opts) {
 
     ws.on('open', () => {
         ws.isOpen = true;
-        ee.emit('open', true);
+        process.nextTick(function(){
+            ee.emit('open', true);
+            cb && cb();
+        });
     });
 
     this.ensure = function (cb) {
@@ -153,7 +159,6 @@ function Client($opts) {
         }
         else {
             return new Promise((resolve) => {
-                console.log('resolving client...');
                 if (ws.isOpen) {
                     resolve(this);
                 }
@@ -242,6 +247,31 @@ function Client($opts) {
     });
 
 }
+
+Client.create = function (opts, cb) {
+    try {
+        const client = new Client(opts);
+        return client.ensure().then(() => {
+            if (cb) {
+                cb(null, client);
+            }
+            else {
+                return client;
+            }
+        });
+
+    }
+    catch (err) {
+        if (cb) {
+            process.nextTick(function () {
+                cb(err);
+            });
+        }
+        else {
+            return Promise.reject(err);
+        }
+    }
+};
 
 Client.prototype.addListener = function (key, fn) {
     assert.equal(typeof key, 'string', ' => Key is not a string.');
@@ -347,6 +377,7 @@ Client.prototype.lock = function _lock(key, opts, cb) {
     }
 
     opts = opts || {};
+    cb && (cb = cb.bind(this));
 
     if ('append' in opts) {
         assert.equal(typeof opts.append, 'string', ' => Live-Mutex usage error => ' +
@@ -505,6 +536,7 @@ Client.prototype.unlock = function _unlock(key, opts, cb) {
     }
 
     opts = opts || {};
+    cb && (cb = cb.bind(this));
 
     if ('force' in opts) {
         assert.equal(typeof opts.force, 'boolean', ' => Live-Mutex usage error => ' +
