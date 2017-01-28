@@ -22,19 +22,20 @@ firstEnsureKeyIsUnlocked(key, function (err) {
         throw err;
     }
 
-    const a = Array.apply(null, {length: 100});
+    const a = Array.apply(null, {length: 1000});
     const start = Date.now();
 
     let i = 0;
 
 
     const ttl = 3; // Lifetime of the lock
-    const maxAttempts = 40; // Max number of times to try setting the lock before erroring
-    const wait = 1000; // Time to wait before another attempt if lock already in place
+    const maxAttempts = 4000; // Max number of times to try setting the lock before erroring
 
     async.each(a, function (val, cb) {
 
-        warlock.optimistic(key, ttl, maxAttempts, wait, function (err, unlock) {
+        const w = Math.ceil(Math.random() * 10);
+
+        warlock.optimistic(key, ttl, maxAttempts, w, function (err, unlock) {
             if (err) {
                 cb(err);
             }

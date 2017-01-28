@@ -118,6 +118,10 @@ lmUtils.conditionallyLaunchSocketServer(opts, function(err){
                
            });
        });
+      
+      // note: using this id ensures that the unlock call corresponds with the original corresponding lock call
+      // otherwise what could happen in your program is that you could call
+      // unlock() for a key that was not supposed to be unlocked by your current call
             
             
       //  simple usage without the call id (this is less safe):
@@ -131,12 +135,6 @@ lmUtils.conditionallyLaunchSocketServer(opts, function(err){
                });
           });      
       });
-       
-       
-       
-       // using this id ensures that the unlock call corresponds with the original corresponding lock call,
-       // otherwise what could happen in your program is that you could call
-       // unlock() for a key that was not supposed to be unlocked by your current call
       
       
 });
@@ -144,8 +142,8 @@ lmUtils.conditionallyLaunchSocketServer(opts, function(err){
 
 ```
 
-Any *locking* errors will mostly be due to the failure to acquire a lock before timing out, and should not
- very rarely happen if you understand your system and provide good settings.
+Any *locking* errors will mostly be due to the failure to acquire a lock before timing out, and should
+ very rarely happen if you understand your system and provide good settings/options to live-mutex.
 
 *Unlocking* errors should be very rare, and most likely will happen if the process running the broker goes down
 or is overwhelmed.
@@ -166,7 +164,8 @@ to see if the web-socket server is running somewhere. I have had a lot of luck w
             // tcp server is already listening on the given host/port
         }
         else {
-           // nothing is listening so probably should launch a new server
+           // nothing is listening so you should launch a new server/broker, as stated above
+           // the broker can run in the same process as a client, or a separate process, either way
         }
     });
 

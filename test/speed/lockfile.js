@@ -3,7 +3,7 @@ const async = require('async');
 const lf = require('lockfile');
 
 
-const a = Array.apply(null, {length: 100});
+const a = Array.apply(null, {length: 1000});
 const file = path.resolve(process.env.HOME + '/speed-test.lock');
 
 const start = Date.now();
@@ -12,7 +12,9 @@ let i = 0;
 
 async.each(a, function (val, cb) {
 
-    lf.lock(file, {wait: 3000, retries: 5, stale: 50}, function (err) {
+    const w = Math.ceil(Math.random() * 3);
+
+    lf.lock(file, {wait: w, retries: 5000, stale: 500}, function (err) {
         if (err) {
             cb(err);
         }

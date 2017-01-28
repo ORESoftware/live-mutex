@@ -1,7 +1,8 @@
 'use strict';
 
-const async = require('async');
+// note: this should run in less than 200 ms, even with logging
 
+const async = require('async');
 const lmUtils = require('live-mutex/utils');
 const Client = require('live-mutex/client');
 
@@ -13,10 +14,11 @@ lmUtils.launchBrokerInChildProcess(conf, function () {
 
     client.ensure().then(function () {
 
-        const a = Array.apply(null, {length: 1000});
+        const a = Array.apply(null, {length: 100});
         const start = Date.now();
 
-        var i = 0;
+        let i = 0;
+
         async.each(a, function (val, cb) {
 
             client.lock('foo', function (err, unlock) {
@@ -42,7 +44,3 @@ lmUtils.launchBrokerInChildProcess(conf, function () {
     });
 
 });
-
-
-
-
