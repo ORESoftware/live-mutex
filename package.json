@@ -4,7 +4,7 @@
   "description": "Simple mutex that uses Node.js process + websockets, instead of Redis; useful if you cannot install Redis etc.",
   "main": "index.js",
   "scripts": {
-    "test": "suman"
+    "test": "./test.sh"
   },
   "repository": {
     "type": "git",

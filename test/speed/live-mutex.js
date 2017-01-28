@@ -13,7 +13,7 @@ const client = new Client({port: 7003});
 
 client.ensure().then(function () {
 
-    const a = Array.apply(null, {length: 1000});
+    const a = Array.apply(null, {length: 300});
     const start = Date.now();
 
     var i = 0;
