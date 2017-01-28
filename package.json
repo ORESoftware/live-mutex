@@ -32,6 +32,10 @@
     "lockfile": "^1.0.3",
     "node-redis-warlock": "^0.2.0",
     "redis": "^2.6.3",
-    "suman": "github:oresoftware/suman#dev"
+    "suman": "github:oresoftware/suman#dev",
+    "@types/async": "^2.0.38",
+    "@types/core-js": "^0.9.35",
+    "@types/lodash": "^4.14.50",
+    "@types/node": "^7.0.0"
   }
 }

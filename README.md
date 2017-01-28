@@ -34,6 +34,9 @@ to write something that I understood and might perform better.
 
 ## Usage
 
+The Live-Mutex API is completely asynchronous and requires usage of async initialization for both
+the client and broker instances.
+
 This library requires a Node.js process to run a websocket server. This can be within one of your existing Node.js
 processes, or more likely launched separately. In other words, a live-mutex client could also be the broker,
 there is nothing wrong with that. For any given key there should be one broker. For absolute speed, you could use separate
@@ -69,6 +72,16 @@ const Client = require('live-mutex/client');
 const lmUtils = require('live-mutex/utils');
 
 ```
+
+// alternatively
+
+```js
+
+import {Client, Broker, lmUtils}  from 'live-mutex';
+
+```
+
+
 
 To check if there is already a broker running in your system on the desired port, you can use a tcp ping utility
 to see if the web-socket server is running somewhere:

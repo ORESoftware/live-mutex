@@ -1,4 +1,12 @@
-const suman = require('suman');
+import * as suman from 'suman';
+
+
+function decoratorExpression(target) {
+    // Add a property on target
+    target.annotated = true;
+}
+
+
 const Test = suman.init(module, {});
 
 
@@ -7,9 +15,10 @@ const async = require('async');
 const _ = require('lodash');
 
 
+
 Test.create(__filename, {}, function (assert, fs, path, Client, Broker, inject) {
 
-    const conf = Object.freeze({port: 7033});
+    const conf = Object.freeze({port: 7027});
 
     inject('yes', () => {
         return {
@@ -83,7 +92,5 @@ Test.create(__filename, {}, function (assert, fs, path, Client, Broker, inject) 
         });
 
     });
-
-
 
 });
