@@ -1,51 +1,47 @@
-/**
- * Created by oleg on 12/28/16.
- */
+'use strict';
 
-
-const path = require('path');
 const async = require('async');
 
 const lmUtils = require('live-mutex/utils');
 const Client = require('live-mutex/client');
 
-const client = new Client({port: 7003});
+const conf = Object.freeze({port: 7003});
 
-client.ensure().then(function () {
+lmUtils.launchBrokerInChildProcess(conf, function () {
 
-    const a = Array.apply(null, {length: 300});
-    const start = Date.now();
+    const client = new Client(conf);
 
-    var i = 0;
-    async.each(a, function (val, cb) {
+    client.ensure().then(function () {
 
-        client.lock('foo', function (err, unlock) {
+        const a = Array.apply(null, {length: 100});
+        const start = Date.now();
+
+        var i = 0;
+        async.each(a, function (val, cb) {
+
+            client.lock('foo', function (err, unlock) {
+                if (err) {
+                    cb(err);
+                }
+                else {
+                    // console.log('unlocking...' + i++);
+                    unlock(cb);
+                }
+            });
+
+        }, function complete(err) {
+
             if (err) {
-                cb(err);
+                throw err;
             }
-            else {
-                // console.log('unlocking...' + i++);
-                unlock(cb);
-            }
+
+            console.log(' => Time required for live-mutex => ', Date.now() - start);
+            process.exit(0);
         });
 
-    }, function complete(err) {
-
-        if (err) {
-            throw err;
-        }
-
-        console.log(' => Time required for live-mutex => ', Date.now() - start);
-        process.exit(0);
     });
 
 });
-
-
-
-
-
-
 
 
 

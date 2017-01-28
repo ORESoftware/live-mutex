@@ -15,8 +15,10 @@ const async = require('async');
 const _ = require('lodash');
 
 
+import {Client, Broker, lmUtils}  from 'live-mutex';
 
-Test.create(__filename, {}, function (assert, fs, path, Client, Broker, inject) {
+
+Test.create(__filename, {}, function (assert, fs, path, inject) {
 
     const conf = Object.freeze({port: 7027});
 

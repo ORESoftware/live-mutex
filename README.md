@@ -2,8 +2,6 @@
 
 # Live-Mutex
 
-http://antirez.com/news/77
-
 ## About
 
 This library is useful for developers who need a multi-process locking mechanism, but may find it
@@ -13,7 +11,13 @@ It offers the same locking features that Redis would offer, but should be more d
 
 For application development, there is no reason not to use Redis or similar,
 but for libraries that need a locking mechanism, and for which installing Redis would be too much to ask, then this
-will be a good solution.
+will be a good solution. In most cases, this library should outperform other libraries doing concurrent access, this
+is because this library uses events instead of polling for its implementation.
+
+This library uses a broker and client model. For any key there should be at most 1 broker. There can be as many
+clients as you like. For more than one key, you can use just 1 broker, or a separate broker per key,
+depending on how much performance you really need.
+
 
 ## ```$ npm install --save live-mutex ```
 
@@ -35,7 +39,7 @@ to write something that I understood and might perform better.
 ## Usage
 
 The Live-Mutex API is completely asynchronous and requires usage of async initialization for both
-the client and broker instances.
+the client and broker instances. You can initialize a client or broker in several different ways.
 
 This library requires a Node.js process to run a websocket server. This can be within one of your existing Node.js
 processes, or more likely launched separately. In other words, a live-mutex client could also be the broker,
@@ -65,75 +69,69 @@ Do not use more than one broker for the same key, as that will defeat the purpos
 
 ```js
 
-// exports:
+// exposed API
 
 const Broker = require('live-mutex/broker');
 const Client = require('live-mutex/client');
 const lmUtils = require('live-mutex/utils');
 
-```
 
 // alternatively
-
-```js
-
 import {Client, Broker, lmUtils}  from 'live-mutex';
 
 ```
 
 
 
-To check if there is already a broker running in your system on the desired port, you can use a tcp ping utility
-to see if the web-socket server is running somewhere:
-
 ```js
 const opts = {port: '<port>' , host: '<host>'};
 
 // check to see if the websocket broker is already running, if not, launch one in this process
 
-// you can probably find a synchronous way to do this
-// (although not a lot of network I/O libraries in the Node.js
-//  world have any synchronous methods/functions)
-
 lmUtils.conditionallyLaunchSocketServer(opts, function(err){
+    
+    if(err){
+        throw err;
+    }
            
       // either this process now owns the broker, or it's already running in a different process
       // either way, we are good to go
       // you don't need to use this utility method, you can easily write your own
       
+      // * the following is our recommended usage* =>
+      // for convenience and safety, you can use the unlock callback, which is bound
+      // to the right key and internal call-id 
+             
+       const client = new Client(opts, function(){
+           client.lock('<key>', function(err, unlock){
+                 unlock(function(err){
+                                  
+                  });
+             });
+         });
+       
+       
+      // using the unlock convenience callback is basically equivalent to doing this:
+             
+      client.lock('<key>', function(err, unlock, id){
+           client.unlock('<key>', id, function(err){
+               
+           });
+       });
+            
+            
+      //  simple usage without the call id (this is less safe):
+      
       const client = new Client(opts);
-     
       
-      //  simple usage
-      
-       client.lock('<key>', function(err){
-           client.unlock('<key>',function(err){
-               
-           });
-       });
+      client.ensure().then(function(c){
+          c.lock('<key>', function(err){
+               c.unlock('<key>',function(err){
+                         
+               });
+          });      
+      });
        
-       
-       // *recommended usage* => for convenience and safety, you can use the unlock callback, which is bound
-       // to the right key and internal call-id for safety
-       
-      client.lock('<key>', function(err, unlock){
-           unlock(function(err){
-               
-           });
-       });
-      
-      
-      
-      
-      
-      
-      // using the unlock callback is basically equivalent to doing this:
-      
-       client.lock('<key>', function(err, unlock, id){
-            client.unlock('<key>', id, function(err){
-                
-            });
-        });
        
        
        // using this id ensures that the unlock call corresponds with the original corresponding lock call,
@@ -144,8 +142,34 @@ lmUtils.conditionallyLaunchSocketServer(opts, function(err){
 });
 
 
-//  NOTE:   any locking errors will mostly be due to the failure to acquire a lock before timing out, and should not
-//          very rarely happen if you understand your system and provide good settings.
-//  NOTE:   unlocking errors should be very rare
+```
+
+Any *locking* errors will mostly be due to the failure to acquire a lock before timing out, and should not
+ very rarely happen if you understand your system and provide good settings.
+
+*Unlocking* errors should be very rare, and most likely will happen if the process running the broker goes down
+or is overwhelmed.
+
+To check if there is already a broker running in your system on the desired port, you can use a tcp ping utility
+to see if the web-socket server is running somewhere. I have had a lot of luck with tcp-ping, like so:
+
+```js
+
+  const ping = require('tcp-ping');
+
+  ping.probe(host, port, function (err, available) {
+
+        if (err) {
+            // handle it
+        }
+        else if (available) {
+            // tcp server is already listening on the given host/port
+        }
+        else {
+           // nothing is listening so probably should launch a new server
+        }
+    });
+
 
 ```
+  

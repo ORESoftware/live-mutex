@@ -7,16 +7,17 @@ var Test = suman.init(module, {});
 var colors = require('colors/safe');
 var async = require('async');
 var _ = require('lodash');
-Test.create(__filename, {}, function (assert, fs, path, Client, Broker, inject) {
+var live_mutex_1 = require("live-mutex");
+Test.create(__filename, {}, function (assert, fs, path, inject) {
     var conf = Object.freeze({ port: 7027 });
     inject('yes', function () {
         return {
-            broker: new Broker(conf).ensure()
+            broker: new live_mutex_1.Broker(conf).ensure()
         };
     });
     inject('yes', function () {
         return {
-            c: new Client(conf).ensure()
+            c: new live_mutex_1.Client(conf).ensure()
         };
     });
     var f = require.resolve('../fixtures/corruptible.txt');

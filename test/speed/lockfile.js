@@ -8,14 +8,16 @@ const file = path.resolve(process.env.HOME + '/speed-test.lock');
 
 const start = Date.now();
 
-async.eachSeries(a, function (val, cb) {
+let i = 0;
+
+async.each(a, function (val, cb) {
 
     lf.lock(file, {wait: 3000, retries: 5, stale: 50}, function (err) {
         if (err) {
             cb(err);
         }
         else {
-            console.log('unlocking...');
+            console.log('unlocking...' + i++);
             lf.unlock(file, cb);
         }
     });
