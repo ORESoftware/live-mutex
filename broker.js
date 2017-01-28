@@ -11,7 +11,6 @@ const WebSocketServer = WebSocket.Server;
 const ijson = require('siamese');
 const async = require('async');
 const colors = require('colors/safe');
-const _ = require('lodash');
 const uuidV4 = require('uuid/v4');
 
 //project
