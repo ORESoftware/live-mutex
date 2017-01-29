@@ -178,3 +178,72 @@ to see if the web-socket server is running somewhere. I have had a lot of luck w
 
 ```
   
+## Extra:
+  
+  This library conciously uses a CPS interface as this is the most primitive async interface.
+  You can always wrap client.lock and client.unlock to use Promises or Observables etc.
+  For example, here we wrap live-mutex to make it usable with RxJS Observables. Notice
+  that we just pass errors to sub.next() instead of sub.error(), but that's just a design
+  decision.
+  
+```js
+
+   import {Observable} from 'rxjs/Rx';
+  
+   function acquireLock(q, name) {
+  
+      const lock = q.lock;
+      const client = q.client;
+  
+      return Observable.create(sub => {
+  
+          client.lock(lock, {append: name},  (err, unlock, id) => {
+          
+              if (err) {
+                  console.error('\n\n', ' => Error acquiring lock => \n', (err.stack || err));
+              }
+  
+              sub.next({
+                  error: err ? (err.stack || err) : undefined,
+                  id: id,
+                  name: name
+              });
+  
+              sub.complete();
+  
+          });
+  
+          return function () {
+              console.log('disposing acquireLock()');
+          }
+      });
+  }
+  
+   function releaseLock(q, lockUuid) {
+  
+      const client = q.client;
+      const lock = q.lock;
+  
+      return Observable.create(sub => {
+  
+          client.unlock(lock, lockUuid,  (err) => {
+  
+              if (err) {
+                  console.error('\n', ' => Release lock error => ', '\n', err.stack || err);
+              }
+            
+              sub.next({
+                  error: err ? (err.stack || err) : undefined
+              });
+  
+              sub.complete();
+  
+          });
+  
+          return function () {
+               console.log('disposing releaseLock()');
+          }
+      });
+  }
+
+```
