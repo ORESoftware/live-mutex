@@ -46,6 +46,12 @@ processes, or more likely launched separately. In other words, a live-mutex clie
 there is nothing wrong with that. For any given key there should be one broker. For absolute speed, you could use separate
 brokers (in separate Node.js processes)for separate keys, but that's not really very necessary.
 
+Two things to remember:
+
+1. You need to initialize a broker before initializing any clients, otherwise your clients will emit errors
+2. You need to call ensure() on a client or use the asynchronous callback passed to the constructor, before
+calling client.lock() or client.unlock().
+
 
 ## You may not need this library
 
