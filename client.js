@@ -250,8 +250,8 @@ function Client($opts, cb) {
 
 Client.create = function (opts, cb) {
     try {
-        return new Client(opts).ensure(c)
-        .then(() => {
+        return new Client(opts).ensure()
+        .then(c => {
             if (cb) {
                 cb(null, c);
             }
