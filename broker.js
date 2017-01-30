@@ -334,8 +334,8 @@ function Broker($opts, cb) {
 
 Broker.create = function (opts, cb) {
     try {
-        const b = new Broker(opts);
-        return b.ensure().then(() => {
+        return new Broker(opts).ensure()
+        .then(b => {
             if (cb) {
                 cb(null, b);
             }

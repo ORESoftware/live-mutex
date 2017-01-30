@@ -14,7 +14,7 @@ lmUtils.launchBrokerInChildProcess(conf, function () {
 
     client.ensure().then(function () {
 
-        const a = Array.apply(null, {length: 100});
+        const a = Array.apply(null, {length: 1000});
         const start = Date.now();
 
         let i = 0;

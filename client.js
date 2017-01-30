@@ -52,7 +52,7 @@ function Client($opts, cb) {
     const opts = this.opts = $opts || {};
     assert(typeof opts === 'object', ' => Bad arguments to live-mutex client constructor.');
 
-    if(cb){
+    if (cb) {
         cb = cb.bind(this);
     }
 
@@ -137,7 +137,7 @@ function Client($opts, cb) {
 
     ws.on('open', () => {
         ws.isOpen = true;
-        process.nextTick(function(){
+        process.nextTick(function () {
             ee.emit('open', true);
             cb && cb();
         });
@@ -250,13 +250,13 @@ function Client($opts, cb) {
 
 Client.create = function (opts, cb) {
     try {
-        const client = new Client(opts);
-        return client.ensure().then(() => {
+        return new Client(opts).ensure(c)
+        .then(() => {
             if (cb) {
-                cb(null, client);
+                cb(null, c);
             }
             else {
-                return client;
+                return c;
             }
         });
 
@@ -329,15 +329,11 @@ Client.prototype.requestLockInfo = function _lock(key, opts, cb) {
 
     };
 
-    function send() {
-        ws.send(JSON.stringify({
-            uuid: uuid,
-            key: key,
-            type: 'lock-info-request',
-        }));
-    }
-
-    process.nextTick(send);
+    ws.send(JSON.stringify({
+        uuid: uuid,
+        key: key,
+        type: 'lock-info-request',
+    }));
 
     // if (ws.isOpen) {
     //     send();
@@ -483,20 +479,18 @@ Client.prototype.lock = function _lock(key, opts, cb) {
 
     };
 
-    function send() {
-        ws.send(JSON.stringify({
-            uuid: uuid,
-            key: key,
-            type: 'lock',
-            ttl: ttl
-        }));
-    }
+    ws.send(JSON.stringify({
+        uuid: uuid,
+        key: key,
+        type: 'lock',
+        ttl: ttl
+    }));
 
     // setTimeout(function(){
     //     send();
     // },500);
 
-    process.nextTick(send);
+    // process.nextTick(send);
 
     // if (ws.isOpen) {
     //     send();
