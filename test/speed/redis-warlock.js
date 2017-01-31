@@ -42,7 +42,7 @@ firstEnsureKeyIsUnlocked(key, function (err) {
             else {
 
                 if (typeof unlock === 'function') {
-                    console.log('unlocking...' + i++);
+                    // console.log('unlocking...' + i++);
                     unlock(cb);
                 }
                 else {
