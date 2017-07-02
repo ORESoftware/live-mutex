@@ -18,6 +18,7 @@
   "homepage": "https://github.com/ORESoftware/live-mutex#readme",
   "dependencies": {
     "async": "^2.1.4",
+    "chalk": "^2.0.1",
     "colors": "^1.1.2",
     "debug": "^2.5.1",
     "siamese": "^2.0.4",
@@ -27,15 +28,17 @@
     "uws": "^8.14.0"
   },
   "devDependencies": {
-    "lodash": "^4.17.3",
+    "@types/async": "^2.0.38",
+    "@types/chalk": "^0.4.31",
+    "@types/core-js": "^0.9.42",
+    "@types/lodash": "^4.14.50",
+    "@types/node": "^7.0.33",
+    "@types/uws": "^0.13.0",
     "bluebird": "^3.4.7",
     "lockfile": "^1.0.3",
+    "lodash": "^4.17.3",
     "node-redis-warlock": "^0.2.0",
     "redis": "^2.6.3",
-    "suman": "github:sumanjs/suman#rebase_branch",
-    "@types/async": "^2.0.38",
-    "@types/core-js": "^0.9.35",
-    "@types/lodash": "^4.14.50",
-    "@types/node": "^7.0.0"
+    "suman": "github:sumanjs/suman#rebase_branch"
   }
 }
