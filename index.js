@@ -1,10 +1,5 @@
-/**
- * Created by oleg on 1/4/17.
- */
+'use strict';
 
-
-module.exports = {
-    Broker: require('./broker'),
-    Client: require('./client'),
-    utils: require('./utils')
-};
+exports.Broker = require('./broker');
+exports.Client = require('./client');
+exports.utils = require('./utils');
