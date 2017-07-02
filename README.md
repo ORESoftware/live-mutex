@@ -2,6 +2,12 @@
 
 # Live-Mutex
 
+### Disclaimer
+
+Test and works on Ubuntu. Does not seem to work on MacOS. The uWS library that is used by live-mutex apparently 
+is not working on MacOS. I am inquiring about that.
+This library will definitely not work on Windows.
+
 ## About
 
 This library is useful for developers who need a multi-process locking mechanism, but may find it
