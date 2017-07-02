@@ -8,9 +8,7 @@ Test.create({mode: 'parallel'}, function (assert, before, it, Client, lmUtils) {
   before('promise', function () {
 
     return lmUtils.conditionallyLaunchSocketServer(conf)
-    .then(function (data) {
-      console.log('data from conditionallyLaunchSocketServer => ', data);
-    }, function (err) {
+    .then(null, function (err) {
       if (err) {
         console.error(err.stack);
       }

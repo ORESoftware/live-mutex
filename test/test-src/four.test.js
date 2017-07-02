@@ -12,7 +12,7 @@ Test.create({mode: 'parallel'}, function (assert, before, it, Client, lmUtils) {
         return lmUtils.conditionallyLaunchSocketServer(conf)
         .then(function (data) {
             console.log('data from conditionallyLaunchSocketServer => ', data);
-            return Promise.delay(3000);
+            return Promise.delay(30);
         }, function (err) {
             if (err) {
                 console.error(err.stack);

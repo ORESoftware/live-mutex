@@ -22,7 +22,9 @@ Test.create(function (assert, before, describe, it, path, Client, Broker, lmUtil
   let client;
 
   before('get client', h => {
-    return client = new Client(conf).ensure();
+    return new Client(conf).ensure().then(function(c){
+      client = c;
+    });
   });
 
 

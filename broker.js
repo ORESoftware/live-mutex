@@ -97,8 +97,6 @@ function Broker($opts, cb) {
   this.host = opts.host || '127.0.0.1';
   this.port = opts.port || '6970';
 
-  console.log('broker host => ', this.host);
-  console.log('broker port => ', this.port);
 
   this.send = function (ws, data, cb) {
     if (ws.readyState !== WebSocket.OPEN) {
