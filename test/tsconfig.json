@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "types": [
+      "node",
+      "lodash",
+      "async",
+      "core-js"
+    ],
+    "experimentalDecorators": true,
+    "target": "es5",
+    "module": "commonjs",
+    "noImplicitAny": false,
+    "removeComments": true,
+    "allowUnreachableCode": true,
+    "lib": [
+      "es2015",
+      "es2016"
+    ]
+  },
+  "compileOnSave": false,
+  "exclude": [
+    "node_modules"
+  ]
+}

@@ -10,8 +10,9 @@ const wss = this.wss = new WebSocketServer({
     port,
     host
   },
-  () => {
+  (err) => {
     console.log('wss callback fired.');
+    err && console.error(err);
   });
 
 

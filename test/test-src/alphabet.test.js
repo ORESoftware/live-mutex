@@ -2,7 +2,8 @@ const suman = require('suman');
 const Test = suman.init(module, {});
 const async = require('async');
 
-Test.create(__filename, function (assert, before, describe, it, path, Client, Broker, lmUtils, fs, inject) {
+
+Test.create(function (assert, before, describe, it, path, Client, Broker, lmUtils, fs, inject) {
 
   const alphabet = 'abcdefghijklmnopqrstuvwxyz';
   const az = alphabet.split('');

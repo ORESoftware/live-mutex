@@ -5,7 +5,6 @@ const colors = require('colors/safe');
 const async = require('async');
 const _ = require('lodash');
 
-
 Test.create(function (assert, describe, Client, Broker, inject) {
 
   const arrays = [
@@ -23,7 +22,7 @@ Test.create(function (assert, describe, Client, Broker, inject) {
     }
   });
 
-  inject( () => {
+  inject(() => {
     return {
       c: new Client(conf).ensure()
     }

@@ -1,14 +1,12 @@
-"use strict";
-var suman = require("suman");
-function decoratorExpression(target) {
-    target.annotated = true;
-}
-var Test = suman.init(module, {});
+'use strict';
+Object.defineProperty(exports, "__esModule", { value: true });
+var suman_1 = require("suman");
+var Test = suman_1.default.init(module);
 var colors = require('colors/safe');
 var async = require('async');
 var _ = require('lodash');
 var live_mutex_1 = require("live-mutex");
-Test.create(__filename, {}, function (assert, fs, path, inject) {
+Test.create(function (assert, fs, path, inject, describe, before, it) {
     var conf = Object.freeze({ port: 7027 });
     inject('yes', function () {
         return {
@@ -21,10 +19,10 @@ Test.create(__filename, {}, function (assert, fs, path, inject) {
         };
     });
     var f = require.resolve('../fixtures/corruptible.txt');
-    this.before.cb('remove file', function (t) {
+    before.cb('remove file', function (t) {
         fs.writeFile(f, '', t);
     });
-    this.describe('inject', function (c) {
+    describe('inject', function (c) {
         function lockWriteRelease(val, cb) {
             c.lock('a', function (err, unlock) {
                 if (err) {
@@ -42,11 +40,11 @@ Test.create(__filename, {}, function (assert, fs, path, inject) {
                 }
             });
         }
-        this.before.cb('write like crazy', { timeout: 30000 }, function (t) {
+        before.cb('write like crazy', { timeout: 30000 }, function (t) {
             var a = Array.apply(null, { length: 20 }).map(function (item, index) { return index; });
             async.each(a, lockWriteRelease, t.done);
         });
-        this.it.cb('ensure that file still has the same stuff in it!', { timeout: 30000 }, function (t) {
+        it.cb('ensure that file still has the same stuff in it!', { timeout: 30000 }, function (t) {
             fs.readFile(f, function (err, data) {
                 if (err) {
                     return t.fail(err);
