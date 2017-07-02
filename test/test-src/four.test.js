@@ -1,7 +1,9 @@
 const suman = require('suman');
-const Test = suman.init(module, {});
+const Test = suman.init(module);
 
-Test.create(__filename, {mode: 'parallel'}, function (assert, before, it, Client, lmUtils) {
+const Promise = require('bluebird');
+
+Test.create({mode: 'parallel'}, function (assert, before, it, Client, lmUtils) {
 
     const conf = Object.freeze({port: 7987});
 
@@ -10,6 +12,7 @@ Test.create(__filename, {mode: 'parallel'}, function (assert, before, it, Client
         return lmUtils.conditionallyLaunchSocketServer(conf)
         .then(function (data) {
             console.log('data from conditionallyLaunchSocketServer => ', data);
+            return Promise.delay(3000);
         }, function (err) {
             if (err) {
                 console.error(err.stack);

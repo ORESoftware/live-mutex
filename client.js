@@ -127,6 +127,9 @@ function Client($opts, cb) {
     this.lockRetryMax = opts.lockRetryMax || 3;
     this.unlockRetryMax = opts.unlockRetryMax || 3;
 
+    console.log('host => ', this.host);
+    console.log('port => ', this.port);
+
     const ws = this.ws = new WebSocket(['ws://', this.host, ':', this.port].join(''));
 
     ws.on('error', err => {

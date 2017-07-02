@@ -15,24 +15,30 @@ module.exports = data => {  //load async deps for any of your suman tests
 
     return {
 
-        //the following are examples
 
-        //synchronous dependency acquisition
-        'example': function () {
+        dependencies: {
+
+
+          //synchronous dependency acquisition
+          'example': function () {
             return {'just':'an example'};
-        },
+          },
 
-        'Broker': function(){
+          'Broker': function(){
             return require('../../broker');
-        },
+          },
 
-        'Client': function(){
+          'Client': function(){
             return require('../../client');
-        },
+          },
 
-        'lmUtils': function(){
+          'lmUtils': function(){
             return require('../../utils');
+          }
+
         }
+
+
 
     }
 

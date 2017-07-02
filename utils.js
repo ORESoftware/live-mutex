@@ -35,7 +35,7 @@ const cond = exports.conditionallyLaunchSocketServer = function (obj, cb) {
                 cb(err)
             }
             else if (available) {
-                cb(null);
+                cb(null, 'available');
             }
             else {
 

@@ -24,7 +24,7 @@
     "strangeloop": "0.0.10001",
     "tcp-ping": "^0.1.1",
     "uuid": "^3.0.1",
-    "uws": "^0.12.0"
+    "uws": "^8.14.0"
   },
   "devDependencies": {
     "lodash": "^4.17.3",
@@ -32,7 +32,7 @@
     "lockfile": "^1.0.3",
     "node-redis-warlock": "^0.2.0",
     "redis": "^2.6.3",
-    "suman": "github:oresoftware/suman#dev",
+    "suman": "github:sumanjs/suman#rebase_branch",
     "@types/async": "^2.0.38",
     "@types/core-js": "^0.9.35",
     "@types/lodash": "^4.14.50",

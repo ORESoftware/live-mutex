@@ -1,12 +1,11 @@
 {
   "compilerOptions": {
     "baseUrl": ".",
-    "paths": {
-    },
     "types": [
       "node",
       "lodash",
-      "async"
+      "async",
+      "core-js"
     ],
     "experimentalDecorators": true,
     "target": "es5",
@@ -20,11 +19,8 @@
     ]
   },
   "compileOnSave": false,
-  "include": [
-    "./**/*.ts",
-    "./**/*.tsx"
-  ],
   "exclude": [
+    "test",
     "node_modules"
   ]
 }
