@@ -35,7 +35,6 @@ const noop = function (cb) {
 };
 
 const validOptions : Array<string> = [
-
   'key',
   'listener',
   'host',
@@ -44,7 +43,6 @@ const validOptions : Array<string> = [
   'lockRequestTimeout',
   'unlockRetryMax',
   'lockRetryMax'
-
 ];
 
 

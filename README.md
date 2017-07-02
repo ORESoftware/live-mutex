@@ -83,8 +83,8 @@ Do not use more than one broker for the same key, as that will defeat the purpos
 
 // exposed API
 
-const Broker = require('live-mutex/broker');
-const Client = require('live-mutex/client');
+const {Broker} = require('live-mutex/broker');
+const {Client} = require('live-mutex/client');
 const lmUtils = require('live-mutex/utils');
 
 

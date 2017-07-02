@@ -30,22 +30,22 @@ if (weAreDebugging) {
 ///////////////////////////////////////////////////////////////////
 
 function addWsLockKey(broker, ws, key) {
-  var temp;
-  if (!( temp = broker.wsLock[ws.wsClientId])) {
-    temp = broker.wsLock[ws.wsClientId] = [];
+  let v;
+  if (!( v = broker.wsLock.get(ws))) {
+    v = [];
+    broker.wsLock.set(ws,v);
   }
-  if (temp.indexOf(key) < 0) {
-    temp.push(key);
+  if (v.indexOf(key) < 0) {
+    v.push(key);
   }
-
 }
 
 function removeWsLockKey(broker, ws, key) {
-  var temp;
-  if (temp = broker.wsLock[ws.wsClientId]) {
-    const i = temp.indexOf(key);
+  let v;
+  if (v = broker.wsLock.get(ws)) {
+    const i = v.indexOf(key);
     if (i >= 0) {
-      temp.splice(i, 1);
+      v.splice(i, 1);
       return true;
     }
   }
@@ -67,7 +67,7 @@ export interface IBrokerOpts {
   port: number
 }
 
-type IBrokerOptsPartial = Partial<IBrokerOpts>
+export type IBrokerOptsPartial = Partial<IBrokerOpts>
 export type IErrorFirstCB = (err: Error | null | undefined | string, val?: any) => void;
 
 export interface IBrokerSend {
@@ -79,12 +79,16 @@ export interface IUuidWSHash {
 }
 
 
-type TBrokerCB = (err: Error | null | undefined | string, val: Broker) => void;
-type ICBOrPromise = (cb? : TBrokerCB) => void | Promise<Broker>;
+export type TBrokerCB = (err: Error | null | undefined | string, val: Broker) => void;
+
+
+export type TEnsureCB = (cb: TBrokerCB) => void;
+export type TEnsurePromise = () => Promise<Broker>;
+export type TEnsure = TEnsurePromise | TEnsureCB;
 
 ////////////////////////////////////////////////////////
 
-class Broker {
+export class Broker {
 
   opts: IBrokerOptsPartial;
   lockExpiresAfter: number;
@@ -97,10 +101,14 @@ class Broker {
   rejected: IUuidWSHash;
   timeouts: IUuidWSHash;
   locks: IUuidWSHash;
-  ensure: ICBOrPromise;
+  ensure: TEnsure;
+  wsLock: Map<CWebSocket, Array<string>>;  // Array<uuid> to be exact
+  clientIdsToKeys: Map<CWebSocket, Array<string>>;
 
 
-  constructor($opts: IBrokerOptsPartial, cb: IErrorFirstCB) {
+  ///////////////////////////////////////////////////////////////
+
+  constructor($opts: IBrokerOptsPartial, cb?: IErrorFirstCB) {
 
     const opts = this.opts = $opts || {};
     assert(typeof opts === 'object', ' => Bad arguments to live-mutex server constructor.');
@@ -189,7 +197,7 @@ class Broker {
           return process.nextTick($cb, null, this);
         }
         const cb = lmUtils.once(this, $cb);
-        let to = setTimeout(cb.bind(this, 'err:timeout'), 3000);
+        let to = setTimeout(cb.bind(this, 'err:timeout'), 2000);
         ee.once('open', () => {
           clearTimeout(to);
           process.nextTick(cb, null, this);
@@ -200,7 +208,7 @@ class Broker {
           if (wss.isOpen) {
             return resolve(this);
           }
-          let to = setTimeout(reject.bind(null, 'err:timeout'), 3000);
+          let to = setTimeout(reject.bind(null, 'err:timeout'), 2000);
           ee.once('open', () => {
             clearTimeout(to);
             resolve(this)
@@ -214,25 +222,18 @@ class Broker {
       console.error(' => WSS error => ', err.stack || err);
     });
 
-    this.bookkeeping = {
-      keys: {}
-    };
+    this.bookkeeping = {};
 
     //maps uuids to ws clients
-    this.uuids = {};
     this.rejected = {};
     this.timeouts = {};
     this.locks = {};
 
-    this.wsLock = {
-      // keys are wsClientIds, values are lock keys
-    };
+    // map ws objects as keys, to values
+    this.wsLock = new Map(); // keys are ws objects, values are lock keys
+    this.clientIdsToKeys = new Map(); // keys are ws objects, values are keys []
 
-    this.clientIdsToKeys = {
-      // wsClientId: { ws:ws, keys: []}
-    };
-
-    var first = true;
+    let first = true;
 
     //TODO: on disconnection we could delete wsClientId key/val from this.clientIdsToKeys
     // but there should be no need to do that since we won't have that many clients
@@ -249,31 +250,26 @@ class Broker {
       });
 
 
-      if (!ws.wsClientId) {
-        ws.wsClientId = uuidV4();
-        var a = this.clientIdsToKeys[ws.wsClientId] = this.clientIdsToKeys[ws.wsClientId] || {};
-        a.ws = a.ws || ws;
-        a.keys = a.keys || [];
+      if (!this.clientIdsToKeys.get(ws)) {
+        this.clientIdsToKeys.set(ws,[]);
       }
 
       ws.on('close', () => {
 
         //TODO: unlock any locks that this ws owns
 
-        console.log(' => Client connection closed, with wsClientId = "' + ws.wsClientId + '".');
+        console.log(' => Client connection closed, with ws = "' + ws + '".');
 
-        var keys;
-        if (keys = this.wsLock[ws.wsClientId]) {
+        let keys;
+        if (keys = this.wsLock.get(ws)) {
           keys.forEach(k => {
             removeWsLockKey(this, ws, k);
-            var lck;
-            if (lck = this.locks[k]) {
+            if (this.locks[k]) {
               this.unlock({
                 force: true,
                 key: k
               }, ws);
             }
-
           });
         }
       });
@@ -282,552 +278,539 @@ class Broker {
 
         ijson.parse(msg).then(data => {
 
-          // console.log('\n', colors.blue(' => broker received this data => '), '\n', data, '\n');
+            // console.log('\n', colors.blue(' => broker received this data => '), '\n', data, '\n');
 
-          const key = data.key;
-
-          if (key) {
-            var a = this.clientIdsToKeys[ws.wsClientId] = this.clientIdsToKeys[ws.wsClientId] || {};
-            a.ws = a.ws || ws;
-            a.keys = a.keys || [];
-            var index = a.keys.indexOf(key);
-            if (index < 0) {
-              a.keys.push(key);
-            }
-          }
-
-          if (data.type === 'unlock') {
-            debug(colors.blue(' => broker is attempting to run unlock...'));
-            this.unlock(data, ws);
-          }
-          else if (data.type === 'lock') {
-            debug(colors.blue(' => broker attempting to get lock...'));
-            this.lock(data, ws);
-          }
-          else if (data.type === 'lock-received') {
-            this.bookkeeping.keys[data.key].lockCount++;
-            clearTimeout(this.timeouts[data.key]);
-            delete this.timeouts[data.key];
-          }
-          else if (data.type === 'unlock-received') {
             const key = data.key;
-            clearTimeout(this.timeouts[key]);
-            delete this.timeouts[key];
-            this.bookkeeping.keys[key].unlockCount++;
-            debug('\n', ' => Lock/unlock count (broker), key => ', '"' + key + '"', '\n',
-              util.inspect(this.bookkeeping.keys[key]), '\n');
-          }
-          else if (data.type === 'lock-client-timeout') {
 
-            // if the client times out, we don't want to send them any more messages
-            const lck = this.locks[key];
-            const uuid = data.uuid;
-            if (!lck) {
-              console.error(' => Lock must have expired.');
-              return;
-            }
-
-            for (var i = 0; i < lck.notify.length; i++) {
-              if (lck.notify[i].uuid === uuid) {
-                console.log('\n\n', colors.blue(' => Removing item from notify array at index => '), i, '\n');
-                lck.notify.splice(i, 1);
-                break;
+            if (key) {
+              let v;
+              if(!(v = this.clientIdsToKeys.get(ws))){
+                v = [];
+                this.clientIdsToKeys.set(ws,v);
+              }
+              let index = v.indexOf(key);
+              if (index < 0) {
+                v.push(key);
               }
             }
 
-          }
-          else if (data.type === 'lock-received-rejected') {
-            const lck = this.locks[key];
-            if (!lck) {
-              console.error(' => Lock must have expired.');
-              return;
+            if (data.type === 'unlock') {
+              debug(colors.blue(' => broker is attempting to run unlock...'));
+              this.unlock(data, ws);
             }
-            this.rejected[data.uuid] = true;
-            this.ensureNewLockHolder(lck, data, function (err) {
-              console.log(' => new lock-holder ensured.');
-            });
-          }
-          else if (data.type === 'lock-info-request') {
-            this.retrieveLockInfo(data, ws);
-          }
-          else {
-            console.error(colors.red.bold(' bad data sent to broker.'));
+            else if (data.type === 'lock') {
+              debug(colors.blue(' => broker attempting to get lock...'));
+              this.lock(data, ws);
+            }
+            else if (data.type === 'lock-received') {
+              this.bookkeeping[data.key].lockCount++;
+              clearTimeout(this.timeouts[data.key]);
+              delete this.timeouts[data.key];
+            }
+            else if (data.type === 'unlock-received') {
+              const key = data.key;
+              clearTimeout(this.timeouts[key]);
+              delete this.timeouts[key];
+              this.bookkeeping[key].unlockCount++;
+              debug('\n', ' => Lock/unlock count (broker), key => ', '"' + key + '"', '\n',
+                util.inspect(this.bookkeeping[key]), '\n');
+            }
+            else if (data.type === 'lock-client-timeout') {
+
+              // if the client times out, we don't want to send them any more messages
+              const lck = this.locks[key];
+              const uuid = data.uuid;
+              if (!lck) {
+                console.error(' => Lock must have expired.');
+                return;
+              }
+
+              for (let i = 0; i < lck.notify.length; i++) {
+                if (lck.notify[i].uuid === uuid) {
+                  console.log('\n\n', colors.blue(' => Removing item from notify array at index => '), i, '\n');
+                  lck.notify.splice(i, 1);
+                  break;
+                }
+              }
+
+            }
+            else if (data.type === 'lock-received-rejected') {
+              const lck = this.locks[key];
+              if (!lck) {
+                console.error(' => Lock must have expired.');
+                return;
+              }
+              this.rejected[data.uuid] = true;
+              this.ensureNewLockHolder(lck, data, function (err) {
+                console.log(' => new lock-holder ensured.');
+              });
+            }
+            else if (data.type === 'lock-info-request') {
+              this.retrieveLockInfo(data, ws);
+            }
+            else {
+              console.error(colors.red.bold(' bad data sent to broker.'));
+
+              this.send(ws, {
+                key: data.key,
+                uuid: data.uuid,
+                error: new Error(' => Bad data sent to web socket server =>').stack
+              });
+            }
+
+          },
+
+          err => {
+            console.error(colors.red.bold(err.stack || err));
 
             this.send(ws, {
-              key: data.key,
-              uuid: data.uuid,
-              error: new Error(' => Bad data sent to web socket server =>').stack
+              error: err.stack
             });
-          }
-
-        }, (err) => {
-          console.error(colors.red.bold(err.stack || err));
-
-          this.send(ws, {
-            error: err.stack
           });
-        });
 
       });
 
     });
 
   }
-}
 
-Broker.create = function (opts, cb) {
-  try {
-    return new Broker(opts).ensure()
-    .then(b => {
-      if (cb) {
-        cb(null, b);
-      }
-      else {
-        return b;
-      }
-    });
+  static create(opts: IBrokerOptsPartial, cb?: TBrokerCB): Promise<Broker> {
+    return new Broker(opts).ensure(cb);
   }
-  catch (err) {
-    if (cb) {
-      process.nextTick(function () {
-        cb(err);
-      });
-    }
-    else {
-      return Promise.reject(err);
-    }
-  }
-};
 
-Broker.prototype.sendStatsMessageToAllClients = function () {
 
-  const time = Date.now();
+  sendStatsMessageToAllClients() {
 
-  // for each client and for each key, we send a message
+    const time = Date.now();
 
-  const clients = Object.keys(this.clientIdsToKeys);
+    // for each client and for each key, we send a message
+    const clients = this.clientIdsToKeys.keys();
 
-  async.mapSeries(clients, (k, cb) => {
+    async.mapSeries(clients, (k, cb) => {
 
-    const obj = this.clientIdsToKeys[k];
+      const keys = this.clientIdsToKeys.get(k);
+      // const keys = obj.keys;
+      const ws = k;
 
-    const keys = obj.keys;
-    const ws = obj.ws;
+      async.mapSeries(keys, (k, cb) => {
 
-    async.mapSeries(keys, (k, cb) => {
+        const lck = this.locks[k];
 
-      const lck = this.locks[k];
+        let len;
 
-      var len;
+        if (!lck) {
+          len = 0;
+        }
+        else {
+          len = lck.notify.length;
+        }
 
-      if (!lck) {
-        len = 0;
+        this.send(ws, {
+
+            type: 'stats',
+            key: k,
+            lockRequestCount: len
+
+          },
+
+          err => {
+            cb(null, {
+              error: err
+            })
+          });
+
+      }, cb);
+
+    }, (err, results) => {
+
+      if (err) {
+        throw err;
       }
-      else {
-        len = lck.notify.length;
-      }
 
-      this.send(ws, {
-
-        type: 'stats',
-        key: k,
-        lockRequestCount: len
-
-      }, (err) => {
-        cb(null, {
-          error: err
-        })
+      results.filter(function (r) {
+        return r && r.error;
+      }).forEach(function (err) {
+        console.error(err.stack || err);
       });
 
-    }, cb);
+      const diff = Date.now() - time;
+      const wait = Math.max(1, 1000 - diff);
 
-  }, (err, results) => {
+      setTimeout(() => {
+        this.sendStatsMessageToAllClients();
+      }, wait);
 
-    if (err) {
-      throw err;
-    }
-
-    results.filter(function (r) {
-      return r && r.error;
-    }).forEach(function (err) {
-      console.error(err.stack || err);
     });
 
-    const diff = Date.now() - time;
-    const wait = Math.max(1, 1000 - diff);
-
-    setTimeout(() => {
-      this.sendStatsMessageToAllClients();
-    }, wait);
-
-  });
-
-};
-
-Broker.prototype.ensureNewLockHolder = function _ensureNewLockHolder(lck, data, cb) {
-
-  const locks = this.locks;
-  const notifyList = lck.notify;
-
-  // currently there is no lock-holder;
-  // before we delete the lock object, let's try to find a new lock-holder
-  lck.uuid = null;
-  lck.pid = null;
-
-  const key = data.key;
-
-  debug('\n', colors.blue.bold(' => Notify list length => '), colors.blue(notifyList.length), '\n');
-
-  clearTimeout(lck.to);
-  delete lck.to;
-
-  var obj;
-  if (obj = notifyList.shift()) {
-
-    debug(colors.cyan.bold(' => Sending ws client the acquired message.'));
-
-    // set the timeout for the next ws to acquire lock, if not within alloted time, we simple call unlock
-
-    var ws = obj.ws;
-    var ttl = weAreDebugging ? 50000000 : (obj.ttl || this.lockExpiresAfter);
-
-    addWsLockKey(this, ws, key);
-
-    lck.uuid = obj.uuid;
-    lck.pid = obj.pid;
-    lck.to = setTimeout(() => {
-
-      // delete locks[key]; => no, this.unlock will take care of that
-      process.emit('warning', ' => Live-Mutex warning, lock object timed out for key => "' + key + '"');
-
-      this.unlock({
-        key: key,
-        force: true
-      });
-
-    }, ttl);
-
-    clearTimeout(this.timeouts[key]);
-    delete this.timeouts[key];
-
-    this.timeouts[key] = setTimeout(() => {
-
-      removeWsLockKey(this, ws, key);
-
-      delete this.timeouts[key];
-
-      // if this timeout occurs, that is because the first item in the notify list did not receive the
-      // acquire lock message, so we push the object back onto the end of notify list and send a retry message to all
-      // if a client receives a retry message, they will all retry to acquire the lock on this key
-
-      var _lck;
-      var count;
-      // if this timeout happens, then we can no longer cross-verify uuid's
-      if (_lck = locks[key]) {
-        _lck.uuid = undefined;
-        _lck.pid = undefined;
-        count = lck.notify.length;
-      }
-      else {
-        count = 0;
-      }
-
-      if (!this.rejected[obj.uuid]) {
-        notifyList.push(obj);
-      }
-
-      notifyList.forEach((obj) => {
-        this.send(obj.ws, {
-          key: data.key,
-          uuid: obj.uuid,
-          type: 'lock',
-          lockRequestCount: count,
-          retry: true
-        });
-      });
-
-    }, this.timeoutToFindNewLockholder);
-
-    var count = lck.notify.length;
-
-    this.send(obj.ws, {
-      key: data.key,
-      uuid: obj.uuid,
-      type: 'lock',
-      lockRequestCount: count,
-      acquired: true
-    });
-  }
-  else {
-    // => only delete lock if no client is remaining to claim it
-    delete locks[key];
-    debug(colors.red.bold(' => No other connections waiting for lock with key => "' + key + '"' +
-      ', so we deleted the lock.'));
   }
 
-};
+  ensureNewLockHolder(lck, data, cb) {
 
-Broker.prototype.retrieveLockInfo = function _retrieveLockInfo(data, ws) {
+    const locks = this.locks;
+    const notifyList = lck.notify;
 
-  const locks = this.locks;
-  const key = data.key;
-  const lck = locks[key];
-  const uuid = data.uuid;
+    // currently there is no lock-holder;
+    // before we delete the lock object, let's try to find a new lock-holder
+    lck.uuid = null;
+    lck.pid = null;
 
-  const isLocked = lck && lck.uuid && true;
-  const lockholderUUID = isLocked ? lck.uuid : null;
-  const lockRequestCount = lck ? lck.notify.length : -1;
+    const key = data.key;
 
-  if (isLocked && lockRequestCount > 0) {
-    console.error(' => Live-Mutex implementation warning, lock is unlocked but ' +
-      'notify array has at least one item, for key => ', key);
-  }
+    debug('\n', colors.blue.bold(' => Notify list length => '), colors.blue(notifyList.length), '\n');
 
-  this.send(ws, {
-    key: key,
-    uuid: uuid,
-    lockholderUUID: lockholderUUID,
-    isLocked: !!isLocked,
-    lockRequestCount: lockRequestCount,
-    lockInfo: true,
-    type: 'lock-info-response'
-  });
+    clearTimeout(lck.to);
+    delete lck.to;
 
-};
+    let obj;
+    if (obj = notifyList.shift()) {
 
-Broker.prototype.lock = function _lock(data, ws) {
+      debug(colors.cyan.bold(' => Sending ws client the acquired message.'));
 
-  const locks = this.locks;
-  const key = data.key;
-  const lck = locks[key];
-  const uuid = data.uuid;
-  const pid = data.pid;
-  const ttl = weAreDebugging ? 500000000 : (data.ttl || this.lockExpiresAfter);
-  const force = data.force;
+      // set the timeout for the next ws to acquire lock, if not within alloted time, we simple call unlock
 
-  this.bookkeeping.keys[key] = this.bookkeeping.keys[key] ||
-    {
-      rawLockCount: 0,
-      rawUnlockCount: 0,
-      lockCount: 0,
-      unlockCount: 0
-    };
+      let ws = obj.ws;
+      let ttl = weAreDebugging ? 50000000 : (obj.ttl || this.lockExpiresAfter);
 
-  this.bookkeeping.keys[key].rawLockCount++;
+      addWsLockKey(this, ws, key);
 
-  if (lck) {
-
-    const count = lck.notify.length;
-
-    if (lck.uuid) {
-
-      debug(' => Lock exists *and* already has a lockholder; adding ws to list of to be notified.');
-
-      // if we are retrying, we may attempt to call lock() more than once
-      // we don't want to push the same ws object / same uuid combo to array
-
-      const alreadyAdded = lck.notify.some(function (item) {
-        return String(item.uuid) === String(uuid);
-      });
-
-      if (!alreadyAdded) {
-        lck.notify.push({
-          ws: ws,
-          uuid: uuid,
-          pid: pid,
-          ttl: ttl
-        });
-      }
-
-      this.send(ws, {
-        key: key,
-        uuid: uuid,
-        lockRequestCount: count,
-        type: 'lock',
-        acquired: false
-      });
-    }
-    else {
-
-      lck.pid = pid;
-      lck.uuid = uuid;
-
-      clearTimeout(lck.to);
+      lck.uuid = obj.uuid;
+      lck.pid = obj.pid;
       lck.to = setTimeout(() => {
-        // delete locks[key];  => no, this.unlock will take care of that
+
+        // delete locks[key]; => no, this.unlock will take care of that
         process.emit('warning', ' => Live-Mutex warning, lock object timed out for key => "' + key + '"');
+
         this.unlock({
           key: key,
           force: true
         });
+
       }, ttl);
+
+      clearTimeout(this.timeouts[key]);
+      delete this.timeouts[key];
+
+      this.timeouts[key] = setTimeout(() => {
+
+        removeWsLockKey(this, ws, key);
+
+        delete this.timeouts[key];
+
+        // if this timeout occurs, that is because the first item in the notify list did not receive the
+        // acquire lock message, so we push the object back onto the end of notify list and send a retry message to all
+        // if a client receives a retry message, they will all retry to acquire the lock on this key
+
+        let _lck;
+        let count;
+        // if this timeout happens, then we can no longer cross-verify uuid's
+        if (_lck = locks[key]) {
+          _lck.uuid = undefined;
+          _lck.pid = undefined;
+          count = lck.notify.length;
+        }
+        else {
+          count = 0;
+        }
+
+        if (!this.rejected[obj.uuid]) {
+          notifyList.push(obj);
+        }
+
+        notifyList.forEach((obj) => {
+          this.send(obj.ws, {
+            key: data.key,
+            uuid: obj.uuid,
+            type: 'lock',
+            lockRequestCount: count,
+            retry: true
+          });
+        });
+
+      }, this.timeoutToFindNewLockholder);
+
+      let count = lck.notify.length;
+
+      this.send(obj.ws, {
+        key: data.key,
+        uuid: obj.uuid,
+        type: 'lock',
+        lockRequestCount: count,
+        acquired: true
+      });
+    }
+    else {
+      // => only delete lock if no client is remaining to claim it
+      delete locks[key];
+      debug(colors.red.bold(' => No other connections waiting for lock with key => "' + key + '"' +
+        ', so we deleted the lock.'));
+    }
+
+  }
+
+
+  retrieveLockInfo(data, ws) {
+
+    const locks = this.locks;
+    const key = data.key;
+    const lck = locks[key];
+    const uuid = data.uuid;
+
+    const isLocked = lck && lck.uuid && true;
+    const lockholderUUID = isLocked ? lck.uuid : null;
+    const lockRequestCount = lck ? lck.notify.length : -1;
+
+    if (isLocked && lockRequestCount > 0) {
+      console.error(' => Live-Mutex implementation warning, lock is unlocked but ' +
+        'notify array has at least one item, for key => ', key);
+    }
+
+    this.send(ws, {
+      key: key,
+      uuid: uuid,
+      lockholderUUID: lockholderUUID,
+      isLocked: !!isLocked,
+      lockRequestCount: lockRequestCount,
+      lockInfo: true,
+      type: 'lock-info-response'
+    });
+
+  }
+
+
+  lock(data, ws) {
+
+    const locks = this.locks;
+    const key = data.key;
+    const lck = locks[key];
+    const uuid = data.uuid;
+    const pid = data.pid;
+    const ttl = weAreDebugging ? 500000000 : (data.ttl || this.lockExpiresAfter);
+    const force = data.force;
+
+    this.bookkeeping[key] = this.bookkeeping[key] ||
+      {
+        rawLockCount: 0,
+        rawUnlockCount: 0,
+        lockCount: 0,
+        unlockCount: 0
+      };
+
+    this.bookkeeping[key].rawLockCount++;
+
+    if (lck) {
+
+      const count = lck.notify.length;
+
+      if (lck.uuid) {
+
+        debug(' => Lock exists *and* already has a lockholder; adding ws to list of to be notified.');
+
+        // if we are retrying, we may attempt to call lock() more than once
+        // we don't want to push the same ws object / same uuid combo to array
+
+        const alreadyAdded = lck.notify.some(function (item) {
+          return String(item.uuid) === String(uuid);
+        });
+
+        if (!alreadyAdded) {
+          lck.notify.push({
+            ws: ws,
+            uuid: uuid,
+            pid: pid,
+            ttl: ttl
+          });
+        }
+
+        this.send(ws, {
+          key: key,
+          uuid: uuid,
+          lockRequestCount: count,
+          type: 'lock',
+          acquired: false
+        });
+      }
+      else {
+
+        lck.pid = pid;
+        lck.uuid = uuid;
+
+        clearTimeout(lck.to);
+        lck.to = setTimeout(() => {
+          // delete locks[key];  => no, this.unlock will take care of that
+          process.emit('warning', ' => Live-Mutex warning, lock object timed out for key => "' + key + '"');
+          this.unlock({
+            key: key,
+            force: true
+          });
+        }, ttl);
+
+        addWsLockKey(this, ws, key);
+
+        this.send(ws, {
+          uuid: uuid,
+          key: key,
+          lockRequestCount: count,
+          type: 'lock',
+          acquired: true
+        });
+      }
+
+    }
+    else {
 
       addWsLockKey(this, ws, key);
 
+      debug(' => Lock does not exist, creating new lock.');
+
+      locks[key] = {
+        pid: pid,
+        uuid: uuid,
+        notify: [],
+        key: key,
+        to: setTimeout(() => {
+          // delete locks[key];  => no!, this.unlock will take care of that
+          process.emit('warning', ' => Live-Mutex warning, lock object timed out for key => "' + key + '"');
+          this.unlock({
+            key: key,
+            force: true
+          });
+        }, ttl)
+      };
+
       this.send(ws, {
         uuid: uuid,
+        lockRequestCount: 0,
         key: key,
-        lockRequestCount: count,
         type: 'lock',
         acquired: true
       });
     }
 
   }
-  else {
 
-    addWsLockKey(this, ws, key);
+  unlock(data: Object, ws?: CWebSocket) {
 
-    debug(' => Lock does not exist, creating new lock.');
+    const locks = this.locks;
+    const key = data.key;
+    const uuid = data.uuid;
+    const _uuid = data._uuid;
+    const force = data.force;
+    const lck = locks[key];
 
-    locks[key] = {
-      pid: pid,
-      uuid: uuid,
-      notify: [],
-      key: key,
-      to: setTimeout(() => {
-        // delete locks[key];  => no, this.unlock will take care of that
-        process.emit('warning', ' => Live-Mutex warning, lock object timed out for key => "' + key + '"');
-        this.unlock({
+    this.bookkeeping[key] = this.bookkeeping[key] || {
+        rawLockCount: 0,
+        rawUnlockCount: 0,
+        lockCount: 0,
+        unlockCount: 0
+      };
+
+    this.bookkeeping[key].rawUnlockCount++;
+
+    // if the user passed _uuid, then we check it, other true
+    // _uuid is the uuid of the original lockholder call
+    // the unlock caller can be given right to unlock only if it holds
+    // the uuid from the original lock call, as a safeguard
+    // this prevents a function from being called at the wrong time, or more than once, etc.
+
+    let same = true;
+
+    if (_uuid && lck && lck.uuid !== undefined) {
+      same = (String(lck.uuid) === String(_uuid));
+      if (!same) {
+        console.error('! => same is => ', same);
+        console.error('! => lck.uuid is => ', lck.uuid);
+        console.error('! => unlock._uuid is => ', _uuid);
+      }
+    }
+
+    if (lck && (same || force)) {
+
+      const count = lck.notify.length;
+      clearTimeout(lck.to);
+
+      if (uuid && ws) {
+        // if no uuid is defined, then unlock was called by something other than the client
+        // aka this library called unlock when there was a timeout
+
+        this.send(ws, {
+          uuid: uuid,
           key: key,
-          force: true
+          lockRequestCount: count,
+          type: 'unlock',
+          unlocked: true
         });
-      }, ttl)
-    };
-
-    this.send(ws, {
-      uuid: uuid,
-      lockRequestCount: 0,
-      key: key,
-      type: 'lock',
-      acquired: true
-    });
-  }
-
-};
-
-Broker.prototype.unlock = function _unlock(data, ws) {
-
-  const locks = this.locks;
-  const key = data.key;
-  const uuid = data.uuid;
-  const _uuid = data._uuid;
-  const force = data.force;
-  const lck = locks[key];
-
-  this.bookkeeping.keys[key] = this.bookkeeping.keys[key] || {
-      rawLockCount: 0,
-      rawUnlockCount: 0,
-      lockCount: 0,
-      unlockCount: 0
-    };
-
-  this.bookkeeping.keys[key].rawUnlockCount++;
-  debug('\n', ' => Raw counts in broker => key => ', key, util.inspect(this.bookkeeping.keys[key]), '\n');
-
-  // if the user passed _uuid, then we check it, other true
-  // _uuid is the uuid of the original lockholder call
-  // the unlock caller can be given right to unlock only if it holds
-  // the uuid from the original lock call, as a safeguard
-  // this prevents a function from being called at the wrong time, or more than once, etc.
-
-  var same = true;
-
-  if (_uuid && lck && lck.uuid !== undefined) {
-    same = (String(lck.uuid) === String(_uuid));
-    if (!same) {
-      console.error('! => same is => ', same);
-      console.error('! => lck.uuid is => ', lck.uuid);
-      console.error('! => unlock._uuid is => ', _uuid);
-    }
-  }
-
-  if (lck && (same || force)) {
-
-    const count = lck.notify.length;
-    clearTimeout(lck.to);
-
-    if (uuid && ws) {
-      // if no uuid is defined, then unlock was called by something other than the client
-      // aka this library called unlock when there was a timeout
-
-      this.send(ws, {
-        uuid: uuid,
-        key: key,
-        lockRequestCount: count,
-        type: 'unlock',
-        unlocked: true
-      });
-    }
-
-    Object.keys(this.wsLock).forEach((k) => {
-      const keys = this.wsLock[k];
-      if (keys) {
-        const i = keys.indexOf[key];
-        if (i >= 0) {
-          keys.splice(i, 1);
-        }
       }
-    });
 
-    this.ensureNewLockHolder(lck, data, function () {
-      debug(' => All done notifying.')
-    });
-
-  }
-  else if (lck) {
-
-    const count = lck.notify.length;
-
-    if (uuid && ws) {
-      // if no uuid is defined, then unlock was called by something other than the client
-      // aka this library called unlock when there was a timeout
-
-      this.send(ws, {
-        uuid: uuid,
-        key: key,
-        lockRequestCount: count,
-        type: 'unlock',
-        error: ' => You need to pass the correct uuid, or use force.',
-        unlocked: false,
-        retry: true
-      });
-    }
-
-  }
-  else {
-
-    console.error(colors.red.bold(' => Usage / implementation error => this should not happen => no lock with key => '),
-      colors.red('"' + key + '"'));
-
-    // since the lock no longer exists for this key, remove ownership of this key
-    //
-    Object.keys(this.wsLock).forEach((k) => {
-      const keys = this.wsLock[k];
-      if (keys) {
-        const i = keys.indexOf[key];
-        if (i >= 0) {
-          keys.splice(i, 1);
+      this.wsLock.keys().forEach(k => {
+        const keys = this.wsLock.get(k);
+        if (keys) {
+          const i = keys.indexOf[key];
+          if (i >= 0) {
+            keys.splice(i, 1);
+          }
         }
-      }
-    });
-
-    if (ws) {
-
-      process.emit('warning', ' => Live-Mutex warning, => no lock with key => "' + key + '"');
-
-      this.send(ws, {
-        uuid: uuid,
-        key: key,
-        lockRequestCount: 0,
-        type: 'unlock',
-        unlocked: true,
-        error: ' => Live-Mutex warning => no lock with key => "' + key + '"'
       });
+
+      this.ensureNewLockHolder(lck, data, function () {
+        debug(' => All done notifying.')
+      });
+
     }
+    else if (lck) {
+
+      const count = lck.notify.length;
+
+      if (uuid && ws) {
+        // if no uuid is defined, then unlock was called by something other than the client
+        // aka this library called unlock when there was a timeout
+
+        this.send(ws, {
+          uuid: uuid,
+          key: key,
+          lockRequestCount: count,
+          type: 'unlock',
+          error: ' => You need to pass the correct uuid, or use force.',
+          unlocked: false,
+          retry: true
+        });
+      }
+
+    }
+    else {
+
+      console.error(colors.red.bold(' => Live-Mutex Usage / implementation error => this should not happen => no lock with key => '),
+        colors.red('"' + key + '"'));
+
+      // since the lock no longer exists for this key, remove ownership of this key
+      this.wsLock.keys().forEach(k => {
+        const keys = this.wsLock.get(k);
+        if (keys) {
+          const i = keys.indexOf[key];
+          if (i >= 0) {
+            keys.splice(i, 1);
+          }
+        }
+      });
+
+      if (ws) {
+
+        process.emit('warning', ' => Live-Mutex warning, => no lock with key => "' + key + '"');
+
+        this.send(ws, {
+          uuid: uuid,
+          key: key,
+          lockRequestCount: 0,
+          type: 'unlock',
+          unlocked: true,
+          error: ' => Live-Mutex warning => no lock with key => "' + key + '"'
+        });
+      }
+    }
+
   }
+}
 
-};
 
-module.exports = Broker;
+
+
 

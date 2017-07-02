@@ -4,7 +4,7 @@ var cp = require("child_process");
 var ping = require('tcp-ping');
 var strangeloop = require('strangeloop');
 var ijson = require('siamese');
-var Broker = require('./broker');
+var Broker = require('./broker').Broker;
 var p = require.resolve('./lib/launch-broker-child');
 exports.once = function (ctx, fn) {
     var callable = true;
@@ -42,7 +42,7 @@ exports.launchSocketServer = function (obj, cb) {
     }
     return strangeloop.conditionalReturn(fn, cb);
 };
-exports.conditionallyLaunchSockerServer = exports.launchSocketServer;
+exports.conditionallyLaunchSocketServer = exports.launchSocketServer;
 exports.launchBrokerInChildProcess = function (conf, cb) {
     var host = conf.host || 'localhost';
     var port = conf.port || 8019;

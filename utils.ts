@@ -13,15 +13,15 @@ const strangeloop = require('strangeloop');
 const ijson = require('siamese');
 
 //project
-const Broker = require('./broker');
+const {Broker} = require('./broker');
 const p = require.resolve('./lib/launch-broker-child');
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
-export const once = function(ctx, fn: Function){
+export const once = function (ctx, fn: Function) {
   let callable = true;
-  return function(){
-    if(callable){
+  return function () {
+    if (callable) {
       callable = false;
       return fn.apply(ctx === 'that' ? this : ctx, arguments);
     }
@@ -65,7 +65,7 @@ export const launchSocketServer = function (obj, cb) {
 };
 
 // alias
-export const conditionallyLaunchSockerServer = launchSocketServer;
+export const conditionallyLaunchSocketServer = launchSocketServer;
 
 export const launchBrokerInChildProcess = function (conf, cb) {
 
@@ -86,7 +86,7 @@ export const launchBrokerInChildProcess = function (conf, cb) {
       else {
 
         const n = cp.spawn('node', [p], {
-          detached: detached,
+          detached,
           stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
         });
 
