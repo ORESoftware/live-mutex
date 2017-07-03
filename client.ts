@@ -5,7 +5,7 @@ import * as util from 'util';
 import * as path from 'path';
 import * as assert from 'assert';
 import * as EE from 'events';
-import {CWebSocket} from "./uws";
+import {CWebSocket} from "./dts/uws";
 import Timer = NodeJS.Timer;
 
 //npm

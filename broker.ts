@@ -8,7 +8,7 @@ import * as EE from 'events';
 
 //npm
 import {Server} from '@types/uws';
-import {CWebSocket} from './uws';
+import {CWebSocket} from './dts/uws';
 const WebSocket = require('uws');
 const WebSocketServer = WebSocket.Server;
 const ijson = require('siamese');

@@ -1,4 +1,4 @@
-import { CWebSocket } from "./uws";
+import { CWebSocket } from "./dts/uws";
 export interface IClientOptions {
     key: string;
     listener: Function;

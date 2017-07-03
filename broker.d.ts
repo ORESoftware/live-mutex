@@ -1,6 +1,6 @@
 /// <reference types="node" />
 import { Server } from '@types/uws';
-import { CWebSocket } from './uws';
+import { CWebSocket } from './dts/uws';
 import Timer = NodeJS.Timer;
 export interface IBrokerOpts {
     lockExpiresAfter: number;
