@@ -3,8 +3,12 @@
 const async = require('async');
 
 const lmUtils = require('live-mutex/utils');
-const Client = require('live-mutex/client');
+const {Client} = require('live-mutex/client');
 const conf = Object.freeze({port: 7003});
+
+process.on('unhandledRejection', function (e) {
+  console.error('unhandledRejection => ', e.stack || e);
+});
 
 ///////////////////////////////////////////////////////////////////
 
@@ -26,6 +30,7 @@ lmUtils.launchBrokerInChildProcess(conf, function () {
         }
         else {
           // console.log('unlocking...' + i++);
+          // client.unlock('foo',cb);
           unlock(cb);
         }
       });

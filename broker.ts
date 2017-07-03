@@ -33,8 +33,7 @@ if (weAreDebugging) {
 function addWsLockKey(broker, ws, key) {
   let v;
   if (!( v = broker.wsLock.get(ws))) {
-    v = [];
-    broker.wsLock.set(ws, v);
+    v = []; broker.wsLock.set(ws, v);
   }
   if (v.indexOf(key) < 0) {
     v.push(key);
@@ -820,7 +819,7 @@ export class Broker {
 
       if (ws) {
 
-        process.emit('warning', ' => Live-Mutex warning, => no lock with key => "' + key + '"');
+        process.emit('warning', ' => Live-Mutex warning, => no lock with key 2 => "' + key + '"');
 
         this.send(ws, {
           uuid: uuid,
@@ -828,7 +827,7 @@ export class Broker {
           lockRequestCount: 0,
           type: 'unlock',
           unlocked: true,
-          error: ' => Live-Mutex warning => no lock with key => "' + key + '"'
+          error: ' => Live-Mutex warning => no lock with key 1 => "' + key + '"'
         });
       }
     }

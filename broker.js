@@ -536,14 +536,14 @@ var Broker = (function () {
                 }
             });
             if (ws) {
-                process.emit('warning', ' => Live-Mutex warning, => no lock with key => "' + key + '"');
+                process.emit('warning', ' => Live-Mutex warning, => no lock with key 2 => "' + key + '"');
                 this.send(ws, {
                     uuid: uuid,
                     key: key,
                     lockRequestCount: 0,
                     type: 'unlock',
                     unlocked: true,
-                    error: ' => Live-Mutex warning => no lock with key => "' + key + '"'
+                    error: ' => Live-Mutex warning => no lock with key 1 => "' + key + '"'
                 });
             }
         }

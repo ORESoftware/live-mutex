@@ -141,7 +141,7 @@ lmUtils.conditionallyLaunchSocketServer(opts, function(err){
       const client = new Client(opts);
       
       client.ensure().then(function(c){
-          c.lock('<key>', function(err){
+          c.lock('<key>', function(err){           // c and client are same object
                c.unlock('<key>',function(err){
                          
                });
