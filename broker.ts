@@ -837,5 +837,6 @@ export class Broker {
 
 
 
-
+const $exports = module.exports;
+export default $exports;
 

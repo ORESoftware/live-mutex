@@ -551,3 +551,5 @@ var Broker = (function () {
     return Broker;
 }());
 exports.Broker = Broker;
+var $exports = module.exports;
+exports.default = $exports;

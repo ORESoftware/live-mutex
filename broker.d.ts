@@ -74,3 +74,5 @@ export declare class Broker {
     lock(data: any, ws: any): void;
     unlock(data: Object, ws?: CWebSocket): void;
 }
+declare const $exports: any;
+export default $exports;

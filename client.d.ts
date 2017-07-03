@@ -65,3 +65,5 @@ export declare class Client {
     lock(key: string, opts: Partial<IClientLockOpts>, cb: TClientLockCB): any;
     unlock(key: string, opts: Partial<IClientUnlockOpts>, cb: TClientUnlockCB): void;
 }
+declare const $exports: any;
+export default $exports;
