@@ -4,9 +4,8 @@
 
 ### Disclaimer
 
-Test and works on Ubuntu. Does not seem to work on MacOS. The uWS library that is used by live-mutex apparently 
-is not working on MacOS. I am inquiring about that.
-This library will definitely not work on Windows.
+Does not seem to work on MacOS, not sure why yet. The uWS library that is used by live-mutex apparently 
+is not working on MacOS. I am inquiring about that. This library will definitely not work on Windows.
 
 ## About
 
@@ -24,12 +23,10 @@ This library uses a broker and client model. For any key there should be at most
 clients as you like. For more than one key, you can use just 1 broker, or a separate broker per key,
 depending on how much performance you really need.
 
+# Installation
 
 ## ```$ npm install --save live-mutex ```
 
-## Disclaimer
-
-Tested on MacOS and *nix, probably will not work on Windows
 
 ## Alternatives
 
@@ -86,7 +83,6 @@ Do not use more than one broker for the same key, as that will defeat the purpos
 const {Broker} = require('live-mutex/broker');
 const {Client} = require('live-mutex/client');
 const lmUtils = require('live-mutex/utils');
-
 
 // alternatively
 import {Client, Broker, lmUtils}  from 'live-mutex';

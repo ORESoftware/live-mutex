@@ -1,5 +1,5 @@
+const {Client, Broker, lmUtils}  = require( 'live-mutex');
 
-
-
-
-console.log(new Map().set('x','y').get('x'));
+console.log(Client);
+console.log(Broker);
+console.log(lmUtils);
