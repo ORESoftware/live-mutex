@@ -18,6 +18,7 @@ const uuidV4 = require('uuid/v4');
 
 //project
 import lmUtils from './utils';
+import Timer = NodeJS.Timer;
 const debug = require('debug')('live-mutex');
 
 ///////////////////////////////////////////////////////////////////
@@ -33,7 +34,7 @@ function addWsLockKey(broker, ws, key) {
   let v;
   if (!( v = broker.wsLock.get(ws))) {
     v = [];
-    broker.wsLock.set(ws,v);
+    broker.wsLock.set(ws, v);
   }
   if (v.indexOf(key) < 0) {
     v.push(key);
@@ -78,6 +79,9 @@ export interface IUuidWSHash {
   [key: string]: CWebSocket
 }
 
+export interface IUuidTimer {
+  [key: string]: Timer
+}
 
 export type TBrokerCB = (err: Error | null | undefined | string, val: Broker) => void;
 
@@ -85,6 +89,40 @@ export type TBrokerCB = (err: Error | null | undefined | string, val: Broker) =>
 export type TEnsureCB = (cb: TBrokerCB) => void;
 export type TEnsurePromise = () => Promise<Broker>;
 export type TEnsure = TEnsurePromise | TEnsureCB;
+
+export interface IBookkeepingHash {
+  [key: string]: IBookkeeping;
+}
+
+export interface IUuidBooleanHash {
+  [key: string]: boolean;
+}
+
+export interface IBookkeeping {
+  rawLockCount: number,
+  rawUnlockCount: number;
+  lockCount: number;
+  unlockCount: number;
+}
+
+export interface ILookObj {
+  pid: number,
+  uuid: string,
+  notify: Array<INotifyObj>,
+  key: string,
+  to: Timer
+}
+
+export interface ILockHash {
+  [key: string]: ILookObj
+}
+
+export interface INotifyObj {
+  ws: CWebSocket,
+  uuid: string,
+  pid: number,
+  ttl: number
+}
 
 ////////////////////////////////////////////////////////
 
@@ -97,13 +135,13 @@ export class Broker {
   port: number;
   send: IBrokerSend;
   wss: Server;
-  uuids: IUuidWSHash;
-  rejected: IUuidWSHash;
-  timeouts: IUuidWSHash;
-  locks: IUuidWSHash;
+  rejected: IUuidBooleanHash;
+  timeouts: IUuidTimer;
+  locks: ILockHash;
   ensure: TEnsure;
   wsLock: Map<CWebSocket, Array<string>>;  // Array<uuid> to be exact
-  clientIdsToKeys: Map<CWebSocket, Array<string>>;
+  wsToKeys: Map<CWebSocket, Array<string>>;
+  bookkeeping: IBookkeepingHash;
 
 
   ///////////////////////////////////////////////////////////////
@@ -223,19 +261,17 @@ export class Broker {
     });
 
     this.bookkeeping = {};
-
-    //maps uuids to ws clients
     this.rejected = {};
     this.timeouts = {};
     this.locks = {};
 
     // map ws objects as keys, to values
     this.wsLock = new Map(); // keys are ws objects, values are lock keys
-    this.clientIdsToKeys = new Map(); // keys are ws objects, values are keys []
+    this.wsToKeys = new Map(); // keys are ws objects, values are keys []
 
     let first = true;
 
-    //TODO: on disconnection we could delete wsClientId key/val from this.clientIdsToKeys
+    //TODO: on disconnection we could delete wsClientId key/val from this.wsToKeys
     // but there should be no need to do that since we won't have that many clients
 
     wss.on('connection', ws => {
@@ -250,8 +286,8 @@ export class Broker {
       });
 
 
-      if (!this.clientIdsToKeys.get(ws)) {
-        this.clientIdsToKeys.set(ws,[]);
+      if (!this.wsToKeys.get(ws)) {
+        this.wsToKeys.set(ws, []);
       }
 
       ws.on('close', () => {
@@ -284,9 +320,9 @@ export class Broker {
 
             if (key) {
               let v;
-              if(!(v = this.clientIdsToKeys.get(ws))){
+              if (!(v = this.wsToKeys.get(ws))) {
                 v = [];
-                this.clientIdsToKeys.set(ws,v);
+                this.wsToKeys.set(ws, v);
               }
               let index = v.indexOf(key);
               if (index < 0) {
@@ -325,9 +361,10 @@ export class Broker {
                 return;
               }
 
-              for (let i = 0; i < lck.notify.length; i++) {
+              let ln = lck.notify.length;
+              for (let i = 0; i < ln ; i++) {
                 if (lck.notify[i].uuid === uuid) {
-                  console.log('\n\n', colors.blue(' => Removing item from notify array at index => '), i, '\n');
+                  // remove item from notify
                   lck.notify.splice(i, 1);
                   break;
                 }
@@ -384,33 +421,22 @@ export class Broker {
     const time = Date.now();
 
     // for each client and for each key, we send a message
-    const clients = this.clientIdsToKeys.keys();
+    const clients = this.wsToKeys.keys();
 
-    async.mapSeries(clients, (k, cb) => {
+    async.mapSeries(clients, (ws, cb) => {
 
-      const keys = this.clientIdsToKeys.get(k);
+      const keys = this.wsToKeys.get(ws);
       // const keys = obj.keys;
-      const ws = k;
 
       async.mapSeries(keys, (k, cb) => {
 
         const lck = this.locks[k];
-
-        let len;
-
-        if (!lck) {
-          len = 0;
-        }
-        else {
-          len = lck.notify.length;
-        }
+        let len = lck ?  lck.notify.length : 0;
 
         this.send(ws, {
-
             type: 'stats',
             key: k,
             lockRequestCount: len
-
           },
 
           err => {

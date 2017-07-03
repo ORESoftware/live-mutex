@@ -139,7 +139,7 @@ var Broker = (function () {
         this.timeouts = {};
         this.locks = {};
         this.wsLock = new Map();
-        this.clientIdsToKeys = new Map();
+        this.wsToKeys = new Map();
         var first = true;
         wss.on('connection', function (ws) {
             if (first) {
@@ -149,8 +149,8 @@ var Broker = (function () {
             ws.on('error', function (err) {
                 console.error(' => ws error => ', err.stack || err);
             });
-            if (!_this.clientIdsToKeys.get(ws)) {
-                _this.clientIdsToKeys.set(ws, []);
+            if (!_this.wsToKeys.get(ws)) {
+                _this.wsToKeys.set(ws, []);
             }
             ws.on('close', function () {
                 console.log(' => Client connection closed, with ws = "' + ws + '".');
@@ -172,9 +172,9 @@ var Broker = (function () {
                     var key = data.key;
                     if (key) {
                         var v = void 0;
-                        if (!(v = _this.clientIdsToKeys.get(ws))) {
+                        if (!(v = _this.wsToKeys.get(ws))) {
                             v = [];
-                            _this.clientIdsToKeys.set(ws, v);
+                            _this.wsToKeys.set(ws, v);
                         }
                         var index = v.indexOf(key);
                         if (index < 0) {
@@ -208,9 +208,9 @@ var Broker = (function () {
                             console.error(' => Lock must have expired.');
                             return;
                         }
-                        for (var i = 0; i < lck.notify.length; i++) {
+                        var ln = lck.notify.length;
+                        for (var i = 0; i < ln; i++) {
                             if (lck.notify[i].uuid === uuid) {
-                                console.log('\n\n', colors.blue(' => Removing item from notify array at index => '), i, '\n');
                                 lck.notify.splice(i, 1);
                                 break;
                             }
@@ -253,19 +253,12 @@ var Broker = (function () {
     Broker.prototype.sendStatsMessageToAllClients = function () {
         var _this = this;
         var time = Date.now();
-        var clients = this.clientIdsToKeys.keys();
-        async.mapSeries(clients, function (k, cb) {
-            var keys = _this.clientIdsToKeys.get(k);
-            var ws = k;
+        var clients = this.wsToKeys.keys();
+        async.mapSeries(clients, function (ws, cb) {
+            var keys = _this.wsToKeys.get(ws);
             async.mapSeries(keys, function (k, cb) {
                 var lck = _this.locks[k];
-                var len;
-                if (!lck) {
-                    len = 0;
-                }
-                else {
-                    len = lck.notify.length;
-                }
+                var len = lck ? lck.notify.length : 0;
                 _this.send(ws, {
                     type: 'stats',
                     key: k,
