@@ -23,6 +23,11 @@ This library uses a broker and client model. For any key there should be at most
 clients as you like. For more than one key, you can use just 1 broker, or a separate broker per key,
 depending on how much performance you really need.
 
+Note that this library uses Websockets - this made it somewhat easier to implement than pure TCP.
+It also makes it possible to use in the browser (although a. this has not been tested in the browser, and b. there 
+probably are not very many use cases for use a mutex library like this in the browser).
+
+
 # Installation
 
 ## ```$ npm install --save live-mutex ```

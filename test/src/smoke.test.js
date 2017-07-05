@@ -30,5 +30,9 @@ setTimeout(function(){
      console.log('ws client is open.');
   });
 
+  setTimeout(function(){
+    process.exit(0);
+  },1000);
+
 
 }, 2000);
