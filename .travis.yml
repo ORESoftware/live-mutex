@@ -1,0 +1,30 @@
+
+# https://docs.travis-ci.com/user/languages/javascript-with-nodejs#Node.js-v4-(or-io.js-v3)-compiler-requirements
+
+language: node_js
+node_js:
+  - '8'
+  - '7'
+  - '6'
+  - '5'
+  - '4'
+env:
+  - CXX=g++-4.8
+cache:
+  directories:
+    - $HOME/.npm
+    - node_modules
+addons:
+  apt:
+    sources:
+      - ubuntu-toolchain-r-test
+    packages:
+      - g++-4.8
+
+before_install: 'if [[ `npm -v` != 4* ]]; then npm i -g npm@4; fi'
+install:
+  - npm install
+script: './@test.sh'
+after_script: 'npm install coveralls && cat coverage/lcov.info | ./node_modules/.bin/coveralls'
+notifications:
+  email: false
