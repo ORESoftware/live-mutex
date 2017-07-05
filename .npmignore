@@ -4,3 +4,7 @@ node_modules
 *.sh
 *.md
 *.json
+.gitignore
+.npmignore
+*.ts
+!*.d.ts
