@@ -5,7 +5,7 @@
 ### Disclaimer
 
 Does not seem to work on MacOS, not sure why yet. The uWS library that is used by live-mutex apparently 
-is not working on MacOS. I am inquiring about that. This library will definitely not work on Windows.
+is only working on Linux. I am inquiring about that. This library will definitely not work on Windows.
 
 ## About
 
@@ -76,9 +76,9 @@ Do not use more than one broker for the same key, as that will defeat the purpos
 
 # Code examples
 
-```js
+### Importing the library
 
-// exposed API
+```js
 
 const {Broker} = require('live-mutex/broker');
 const {Client} = require('live-mutex/client');
@@ -88,7 +88,7 @@ const lmUtils = require('live-mutex/utils');
 import {Client, Broker, lmUtils}  from 'live-mutex';
 
 ```
-
+## Using the library
 
 
 ```js
