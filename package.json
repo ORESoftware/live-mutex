@@ -1,6 +1,6 @@
 {
   "name": "live-mutex",
-  "version": "0.0.10012",
+  "version": "0.0.10013",
   "description": "Simple mutex that uses Node.js process + websockets, instead of Redis; useful if you cannot install Redis etc.",
   "main": "index.js",
   "scripts": {
