@@ -293,8 +293,6 @@ export class Broker {
 
         //TODO: unlock any locks that this ws owns
 
-        console.log(' => Client connection closed, with ws = "' + ws + '".');
-
         let keys;
         if (keys = this.wsLock.get(ws)) {
           keys.forEach(k => {
@@ -330,7 +328,6 @@ export class Broker {
             }
 
             if (data.type === 'unlock') {
-              debug(colors.blue(' => broker is attempting to run unlock...'));
               this.unlock(data, ws);
             }
             else if (data.type === 'lock') {
@@ -347,8 +344,6 @@ export class Broker {
               clearTimeout(this.timeouts[key]);
               delete this.timeouts[key];
               this.bookkeeping[key].unlockCount++;
-              debug('\n', ' => Lock/unlock count (broker), key => ', '"' + key + '"', '\n',
-                util.inspect(this.bookkeeping[key]), '\n');
             }
             else if (data.type === 'lock-client-timeout') {
 
@@ -766,7 +761,7 @@ export class Broker {
         });
       }
 
-      this.wsLock.keys().forEach(k => {
+      this.wsLock.forEach((v,k) => {
         const keys = this.wsLock.get(k);
         if (keys) {
           const i = keys.indexOf[key];
@@ -807,7 +802,7 @@ export class Broker {
         colors.red('"' + key + '"'));
 
       // since the lock no longer exists for this key, remove ownership of this key
-      this.wsLock.keys().forEach(k => {
+      this.wsLock.forEach((v,k) => {
         const keys = this.wsLock.get(k);
         if (keys) {
           const i = keys.indexOf[key];

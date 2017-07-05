@@ -18,7 +18,6 @@ module.exports = data => {  //load async deps for any of your suman tests
 
         dependencies: {
 
-
           //synchronous dependency acquisition
           'example': function () {
             return {'just':'an example'};

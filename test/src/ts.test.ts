@@ -14,15 +14,17 @@ Test.create(function (assert, fs, path, inject, describe, before, it) {
 
   const conf = Object.freeze({port: 7027});
 
+  let p ;
+
   inject(() => {
     return {
-      broker: new Broker(conf).ensure()
+      broker: p = new Broker(conf).ensure()
     }
   });
 
   inject(() => {
     return {
-      c: new Client(conf).ensure()
+      c: p.then(v => new Client(conf).ensure())
     }
   });
 
