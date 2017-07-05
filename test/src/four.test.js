@@ -23,7 +23,7 @@ Test.create({mode: 'parallel'}, function (assert, before, it, Client, lmUtils) {
 
   });
 
-  it.cb('yes', {timeout: 30000}, t => {
+  it.cb('yes', {timeout: 300}, t => {
 
     Client.create(conf, (err, c) => {
       if (err) return t.fail(err);
@@ -35,7 +35,7 @@ Test.create({mode: 'parallel'}, function (assert, before, it, Client, lmUtils) {
 
   });
 
-  it.cb('yes', {timeout: 30000}, t => {
+  it.cb('yes', {timeout: 300}, t => {
 
     const c = new Client(conf);
 
@@ -47,7 +47,7 @@ Test.create({mode: 'parallel'}, function (assert, before, it, Client, lmUtils) {
     });
   });
 
-  it.cb('yes', {timeout: 30000}, t => {
+  it.cb('yes', {timeout: 300}, t => {
 
     return Client.create(conf).then(c => {
       c.lock('z', function (err) {
@@ -58,7 +58,7 @@ Test.create({mode: 'parallel'}, function (assert, before, it, Client, lmUtils) {
 
   });
 
-  it.cb('yes', {timeout: 30000}, t => {
+  it.cb('yes', {timeout: 300}, t => {
 
     Client.create(conf).then(c => {
       c.lock('z', function (err) {

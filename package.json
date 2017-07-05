@@ -38,7 +38,6 @@
     "lockfile": "^1.0.3",
     "lodash": "^4.17.3",
     "node-redis-warlock": "^0.2.0",
-    "redis": "^2.6.3",
-    "suman": "github:sumanjs/suman#rebase_branch"
+    "redis": "^2.6.3"
   }
 }
