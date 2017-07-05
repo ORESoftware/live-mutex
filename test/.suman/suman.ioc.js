@@ -25,11 +25,11 @@ module.exports = data => {  //load async deps for any of your suman tests
           },
 
           'Broker': function(){
-            return require('../../broker');
+            return require('../../broker').Broker;
           },
 
           'Client': function(){
-            return require('../../client');
+            return require('../../client').Client;
           },
 
           'lmUtils': function(){
