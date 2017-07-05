@@ -1,10 +1,10 @@
 {
   "name": "live-mutex",
-  "version": "0.0.10012",
+  "version": "0.0.10017",
   "description": "Simple mutex that uses Node.js process + websockets, instead of Redis; useful if you cannot install Redis etc.",
   "main": "index.js",
   "scripts": {
-    "test": "./test.sh"
+    "test": "./@test.sh"
   },
   "repository": {
     "type": "git",
@@ -38,7 +38,6 @@
     "lockfile": "^1.0.3",
     "lodash": "^4.17.3",
     "node-redis-warlock": "^0.2.0",
-    "redis": "^2.6.3",
-    "suman": "github:sumanjs/suman#rebase_branch"
+    "redis": "^2.6.3"
   }
 }

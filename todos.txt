@@ -1,6 +1,8 @@
 
 
-allow lock-requestors to force their way to obtaining a lock
+* allow lock-requestors to force their way to obtaining a lock
 similar to unlock-requestors being able to force unlock even if they don't have the key
 
-https://github.com/uWebSockets/uWebSockets
+* https://github.com/uWebSockets/uWebSockets
+
+* unlock may be callable more than once, that should not happen.

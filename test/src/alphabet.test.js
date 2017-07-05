@@ -1,13 +1,12 @@
 const suman = require('suman');
-const Test = suman.init(module, {});
+const Test = suman.init(module);
 const async = require('async');
-
 
 Test.create(function (assert, before, describe, it, path, Client, Broker, lmUtils, fs, inject) {
 
   const alphabet = 'abcdefghijklmnopqrstuvwxyz';
-  const az = alphabet.split('');
-  assert.equal(az.length, 26, ' => Western alphabet is messed up.');
+  const a2z = alphabet.split('');
+  assert.equal(a2z.length, 26, ' => Western alphabet is messed up.');
 
   const num = 100;
 
@@ -22,32 +21,34 @@ Test.create(function (assert, before, describe, it, path, Client, Broker, lmUtil
   let client;
 
   before('get client', h => {
-    return new Client(conf).ensure().then(function(c){
+    return new Client(conf).ensure().then(function (c) {
       client = c;
     });
   });
 
+  const p = path.resolve(__dirname + '/../fixtures/alphabet.test');
 
-  const p = path.resolve(process.env.HOME + '/alphabet.test');
+  before.cb('clean up file', h => {
+    fs.writeFile(p, '', h);
+  });
 
-  describe('post', function (broker) {
-
+  describe('post', function () {
 
     before.cb('yo', h => {
 
-      async.each(az, function (val, cb) {
+      async.each(a2z, function (val, cb) {
 
         client.lock('foo', function (err, unlock) {
 
           const strm = fs.createWriteStream(p, {flags: 'a'});
 
-          for (var i = 0; i < num; i++) {
+          for (let i = 0; i < num; i++) {
             strm.write(val);
           }
 
           strm.end();
 
-          strm.on('finish', function () {
+          strm.once('finish', function () {
             unlock(cb);
           });
         });
@@ -77,8 +78,8 @@ Test.create(function (assert, before, describe, it, path, Client, Broker, lmUtil
 
       readable.on('readable', function () {
 
-        var index = 0;
-        var chunk;
+        let index = 0;
+        let chunk;
         while (null != (chunk = readable.read(1))) {
 
           const temp = (index - (index % num)) / num;

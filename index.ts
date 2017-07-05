@@ -2,5 +2,5 @@
 
 export  {Broker} from './broker';
 export  {Client} from './client';
-export * from './utils';
+export {default as lmUtils} from './utils';
 

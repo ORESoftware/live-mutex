@@ -8,14 +8,15 @@ var _ = require('lodash');
 var live_mutex_1 = require("live-mutex");
 Test.create(function (assert, fs, path, inject, describe, before, it) {
     var conf = Object.freeze({ port: 7027 });
-    inject('yes', function () {
+    var p;
+    inject(function () {
         return {
-            broker: new live_mutex_1.Broker(conf).ensure()
+            broker: p = new live_mutex_1.Broker(conf).ensure()
         };
     });
-    inject('yes', function () {
+    inject(function () {
         return {
-            c: new live_mutex_1.Client(conf).ensure()
+            c: p.then(function (v) { return new live_mutex_1.Client(conf).ensure(); })
         };
     });
     var f = require.resolve('../fixtures/corruptible.txt');

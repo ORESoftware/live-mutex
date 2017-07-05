@@ -1,6 +1,5 @@
 'use strict';
 Object.defineProperty(exports, "__esModule", { value: true });
-var util = require("util");
 var assert = require("assert");
 var EE = require("events");
 var WebSocket = require('uws');
@@ -153,7 +152,6 @@ var Broker = (function () {
                 _this.wsToKeys.set(ws, []);
             }
             ws.on('close', function () {
-                console.log(' => Client connection closed, with ws = "' + ws + '".');
                 var keys;
                 if (keys = _this.wsLock.get(ws)) {
                     keys.forEach(function (k) {
@@ -182,7 +180,6 @@ var Broker = (function () {
                         }
                     }
                     if (data.type === 'unlock') {
-                        debug(colors.blue(' => broker is attempting to run unlock...'));
                         _this.unlock(data, ws);
                     }
                     else if (data.type === 'lock') {
@@ -199,7 +196,6 @@ var Broker = (function () {
                         clearTimeout(_this.timeouts[key_1]);
                         delete _this.timeouts[key_1];
                         _this.bookkeeping[key_1].unlockCount++;
-                        debug('\n', ' => Lock/unlock count (broker), key => ', '"' + key_1 + '"', '\n', util.inspect(_this.bookkeeping[key_1]), '\n');
                     }
                     else if (data.type === 'lock-client-timeout') {
                         var lck = _this.locks[key];
@@ -497,7 +493,7 @@ var Broker = (function () {
                     unlocked: true
                 });
             }
-            this.wsLock.keys().forEach(function (k) {
+            this.wsLock.forEach(function (v, k) {
                 var keys = _this.wsLock.get(k);
                 if (keys) {
                     var i = keys.indexOf[key];
@@ -526,7 +522,7 @@ var Broker = (function () {
         }
         else {
             console.error(colors.red.bold(' => Live-Mutex Usage / implementation error => this should not happen => no lock with key => '), colors.red('"' + key + '"'));
-            this.wsLock.keys().forEach(function (k) {
+            this.wsLock.forEach(function (v, k) {
                 var keys = _this.wsLock.get(k);
                 if (keys) {
                     var i = keys.indexOf[key];

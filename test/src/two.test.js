@@ -5,7 +5,7 @@ const colors = require('colors/safe');
 const async = require('async');
 const _ = require('lodash');
 
-Test.create(function (assert, describe, Client, Broker, inject) {
+Test.create(function (assert, describe, Client, Broker, inject, it) {
 
   const arrays = [
     [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
@@ -72,7 +72,7 @@ Test.create(function (assert, describe, Client, Broker, inject) {
 
           fns.forEach(fn => {
 
-            this.it.cb('locks/unlocks', fn);
+            it.cb('locks/unlocks', fn);
 
           });
 

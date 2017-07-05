@@ -14,12 +14,10 @@ module.exports = Object.freeze({
   //regex
   matchAny: [],                              //recommended regex for "matchAny" => [/\.test\.js$/],
   matchNone: [/fixture/, /.*target/],        //recommended regex for "matchNone" => [/fixture/],
-  matchAll: [/\.test\.js$/],                 //recommended regex for "matchAll" => [],
+  matchAll: [],                 //recommended regex for "matchAll" => [],
 
   //string
   testDir: 'test',
-  testSrcDir: 'test/test-src',                        // recommended that you create a test/test-src directory
-  testTargetDir: 'test/test-target',              // recommended to transpile to test/test-target directory
   sumanHelpersDir: 'test/.suman',
   uniqueAppName: '<your-app-name-here>',
   browser: 'Firefox',                 // browser to open test results with

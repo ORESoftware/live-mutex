@@ -5,7 +5,7 @@
 ### Disclaimer
 
 Does not seem to work on MacOS, not sure why yet. The uWS library that is used by live-mutex apparently 
-is not working on MacOS. I am inquiring about that. This library will definitely not work on Windows.
+is only working on Linux. I am inquiring about that. This library will definitely not work on Windows.
 
 ## About
 
@@ -22,6 +22,11 @@ is because this library uses events instead of polling for its implementation.
 This library uses a broker and client model. For any key there should be at most 1 broker. There can be as many
 clients as you like. For more than one key, you can use just 1 broker, or a separate broker per key,
 depending on how much performance you really need.
+
+Note that this library uses Websockets - this made it somewhat easier to implement than pure TCP.
+It also makes it possible to use in the browser (although a. this has not been tested in the browser, and b. there 
+probably are not very many use cases for use a mutex library like this in the browser).
+
 
 # Installation
 
@@ -76,9 +81,9 @@ Do not use more than one broker for the same key, as that will defeat the purpos
 
 # Code examples
 
-```js
+### Importing the library
 
-// exposed API
+```js
 
 const {Broker} = require('live-mutex/broker');
 const {Client} = require('live-mutex/client');
@@ -88,7 +93,7 @@ const lmUtils = require('live-mutex/utils');
 import {Client, Broker, lmUtils}  from 'live-mutex';
 
 ```
-
+## Using the library
 
 
 ```js
