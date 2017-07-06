@@ -30,7 +30,7 @@ fi
 
 WHICH_SUMAN=$(which suman);
 if [[ " " || -z ${WHICH_SUMAN} ]]; then
-    echo "installing suman locally";
+    echo "installing suman locally (rebase?)";
     npm install github:sumanjs/suman#rebase_branch
 fi
 
