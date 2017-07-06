@@ -6,8 +6,10 @@ LIB_NAME="live-mutex";
 
 WHICH_SUMAN_TOOLS=$(which suman-tools);
 
+export PATH=${PATH}:./node_modules/.bin
+
 if [[ -z ${WHICH_SUMAN_TOOLS} ]]; then
-npm install -g suman-tools;
+npm install suman-tools;
 fi
 
 IS_GLOBALLY_SYMLINKED=`suman-tools --is-symlinked-globally="${LIB_NAME}"`
@@ -27,5 +29,5 @@ if [[ -z ${WHICH_SUMAN} ]]; then
  npm install github:sumanjs/suman#rebase_branch
 fi
 
-./node_modules/.bin/suman test/src/*.js --inherit-stdio
+suman test/src/*.js --inherit-stdio --force
 
