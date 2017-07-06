@@ -1,10 +1,11 @@
 'use strict';
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 var suman_1 = require("suman");
-var Test = suman_1.default.init(module);
+var Test = suman_1["default"].init(module);
 var colors = require('colors/safe');
 var async = require('async');
 var _ = require('lodash');
+// import the other way, just to be sure
 var live_mutex_1 = require("live-mutex");
 Test.create(function (assert, fs, path, inject, describe, before, it) {
     var conf = Object.freeze({ port: 7027 });

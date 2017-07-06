@@ -1,0 +1,12 @@
+{
+  "@run": {
+    "plugin": {
+      "value": "suman-run-plugins/plugins/typescript-std"
+    }
+  },
+  "@transform": {
+    "plugin": {
+      "value": "suman-transform-plugins/plugins/typescript-std"
+    }
+  }
+}

@@ -13,7 +13,7 @@ WHICH_SUMAN_TOOLS=$(which suman-tools);
 # with the PATH set, we can pick up local NPM executables
 export PATH=${PATH}:./node_modules/.bin
 
-if [[ " " ||  -z ${WHICH_SUMAN_TOOLS} ]]; then
+if [[ -z ${WHICH_SUMAN_TOOLS} ]]; then
     npm install suman-tools;
 fi
 
@@ -29,9 +29,9 @@ if [[ ${IS_LOCALLY_SYMLINKED} != *"affirmative"* || ${IS_GLOBALLY_SYMLINKED} != 
 fi
 
 WHICH_SUMAN=$(which suman);
-if [[ " " || -z ${WHICH_SUMAN} ]]; then
+if [[ -z ${WHICH_SUMAN} || "${NODE_ENV}" != "local" ]]; then
     echo "installing suman locally (rebase?)";
     npm install github:sumanjs/suman#rebase_branch
 fi
 
-suman test/src/*.js --force --inherit-stdio
+suman test/@src/*.ts --force --inherit-stdio
