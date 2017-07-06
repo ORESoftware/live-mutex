@@ -34,4 +34,4 @@ if [[ " " || -z ${WHICH_SUMAN} ]]; then
     npm install github:sumanjs/suman#rebase_branch
 fi
 
-suman test/src/*.js --inherit-stdio --force
+suman test/src/*.js --force

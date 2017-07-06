@@ -1,3 +1,4 @@
+[![Build Status](https://travis-ci.org/ORESoftware/live-mutex.svg?branch=master)](https://travis-ci.org/ORESoftware/live-mutex)
 
 
 # Live-Mutex
