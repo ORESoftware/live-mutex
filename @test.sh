@@ -24,10 +24,12 @@ if [[ ${IS_LOCALLY_SYMLINKED} != *"affirmative"* || ${IS_GLOBALLY_SYMLINKED} != 
 fi
 
 WHICH_SUMAN=$(which suman);
-if [[ -z ${WHICH_SUMAN} ]]; then
+if [[ " " || -z ${WHICH_SUMAN} ]]; then
  echo "installing suman locally";
  npm install github:sumanjs/suman#rebase_branch
 fi
 
-suman test/src/*.js --inherit-stdio --force
+#suman test/src/*.js --inherit-stdio --force
+
+suman test/src/four.test.js
 
