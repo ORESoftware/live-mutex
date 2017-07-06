@@ -2,9 +2,12 @@
 
 cd $(dirname "$0");
 
-LIB_NAME="live-mutex";
+if [[ ! -d "${pwd}/node_modules" ]]; then
+  echo "error: node_modules directory is not present...run npm install as needed.";
+  exit 1;
+fi
 
-npm rebuild &&  # rebuild must be successfuly
+LIB_NAME="live-mutex";
 
 WHICH_SUMAN_TOOLS=$(which suman-tools);
 
