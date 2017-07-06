@@ -2,9 +2,9 @@
 
 cd $(dirname "$0");
 
-if [[ ! -d "${pwd}/node_modules" ]]; then
+if [[ ! -d "./node_modules" ]]; then
   echo "error: node_modules directory is not present...run npm install as needed.";
-  exit 1;
+#  exit 1;
 fi
 
 LIB_NAME="live-mutex";
