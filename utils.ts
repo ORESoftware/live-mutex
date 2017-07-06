@@ -9,7 +9,7 @@ import * as cp from 'child_process';
 
 //npm
 const ping = require('tcp-ping');
-const strangeloop = require('strangeloop');
+const sl = require('strangeloop');
 const ijson = require('siamese');
 
 //project
@@ -61,7 +61,7 @@ export const launchSocketServer = function (obj, cb) {
     });
   }
 
-  return strangeloop.conditionalReturn(fn, cb);
+  return sl.conditionalReturn(fn, cb);
 };
 
 // alias
@@ -114,10 +114,9 @@ export const launchBrokerInChildProcess = function (conf, cb) {
 
   }
 
-  return strangeloop.conditionalReturn(fn, cb);
+  return sl.conditionalReturn(fn, cb);
 
 };
-
 
 const $exports = module.exports;
 export default $exports;

@@ -92,81 +92,74 @@ var Broker = (function () {
             });
         };
         var ee = new EE();
-        var onData = function (ws, msg) {
-            ijson.parse(msg).then(function (data) {
-                var key = data.key;
-                if (key) {
-                    var v = void 0;
-                    if (!(v = _this.wsToKeys.get(ws))) {
-                        v = [];
-                        _this.wsToKeys.set(ws, v);
-                    }
-                    var index = v.indexOf(key);
-                    if (index < 0) {
-                        v.push(key);
-                    }
+        var onData = function (ws, data) {
+            var key = data.key;
+            if (key) {
+                var v = void 0;
+                if (!(v = _this.wsToKeys.get(ws))) {
+                    v = [];
+                    _this.wsToKeys.set(ws, v);
                 }
-                if (data.type === 'unlock') {
-                    _this.unlock(data, ws);
+                var index = v.indexOf(key);
+                if (index < 0) {
+                    v.push(key);
                 }
-                else if (data.type === 'lock') {
-                    debug(colors.blue(' => broker attempting to get lock...'));
-                    _this.lock(data, ws);
+            }
+            if (data.type === 'unlock') {
+                _this.unlock(data, ws);
+            }
+            else if (data.type === 'lock') {
+                debug(colors.blue(' => broker attempting to get lock...'));
+                _this.lock(data, ws);
+            }
+            else if (data.type === 'lock-received') {
+                _this.bookkeeping[data.key].lockCount++;
+                clearTimeout(_this.timeouts[data.key]);
+                delete _this.timeouts[data.key];
+            }
+            else if (data.type === 'unlock-received') {
+                var key_1 = data.key;
+                clearTimeout(_this.timeouts[key_1]);
+                delete _this.timeouts[key_1];
+                _this.bookkeeping[key_1].unlockCount++;
+            }
+            else if (data.type === 'lock-client-timeout') {
+                var lck = _this.locks[key];
+                var uuid = data.uuid;
+                if (!lck) {
+                    console.error(' => Lock must have expired.');
+                    return;
                 }
-                else if (data.type === 'lock-received') {
-                    _this.bookkeeping[data.key].lockCount++;
-                    clearTimeout(_this.timeouts[data.key]);
-                    delete _this.timeouts[data.key];
-                }
-                else if (data.type === 'unlock-received') {
-                    var key_1 = data.key;
-                    clearTimeout(_this.timeouts[key_1]);
-                    delete _this.timeouts[key_1];
-                    _this.bookkeeping[key_1].unlockCount++;
-                }
-                else if (data.type === 'lock-client-timeout') {
-                    var lck = _this.locks[key];
-                    var uuid = data.uuid;
-                    if (!lck) {
-                        console.error(' => Lock must have expired.');
-                        return;
-                    }
-                    var ln = lck.notify.length;
-                    for (var i = 0; i < ln; i++) {
-                        if (lck.notify[i].uuid === uuid) {
-                            lck.notify.splice(i, 1);
-                            break;
-                        }
+                var ln = lck.notify.length;
+                for (var i = 0; i < ln; i++) {
+                    if (lck.notify[i].uuid === uuid) {
+                        lck.notify.splice(i, 1);
+                        break;
                     }
                 }
-                else if (data.type === 'lock-received-rejected') {
-                    var lck = _this.locks[key];
-                    if (!lck) {
-                        console.error(' => Lock must have expired.');
-                        return;
-                    }
-                    _this.rejected[data.uuid] = true;
-                    _this.ensureNewLockHolder(lck, data, function (err) {
-                        console.log(' => new lock-holder ensured.');
-                    });
+            }
+            else if (data.type === 'lock-received-rejected') {
+                var lck = _this.locks[key];
+                if (!lck) {
+                    console.error(' => Lock must have expired.');
+                    return;
                 }
-                else if (data.type === 'lock-info-request') {
-                    _this.retrieveLockInfo(data, ws);
-                }
-                else {
-                    console.error(colors.red.bold(' bad data sent to broker.'));
-                    _this.send(ws, {
-                        key: data.key,
-                        uuid: data.uuid,
-                        error: new Error(' => Bad data sent to web socket server =>').stack
-                    });
-                }
-            }, function (err) {
-                console.error(colors.red.bold(err.stack || err), 'for the following raw message => \n', String(msg));
-                _this.send(ws, {
-                    error: String(err.stack || err)
+                _this.rejected[data.uuid] = true;
+                _this.ensureNewLockHolder(lck, data, function (err) {
+                    console.log(' => new lock-holder ensured.');
                 });
-            });
+            }
+            else if (data.type === 'lock-info-request') {
+                _this.retrieveLockInfo(data, ws);
+            }
+            else {
+                console.error(colors.red.bold(' bad data sent to broker.'));
+                _this.send(ws, {
+                    key: data.key,
+                    uuid: data.uuid,
+                    error: new Error(' => Bad data sent to web socket server =>').stack
+                });
+            }
         };
         var wss = net.createServer(function (ws) {
             if (first) {
@@ -195,14 +188,27 @@ var Broker = (function () {
             });
             ws.pipe(JSONStream.parse()).on('data', function (v) {
                 onData(ws, v);
+            })
+                .once('error', function (e) {
+                this.send(ws, {
+                    error: String(e.stack || e)
+                }, function () {
+                    ws.end();
+                });
             });
         });
-        wss.listen(this.port, function () {
-            console.log('opened server on', wss.address());
-            wss.isOpen = true;
-            process.nextTick(function () {
-                ee.emit('open', true);
-                cb && cb(null, _this);
+        wss
+            .listen(this
+            .port, function () {
+            wss
+                .isOpen = true;
+            process
+                .nextTick(function () {
+                ee
+                    .emit('open', true);
+                cb
+                    &&
+                        cb(null, _this);
             });
         });
         this.ensure = function ($cb) {
@@ -243,9 +249,6 @@ var Broker = (function () {
         var first = true;
         wss.on('connection', function (ws) {
             console.log('wss connection.');
-            ws.on('message', function (m) {
-                console.log('message => ', String(m));
-            });
         });
     }
     Broker.create = function (opts, cb) {

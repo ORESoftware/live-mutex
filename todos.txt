@@ -6,3 +6,6 @@ similar to unlock-requestors being able to force unlock even if they don't have 
 * https://github.com/uWebSockets/uWebSockets
 
 * unlock may be callable more than once, that should not happen.
+
+*on disconnection we could delete wsClientId key/val from this.wsToKeys
+ but there should be no real need to do that since we won't have that many clients

@@ -275,66 +275,62 @@ export class Client {
     this.resolutions = {};
     this.giveups = {};
 
-    // flags.binary will be set if a binary data is received.
-    // flags.masked will be set if the data was masked.
+    const onData = data => {
 
-    const onData = (ws, msg) => {
+      if (data.type === 'stats') {
+        this.setLockRequestorCount(data.key, data.lockRequestCount);
+        return;
+      }
 
-      ijson.parse(msg).then(data => {
+      const uuid = data.uuid;
 
-        if (data.type === 'stats') {
-          this.setLockRequestorCount(data.key, data.lockRequestCount);
+      if (uuid) {
+
+        if (this.giveups[uuid]) {
+          delete this.giveups[uuid];
           return;
         }
 
-        const uuid = data.uuid;
+        const fn = this.resolutions[uuid];
+        const to = this.timeouts[uuid];
 
-        if (uuid) {
+        if (fn && to) {
+          throw new Error(' => Fn and TO both exist => Live-Mutex implementation error.');
+        }
+        if (fn) {
+          fn.call(this, null, data);
+        }
+        else if (to) {
+          console.error(' => Client side lock/unlock request timed-out.');
 
-          if (this.giveups[uuid]) {
-            delete this.giveups[uuid];
-            return;
-          }
+          delete this.timeouts[uuid];
 
-          const fn = this.resolutions[uuid];
-          const to = this.timeouts[uuid];
-
-          if (fn && to) {
-            throw new Error(' => Fn and TO both exist => Live-Mutex implementation error.');
-          }
-          if (fn) {
-            fn.call(this, null, data);
-          }
-          else if (to) {
-            console.error(' => Client side lock/unlock request timed-out.');
-
-            delete this.timeouts[uuid];
-
-            if (data.type === 'lock') {
-              this.write({
-                uuid: uuid,
-                key: data.key,
-                pid: process.pid,
-                type: 'lock-received-rejected'
-              });
-            }
-          }
-          else {
-            throw new Error(' => No fn with that uuid in the resolutions hash => \n' + util.inspect(data));
+          if (data.type === 'lock') {
+            this.write({
+              uuid: uuid,
+              key: data.key,
+              pid: process.pid,
+              type: 'lock-received-rejected'
+            });
           }
         }
         else {
-          console.error(colors.yellow(' => Live-Mutex internal issue => message did not contain uuid =>'), '\n', msg);
+          throw new Error(' => No fn with that uuid in the resolutions hash => \n' + util.inspect(data));
         }
-
-      }, function (err) {
-        console.error(colors.red.bold(' => Message could not be JSON.parsed => '), msg, '\n', err.stack || err);
-      });
+      }
+      else {
+        console.error(colors.yellow(' => Live-Mutex internal issue => message did not contain uuid =>'), '\n', msg);
+      }
 
     };
 
-    ws.pipe(JSONStream.parse()).on('data', v => {
-      onData(ws, v);
+    ws.pipe(JSONStream.parse()).on('data', onData)
+    .once('error', function (e) {
+      this.send(ws, {
+        error: String(e.stack || e)
+      }, function () {
+        ws.end();
+      });
     });
 
   };

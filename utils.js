@@ -2,7 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 var cp = require("child_process");
 var ping = require('tcp-ping');
-var strangeloop = require('strangeloop');
+var sl = require('strangeloop');
 var ijson = require('siamese');
 var Broker = require('./broker').Broker;
 var p = require.resolve('./lib/launch-broker-child');
@@ -40,7 +40,7 @@ exports.launchSocketServer = function (obj, cb) {
             }
         });
     }
-    return strangeloop.conditionalReturn(fn, cb);
+    return sl.conditionalReturn(fn, cb);
 };
 exports.conditionallyLaunchSocketServer = exports.launchSocketServer;
 exports.launchBrokerInChildProcess = function (conf, cb) {
@@ -77,7 +77,7 @@ exports.launchBrokerInChildProcess = function (conf, cb) {
             }
         });
     }
-    return strangeloop.conditionalReturn(fn, cb);
+    return sl.conditionalReturn(fn, cb);
 };
 var $exports = module.exports;
 exports.default = $exports;
