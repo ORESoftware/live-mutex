@@ -3,10 +3,12 @@ Object.defineProperty(exports, "__esModule", { value: true });
 var util = require("util");
 var assert = require("assert");
 var EE = require("events");
+var net = require("net");
 var WebSocket = require('uws');
 var ijson = require('siamese');
 var uuidV4 = require('uuid/v4');
 var colors = require('colors/safe');
+var JSONStream = require('JSONStream');
 var debug = require('debug')('live-mutex');
 var utils_1 = require("./utils");
 var weAreDebugging = require('./lib/we-are-debugging');
@@ -87,17 +89,20 @@ var Client = (function () {
         this.lockTimeout = weAreDebugging ? 5000000 : (opts.lockRequestTimeout || 6000);
         this.lockRetryMax = opts.lockRetryMax || 3;
         this.unlockRetryMax = opts.unlockRetryMax || 3;
-        var ws = this.ws = new WebSocket(['ws://', this.host, ':', this.port].join(''));
-        ws.on('error', function (err) {
-            console.error('\n', ' => Websocket client error => ', err.stack || err, '\n');
-        });
         var ee = new EE();
-        ws.on('open', function () {
+        var ws = this.ws = net.createConnection({ port: this.port }, function () {
             ws.isOpen = true;
             process.nextTick(function () {
                 ee.emit('open', true);
                 cb && cb(null, _this);
             });
+        });
+        ws.setEncoding('utf8');
+        this.write = function (data, cb) {
+            ws.write(JSON.stringify(data) + '\n', 'utf8', cb);
+        };
+        ws.on('end', function () {
+            console.log('disconnected from server');
         });
         this.ensure = function ($cb) {
             var _this = this;
@@ -129,19 +134,18 @@ var Client = (function () {
             ws.isOpen = false;
         });
         process.once('exit', function () {
-            ws.close();
+            ws.end();
         });
         this.close = function () {
-            return ws.close();
+            return ws.end();
         };
         this.bookkeeping = {};
         this.lockholderCount = {};
         this.timeouts = {};
         this.resolutions = {};
         this.giveups = {};
-        ws.on('message', function (msg, flags) {
+        var onData = function (ws, msg) {
             ijson.parse(msg).then(function (data) {
-                debug('\n', ' => onMessage in lock => ', '\n', colors.blue(util.inspect(data)), '\n');
                 if (data.type === 'stats') {
                     _this.setLockRequestorCount(data.key, data.lockRequestCount);
                     return;
@@ -164,12 +168,12 @@ var Client = (function () {
                         console.error(' => Client side lock/unlock request timed-out.');
                         delete _this.timeouts[uuid];
                         if (data.type === 'lock') {
-                            ws.send(JSON.stringify({
+                            _this.write({
                                 uuid: uuid,
                                 key: data.key,
                                 pid: process.pid,
                                 type: 'lock-received-rejected'
-                            }));
+                            });
                         }
                     }
                     else {
@@ -182,8 +186,12 @@ var Client = (function () {
             }, function (err) {
                 console.error(colors.red.bold(' => Message could not be JSON.parsed => '), msg, '\n', err.stack || err);
             });
+        };
+        ws.pipe(JSONStream.parse()).on('data', function (v) {
+            onData(ws, v);
         });
     }
+    ;
     Client.create = function (opts, cb) {
         return new Client(opts).ensure(cb);
     };
@@ -230,11 +238,11 @@ var Client = (function () {
                 cb(null, { data: data });
             }
         };
-        ws.send(JSON.stringify({
+        this.write({
             uuid: uuid,
             key: key,
             type: 'lock-info-request',
-        }));
+        });
     };
     Client.prototype.lock = function (key, opts, cb) {
         var _this = this;
@@ -290,14 +298,11 @@ var Client = (function () {
         var to = setTimeout(function () {
             _this.timeouts[uuid] = true;
             delete _this.resolutions[uuid];
-            ws.send(JSON.stringify({
+            _this.write({
                 uuid: uuid,
                 key: key,
                 pid: process.pid,
                 type: 'lock-client-timeout'
-            }), function ($err) {
-                var err = $err ? ('=>' + ($err.stack || $err)) : '';
-                cb(new Error(' => Acquiring lock operation timed out => Client-side timeout fired. ' + err), false);
             });
         }, lockTimeout);
         this.resolutions[uuid] = function (err, data) {
@@ -320,12 +325,12 @@ var Client = (function () {
                 clearTimeout(to);
                 delete _this.resolutions[uuid];
                 _this.bookkeeping[key].lockCount++;
-                ws.send(JSON.stringify({
+                _this.write({
                     uuid: uuid,
                     key: key,
                     pid: process.pid,
                     type: 'lock-received'
-                }));
+                });
                 if (data.uuid !== uuid) {
                     cb(new Error(' => Something went wrong.'), false);
                 }
@@ -350,12 +355,12 @@ var Client = (function () {
                 throw 'fallthrough in condition here 1.';
             }
         };
-        ws.send(JSON.stringify({
+        this.write({
             uuid: uuid,
             key: key,
             type: 'lock',
             ttl: ttl
-        }));
+        });
     };
     Client.prototype.unlock = function (key, opts, cb) {
         var _this = this;
@@ -423,12 +428,12 @@ var Client = (function () {
                 _this.bookkeeping[key].unlockCount++;
                 debug('\n', ' => Lock unlock count (client), key => ', '"' + key + '"', '\n', util.inspect(_this.bookkeeping[key]), '\n');
                 delete _this.resolutions[uuid];
-                ws.send(JSON.stringify({
+                _this.write({
                     uuid: uuid,
                     key: key,
                     pid: process.pid,
                     type: 'unlock-received'
-                }));
+                });
                 cb(null, data.uuid);
             }
             else if (data.retry === true) {
@@ -442,13 +447,13 @@ var Client = (function () {
                 throw 'fallthrough in conditional 2';
             }
         };
-        ws.send(JSON.stringify({
+        this.write({
             uuid: uuid,
             _uuid: opts._uuid,
             key: key,
             force: (opts._retryCount > 0) ? opts.force : false,
             type: 'unlock'
-        }));
+        });
     };
     return Client;
 }());

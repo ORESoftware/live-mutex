@@ -2,12 +2,14 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 var assert = require("assert");
 var EE = require("events");
+var net = require("net");
 var WebSocket = require('uws');
 var WebSocketServer = WebSocket.Server;
 var ijson = require('siamese');
 var async = require('async');
 var colors = require('colors/safe');
 var uuidV4 = require('uuid/v4');
+var JSONStream = require('JSONStream');
 var utils_1 = require("./utils");
 var debug = require('debug')('live-mutex');
 var weAreDebugging = require('./lib/we-are-debugging');
@@ -72,11 +74,7 @@ var Broker = (function () {
         this.port = opts.port || 6970;
         this.send = function (ws, data, cb) {
             var _this = this;
-            if (ws.readyState !== WebSocket.OPEN) {
-                cb && cb('err: Socket is not OPEN.');
-                return;
-            }
-            ws.send(JSON.stringify(data), function (err) {
+            ws.write(JSON.stringify(data) + '\n', 'utf8', function (err) {
                 if (err) {
                     console.error(err.stack || err);
                     var key = data.key;
@@ -94,10 +92,113 @@ var Broker = (function () {
             });
         };
         var ee = new EE();
-        var wss = this.wss = new WebSocketServer({
-            port: this.port,
-            host: this.host
-        }, function () {
+        var onData = function (ws, msg) {
+            ijson.parse(msg).then(function (data) {
+                var key = data.key;
+                if (key) {
+                    var v = void 0;
+                    if (!(v = _this.wsToKeys.get(ws))) {
+                        v = [];
+                        _this.wsToKeys.set(ws, v);
+                    }
+                    var index = v.indexOf(key);
+                    if (index < 0) {
+                        v.push(key);
+                    }
+                }
+                if (data.type === 'unlock') {
+                    _this.unlock(data, ws);
+                }
+                else if (data.type === 'lock') {
+                    debug(colors.blue(' => broker attempting to get lock...'));
+                    _this.lock(data, ws);
+                }
+                else if (data.type === 'lock-received') {
+                    _this.bookkeeping[data.key].lockCount++;
+                    clearTimeout(_this.timeouts[data.key]);
+                    delete _this.timeouts[data.key];
+                }
+                else if (data.type === 'unlock-received') {
+                    var key_1 = data.key;
+                    clearTimeout(_this.timeouts[key_1]);
+                    delete _this.timeouts[key_1];
+                    _this.bookkeeping[key_1].unlockCount++;
+                }
+                else if (data.type === 'lock-client-timeout') {
+                    var lck = _this.locks[key];
+                    var uuid = data.uuid;
+                    if (!lck) {
+                        console.error(' => Lock must have expired.');
+                        return;
+                    }
+                    var ln = lck.notify.length;
+                    for (var i = 0; i < ln; i++) {
+                        if (lck.notify[i].uuid === uuid) {
+                            lck.notify.splice(i, 1);
+                            break;
+                        }
+                    }
+                }
+                else if (data.type === 'lock-received-rejected') {
+                    var lck = _this.locks[key];
+                    if (!lck) {
+                        console.error(' => Lock must have expired.');
+                        return;
+                    }
+                    _this.rejected[data.uuid] = true;
+                    _this.ensureNewLockHolder(lck, data, function (err) {
+                        console.log(' => new lock-holder ensured.');
+                    });
+                }
+                else if (data.type === 'lock-info-request') {
+                    _this.retrieveLockInfo(data, ws);
+                }
+                else {
+                    console.error(colors.red.bold(' bad data sent to broker.'));
+                    _this.send(ws, {
+                        key: data.key,
+                        uuid: data.uuid,
+                        error: new Error(' => Bad data sent to web socket server =>').stack
+                    });
+                }
+            }, function (err) {
+                console.error(colors.red.bold(err.stack || err), 'for the following raw message => \n', String(msg));
+                _this.send(ws, {
+                    error: String(err.stack || err)
+                });
+            });
+        };
+        var wss = net.createServer(function (ws) {
+            if (first) {
+                first = false;
+                _this.sendStatsMessageToAllClients();
+            }
+            ws.on('error', function (err) {
+                console.error(' => client error => ', err.stack || err);
+            });
+            if (!_this.wsToKeys.get(ws)) {
+                _this.wsToKeys.set(ws, []);
+            }
+            ws.on('end', function () {
+                var keys;
+                if (keys = _this.wsLock.get(ws)) {
+                    keys.forEach(function (k) {
+                        removeWsLockKey(_this, ws, k);
+                        if (_this.locks[k]) {
+                            _this.unlock({
+                                force: true,
+                                key: k
+                            }, ws);
+                        }
+                    });
+                }
+            });
+            ws.pipe(JSONStream.parse()).on('data', function (v) {
+                onData(ws, v);
+            });
+        });
+        wss.listen(this.port, function () {
+            console.log('opened server on', wss.address());
             wss.isOpen = true;
             process.nextTick(function () {
                 ee.emit('open', true);
@@ -141,105 +242,9 @@ var Broker = (function () {
         this.wsToKeys = new Map();
         var first = true;
         wss.on('connection', function (ws) {
-            if (first) {
-                first = false;
-                _this.sendStatsMessageToAllClients();
-            }
-            ws.on('error', function (err) {
-                console.error(' => ws error => ', err.stack || err);
-            });
-            if (!_this.wsToKeys.get(ws)) {
-                _this.wsToKeys.set(ws, []);
-            }
-            ws.on('close', function () {
-                var keys;
-                if (keys = _this.wsLock.get(ws)) {
-                    keys.forEach(function (k) {
-                        removeWsLockKey(_this, ws, k);
-                        if (_this.locks[k]) {
-                            _this.unlock({
-                                force: true,
-                                key: k
-                            }, ws);
-                        }
-                    });
-                }
-            });
-            ws.on('message', function (msg) {
-                ijson.parse(msg).then(function (data) {
-                    var key = data.key;
-                    if (key) {
-                        var v = void 0;
-                        if (!(v = _this.wsToKeys.get(ws))) {
-                            v = [];
-                            _this.wsToKeys.set(ws, v);
-                        }
-                        var index = v.indexOf(key);
-                        if (index < 0) {
-                            v.push(key);
-                        }
-                    }
-                    if (data.type === 'unlock') {
-                        _this.unlock(data, ws);
-                    }
-                    else if (data.type === 'lock') {
-                        debug(colors.blue(' => broker attempting to get lock...'));
-                        _this.lock(data, ws);
-                    }
-                    else if (data.type === 'lock-received') {
-                        _this.bookkeeping[data.key].lockCount++;
-                        clearTimeout(_this.timeouts[data.key]);
-                        delete _this.timeouts[data.key];
-                    }
-                    else if (data.type === 'unlock-received') {
-                        var key_1 = data.key;
-                        clearTimeout(_this.timeouts[key_1]);
-                        delete _this.timeouts[key_1];
-                        _this.bookkeeping[key_1].unlockCount++;
-                    }
-                    else if (data.type === 'lock-client-timeout') {
-                        var lck = _this.locks[key];
-                        var uuid = data.uuid;
-                        if (!lck) {
-                            console.error(' => Lock must have expired.');
-                            return;
-                        }
-                        var ln = lck.notify.length;
-                        for (var i = 0; i < ln; i++) {
-                            if (lck.notify[i].uuid === uuid) {
-                                lck.notify.splice(i, 1);
-                                break;
-                            }
-                        }
-                    }
-                    else if (data.type === 'lock-received-rejected') {
-                        var lck = _this.locks[key];
-                        if (!lck) {
-                            console.error(' => Lock must have expired.');
-                            return;
-                        }
-                        _this.rejected[data.uuid] = true;
-                        _this.ensureNewLockHolder(lck, data, function (err) {
-                            console.log(' => new lock-holder ensured.');
-                        });
-                    }
-                    else if (data.type === 'lock-info-request') {
-                        _this.retrieveLockInfo(data, ws);
-                    }
-                    else {
-                        console.error(colors.red.bold(' bad data sent to broker.'));
-                        _this.send(ws, {
-                            key: data.key,
-                            uuid: data.uuid,
-                            error: new Error(' => Bad data sent to web socket server =>').stack
-                        });
-                    }
-                }, function (err) {
-                    console.error(colors.red.bold(err.stack || err));
-                    _this.send(ws, {
-                        error: err.stack
-                    });
-                });
+            console.log('wss connection.');
+            ws.on('message', function (m) {
+                console.log('message => ', String(m));
             });
         });
     }

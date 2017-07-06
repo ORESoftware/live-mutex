@@ -5,6 +5,7 @@ import * as util from 'util';
 import * as path from 'path';
 import * as assert from 'assert';
 import * as EE from 'events';
+import * as net from 'net';
 
 //npm
 import {Server} from '@types/uws';
@@ -15,6 +16,7 @@ const ijson = require('siamese');
 const async = require('async');
 const colors = require('colors/safe');
 const uuidV4 = require('uuid/v4');
+const JSONStream = require('JSONStream');
 
 //project
 import lmUtils from './utils';
@@ -33,7 +35,8 @@ if (weAreDebugging) {
 function addWsLockKey(broker, ws, key) {
   let v;
   if (!( v = broker.wsLock.get(ws))) {
-    v = []; broker.wsLock.set(ws, v);
+    v = [];
+    broker.wsLock.set(ws, v);
   }
   if (v.indexOf(key) < 0) {
     v.push(key);
@@ -83,7 +86,6 @@ export interface IUuidTimer {
 }
 
 export type TBrokerCB = (err: Error | null | undefined | string, val: Broker) => void;
-
 
 export type TEnsureCB = (cb: TBrokerCB) => void;
 export type TEnsurePromise = () => Promise<Broker>;
@@ -142,7 +144,6 @@ export class Broker {
   wsToKeys: Map<CWebSocket, Array<string>>;
   bookkeeping: IBookkeepingHash;
 
-
   ///////////////////////////////////////////////////////////////
 
   constructor($opts: IBrokerOptsPartial, cb?: IErrorFirstCB) {
@@ -188,12 +189,12 @@ export class Broker {
     this.port = opts.port || 6970;
 
     this.send = function (ws, data, cb) {
-      if (ws.readyState !== WebSocket.OPEN) {
-        cb && cb('err: Socket is not OPEN.');
-        return;
-      }
+      // if (ws.readyState !== WebSocket.OPEN) {
+      //   cb && cb('err: Socket is not OPEN.');
+      //   return;
+      // }
 
-      ws.send(JSON.stringify(data), err => {
+      ws.write(JSON.stringify(data) + '\n', 'utf8', err => {
         if (err) {
           console.error(err.stack || err);
           const key = data.key;
@@ -214,18 +215,150 @@ export class Broker {
 
     const ee = new EE();
 
-    const wss = this.wss = new WebSocketServer({
-        port: this.port,
-        host: this.host
-      },
-      () => {
-        wss.isOpen = true;
-        process.nextTick(() => {
-          ee.emit('open', true);
-          cb && cb(null, this);
+    const onData = (ws, msg) => {
+
+      // console.log('raw message from client => ', String(msg));
+
+      ijson.parse(msg).then(data => {
+
+          // console.log('\n', colors.blue(' => broker received this data => '), '\n', data, '\n');
+
+          const key = data.key;
+
+          if (key) {
+            let v;
+            if (!(v = this.wsToKeys.get(ws))) {
+              v = [];
+              this.wsToKeys.set(ws, v);
+            }
+            let index = v.indexOf(key);
+            if (index < 0) {
+              v.push(key);
+            }
+          }
+
+          if (data.type === 'unlock') {
+            this.unlock(data, ws);
+          }
+          else if (data.type === 'lock') {
+            debug(colors.blue(' => broker attempting to get lock...'));
+            this.lock(data, ws);
+          }
+          else if (data.type === 'lock-received') {
+            this.bookkeeping[data.key].lockCount++;
+            clearTimeout(this.timeouts[data.key]);
+            delete this.timeouts[data.key];
+          }
+          else if (data.type === 'unlock-received') {
+            const key = data.key;
+            clearTimeout(this.timeouts[key]);
+            delete this.timeouts[key];
+            this.bookkeeping[key].unlockCount++;
+          }
+          else if (data.type === 'lock-client-timeout') {
+
+            // if the client times out, we don't want to send them any more messages
+            const lck = this.locks[key];
+            const uuid = data.uuid;
+            if (!lck) {
+              console.error(' => Lock must have expired.');
+              return;
+            }
+
+            let ln = lck.notify.length;
+            for (let i = 0; i < ln; i++) {
+              if (lck.notify[i].uuid === uuid) {
+                // remove item from notify
+                lck.notify.splice(i, 1);
+                break;
+              }
+            }
+
+          }
+          else if (data.type === 'lock-received-rejected') {
+            const lck = this.locks[key];
+            if (!lck) {
+              console.error(' => Lock must have expired.');
+              return;
+            }
+            this.rejected[data.uuid] = true;
+            this.ensureNewLockHolder(lck, data, function (err) {
+              console.log(' => new lock-holder ensured.');
+            });
+          }
+          else if (data.type === 'lock-info-request') {
+            this.retrieveLockInfo(data, ws);
+          }
+          else {
+            console.error(colors.red.bold(' bad data sent to broker.'));
+
+            this.send(ws, {
+              key: data.key,
+              uuid: data.uuid,
+              error: new Error(' => Bad data sent to web socket server =>').stack
+            });
+          }
+
+        },
+
+        err => {
+
+          console.error(colors.red.bold(err.stack || err), 'for the following raw message => \n', String(msg));
+
+          this.send(ws, {
+            error: String(err.stack || err)
+          });
         });
 
+    };
+
+    const wss = net.createServer(ws => {
+
+      if (first) {
+        first = false;
+        this.sendStatsMessageToAllClients();
+      }
+
+      ws.on('error', function (err) {
+        console.error(' => client error => ', err.stack || err);
       });
+
+      if (!this.wsToKeys.get(ws)) {
+        this.wsToKeys.set(ws, []);
+      }
+
+      ws.on('end', () => {
+
+        //TODO: unlock any locks that this ws owns
+
+        let keys;
+        if (keys = this.wsLock.get(ws)) {
+          keys.forEach(k => {
+            removeWsLockKey(this, ws, k);
+            if (this.locks[k]) {
+              this.unlock({
+                force: true,
+                key: k
+              }, ws);
+            }
+          });
+        }
+      });
+
+      ws.pipe(JSONStream.parse()).on('data', v => {
+        onData(ws, v);
+      });
+
+    });
+
+    wss.listen(this.port, () => {
+      console.log('opened server on', wss.address());
+      wss.isOpen = true;
+      process.nextTick(() => {
+        ee.emit('open', true);
+        cb && cb(null, this);
+      });
+    });
 
     this.ensure = function ($cb) {
 
@@ -264,151 +397,29 @@ export class Broker {
     this.timeouts = {};
     this.locks = {};
 
-    // map ws objects as keys, to values
+// map ws objects as keys, to values
     this.wsLock = new Map(); // keys are ws objects, values are lock keys
     this.wsToKeys = new Map(); // keys are ws objects, values are keys []
 
     let first = true;
 
-    //TODO: on disconnection we could delete wsClientId key/val from this.wsToKeys
-    // but there should be no need to do that since we won't have that many clients
+//TODO: on disconnection we could delete wsClientId key/val from this.wsToKeys
+// but there should be no need to do that since we won't have that many clients
 
     wss.on('connection', ws => {
+      console.log('wss connection.');
 
-      if (first) {
-        first = false;
-        this.sendStatsMessageToAllClients();
-      }
-
-      ws.on('error', function (err) {
-        console.error(' => ws error => ', err.stack || err);
-      });
-
-
-      if (!this.wsToKeys.get(ws)) {
-        this.wsToKeys.set(ws, []);
-      }
-
-      ws.on('close', () => {
-
-        //TODO: unlock any locks that this ws owns
-
-        let keys;
-        if (keys = this.wsLock.get(ws)) {
-          keys.forEach(k => {
-            removeWsLockKey(this, ws, k);
-            if (this.locks[k]) {
-              this.unlock({
-                force: true,
-                key: k
-              }, ws);
-            }
-          });
-        }
-      });
-
-      ws.on('message', (msg) => {
-
-        ijson.parse(msg).then(data => {
-
-            // console.log('\n', colors.blue(' => broker received this data => '), '\n', data, '\n');
-
-            const key = data.key;
-
-            if (key) {
-              let v;
-              if (!(v = this.wsToKeys.get(ws))) {
-                v = [];
-                this.wsToKeys.set(ws, v);
-              }
-              let index = v.indexOf(key);
-              if (index < 0) {
-                v.push(key);
-              }
-            }
-
-            if (data.type === 'unlock') {
-              this.unlock(data, ws);
-            }
-            else if (data.type === 'lock') {
-              debug(colors.blue(' => broker attempting to get lock...'));
-              this.lock(data, ws);
-            }
-            else if (data.type === 'lock-received') {
-              this.bookkeeping[data.key].lockCount++;
-              clearTimeout(this.timeouts[data.key]);
-              delete this.timeouts[data.key];
-            }
-            else if (data.type === 'unlock-received') {
-              const key = data.key;
-              clearTimeout(this.timeouts[key]);
-              delete this.timeouts[key];
-              this.bookkeeping[key].unlockCount++;
-            }
-            else if (data.type === 'lock-client-timeout') {
-
-              // if the client times out, we don't want to send them any more messages
-              const lck = this.locks[key];
-              const uuid = data.uuid;
-              if (!lck) {
-                console.error(' => Lock must have expired.');
-                return;
-              }
-
-              let ln = lck.notify.length;
-              for (let i = 0; i < ln ; i++) {
-                if (lck.notify[i].uuid === uuid) {
-                  // remove item from notify
-                  lck.notify.splice(i, 1);
-                  break;
-                }
-              }
-
-            }
-            else if (data.type === 'lock-received-rejected') {
-              const lck = this.locks[key];
-              if (!lck) {
-                console.error(' => Lock must have expired.');
-                return;
-              }
-              this.rejected[data.uuid] = true;
-              this.ensureNewLockHolder(lck, data, function (err) {
-                console.log(' => new lock-holder ensured.');
-              });
-            }
-            else if (data.type === 'lock-info-request') {
-              this.retrieveLockInfo(data, ws);
-            }
-            else {
-              console.error(colors.red.bold(' bad data sent to broker.'));
-
-              this.send(ws, {
-                key: data.key,
-                uuid: data.uuid,
-                error: new Error(' => Bad data sent to web socket server =>').stack
-              });
-            }
-
-          },
-
-          err => {
-            console.error(colors.red.bold(err.stack || err));
-
-            this.send(ws, {
-              error: err.stack
-            });
-          });
-
-      });
-
+      ws.on('message', function (m) {
+        console.log('message => ', String(m));
+      })
     });
 
   }
 
-  static create(opts: IBrokerOptsPartial, cb?: TBrokerCB): Promise<Broker> {
+  static
+  create(opts: IBrokerOptsPartial, cb ?: TBrokerCB): Promise<Broker> {
     return new Broker(opts).ensure(cb);
   }
-
 
   sendStatsMessageToAllClients() {
 
@@ -425,7 +436,7 @@ export class Broker {
       async.mapSeries(keys, (k, cb) => {
 
         const lck = this.locks[k];
-        let len = lck ?  lck.notify.length : 0;
+        let len = lck ? lck.notify.length : 0;
 
         this.send(ws, {
             type: 'stats',
@@ -567,7 +578,6 @@ export class Broker {
 
   }
 
-
   retrieveLockInfo(data, ws) {
 
     const locks = this.locks;
@@ -595,7 +605,6 @@ export class Broker {
     });
 
   }
-
 
   lock(data, ws) {
 
@@ -708,7 +717,7 @@ export class Broker {
 
   }
 
-  unlock(data: Object, ws?: CWebSocket) {
+  unlock(data: Object, ws ?: CWebSocket) {
 
     const locks = this.locks;
     const key = data.key;
@@ -761,7 +770,7 @@ export class Broker {
         });
       }
 
-      this.wsLock.forEach((v,k) => {
+      this.wsLock.forEach((v, k) => {
         const keys = this.wsLock.get(k);
         if (keys) {
           const i = keys.indexOf[key];
@@ -802,7 +811,7 @@ export class Broker {
         colors.red('"' + key + '"'));
 
       // since the lock no longer exists for this key, remove ownership of this key
-      this.wsLock.forEach((v,k) => {
+      this.wsLock.forEach((v, k) => {
         const keys = this.wsLock.get(k);
         if (keys) {
           const i = keys.indexOf[key];
@@ -829,8 +838,6 @@ export class Broker {
 
   }
 }
-
-
 
 const $exports = module.exports;
 export default $exports;

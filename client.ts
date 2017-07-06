@@ -7,12 +7,14 @@ import * as assert from 'assert';
 import * as EE from 'events';
 import {CWebSocket} from "./dts/uws";
 import Timer = NodeJS.Timer;
+import * as net from 'net';
 
 //npm
 const WebSocket = require('uws');
 const ijson = require('siamese');
 const uuidV4 = require('uuid/v4');
 const colors = require('colors/safe');
+const JSONStream = require('JSONStream');
 
 //project
 const debug = require('debug')('live-mutex');
@@ -68,7 +70,6 @@ export interface IUuidTimeoutBool {
   [key: string]: boolean
 }
 
-
 export type IErrorFirstDataCB = (err: Error | null | undefined | string, val?: any) => void;
 
 export interface IClientResolution {
@@ -86,8 +87,7 @@ export interface IBookkeeping {
   unlockCount: number;
 }
 
-
-export type TClientCB = (err: Error | string | null | undefined, c? : Client) => void;
+export type TClientCB = (err: Error | string | null | undefined, c?: Client) => void;
 export type TEnsureCB = (cb: TClientCB) => void;
 export type TEnsurePromise = () => Promise<Client>;
 export type TEnsure = TEnsurePromise | TEnsureCB;
@@ -104,9 +104,8 @@ export interface IClientUnlockOpts {
 
 }
 
-export type TClientLockCB = (err: Error | string | null | undefined, unlock: Function| false, id?: string) => void;
+export type TClientLockCB = (err: Error | string | null | undefined, unlock: Function | false, id?: string) => void;
 export type TClientUnlockCB = (err: Error | string | null | undefined, uuid?: string) => void;
-
 
 ////////////////////////////////////////////////////////////////
 
@@ -210,20 +209,24 @@ export class Client {
     this.lockRetryMax = opts.lockRetryMax || 3;
     this.unlockRetryMax = opts.unlockRetryMax || 3;
 
-    const ws = this.ws = new WebSocket(['ws://', this.host, ':', this.port].join(''));
-
-    ws.on('error', err => {
-      console.error('\n', ' => Websocket client error => ', err.stack || err, '\n');
-    });
-
     const ee = new EE();
 
-    ws.on('open', () => {
+    const ws = this.ws = net.createConnection({port: this.port}, () => {
       ws.isOpen = true;
       process.nextTick(() => {
         ee.emit('open', true);
         cb && cb(null, this);
       });
+    });
+
+    ws.setEncoding('utf8');
+
+    this.write = function (data, cb) {
+      ws.write(JSON.stringify(data) + '\n', 'utf8', cb);
+    };
+
+    ws.on('end', () => {
+      console.log('disconnected from server');
     });
 
     this.ensure = function ($cb) {
@@ -259,11 +262,11 @@ export class Client {
     });
 
     process.once('exit', function () {
-      ws.close();
+      ws.end();
     });
 
     this.close = function () {
-      return ws.close();
+      return ws.end();
     };
 
     this.bookkeeping = {};
@@ -272,14 +275,12 @@ export class Client {
     this.resolutions = {};
     this.giveups = {};
 
-    ws.on('message', (msg, flags) => {
+    // flags.binary will be set if a binary data is received.
+    // flags.masked will be set if the data was masked.
 
-      // flags.binary will be set if a binary data is received.
-      // flags.masked will be set if the data was masked.
+    const onData = (ws, msg) => {
 
       ijson.parse(msg).then(data => {
-
-        debug('\n', ' => onMessage in lock => ', '\n', colors.blue(util.inspect(data)), '\n');
 
         if (data.type === 'stats') {
           this.setLockRequestorCount(data.key, data.lockRequestCount);
@@ -310,12 +311,12 @@ export class Client {
             delete this.timeouts[uuid];
 
             if (data.type === 'lock') {
-              ws.send(JSON.stringify({
+              this.write({
                 uuid: uuid,
                 key: data.key,
                 pid: process.pid,
                 type: 'lock-received-rejected'
-              }));
+              });
             }
           }
           else {
@@ -330,11 +331,15 @@ export class Client {
         console.error(colors.red.bold(' => Message could not be JSON.parsed => '), msg, '\n', err.stack || err);
       });
 
+    };
+
+    ws.pipe(JSONStream.parse()).on('data', v => {
+      onData(ws, v);
     });
 
-  }
+  };
 
-  static create(opts: TClientOptions, cb: TClientCB) : Promise<Client> {
+  static create(opts: TClientOptions, cb: TClientCB): Promise<Client> {
     return new Client(opts).ensure(cb)
   }
 
@@ -345,7 +350,7 @@ export class Client {
     a.push(fn);
   }
 
-  setLockRequestorCount(key, val) : void {
+  setLockRequestorCount(key, val): void {
     this.lockholderCount[key] = val;
     debug(' => Requestor count => key =>', key, ' => value =>', val);
     const a = this.listeners[key] = this.listeners[key] || [];
@@ -354,7 +359,7 @@ export class Client {
     }
   }
 
-  getLockholderCount(key) : number{
+  getLockholderCount(key): number {
     return this.lockholderCount[key] || 0;
   }
 
@@ -394,11 +399,11 @@ export class Client {
 
     };
 
-    ws.send(JSON.stringify({
+    this.write({
       uuid: uuid,
       key: key,
       type: 'lock-info-request',
-    }));
+    });
 
   }
 
@@ -474,14 +479,11 @@ export class Client {
       this.timeouts[uuid] = true;
       delete  this.resolutions[uuid];
 
-      ws.send(JSON.stringify({
+      this.write({
         uuid: uuid,
         key: key,
         pid: process.pid,
         type: 'lock-client-timeout'
-      }), function ($err) {
-        const err = $err ? ('=>' + ($err.stack || $err)) : '';
-        cb(new Error(' => Acquiring lock operation timed out => Client-side timeout fired. ' + err), false);
       });
 
     }, lockTimeout);
@@ -512,12 +514,12 @@ export class Client {
         delete this.resolutions[uuid];
         this.bookkeeping[key].lockCount++;
 
-        ws.send(JSON.stringify({
+        this.write({
           uuid: uuid,
           key: key,
           pid: process.pid,
           type: 'lock-received'
-        }));
+        });
 
         if (data.uuid !== uuid) {
           cb(new Error(' => Something went wrong.'), false);
@@ -546,12 +548,12 @@ export class Client {
 
     };
 
-    ws.send(JSON.stringify({
+    this.write({
       uuid: uuid,
       key: key,
       type: 'lock',
       ttl: ttl
-    }));
+    });
 
   }
 
@@ -647,12 +649,12 @@ export class Client {
 
         delete this.resolutions[uuid];
 
-        ws.send(JSON.stringify({
+        this.write({
           uuid: uuid,
           key: key,
           pid: process.pid,
           type: 'unlock-received'
-        }));
+        });
 
         cb(null, data.uuid);
       }
@@ -664,20 +666,20 @@ export class Client {
         opts._uuid = opts._uuid || uuid;
         this.unlock(key, opts, cb);
       }
-      else{
+      else {
         throw 'fallthrough in conditional 2';
       }
 
     };
 
-    ws.send(JSON.stringify({
+    this.write({
       uuid: uuid,
       _uuid: opts._uuid,
       key: key,
       // we only use force if we have to retry
       force: (opts._retryCount > 0) ? opts.force : false,
       type: 'unlock'
-    }));
+    });
   }
 
 }
