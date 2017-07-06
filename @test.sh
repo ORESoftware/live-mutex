@@ -4,6 +4,8 @@ cd $(dirname "$0");
 
 LIB_NAME="live-mutex";
 
+npm rebuild &&  # rebuild must be successfuly
+
 WHICH_SUMAN_TOOLS=$(which suman-tools);
 
 export PATH=${PATH}:./node_modules/.bin
