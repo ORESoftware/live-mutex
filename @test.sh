@@ -27,5 +27,5 @@ if [[ -z ${WHICH_SUMAN} ]]; then
  npm install github:sumanjs/suman#rebase_branch
 fi
 
-./node_modules/.bin/suman test/src/*.js
+./node_modules/.bin/suman test/src/*.js --inherit-stdio
 
