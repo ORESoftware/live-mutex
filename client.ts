@@ -687,8 +687,6 @@ export class Client {
 
 }
 
-const $exports = module.exports;
-export default $exports;
 
 
 

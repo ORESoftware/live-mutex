@@ -16,6 +16,8 @@ const ijson = require('siamese');
 const {Broker} = require('./broker');
 const p = require.resolve('./lib/launch-broker-child');
 
+console.log('broker => ', Broker);
+
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
 export const once = function (ctx, fn: Function) {

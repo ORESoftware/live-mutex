@@ -464,5 +464,3 @@ var Client = (function () {
     return Client;
 }());
 exports.Client = Client;
-var $exports = module.exports;
-exports.default = $exports;
