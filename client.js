@@ -23,6 +23,7 @@ process.on('warning', function (w) {
 var noop = function (cb) {
     cb && process.nextTick(cb);
 };
+var totalNoop = function () { };
 var validOptions = [
     'key',
     'listener',
@@ -389,7 +390,10 @@ var Client = (function () {
             };
         }
         opts = opts || {};
-        cb && (cb = cb.bind(this));
+        if (cb && !opts._retryCount) {
+            cb = cb.bind(this);
+        }
+        cb = cb || totalNoop;
         if ('force' in opts) {
             assert.equal(typeof opts.force, 'boolean', ' => Live-Mutex usage error => ' +
                 '"force" option must be a boolean value. Coerce it on your side, for safety.');
@@ -402,14 +406,14 @@ var Client = (function () {
         if (opts._retryCount > this.unlockRetryMax) {
             var err = new Error(' => Maximum retries reached.');
             process.emit('warning', err);
-            return cb(err);
+            return cb && cb(err);
         }
         var uuid = uuidV4();
         var unlockTimeout = opts.unlockRequestTimeout || this.unlockTimeout;
         var to = setTimeout(function () {
             delete _this.resolutions[uuid];
             _this.timeouts[uuid] = true;
-            var err = new Error(' => Unlocking timed out.');
+            var err = new Error('Unlock request timed out.');
             process.emit('warning', err);
             cb(err);
         }, unlockTimeout);
@@ -418,17 +422,17 @@ var Client = (function () {
             if (String(key) !== String(data.key)) {
                 var err_3 = new Error(' => Implementation error, bad key.');
                 process.emit('warning', err_3);
-                return cb(err_3);
+                return cb && cb(err_3);
             }
             if ([data.unlocked].filter(function (i) { return i; }).length > 1) {
                 var err_4 = new Error(' => Live-Mutex implementation error.');
                 process.emit('warning', err_4);
-                return cb(err_4);
+                return cb && cb(err_4);
             }
             if (data.error) {
                 clearTimeout(to);
                 process.emit('warning', new Error(data.error));
-                return cb(data.error);
+                return cb && cb(data.error);
             }
             if (data.unlocked === true) {
                 clearTimeout(to);
@@ -440,7 +444,7 @@ var Client = (function () {
                     pid: process.pid,
                     type: 'unlock-received'
                 });
-                cb(null, data.uuid);
+                cb && cb(null, data.uuid);
             }
             else if (data.retry === true) {
                 debug(' => Retrying the unlock call.');
@@ -450,7 +454,7 @@ var Client = (function () {
                 _this.unlock(key, opts, cb);
             }
             else {
-                process.emit('warning', 'fallthrough in conditional [2], Live-Mutex fail.');
+                process.emit('warning', 'fallthrough in conditional [2], Live-Mutex failure.');
             }
         };
         this.write({

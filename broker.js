@@ -72,19 +72,26 @@ var Broker = (function () {
         this.port = opts.port || 6970;
         this.send = function (ws, data, cb) {
             var _this = this;
+            var cleanUp = function () {
+                var key = data.key;
+                if (key) {
+                    var isOwnsKey = removeWsLockKey(_this, ws, key);
+                    if (isOwnsKey) {
+                        _this.unlock({
+                            key: key,
+                            force: true
+                        }, ws);
+                    }
+                }
+            };
+            if (!ws.writable) {
+                cleanUp();
+                return process.nextTick(cb);
+            }
             ws.write(JSON.stringify(data) + '\n', 'utf8', function (err) {
                 if (err) {
                     console.error(err.stack || err);
-                    var key = data.key;
-                    if (key) {
-                        var isOwnsKey = removeWsLockKey(_this, ws, key);
-                        if (isOwnsKey) {
-                            _this.unlock({
-                                key: key,
-                                force: true
-                            }, ws);
-                        }
-                    }
+                    cleanUp();
                 }
                 cb && cb(null);
             });
@@ -161,17 +168,25 @@ var Broker = (function () {
         };
         var first = true;
         var wss = net.createServer(function (ws) {
+            console.log('client connected.');
+            process.once('exit', function () {
+                try {
+                    ws.end();
+                }
+                finally {
+                }
+            });
             if (first) {
                 first = false;
                 _this.sendStatsMessageToAllClients();
             }
-            ws.on('error', function (err) {
+            ws.once('error', function (err) {
                 console.error(' => client error => ', err.stack || err);
             });
             if (!_this.wsToKeys.get(ws)) {
                 _this.wsToKeys.set(ws, []);
             }
-            ws.on('end', function () {
+            ws.once('end', function () {
                 var keys;
                 if (keys = _this.wsLock.get(ws)) {
                     keys.forEach(function (k) {

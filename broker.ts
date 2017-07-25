@@ -185,25 +185,29 @@ export class Broker {
     this.port = opts.port || 6970;
 
     this.send = function (ws, data, cb) {
-      // if (ws.readyState !== WebSocket.OPEN) {
-      //   cb && cb('err: Socket is not OPEN.');
-      //   return;
-      // }
+
+      let cleanUp = () => {
+        const key = data.key;
+        if (key) {
+          const isOwnsKey = removeWsLockKey(this, ws, key);
+          if (isOwnsKey) {
+            this.unlock({
+              key: key,
+              force: true
+            }, ws);
+          }
+        }
+      };
+
+      if (!ws.writable) {
+        cleanUp();
+        return process.nextTick(cb);
+      }
 
       ws.write(JSON.stringify(data) + '\n', 'utf8', err => {
         if (err) {
           console.error(err.stack || err);
-          const key = data.key;
-          if (key) {
-            const isOwnsKey = removeWsLockKey(this, ws, key);
-            if (isOwnsKey) {
-              this.unlock({
-                key: key,
-                force: true
-              }, ws);
-            }
-          }
-
+          cleanUp();
         }
         cb && cb(null);
       });
@@ -295,12 +299,23 @@ export class Broker {
 
     const wss = net.createServer(ws => {
 
+      console.log('client connected.');
+
+      process.once('exit', function () {
+        try {
+          ws.end();
+        }
+        finally {
+          // noop
+        }
+      });
+
       if (first) {
         first = false;
         this.sendStatsMessageToAllClients();
       }
 
-      ws.on('error', function (err) {
+      ws.once('error', function (err) {
         console.error(' => client error => ', err.stack || err);
       });
 
@@ -308,7 +323,7 @@ export class Broker {
         this.wsToKeys.set(ws, []);
       }
 
-      ws.on('end', () => {
+      ws.once('end', () => {
 
         let keys;
         if (keys = this.wsLock.get(ws)) {

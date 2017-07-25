@@ -6,7 +6,7 @@ var sl = require('strangeloop');
 var ijson = require('siamese');
 var Broker = require('./broker').Broker;
 var p = require.resolve('./lib/launch-broker-child');
-console.log('broker => ', Broker);
+console.error('broker => ', Broker);
 exports.once = function (ctx, fn) {
     var callable = true;
     return function () {
