@@ -4,7 +4,6 @@ var util = require("util");
 var assert = require("assert");
 var EE = require("events");
 var net = require("net");
-var WebSocket = require('uws');
 var ijson = require('siamese');
 var uuidV4 = require('uuid/v4');
 var colors = require('colors/safe');

@@ -10,7 +10,6 @@ import Timer = NodeJS.Timer;
 import * as net from 'net';
 
 //npm
-const WebSocket = require('uws');
 const ijson = require('siamese');
 const uuidV4 = require('uuid/v4');
 const colors = require('colors/safe');
