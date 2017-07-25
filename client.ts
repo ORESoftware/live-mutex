@@ -39,6 +39,8 @@ const noop = function (cb) {
   cb && process.nextTick(cb);
 };
 
+const totalNoop = function(){};
+
 const validOptions: Array<string> = [
   'key',
   'listener',
@@ -589,7 +591,12 @@ export class Client {
     }
 
     opts = opts || {};
-    cb && (cb = cb.bind(this));
+
+    if(cb && !opts._retryCount){
+       cb = cb.bind(this);
+    }
+
+    cb = cb || totalNoop;
 
     if ('force' in opts) {
       assert.equal(typeof opts.force, 'boolean', ' => Live-Mutex usage error => ' +
@@ -608,7 +615,7 @@ export class Client {
     if (opts._retryCount > this.unlockRetryMax) {
       let err = new Error(' => Maximum retries reached.');
       process.emit('warning', err);
-      return cb(err);
+      return cb && cb(err);
     }
 
     const uuid = uuidV4();
@@ -618,7 +625,7 @@ export class Client {
 
       delete this.resolutions[uuid];
       this.timeouts[uuid] = true;
-      let err = new Error(' => Unlocking timed out.');
+      let err = new Error('Unlock request timed out.');
       process.emit('warning', err);
       cb(err);
 
@@ -631,19 +638,19 @@ export class Client {
       if (String(key) !== String(data.key)) {
         let err = new Error(' => Implementation error, bad key.');
         process.emit('warning', err);
-        return cb(err);
+        return cb && cb(err);
       }
 
       if ([data.unlocked].filter(i => i).length > 1) {
         let err = new Error(' => Live-Mutex implementation error.');
         process.emit('warning', err);
-        return cb(err);
+        return cb && cb(err);
       }
 
       if (data.error) {
         clearTimeout(to);
         process.emit('warning', new Error(data.error));
-        return cb(data.error);
+        return cb && cb(data.error);
       }
 
       if (data.unlocked === true) {
@@ -659,7 +666,7 @@ export class Client {
           type: 'unlock-received'
         });
 
-        cb(null, data.uuid);
+        cb && cb(null, data.uuid);
       }
       else if (data.retry === true) {
 
@@ -670,7 +677,7 @@ export class Client {
         this.unlock(key, opts, cb);
       }
       else {
-        process.emit('warning', 'fallthrough in conditional [2], Live-Mutex fail.');
+        process.emit('warning', 'fallthrough in conditional [2], Live-Mutex failure.');
       }
 
     };
@@ -687,8 +694,6 @@ export class Client {
 
 }
 
-const $exports = module.exports;
-export default $exports;
 
 
 

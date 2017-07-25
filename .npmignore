@@ -4,6 +4,8 @@ node_modules
 *.sh
 *.md
 *.json
+*.txt
+suman.conf.js
 .gitignore
 .npmignore
 *.ts

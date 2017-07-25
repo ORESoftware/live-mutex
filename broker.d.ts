@@ -73,5 +73,3 @@ export declare class Broker {
     lock(data: any, ws: any): void;
     unlock(data: Object, ws?: Socket): void;
 }
-declare const $exports: any;
-export default $exports;
