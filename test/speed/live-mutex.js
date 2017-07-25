@@ -1,7 +1,6 @@
 'use strict';
 
 const async = require('async');
-
 const lmUtils = require('live-mutex/utils');
 const {Client} = require('live-mutex/client');
 const conf = Object.freeze({port: 7003});
@@ -41,7 +40,9 @@ lmUtils.launchBrokerInChildProcess(conf, function () {
         throw err;
       }
 
-      console.log(' => Time required for live-mutex => ', Date.now() - start);
+      const diff = Date.now() - start;
+      console.log(' => Time required for live-mutex => ', diff);
+      console.log(' => Lock/unlock cycles per millisecond => ', Number(a.length/diff).toFixed(3));
       process.exit(0);
     });
 

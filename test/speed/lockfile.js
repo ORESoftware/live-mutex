@@ -18,7 +18,6 @@ async.each(a, function (val, cb) {
       cb(err);
     }
     else {
-      console.log('unlocking...' + i++);
       lf.unlock(file, cb);
     }
   });
@@ -29,7 +28,9 @@ async.each(a, function (val, cb) {
     throw err;
   }
 
-  console.log(' => Time required for lockfile => ', Date.now() - start);
+  const diff = Date.now() - start;
+  console.log(' => Time required for lockfile => ', diff);
+  console.log(' => Lock/unlock cycles per millisecond => ', Number(a.length/diff).toFixed(3));
   process.exit(0);
 
 });

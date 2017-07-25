@@ -38,6 +38,9 @@ export interface IClientLockOpts {
 }
 export interface IClientUnlockOpts {
 }
+export interface ILockHolderCount {
+    [key: string]: number;
+}
 export declare type TClientLockCB = (err: Error | string | null | undefined, unlock: Function | false, id?: string) => void;
 export declare type TClientUnlockCB = (err: Error | string | null | undefined, uuid?: string) => void;
 export declare class Client {
@@ -56,6 +59,10 @@ export declare class Client {
     bookkeeping: IBookkeepingHash;
     ensure: TEnsure;
     giveups: IUuidBooleanHash;
+    write: Function;
+    isOpen: boolean;
+    lockholderCount: ILockHolderCount;
+    close: Function;
     constructor($opts: TClientOptions, cb?: TClientCB);
     static create(opts: TClientOptions, cb: TClientCB): Promise<Client>;
     addListener(key: any, fn: any): void;

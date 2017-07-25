@@ -104,6 +104,10 @@ export interface IClientUnlockOpts {
 
 }
 
+export interface ILockHolderCount {
+  [key: string]: number;
+}
+
 export type TClientLockCB = (err: Error | string | null | undefined, unlock: Function | false, id?: string) => void;
 export type TClientUnlockCB = (err: Error | string | null | undefined, uuid?: string) => void;
 
@@ -126,11 +130,16 @@ export class Client {
   bookkeeping: IBookkeepingHash;
   ensure: TEnsure;
   giveups: IUuidBooleanHash;
+  write: Function;
+  isOpen: boolean;
+  lockholderCount: ILockHolderCount;
+  close: Function;
 
   ////////////////////////////////////////////////////////////////
 
   constructor($opts: TClientOptions, cb?: TClientCB) {
 
+    this.isOpen = false;
     const opts = this.opts = $opts || {};
     assert(typeof opts === 'object', ' => Bad arguments to live-mutex client constructor.');
 
@@ -211,8 +220,8 @@ export class Client {
 
     const ee = new EE();
 
-    const ws = this.ws = net.createConnection({port: this.port}, () => {
-      ws.isOpen = true;
+    const ws = net.createConnection({port: this.port}, () => {
+      this.isOpen = true;
       process.nextTick(() => {
         ee.emit('open', true);
         cb && cb(null, this);
@@ -229,10 +238,10 @@ export class Client {
       console.log('disconnected from server');
     });
 
-    this.ensure = function ($cb) {
+    this.ensure = function ($cb?: Function) {
 
       if ($cb) {
-        if (ws.isOpen) {
+        if (this.isOpen) {
           return process.nextTick($cb, null, this);
         }
         const cb = lmUtils.once(this, $cb);
@@ -244,7 +253,7 @@ export class Client {
       }
       else {
         return new Promise((resolve, reject) => {
-          if (ws.isOpen) {
+          if (this.isOpen) {
             return resolve(this);
           }
           let to = setTimeout(reject.bind(null, 'err:timeout'), 2000);
@@ -252,13 +261,12 @@ export class Client {
             clearTimeout(to);
             resolve(this)
           });
-
         });
       }
     };
 
     ws.on('close', () => {
-      ws.isOpen = false;
+      this.isOpen = false;
     });
 
     process.once('exit', function () {
@@ -295,14 +303,15 @@ export class Client {
         const to = this.timeouts[uuid];
 
         if (fn && to) {
-          throw new Error(' => Fn and TO both exist => Live-Mutex implementation error.');
+          throw new Error(' => Function and timeout both exist => Live-Mutex implementation error.');
         }
+
         if (fn) {
           fn.call(this, null, data);
         }
         else if (to) {
-          console.error(' => Client side lock/unlock request timed-out.');
 
+          console.error(' => Client side lock/unlock request timed-out.');
           delete this.timeouts[uuid];
 
           if (data.type === 'lock') {
@@ -319,14 +328,15 @@ export class Client {
         }
       }
       else {
-        console.error(colors.yellow(' => Live-Mutex internal issue => message did not contain uuid =>'), '\n', msg);
+        console.error(colors.yellow(' => Live-Mutex internal issue => message did not contain uuid =>'),
+          '\n', util.inspect(data));
       }
 
     };
 
     ws.pipe(JSONStream.parse()).on('data', onData)
     .once('error', function (e) {
-      this.send(ws, {
+      this.sened(ws, {
         error: String(e.stack || e)
       }, function () {
         ws.end();
@@ -336,7 +346,7 @@ export class Client {
   };
 
   static create(opts: TClientOptions, cb: TClientCB): Promise<Client> {
-    return new Client(opts).ensure(cb)
+    return new Client(opts).ensure(cb);
   }
 
   addListener(key, fn) {
@@ -348,7 +358,6 @@ export class Client {
 
   setLockRequestorCount(key, val): void {
     this.lockholderCount[key] = val;
-    debug(' => Requestor count => key =>', key, ' => value =>', val);
     const a = this.listeners[key] = this.listeners[key] || [];
     for (let i = 0; i < a.length; i++) {
       a[i].call(null, val);
@@ -369,12 +378,9 @@ export class Client {
     }
 
     opts = opts || {};
-
-    const ws = this.ws;
     const uuid = opts._uuid || uuidV4();
 
     this.resolutions[uuid] = (err, data) => {
-
       if (String(key) !== String(data.key)) {
         delete this.resolutions[uuid];
         throw new Error(' => Live-Mutex implementation error => bad key.');
@@ -392,7 +398,6 @@ export class Client {
         delete this.resolutions[uuid];
         cb(null, {data: data});
       }
-
     };
 
     this.write({
@@ -465,7 +470,6 @@ export class Client {
     opts._retryCount = opts._retryCount || 0;
 
     const append = opts.append || '';
-    const ws = this.ws;
     const uuid = opts._uuid || (append + uuidV4());
     const ttl = opts.ttl || this.ttl;
     const lockTimeout = opts.lockRequestTimeout || this.lockTimeout;
@@ -603,7 +607,6 @@ export class Client {
     }
 
     const uuid = uuidV4();
-    const ws = this.ws;
     const unlockTimeout = opts.unlockRequestTimeout || this.unlockTimeout;
 
     const to = setTimeout(() => {
@@ -618,11 +621,9 @@ export class Client {
 
       this.setLockRequestorCount(key, data.lockRequestCount);
 
-      debug('\n', ' onMessage in unlock =>', '\n', colors.blue(util.inspect(data)), '\n');
-
       if (String(key) !== String(data.key)) {
         console.error(colors.bgRed(new Error(' !!! bad key !!!').stack));
-        return cb(new Error(' => Implementation error.'))
+        return cb(new Error(' => Implementation error, bad key.'))
       }
 
       if ([data.unlocked].filter(i => i).length > 1) {
@@ -669,8 +670,8 @@ export class Client {
     };
 
     this.write({
-      uuid: uuid,
       _uuid: opts._uuid,
+      uuid: uuid,
       key: key,
       // we only use force if we have to retry
       force: (opts._retryCount > 0) ? opts.force : false,

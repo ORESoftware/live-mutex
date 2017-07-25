@@ -36,6 +36,7 @@ var validOptions = [
 var Client = (function () {
     function Client($opts, cb) {
         var _this = this;
+        this.isOpen = false;
         var opts = this.opts = $opts || {};
         assert(typeof opts === 'object', ' => Bad arguments to live-mutex client constructor.');
         if (cb) {
@@ -90,8 +91,8 @@ var Client = (function () {
         this.lockRetryMax = opts.lockRetryMax || 3;
         this.unlockRetryMax = opts.unlockRetryMax || 3;
         var ee = new EE();
-        var ws = this.ws = net.createConnection({ port: this.port }, function () {
-            ws.isOpen = true;
+        var ws = net.createConnection({ port: this.port }, function () {
+            _this.isOpen = true;
             process.nextTick(function () {
                 ee.emit('open', true);
                 cb && cb(null, _this);
@@ -107,7 +108,7 @@ var Client = (function () {
         this.ensure = function ($cb) {
             var _this = this;
             if ($cb) {
-                if (ws.isOpen) {
+                if (this.isOpen) {
                     return process.nextTick($cb, null, this);
                 }
                 var cb_1 = utils_1.default.once(this, $cb);
@@ -119,7 +120,7 @@ var Client = (function () {
             }
             else {
                 return new Promise(function (resolve, reject) {
-                    if (ws.isOpen) {
+                    if (_this.isOpen) {
                         return resolve(_this);
                     }
                     var to = setTimeout(reject.bind(null, 'err:timeout'), 2000);
@@ -131,7 +132,7 @@ var Client = (function () {
             }
         };
         ws.on('close', function () {
-            ws.isOpen = false;
+            _this.isOpen = false;
         });
         process.once('exit', function () {
             ws.end();
@@ -158,7 +159,7 @@ var Client = (function () {
                 var fn = _this.resolutions[uuid];
                 var to = _this.timeouts[uuid];
                 if (fn && to) {
-                    throw new Error(' => Fn and TO both exist => Live-Mutex implementation error.');
+                    throw new Error(' => Function and timeout both exist => Live-Mutex implementation error.');
                 }
                 if (fn) {
                     fn.call(_this, null, data);
@@ -180,12 +181,12 @@ var Client = (function () {
                 }
             }
             else {
-                console.error(colors.yellow(' => Live-Mutex internal issue => message did not contain uuid =>'), '\n', msg);
+                console.error(colors.yellow(' => Live-Mutex internal issue => message did not contain uuid =>'), '\n', util.inspect(data));
             }
         };
         ws.pipe(JSONStream.parse()).on('data', onData)
             .once('error', function (e) {
-            this.send(ws, {
+            this.sened(ws, {
                 error: String(e.stack || e)
             }, function () {
                 ws.end();
@@ -204,7 +205,6 @@ var Client = (function () {
     };
     Client.prototype.setLockRequestorCount = function (key, val) {
         this.lockholderCount[key] = val;
-        debug(' => Requestor count => key =>', key, ' => value =>', val);
         var a = this.listeners[key] = this.listeners[key] || [];
         for (var i = 0; i < a.length; i++) {
             a[i].call(null, val);
@@ -221,7 +221,6 @@ var Client = (function () {
             opts = {};
         }
         opts = opts || {};
-        var ws = this.ws;
         var uuid = opts._uuid || uuidV4();
         this.resolutions[uuid] = function (err, data) {
             if (String(key) !== String(data.key)) {
@@ -292,7 +291,6 @@ var Client = (function () {
         }
         opts._retryCount = opts._retryCount || 0;
         var append = opts.append || '';
-        var ws = this.ws;
         var uuid = opts._uuid || (append + uuidV4());
         var ttl = opts.ttl || this.ttl;
         var lockTimeout = opts.lockRequestTimeout || this.lockTimeout;
@@ -402,7 +400,6 @@ var Client = (function () {
             return cb(new Error(' => Maximum retries reached.'));
         }
         var uuid = uuidV4();
-        var ws = this.ws;
         var unlockTimeout = opts.unlockRequestTimeout || this.unlockTimeout;
         var to = setTimeout(function () {
             delete _this.resolutions[uuid];
@@ -411,10 +408,9 @@ var Client = (function () {
         }, unlockTimeout);
         this.resolutions[uuid] = function (err, data) {
             _this.setLockRequestorCount(key, data.lockRequestCount);
-            debug('\n', ' onMessage in unlock =>', '\n', colors.blue(util.inspect(data)), '\n');
             if (String(key) !== String(data.key)) {
                 console.error(colors.bgRed(new Error(' !!! bad key !!!').stack));
-                return cb(new Error(' => Implementation error.'));
+                return cb(new Error(' => Implementation error, bad key.'));
             }
             if ([data.unlocked].filter(function (i) { return i; }).length > 1) {
                 throw new Error(' => Live-Mutex implementation error.');
@@ -449,8 +445,8 @@ var Client = (function () {
             }
         };
         this.write({
-            uuid: uuid,
             _uuid: opts._uuid,
+            uuid: uuid,
             key: key,
             force: (opts._retryCount > 0) ? opts.force : false,
             type: 'unlock'
