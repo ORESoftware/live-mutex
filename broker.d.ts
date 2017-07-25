@@ -1,7 +1,6 @@
 /// <reference types="node" />
-import { Server } from '@types/uws';
-import { CWebSocket } from './dts/uws';
 import Timer = NodeJS.Timer;
+import Socket = NodeJS.Socket;
 export interface IBrokerOpts {
     lockExpiresAfter: number;
     timeoutToFindNewLockholder: number;
@@ -11,10 +10,10 @@ export interface IBrokerOpts {
 export declare type IBrokerOptsPartial = Partial<IBrokerOpts>;
 export declare type IErrorFirstCB = (err: Error | null | undefined | string, val?: any) => void;
 export interface IBrokerSend {
-    (ws: CWebSocket, data: any, cb?: IErrorFirstCB): void;
+    (ws: Socket, data: any, cb?: IErrorFirstCB): void;
 }
 export interface IUuidWSHash {
-    [key: string]: CWebSocket;
+    [key: string]: Socket;
 }
 export interface IUuidTimer {
     [key: string]: Timer;
@@ -46,7 +45,7 @@ export interface ILockHash {
     [key: string]: ILookObj;
 }
 export interface INotifyObj {
-    ws: CWebSocket;
+    ws: Socket;
     uuid: string;
     pid: number;
     ttl: number;
@@ -58,21 +57,21 @@ export declare class Broker {
     host: string;
     port: number;
     send: IBrokerSend;
-    wss: Server;
     rejected: IUuidBooleanHash;
     timeouts: IUuidTimer;
     locks: ILockHash;
     ensure: TEnsure;
-    wsLock: Map<CWebSocket, Array<string>>;
-    wsToKeys: Map<CWebSocket, Array<string>>;
+    wsLock: Map<Socket, Array<string>>;
+    wsToKeys: Map<Socket, Array<string>>;
     bookkeeping: IBookkeepingHash;
+    isOpen: boolean;
     constructor($opts: IBrokerOptsPartial, cb?: IErrorFirstCB);
-    static create(opts: IBrokerOptsPartial, cb?: TBrokerCB): Promise<Broker>;
+    static create(opts: IBrokerOptsPartial, cb?: TBrokerCB): Promise<Broker> | void;
     sendStatsMessageToAllClients(): void;
     ensureNewLockHolder(lck: any, data: any, cb: any): void;
     retrieveLockInfo(data: any, ws: any): void;
     lock(data: any, ws: any): void;
-    unlock(data: Object, ws?: CWebSocket): void;
+    unlock(data: Object, ws?: Socket): void;
 }
 declare const $exports: any;
 export default $exports;

@@ -1,18 +1,11 @@
 'use strict';
 
 //core
-import * as util from 'util';
-import * as path from 'path';
 import * as assert from 'assert';
 import * as EE from 'events';
 import * as net from 'net';
 
 //npm
-import {Server} from '@types/uws';
-import {CWebSocket} from './dts/uws';
-const WebSocket = require('uws');
-const WebSocketServer = WebSocket.Server;
-const ijson = require('siamese');
 const async = require('async');
 const colors = require('colors/safe');
 const uuidV4 = require('uuid/v4');
@@ -21,6 +14,8 @@ const JSONStream = require('JSONStream');
 //project
 import lmUtils from './utils';
 import Timer = NodeJS.Timer;
+import Socket = NodeJS.Socket;
+
 const debug = require('debug')('live-mutex');
 
 ///////////////////////////////////////////////////////////////////
@@ -61,7 +56,7 @@ const validOptions = [
   'port'
 ];
 
-/////////// interfaces /////////////////////////////////////
+/////////////////// interfaces /////////////////////////////////////
 
 export interface IBrokerOpts {
   lockExpiresAfter: number;
@@ -74,11 +69,11 @@ export type IBrokerOptsPartial = Partial<IBrokerOpts>
 export type IErrorFirstCB = (err: Error | null | undefined | string, val?: any) => void;
 
 export interface IBrokerSend {
-  (ws: CWebSocket, data: any, cb?: IErrorFirstCB): void;
+  (ws: Socket, data: any, cb?: IErrorFirstCB): void;
 }
 
 export interface IUuidWSHash {
-  [key: string]: CWebSocket
+  [key: string]: Socket
 }
 
 export interface IUuidTimer {
@@ -119,7 +114,7 @@ export interface ILockHash {
 }
 
 export interface INotifyObj {
-  ws: CWebSocket,
+  ws: Socket,
   uuid: string,
   pid: number,
   ttl: number
@@ -135,19 +130,20 @@ export class Broker {
   host: string;
   port: number;
   send: IBrokerSend;
-  wss: Server;
   rejected: IUuidBooleanHash;
   timeouts: IUuidTimer;
   locks: ILockHash;
   ensure: TEnsure;
-  wsLock: Map<CWebSocket, Array<string>>;  // Array<uuid> to be exact
-  wsToKeys: Map<CWebSocket, Array<string>>;
+  wsLock: Map<Socket, Array<string>>;  // Array<uuid> to be exact
+  wsToKeys: Map<Socket, Array<string>>;
   bookkeeping: IBookkeepingHash;
+  isOpen: boolean;
 
   ///////////////////////////////////////////////////////////////
 
   constructor($opts: IBrokerOptsPartial, cb?: IErrorFirstCB) {
 
+    this.isOpen = false;
     const opts = this.opts = $opts || {};
     assert(typeof opts === 'object', ' => Bad arguments to live-mutex server constructor.');
 
@@ -295,6 +291,8 @@ export class Broker {
 
     };
 
+    let first = true;
+
     const wss = net.createServer(ws => {
 
       if (first) {
@@ -311,8 +309,6 @@ export class Broker {
       }
 
       ws.on('end', () => {
-
-        //TODO: unlock any locks that this ws owns
 
         let keys;
         if (keys = this.wsLock.get(ws)) {
@@ -341,40 +337,18 @@ export class Broker {
 
     });
 
-    wss
-    .listen(this
-
-        .port
-      , () => {
-        // console.log('opened server on', wss.address());
-        wss
-          .isOpen = true;
-        process
-        .nextTick(
-          () => {
-            ee
-            .emit(
-              'open'
-              ,
-              true
-            );
-            cb
-            &&
-            cb(
-              null
-              ,
-              this
-            );
-          }
-        )
-        ;
-      })
-    ;
+    wss.listen(this.port, () => {
+      this.isOpen = true;
+      process.nextTick(() => {
+        ee.emit('open', true);
+        cb && cb(null, this);
+      });
+    });
 
     this.ensure = function ($cb) {
 
       if ($cb) {
-        if (wss.isOpen) {
+        if (this.isOpen) {
           return process.nextTick($cb, null, this);
         }
         const cb = lmUtils.once(this, $cb);
@@ -386,15 +360,14 @@ export class Broker {
       }
       else {
         return new Promise((resolve, reject) => {
-          if (wss.isOpen) {
+          if (this.isOpen) {
             return resolve(this);
           }
           let to = setTimeout(reject.bind(null, 'err:timeout'), 2000);
           ee.once('open', () => {
             clearTimeout(to);
-            resolve(this)
+            resolve(this);
           });
-
         });
       }
     };
@@ -407,21 +380,12 @@ export class Broker {
     this.rejected = {};
     this.timeouts = {};
     this.locks = {};
-
-// map ws objects as keys, to values
     this.wsLock = new Map(); // keys are ws objects, values are lock keys
     this.wsToKeys = new Map(); // keys are ws objects, values are keys []
 
-    let first = true;
-
-    wss.on('connection', ws => {
-      console.log('wss connection.');
-    });
-
   }
 
-  static
-  create(opts: IBrokerOptsPartial, cb ?: TBrokerCB): Promise<Broker> {
+  static create(opts: IBrokerOptsPartial, cb ?: TBrokerCB): Promise<Broker> | void {
     return new Broker(opts).ensure(cb);
   }
 
@@ -721,7 +685,7 @@ export class Broker {
 
   }
 
-  unlock(data: Object, ws ?: CWebSocket) {
+  unlock(data: Object, ws?: Socket) {
 
     const locks = this.locks;
     const key = data.key;
@@ -731,11 +695,11 @@ export class Broker {
     const lck = locks[key];
 
     this.bookkeeping[key] = this.bookkeeping[key] || {
-        rawLockCount: 0,
-        rawUnlockCount: 0,
-        lockCount: 0,
-        unlockCount: 0
-      };
+      rawLockCount: 0,
+      rawUnlockCount: 0,
+      lockCount: 0,
+      unlockCount: 0
+    };
 
     this.bookkeeping[key].rawUnlockCount++;
 
@@ -827,7 +791,7 @@ export class Broker {
 
       if (ws) {
 
-        process.emit('warning', ' => Live-Mutex warning, => no lock with key 2 => "' + key + '"');
+        process.emit('warning', 'Live-Mutex warning, => no lock with key [2] => "' + key + '"');
 
         this.send(ws, {
           uuid: uuid,
@@ -835,7 +799,7 @@ export class Broker {
           lockRequestCount: 0,
           type: 'unlock',
           unlocked: true,
-          error: ' => Live-Mutex warning => no lock with key 1 => "' + key + '"'
+          error: ' => Live-Mutex warning => no lock with key [1] => "' + key + '"'
         });
       }
     }

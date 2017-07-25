@@ -413,11 +413,11 @@ export class Client {
     assert.equal(typeof key, 'string', ' => Key passed to live-mutex#lock needs to be a string.');
 
     this.bookkeeping[key] = this.bookkeeping[key] || {
-        rawLockCount: 0,
-        rawUnlockCount: 0,
-        lockCount: 0,
-        unlockCount: 0
-      };
+      rawLockCount: 0,
+      rawUnlockCount: 0,
+      lockCount: 0,
+      unlockCount: 0
+    };
 
     this.bookkeeping[key].rawLockCount++;
 
@@ -495,18 +495,19 @@ export class Client {
       if (String(key) !== String(data.key)) {
         clearTimeout(to);
         delete this.resolutions[uuid];
-        console.error(colors.bgRed(new Error(' !!! bad key !!!').stack));
-        return cb(new Error(' => Implementation error.'), false)
+        let err = new Error(`Live-Mutex bad key, 1 -> ', ${key}, 2 -> ${data.key}`);
+        process.emit('warning', err);
+        return cb(err, false)
       }
 
       if (data.error) {
-        console.error('\n', colors.bgRed(data.error), '\n');
+        process.emit('warning', new Error(data.error));
         clearTimeout(to);
         return cb(data.error, false);
       }
 
       if ([data.acquired, data.retry].filter(i => i).length > 1) {
-        throw new Error(' => Live-Mutex implementation error.');
+        process.emit('error', 'Nasty Live-Mutex implementation error.');
       }
 
       if (data.acquired === true) {
@@ -522,7 +523,9 @@ export class Client {
         });
 
         if (data.uuid !== uuid) {
-          cb(new Error(' => Something went wrong.'), false);
+          let err = new Error(`Live-Mutex error, mismatch in uuids -> ${data.uuid}, -> ${uuid}`);
+          process.emit('warning', err);
+          cb(err, false);
         }
         else {
           cb(null, this.unlock.bind(this, key, {_uuid: uuid}), data.uuid);
@@ -543,7 +546,7 @@ export class Client {
         }
       }
       else {
-        throw 'fallthrough in condition here 1.';
+        process.emit('warning', new Error(`fallthrough in condition [1]`));
       }
 
     };
@@ -562,11 +565,11 @@ export class Client {
     assert.equal(typeof key, 'string', ' => Key passed to live-mutex#unlock needs to be a string.');
 
     this.bookkeeping[key] = this.bookkeeping[key] || {
-        rawLockCount: 0,
-        rawUnlockCount: 0,
-        lockCount: 0,
-        unlockCount: 0
-      };
+      rawLockCount: 0,
+      rawUnlockCount: 0,
+      lockCount: 0,
+      unlockCount: 0
+    };
 
     this.bookkeeping[key].rawUnlockCount++;
 
@@ -603,7 +606,9 @@ export class Client {
     opts._retryCount = opts._retryCount || 0;
 
     if (opts._retryCount > this.unlockRetryMax) {
-      return cb(new Error(' => Maximum retries reached.'));
+      let err = new Error(' => Maximum retries reached.');
+      process.emit('warning', err);
+      return cb(err);
     }
 
     const uuid = uuidV4();
@@ -613,7 +618,9 @@ export class Client {
 
       delete this.resolutions[uuid];
       this.timeouts[uuid] = true;
-      cb(new Error(' => Unlocking timed out.'));
+      let err = new Error(' => Unlocking timed out.');
+      process.emit('warning', err);
+      cb(err);
 
     }, unlockTimeout);
 
@@ -622,17 +629,20 @@ export class Client {
       this.setLockRequestorCount(key, data.lockRequestCount);
 
       if (String(key) !== String(data.key)) {
-        console.error(colors.bgRed(new Error(' !!! bad key !!!').stack));
-        return cb(new Error(' => Implementation error, bad key.'))
+        let err = new Error(' => Implementation error, bad key.');
+        process.emit('warning', err);
+        return cb(err);
       }
 
       if ([data.unlocked].filter(i => i).length > 1) {
-        throw new Error(' => Live-Mutex implementation error.');
+        let err = new Error(' => Live-Mutex implementation error.');
+        process.emit('warning', err);
+        return cb(err);
       }
 
       if (data.error) {
-        console.error('\n', colors.bgRed(data.error), '\n');
         clearTimeout(to);
+        process.emit('warning', new Error(data.error));
         return cb(data.error);
       }
 
@@ -640,10 +650,6 @@ export class Client {
 
         clearTimeout(to);
         this.bookkeeping[key].unlockCount++;
-
-        debug('\n', ' => Lock unlock count (client), key => ', '"' + key + '"', '\n',
-          util.inspect(this.bookkeeping[key]), '\n');
-
         delete this.resolutions[uuid];
 
         this.write({
@@ -664,7 +670,7 @@ export class Client {
         this.unlock(key, opts, cb);
       }
       else {
-        throw 'fallthrough in conditional 2';
+        process.emit('warning', 'fallthrough in conditional [2], Live-Mutex fail.');
       }
 
     };

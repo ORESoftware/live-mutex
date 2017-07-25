@@ -309,16 +309,17 @@ var Client = (function () {
             if (String(key) !== String(data.key)) {
                 clearTimeout(to);
                 delete _this.resolutions[uuid];
-                console.error(colors.bgRed(new Error(' !!! bad key !!!').stack));
-                return cb(new Error(' => Implementation error.'), false);
+                var err_1 = new Error("Live-Mutex bad key, 1 -> ', " + key + ", 2 -> " + data.key);
+                process.emit('warning', err_1);
+                return cb(err_1, false);
             }
             if (data.error) {
-                console.error('\n', colors.bgRed(data.error), '\n');
+                process.emit('warning', new Error(data.error));
                 clearTimeout(to);
                 return cb(data.error, false);
             }
             if ([data.acquired, data.retry].filter(function (i) { return i; }).length > 1) {
-                throw new Error(' => Live-Mutex implementation error.');
+                process.emit('error', 'Nasty Live-Mutex implementation error.');
             }
             if (data.acquired === true) {
                 clearTimeout(to);
@@ -331,7 +332,9 @@ var Client = (function () {
                     type: 'lock-received'
                 });
                 if (data.uuid !== uuid) {
-                    cb(new Error(' => Something went wrong.'), false);
+                    var err_2 = new Error("Live-Mutex error, mismatch in uuids -> " + data.uuid + ", -> " + uuid);
+                    process.emit('warning', err_2);
+                    cb(err_2, false);
                 }
                 else {
                     cb(null, _this.unlock.bind(_this, key, { _uuid: uuid }), data.uuid);
@@ -351,7 +354,7 @@ var Client = (function () {
                 }
             }
             else {
-                throw 'fallthrough in condition here 1.';
+                process.emit('warning', new Error("fallthrough in condition [1]"));
             }
         };
         this.write({
@@ -397,33 +400,39 @@ var Client = (function () {
         }
         opts._retryCount = opts._retryCount || 0;
         if (opts._retryCount > this.unlockRetryMax) {
-            return cb(new Error(' => Maximum retries reached.'));
+            var err = new Error(' => Maximum retries reached.');
+            process.emit('warning', err);
+            return cb(err);
         }
         var uuid = uuidV4();
         var unlockTimeout = opts.unlockRequestTimeout || this.unlockTimeout;
         var to = setTimeout(function () {
             delete _this.resolutions[uuid];
             _this.timeouts[uuid] = true;
-            cb(new Error(' => Unlocking timed out.'));
+            var err = new Error(' => Unlocking timed out.');
+            process.emit('warning', err);
+            cb(err);
         }, unlockTimeout);
         this.resolutions[uuid] = function (err, data) {
             _this.setLockRequestorCount(key, data.lockRequestCount);
             if (String(key) !== String(data.key)) {
-                console.error(colors.bgRed(new Error(' !!! bad key !!!').stack));
-                return cb(new Error(' => Implementation error, bad key.'));
+                var err_3 = new Error(' => Implementation error, bad key.');
+                process.emit('warning', err_3);
+                return cb(err_3);
             }
             if ([data.unlocked].filter(function (i) { return i; }).length > 1) {
-                throw new Error(' => Live-Mutex implementation error.');
+                var err_4 = new Error(' => Live-Mutex implementation error.');
+                process.emit('warning', err_4);
+                return cb(err_4);
             }
             if (data.error) {
-                console.error('\n', colors.bgRed(data.error), '\n');
                 clearTimeout(to);
+                process.emit('warning', new Error(data.error));
                 return cb(data.error);
             }
             if (data.unlocked === true) {
                 clearTimeout(to);
                 _this.bookkeeping[key].unlockCount++;
-                debug('\n', ' => Lock unlock count (client), key => ', '"' + key + '"', '\n', util.inspect(_this.bookkeeping[key]), '\n');
                 delete _this.resolutions[uuid];
                 _this.write({
                     uuid: uuid,
@@ -441,7 +450,7 @@ var Client = (function () {
                 _this.unlock(key, opts, cb);
             }
             else {
-                throw 'fallthrough in conditional 2';
+                process.emit('warning', 'fallthrough in conditional [2], Live-Mutex fail.');
             }
         };
         this.write({

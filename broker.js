@@ -3,9 +3,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 var assert = require("assert");
 var EE = require("events");
 var net = require("net");
-var WebSocket = require('uws');
-var WebSocketServer = WebSocket.Server;
-var ijson = require('siamese');
 var async = require('async');
 var colors = require('colors/safe');
 var uuidV4 = require('uuid/v4');
@@ -45,6 +42,7 @@ var validOptions = [
 var Broker = (function () {
     function Broker($opts, cb) {
         var _this = this;
+        this.isOpen = false;
         var opts = this.opts = $opts || {};
         assert(typeof opts === 'object', ' => Bad arguments to live-mutex server constructor.');
         Object.keys(opts).forEach(function (key) {
@@ -161,6 +159,7 @@ var Broker = (function () {
                 });
             }
         };
+        var first = true;
         var wss = net.createServer(function (ws) {
             if (first) {
                 first = false;
@@ -197,24 +196,17 @@ var Broker = (function () {
                 });
             });
         });
-        wss
-            .listen(this
-            .port, function () {
-            wss
-                .isOpen = true;
-            process
-                .nextTick(function () {
-                ee
-                    .emit('open', true);
-                cb
-                    &&
-                        cb(null, _this);
+        wss.listen(this.port, function () {
+            _this.isOpen = true;
+            process.nextTick(function () {
+                ee.emit('open', true);
+                cb && cb(null, _this);
             });
         });
         this.ensure = function ($cb) {
             var _this = this;
             if ($cb) {
-                if (wss.isOpen) {
+                if (this.isOpen) {
                     return process.nextTick($cb, null, this);
                 }
                 var cb_1 = utils_1.default.once(this, $cb);
@@ -226,7 +218,7 @@ var Broker = (function () {
             }
             else {
                 return new Promise(function (resolve, reject) {
-                    if (wss.isOpen) {
+                    if (_this.isOpen) {
                         return resolve(_this);
                     }
                     var to = setTimeout(reject.bind(null, 'err:timeout'), 2000);
@@ -246,10 +238,6 @@ var Broker = (function () {
         this.locks = {};
         this.wsLock = new Map();
         this.wsToKeys = new Map();
-        var first = true;
-        wss.on('connection', function (ws) {
-            console.log('wss connection.');
-        });
     }
     Broker.create = function (opts, cb) {
         return new Broker(opts).ensure(cb);
@@ -540,14 +528,14 @@ var Broker = (function () {
                 }
             });
             if (ws) {
-                process.emit('warning', ' => Live-Mutex warning, => no lock with key 2 => "' + key + '"');
+                process.emit('warning', 'Live-Mutex warning, => no lock with key [2] => "' + key + '"');
                 this.send(ws, {
                     uuid: uuid,
                     key: key,
                     lockRequestCount: 0,
                     type: 'unlock',
                     unlocked: true,
-                    error: ' => Live-Mutex warning => no lock with key 1 => "' + key + '"'
+                    error: ' => Live-Mutex warning => no lock with key [1] => "' + key + '"'
                 });
             }
         }
