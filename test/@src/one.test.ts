@@ -1,6 +1,6 @@
 'use strict';
 
-const suman = require('suman');
+import suman = require('suman');
 const Test = suman.init(module);
 const colors = require('colors/safe');
 
