@@ -19,26 +19,29 @@ const JSONStream = require('JSONStream');
 const debug = require('debug')('live-mutex');
 import lmUtils from './utils';
 
+const loginfo = console.log.bind(console,' [live-mutex client] =>');
+const logerr = console.error.bind(console,' [live-mutex client] =>');
+
 /////////////////////////////////////////////////////////////////////////
 
 const weAreDebugging = require('./lib/we-are-debugging');
 if (weAreDebugging) {
-  console.log(' => Live-Mutex client is in debug mode. Timeouts are turned off.');
+  loginfo('Live-Mutex client is in debug mode. Timeouts are turned off.');
 }
 
 /////////////////////////////////////////////////////////////////////////
 
-process.on('warning', function (w) {
-  if (!String(w).match(/DEBUG_FD/) && !String(w).match(/Live.*Mutex/i)) {
-    console.error('\n', ' => Live-Mutex warning => ', w.stack || w, '\n');
+setTimeout(function(){
+  if(process.listenerCount('warning') < 1){
+    loginfo('recommends you attach a process.on("warning") event handler.');
   }
-});
+}, 1000);
 
-const noop = function (cb) {
+const totalNoop = function(){};
+const asyncNoop = function (cb) {
   cb && process.nextTick(cb);
 };
 
-const totalNoop = function(){};
 
 const validOptions: Array<string> = [
   'key',
@@ -236,7 +239,7 @@ export class Client {
     };
 
     ws.on('end', () => {
-      console.log('disconnected from server');
+      loginfo('client stream "end" event occurred.');
     });
 
     this.ensure = function ($cb?: Function) {
@@ -304,7 +307,7 @@ export class Client {
         const to = this.timeouts[uuid];
 
         if (fn && to) {
-          throw new Error(' => Function and timeout both exist => Live-Mutex implementation error.');
+          throw new Error('Function and timeout both exist => Live-Mutex implementation error.');
         }
 
         if (fn) {
@@ -312,7 +315,8 @@ export class Client {
         }
         else if (to) {
 
-          console.error(' => Client side lock/unlock request timed-out.');
+          logerr('Client side lock/unlock request timed-out.');
+
           delete this.timeouts[uuid];
 
           if (data.type === 'lock') {
@@ -325,11 +329,12 @@ export class Client {
           }
         }
         else {
-          throw new Error(' => No fn with that uuid in the resolutions hash => \n' + util.inspect(data));
+          logerr('Live-mutex implementation error, ' +
+            'no fn with that uuid in the resolutions hash => \n' + util.inspect(data));
         }
       }
       else {
-        console.error(colors.yellow(' => Live-Mutex internal issue => message did not contain uuid =>'),
+        logerr(colors.yellow('Live-Mutex implementation issue => message did not contain uuid =>'),
           '\n', util.inspect(data));
       }
 
@@ -388,7 +393,7 @@ export class Client {
       }
 
       if (data.error) {
-        console.error('\n', colors.bgRed(data.error), '\n');
+        logerr(colors.bgRed(data.error),'\n');
       }
 
       if ([data.acquired, data.retry].filter(i => i).length > 1) {
@@ -450,6 +455,11 @@ export class Client {
         '"force" option must be a boolean value. Coerce it on your side, for safety.');
     }
 
+    if ('retry' in opts) {
+      assert(Number.isInteger(opts.retry), '"retry" option must be an integer.');
+      assert(opts.retry >=0 && opts.retry <= 20, '"retry" option must be an integer between 0 and 20 inclusive.');
+    }
+
     if ('ttl' in opts) {
       assert(Number.isInteger(opts.ttl),
         ' => Live-Mutex usage error => Please pass an integer representing milliseconds as the value for "ttl".');
@@ -464,8 +474,12 @@ export class Client {
         ' => "ttl" for a lock needs to be integer between 3 and 800000 millis.');
     }
 
+    if (Number.isInteger(opts.retry) && opts._retryCount > opts.retry) {
+      return cb(new Error(`Maximum retries ${opts.retry} attempted.`));
+    }
+
     if (opts._retryCount > this.lockRetryMax) {
-      return cb(new Error(' => Maximum retries breached.'));
+      return cb(new Error(`Maximum retries ${this.lockRetryMax} attempted.`));
     }
 
     opts._retryCount = opts._retryCount || 0;
@@ -538,10 +552,11 @@ export class Client {
         clearTimeout(to);
         opts._retryCount++;
         opts._uuid = opts._uuid || uuid;
+        logerr('retrying lock request, attempt #', opts._retryCount);
         this.lock(key, opts, cb);
       }
       else if (data.acquired === false) {
-        if (opts.once) {
+        if (opts.retry) {
           this.giveups[uuid] = true;
           clearTimeout(to);
           cb(null, false, data.uuid);
@@ -686,13 +701,14 @@ export class Client {
       uuid: uuid,
       key: key,
       // we only use force if we have to retry
-      force: (opts._retryCount > 0) ? opts.force : false,
+      force: (opts._retryCount > 0) ? !!opts.force : false,
       type: 'unlock'
     });
   }
 
 }
 
-
-
-
+// aliases
+export const LMClient = Client;
+export const LvMtxClient = Client;
+export default Client;

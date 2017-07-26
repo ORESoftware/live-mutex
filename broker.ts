@@ -4,6 +4,7 @@
 import * as assert from 'assert';
 import * as EE from 'events';
 import * as net from 'net';
+import * as util from 'util';
 
 //npm
 const async = require('async');
@@ -17,13 +18,19 @@ import Timer = NodeJS.Timer;
 import Socket = NodeJS.Socket;
 
 const debug = require('debug')('live-mutex');
+const loginfo = console.log.bind(console, '[live-mutex broker] =>');
+const logerr = console.error.bind(console, '[live-mutex broker] =>');
 
 ///////////////////////////////////////////////////////////////////
 
 const weAreDebugging = require('./lib/we-are-debugging');
 if (weAreDebugging) {
-  console.log(' => Live-Mutex broker is in debug mode. Timeouts are turned off.');
+  loginfo('Live-Mutex broker is in debug mode. Timeouts are turned off.');
 }
+
+process.on('warning', function (e) {
+  console.error(e.stack || e);
+});
 
 ///////////////////////////////////////////////////////////////////
 
@@ -206,7 +213,7 @@ export class Broker {
 
       ws.write(JSON.stringify(data) + '\n', 'utf8', err => {
         if (err) {
-          console.error(err.stack || err);
+          logerr(err.stack || err, '\n');
           cleanUp();
         }
         cb && cb(null);
@@ -255,7 +262,7 @@ export class Broker {
         const lck = this.locks[key];
         const uuid = data.uuid;
         if (!lck) {
-          console.error(' => Lock must have expired.');
+          logerr('Lock must have expired.');
           return;
         }
 
@@ -272,24 +279,22 @@ export class Broker {
       else if (data.type === 'lock-received-rejected') {
         const lck = this.locks[key];
         if (!lck) {
-          console.error(' => Lock must have expired.');
+          logerr('Lock must have expired.');
           return;
         }
         this.rejected[data.uuid] = true;
-        this.ensureNewLockHolder(lck, data, function (err) {
-          console.log(' => new lock-holder ensured.');
-        });
+        this.ensureNewLockHolder(lck, data);
       }
       else if (data.type === 'lock-info-request') {
         this.retrieveLockInfo(data, ws);
       }
       else {
-        console.error(colors.red.bold(' bad data sent to broker.'));
+        logerr(colors.red.bold(`implementation error, bad data sent to broker => \n${util.inspect(data)}`));
 
         this.send(ws, {
           key: data.key,
           uuid: data.uuid,
-          error: new Error(' => Bad data sent to web socket server =>').stack
+          error: 'Malformed data sent to Live-Mutex broker.'
         });
       }
 
@@ -299,7 +304,7 @@ export class Broker {
 
     const wss = net.createServer(ws => {
 
-      console.log('client connected.');
+      loginfo('client connected.');
 
       process.once('exit', function () {
         try {
@@ -316,7 +321,7 @@ export class Broker {
       }
 
       ws.once('error', function (err) {
-        console.error(' => client error => ', err.stack || err);
+        logerr('client error', err.stack || err, '\n');
       });
 
       if (!this.wsToKeys.get(ws)) {
@@ -324,7 +329,6 @@ export class Broker {
       }
 
       ws.once('end', () => {
-
         let keys;
         if (keys = this.wsLock.get(ws)) {
           keys.forEach(k => {
@@ -351,6 +355,13 @@ export class Broker {
       });
 
     });
+
+    setInterval(function () {
+      wss.getConnections(function (err,data) {
+        err && logerr(err);
+        data && logerr('connection information =>', data);
+      });
+    }, 4000);
 
     wss.listen(this.port, () => {
       this.isOpen = true;
@@ -458,13 +469,14 @@ export class Broker {
 
   }
 
-  ensureNewLockHolder(lck, data, cb) {
+  ensureNewLockHolder(lck, data) {
 
     const locks = this.locks;
     const notifyList = lck.notify;
 
     // currently there is no lock-holder;
     // before we delete the lock object, let's try to find a new lock-holder
+
     lck.uuid = null;
     lck.pid = null;
 
@@ -488,7 +500,7 @@ export class Broker {
       lck.to = setTimeout(() => {
 
         // delete locks[key]; => no, this.unlock will take care of that
-        process.emit('warning', ' => Live-Mutex warning, lock object timed out for key => "' + key + '"');
+        process.emit('warning', 'Live-Mutex warning, lock object timed out for key => "' + key + '"');
 
         this.unlock({
           key: key,
@@ -573,11 +585,9 @@ export class Broker {
     }
 
     this.send(ws, {
-      key: key,
-      uuid: uuid,
-      lockholderUUID: lockholderUUID,
+      key, uuid, lockholderUUID,
+      lockRequestCount,
       isLocked: !!isLocked,
-      lockRequestCount: lockRequestCount,
       lockInfo: true,
       type: 'lock-info-response'
     });
@@ -657,8 +667,6 @@ export class Broker {
     else {
 
       addWsLockKey(this, ws, key);
-
-      debug(' => Lock does not exist, creating new lock.');
 
       locks[key] = {
         pid,
@@ -746,9 +754,7 @@ export class Broker {
         }
       });
 
-      this.ensureNewLockHolder(lck, data, function () {
-        debug(' => All done notifying.')
-      });
+      this.ensureNewLockHolder(lck, data);
 
     }
     else if (lck) {
@@ -805,4 +811,7 @@ export class Broker {
   }
 }
 
-
+// aliases
+export const LvMtxBroker = Broker;
+export const LMBroker = Broker;
+export default Broker;

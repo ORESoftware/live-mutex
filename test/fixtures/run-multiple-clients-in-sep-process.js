@@ -13,33 +13,39 @@ for (let i = 0; i < times; i++) {
 let min = 5;
 let max = 100;
 
-process.on('warning', function(e){
-   console.error(e.stack || e);
+process.on('warning', function (e) {
+  console.error(e.stack || e);
 });
 
 const port = parseInt(process.env.multi_process_port);
 
-const client = new Client({port}, function (err) {
-
-  if(err){
-    throw err;
-  }
+Promise.all([
+  new Client({port}).ensure(),
+  new Client({port}).ensure(),
+  new Client({port}).ensure(),
+  new Client({port}).ensure(),
+  new Client({port}).ensure()
+])
+.then(function (clients) {
 
   async.timesLimit(100000, 200, function (n, cb) {
 
     let randomKey = keys[Math.floor(Math.random() * keys.length)];
-    console.error('count',n, 'randomKey', randomKey);
+    let randomClient = clients[Math.floor(Math.random() * clients.length)];
 
-    client.lock(randomKey, function (err, unlock) {
+    // console.error('count => ', n);
 
-      if(err){
+    randomClient.lock(randomKey, function (err, unlock) {
+
+      if (err) {
         return cb(err);
       }
 
-      let randomTime = Math.round(Math.random()*(max - min)) + min;
-      console.error('random time => ',randomTime);
+      let randomTime = Math.round(Math.random() * (max - min)) + min;
 
-      setTimeout(function(){
+      // console.error('randomTime => ', randomTime);
+
+      setTimeout(function () {
         unlock(cb);
       }, randomTime)
 
@@ -58,6 +64,10 @@ const client = new Client({port}, function (err) {
   });
 
 });
+
+
+
+
 
 
 

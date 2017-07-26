@@ -68,8 +68,11 @@ export declare class Broker {
     constructor($opts: IBrokerOptsPartial, cb?: IErrorFirstCB);
     static create(opts: IBrokerOptsPartial, cb?: TBrokerCB): Promise<Broker> | void;
     sendStatsMessageToAllClients(): void;
-    ensureNewLockHolder(lck: any, data: any, cb: any): void;
+    ensureNewLockHolder(lck: any, data: any): void;
     retrieveLockInfo(data: any, ws: any): void;
     lock(data: any, ws: any): void;
     unlock(data: Object, ws?: Socket): void;
 }
+export declare const LvMtxBroker: typeof Broker;
+export declare const LMBroker: typeof Broker;
+export default Broker;

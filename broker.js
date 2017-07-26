@@ -3,16 +3,22 @@ Object.defineProperty(exports, "__esModule", { value: true });
 var assert = require("assert");
 var EE = require("events");
 var net = require("net");
+var util = require("util");
 var async = require('async');
 var colors = require('colors/safe');
 var uuidV4 = require('uuid/v4');
 var JSONStream = require('JSONStream');
 var utils_1 = require("./utils");
 var debug = require('debug')('live-mutex');
+var loginfo = console.log.bind(console, '[live-mutex broker] =>');
+var logerr = console.error.bind(console, '[live-mutex broker] =>');
 var weAreDebugging = require('./lib/we-are-debugging');
 if (weAreDebugging) {
-    console.log(' => Live-Mutex broker is in debug mode. Timeouts are turned off.');
+    loginfo('Live-Mutex broker is in debug mode. Timeouts are turned off.');
 }
+process.on('warning', function (e) {
+    console.error(e.stack || e);
+});
 function addWsLockKey(broker, ws, key) {
     var v;
     if (!(v = broker.wsLock.get(ws))) {
@@ -90,7 +96,7 @@ var Broker = (function () {
             }
             ws.write(JSON.stringify(data) + '\n', 'utf8', function (err) {
                 if (err) {
-                    console.error(err.stack || err);
+                    logerr(err.stack || err, '\n');
                     cleanUp();
                 }
                 cb && cb(null);
@@ -132,7 +138,7 @@ var Broker = (function () {
                 var lck = _this.locks[key];
                 var uuid = data.uuid;
                 if (!lck) {
-                    console.error(' => Lock must have expired.');
+                    logerr('Lock must have expired.');
                     return;
                 }
                 var ln = lck.notify.length;
@@ -146,29 +152,27 @@ var Broker = (function () {
             else if (data.type === 'lock-received-rejected') {
                 var lck = _this.locks[key];
                 if (!lck) {
-                    console.error(' => Lock must have expired.');
+                    logerr('Lock must have expired.');
                     return;
                 }
                 _this.rejected[data.uuid] = true;
-                _this.ensureNewLockHolder(lck, data, function (err) {
-                    console.log(' => new lock-holder ensured.');
-                });
+                _this.ensureNewLockHolder(lck, data);
             }
             else if (data.type === 'lock-info-request') {
                 _this.retrieveLockInfo(data, ws);
             }
             else {
-                console.error(colors.red.bold(' bad data sent to broker.'));
+                logerr(colors.red.bold("implementation error, bad data sent to broker => \n" + util.inspect(data)));
                 _this.send(ws, {
                     key: data.key,
                     uuid: data.uuid,
-                    error: new Error(' => Bad data sent to web socket server =>').stack
+                    error: 'Malformed data sent to Live-Mutex broker.'
                 });
             }
         };
         var first = true;
         var wss = net.createServer(function (ws) {
-            console.log('client connected.');
+            loginfo('client connected.');
             process.once('exit', function () {
                 try {
                     ws.end();
@@ -181,7 +185,7 @@ var Broker = (function () {
                 _this.sendStatsMessageToAllClients();
             }
             ws.once('error', function (err) {
-                console.error(' => client error => ', err.stack || err);
+                logerr('client error', err.stack || err, '\n');
             });
             if (!_this.wsToKeys.get(ws)) {
                 _this.wsToKeys.set(ws, []);
@@ -211,6 +215,12 @@ var Broker = (function () {
                 });
             });
         });
+        setInterval(function () {
+            wss.getConnections(function (err, data) {
+                err && logerr(err);
+                data && logerr('connection information =>', data);
+            });
+        }, 4000);
         wss.listen(this.port, function () {
             _this.isOpen = true;
             process.nextTick(function () {
@@ -292,7 +302,7 @@ var Broker = (function () {
             }, wait);
         });
     };
-    Broker.prototype.ensureNewLockHolder = function (lck, data, cb) {
+    Broker.prototype.ensureNewLockHolder = function (lck, data) {
         var _this = this;
         var locks = this.locks;
         var notifyList = lck.notify;
@@ -309,7 +319,7 @@ var Broker = (function () {
             lck.uuid = obj.uuid;
             lck.pid = obj.pid;
             lck.to = setTimeout(function () {
-                process.emit('warning', ' => Live-Mutex warning, lock object timed out for key => "' + key + '"');
+                process.emit('warning', 'Live-Mutex warning, lock object timed out for key => "' + key + '"');
                 _this.unlock({
                     key: key,
                     force: true
@@ -369,11 +379,9 @@ var Broker = (function () {
                 'notify array has at least one item, for key => ', key);
         }
         this.send(ws, {
-            key: key,
-            uuid: uuid,
-            lockholderUUID: lockholderUUID,
-            isLocked: !!isLocked,
+            key: key, uuid: uuid, lockholderUUID: lockholderUUID,
             lockRequestCount: lockRequestCount,
+            isLocked: !!isLocked,
             lockInfo: true,
             type: 'lock-info-response'
         });
@@ -432,7 +440,6 @@ var Broker = (function () {
         }
         else {
             addWsLockKey(this, ws, key);
-            debug(' => Lock does not exist, creating new lock.');
             locks[key] = {
                 pid: pid,
                 uuid: uuid,
@@ -497,9 +504,7 @@ var Broker = (function () {
                     }
                 }
             });
-            this.ensureNewLockHolder(lck, data, function () {
-                debug(' => All done notifying.');
-            });
+            this.ensureNewLockHolder(lck, data);
         }
         else if (lck) {
             var count = lck.notify.length;
@@ -542,3 +547,6 @@ var Broker = (function () {
     return Broker;
 }());
 exports.Broker = Broker;
+exports.LvMtxBroker = Broker;
+exports.LMBroker = Broker;
+exports.default = Broker;

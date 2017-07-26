@@ -10,19 +10,21 @@ var colors = require('colors/safe');
 var JSONStream = require('JSONStream');
 var debug = require('debug')('live-mutex');
 var utils_1 = require("./utils");
+var loginfo = console.log.bind(console, ' [live-mutex client] =>');
+var logerr = console.error.bind(console, ' [live-mutex client] =>');
 var weAreDebugging = require('./lib/we-are-debugging');
 if (weAreDebugging) {
-    console.log(' => Live-Mutex client is in debug mode. Timeouts are turned off.');
+    loginfo('Live-Mutex client is in debug mode. Timeouts are turned off.');
 }
-process.on('warning', function (w) {
-    if (!String(w).match(/DEBUG_FD/) && !String(w).match(/Live.*Mutex/i)) {
-        console.error('\n', ' => Live-Mutex warning => ', w.stack || w, '\n');
+setTimeout(function () {
+    if (process.listenerCount('warning') < 1) {
+        loginfo('recommends you attach a process.on("warning") event handler.');
     }
-});
-var noop = function (cb) {
+}, 1000);
+var totalNoop = function () { };
+var asyncNoop = function (cb) {
     cb && process.nextTick(cb);
 };
-var totalNoop = function () { };
 var validOptions = [
     'key',
     'listener',
@@ -103,7 +105,7 @@ var Client = (function () {
             ws.write(JSON.stringify(data) + '\n', 'utf8', cb);
         };
         ws.on('end', function () {
-            console.log('disconnected from server');
+            loginfo('client stream "end" event occurred.');
         });
         this.ensure = function ($cb) {
             var _this = this;
@@ -159,13 +161,13 @@ var Client = (function () {
                 var fn = _this.resolutions[uuid];
                 var to = _this.timeouts[uuid];
                 if (fn && to) {
-                    throw new Error(' => Function and timeout both exist => Live-Mutex implementation error.');
+                    throw new Error('Function and timeout both exist => Live-Mutex implementation error.');
                 }
                 if (fn) {
                     fn.call(_this, null, data);
                 }
                 else if (to) {
-                    console.error(' => Client side lock/unlock request timed-out.');
+                    logerr('Client side lock/unlock request timed-out.');
                     delete _this.timeouts[uuid];
                     if (data.type === 'lock') {
                         _this.write({
@@ -177,11 +179,12 @@ var Client = (function () {
                     }
                 }
                 else {
-                    throw new Error(' => No fn with that uuid in the resolutions hash => \n' + util.inspect(data));
+                    logerr('Live-mutex implementation error, ' +
+                        'no fn with that uuid in the resolutions hash => \n' + util.inspect(data));
                 }
             }
             else {
-                console.error(colors.yellow(' => Live-Mutex internal issue => message did not contain uuid =>'), '\n', util.inspect(data));
+                logerr(colors.yellow('Live-Mutex implementation issue => message did not contain uuid =>'), '\n', util.inspect(data));
             }
         };
         ws.pipe(JSONStream.parse()).on('data', onData)
@@ -228,7 +231,7 @@ var Client = (function () {
                 throw new Error(' => Live-Mutex implementation error => bad key.');
             }
             if (data.error) {
-                console.error('\n', colors.bgRed(data.error), '\n');
+                logerr(colors.bgRed(data.error), '\n');
             }
             if ([data.acquired, data.retry].filter(function (i) { return i; }).length > 1) {
                 throw new Error(' => Live-Mutex implementation error.');
@@ -246,7 +249,7 @@ var Client = (function () {
     };
     Client.prototype.lock = function (key, opts, cb) {
         var _this = this;
-        assert.equal(typeof key, 'string', ' => Key passed to live-mutex#lock needs to be a string.');
+        assert.equal(typeof key, 'string', 'Key passed to live-mutex#lock needs to be a string.');
         this.bookkeeping[key] = this.bookkeeping[key] || {
             rawLockCount: 0,
             rawUnlockCount: 0,
@@ -278,6 +281,10 @@ var Client = (function () {
             assert.equal(typeof opts.force, 'boolean', ' => Live-Mutex usage error => ' +
                 '"force" option must be a boolean value. Coerce it on your side, for safety.');
         }
+        if ('retry' in opts) {
+            assert(Number.isInteger(opts.retry), '"retry" option must be an integer.');
+            assert(opts.retry >= 0 && opts.retry <= 20, '"retry" option must be an integer between 0 and 20 inclusive.');
+        }
         if ('ttl' in opts) {
             assert(Number.isInteger(opts.ttl), ' => Live-Mutex usage error => Please pass an integer representing milliseconds as the value for "ttl".');
             assert(opts.ttl >= 3 && opts.ttl <= 800000, ' => Live-Mutex usage error => "ttl" for a lock needs to be integer between 3 and 800000 millis.');
@@ -286,8 +293,11 @@ var Client = (function () {
             assert(Number.isInteger(opts.lockRequestTimeout), ' => Please pass an integer representing milliseconds as the value for "ttl".');
             assert(opts.lockRequestTimeout >= 20 && opts.lockRequestTimeout <= 800000, ' => "ttl" for a lock needs to be integer between 3 and 800000 millis.');
         }
+        if (Number.isInteger(opts.retry) && opts._retryCount > opts.retry) {
+            return cb(new Error("Maximum retries " + opts.retry + " attempted."));
+        }
         if (opts._retryCount > this.lockRetryMax) {
-            return cb(new Error(' => Maximum retries breached.'));
+            return cb(new Error("Maximum retries " + this.lockRetryMax + " attempted."));
         }
         opts._retryCount = opts._retryCount || 0;
         var append = opts.append || '';
@@ -345,10 +355,11 @@ var Client = (function () {
                 clearTimeout(to);
                 opts._retryCount++;
                 opts._uuid = opts._uuid || uuid;
+                logerr('retrying lock request, attempt #', opts._retryCount);
                 _this.lock(key, opts, cb);
             }
             else if (data.acquired === false) {
-                if (opts.once) {
+                if (opts.retry) {
                     _this.giveups[uuid] = true;
                     clearTimeout(to);
                     cb(null, false, data.uuid);
@@ -367,7 +378,7 @@ var Client = (function () {
     };
     Client.prototype.unlock = function (key, opts, cb) {
         var _this = this;
-        assert.equal(typeof key, 'string', ' => Key passed to live-mutex#unlock needs to be a string.');
+        assert.equal(typeof key, 'string', 'Key passed to live-mutex#unlock needs to be a string.');
         this.bookkeeping[key] = this.bookkeeping[key] || {
             rawLockCount: 0,
             rawUnlockCount: 0,
@@ -447,7 +458,6 @@ var Client = (function () {
                 cb && cb(null, data.uuid);
             }
             else if (data.retry === true) {
-                debug(' => Retrying the unlock call.');
                 clearTimeout(to);
                 ++opts._retryCount;
                 opts._uuid = opts._uuid || uuid;
@@ -461,10 +471,13 @@ var Client = (function () {
             _uuid: opts._uuid,
             uuid: uuid,
             key: key,
-            force: (opts._retryCount > 0) ? opts.force : false,
+            force: (opts._retryCount > 0) ? !!opts.force : false,
             type: 'unlock'
         });
     };
     return Client;
 }());
 exports.Client = Client;
+exports.LMClient = Client;
+exports.LvMtxClient = Client;
+exports.default = Client;

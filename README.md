@@ -91,7 +91,12 @@ const {Broker} = require('live-mutex/broker');
 const {Client} = require('live-mutex/client');
 const lmUtils = require('live-mutex/utils');
 
-// alternatively
+// there are also aliases, which are more descriptive:
+
+const {LMBroker, LvMtxBroker} = require('live-mutex/broker');  // both are same as Broker
+const {LMClient, LvMtxClient} = require('live-mutex/client');  // both are same as Client
+
+// alternatively you can import all of these directly
 import {Client, Broker, lmUtils}  from 'live-mutex';
 
 ```
@@ -186,39 +191,51 @@ to see if the web-socket server is running somewhere. I have had a lot of luck w
 
 
 ```
+
+## Creating a simple client pool
+
+In most cases, a single client is sufficient, and this is true many types of networked clients using async I/O.
+However, if you test and find a client pool might be beneficial. Try this:
+
+```js
+
+const {Client} = require('live-mutex/client');
+
+exports.createPool = function(opts){
   
-## Extra:
+  return Promise.all([
+     
+    
+  ])
+
+
+}
+
+
+```
+
+  
+## Usage with Promises and RxJS5 Observables:
   
   This library conciously uses a CPS interface as this is the most primitive async interface.
   You can always wrap client.lock and client.unlock to use Promises or Observables etc.
-  For example, here we wrap live-mutex to make it usable with RxJS5 Observables. Notice
-  that we just pass errors to sub.next() instead of sub.error(), but that's just a design
-  decision.
+  Below I have demonstrated making live-mutex usable with ES6 Promises and RxJS5 Observables. 
+  Releasing the lock can be implemented with (1) the unlock() convenience callback or with (2) both
+  the lockName and the uuid of the lock request.
+  
+  With regard the Observables implementation, notice that we just pass errors to sub.next() instead of sub.error(), 
+  but that's just a design decision.
+  
+  Below, we assume you have created a connected client. It's best to avoid having to call `client.ensure()` for every
+  request. Simply call `client.ensure()` once, when your application starts up.
   
   
 ### Usage with Promises:
 
-```js
-
-exports.acquireLock = function(client, lockName){
-  
-  return new Promise(function(resolve,reject){
-    
-    client.lock(lockName, function(err, unlock){
-      
-      err ? reject(err) : resolve(unlock);
-      
-    });
-    
-  });
-  
-};
-
-```
 
 ```js
 
-exports.acquireLock = function(client, lockName){
+exports.acquireLock = function(lockName){
   
   return new Promise(function(resolve,reject){
     
@@ -247,7 +264,8 @@ exports.releaseLock = function(lockName, lockUuid){
   
 };
 
-// alternatively, if you use the unlock convenience function
+// alternatively, if you use the unlock convenience function, 
+// releaseLock can be implemented more simply as:
 
 exports.releaseLock = function(unlock){
   
@@ -263,10 +281,6 @@ exports.releaseLock = function(unlock){
 
 
 ```
-
-
-
-
 
 
 
