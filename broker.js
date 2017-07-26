@@ -86,7 +86,7 @@ var Broker = (function () {
             };
             if (!ws.writable) {
                 cleanUp();
-                return process.nextTick(cb);
+                return cb && process.nextTick(cb);
             }
             ws.write(JSON.stringify(data) + '\n', 'utf8', function (err) {
                 if (err) {
@@ -299,12 +299,10 @@ var Broker = (function () {
         lck.uuid = null;
         lck.pid = null;
         var key = data.key;
-        debug('\n', colors.blue.bold(' => Notify list length => '), colors.blue(notifyList.length), '\n');
         clearTimeout(lck.to);
         delete lck.to;
         var obj;
         if (obj = notifyList.shift()) {
-            debug(colors.cyan.bold(' => Sending ws client the acquired message.'));
             var ws_1 = obj.ws;
             var ttl = weAreDebugging ? 50000000 : (obj.ttl || this.lockExpiresAfter);
             addWsLockKey(this, ws_1, key);
@@ -356,8 +354,6 @@ var Broker = (function () {
         }
         else {
             delete locks[key];
-            debug(colors.red.bold(' => No other connections waiting for lock with key => "' + key + '"' +
-                ', so we deleted the lock.'));
         }
     };
     Broker.prototype.retrieveLockInfo = function (data, ws) {
@@ -402,17 +398,11 @@ var Broker = (function () {
         if (lck) {
             var count = lck.notify.length;
             if (lck.uuid) {
-                debug(' => Lock exists *and* already has a lockholder; adding ws to list of to be notified.');
                 var alreadyAdded = lck.notify.some(function (item) {
                     return String(item.uuid) === String(uuid);
                 });
                 if (!alreadyAdded) {
-                    lck.notify.push({
-                        ws: ws,
-                        uuid: uuid,
-                        pid: pid,
-                        ttl: ttl
-                    });
+                    lck.notify.push({ ws: ws, uuid: uuid, pid: pid, ttl: ttl });
                 }
                 this.send(ws, {
                     key: key,
@@ -428,10 +418,7 @@ var Broker = (function () {
                 clearTimeout(lck.to);
                 lck.to = setTimeout(function () {
                     process.emit('warning', ' => Live-Mutex warning, lock object timed out for key => "' + key + '"');
-                    _this.unlock({
-                        key: key,
-                        force: true
-                    });
+                    _this.unlock({ key: key, force: true });
                 }, ttl);
                 addWsLockKey(this, ws, key);
                 this.send(ws, {
@@ -449,14 +436,11 @@ var Broker = (function () {
             locks[key] = {
                 pid: pid,
                 uuid: uuid,
-                notify: [],
                 key: key,
+                notify: [],
                 to: setTimeout(function () {
                     process.emit('warning', ' => Live-Mutex warning, lock object timed out for key => "' + key + '"');
-                    _this.unlock({
-                        key: key,
-                        force: true
-                    });
+                    _this.unlock({ key: key, force: true });
                 }, ttl)
             };
             this.send(ws, {

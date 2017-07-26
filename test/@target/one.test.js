@@ -1,5 +1,6 @@
 'use strict';
-var suman = require('suman');
+exports.__esModule = true;
+var suman = require("suman");
 var Test = suman.init(module);
 var colors = require('colors/safe');
 Test.create(function (it, Broker, Client, inject, describe, before) {

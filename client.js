@@ -314,9 +314,10 @@ var Client = (function () {
                 return cb(err_1, false);
             }
             if (data.error) {
-                process.emit('warning', new Error(data.error));
+                var err_2 = new Error(data.error);
+                process.emit('warning');
                 clearTimeout(to);
-                return cb(data.error, false);
+                return cb(err_2, false);
             }
             if ([data.acquired, data.retry].filter(function (i) { return i; }).length > 1) {
                 process.emit('error', 'Nasty Live-Mutex implementation error.');
@@ -332,9 +333,9 @@ var Client = (function () {
                     type: 'lock-received'
                 });
                 if (data.uuid !== uuid) {
-                    var err_2 = new Error("Live-Mutex error, mismatch in uuids -> " + data.uuid + ", -> " + uuid);
-                    process.emit('warning', err_2);
-                    cb(err_2, false);
+                    var err_3 = new Error("Live-Mutex error, mismatch in uuids -> " + data.uuid + ", -> " + uuid);
+                    process.emit('warning', err_3);
+                    cb(err_3, false);
                 }
                 else {
                     cb(null, _this.unlock.bind(_this, key, { _uuid: uuid }), data.uuid);
@@ -419,14 +420,14 @@ var Client = (function () {
         this.resolutions[uuid] = function (err, data) {
             _this.setLockRequestorCount(key, data.lockRequestCount);
             if (String(key) !== String(data.key)) {
-                var err_3 = new Error(' => Implementation error, bad key.');
-                process.emit('warning', err_3);
-                return cb && cb(err_3);
-            }
-            if ([data.unlocked].filter(function (i) { return i; }).length > 1) {
-                var err_4 = new Error(' => Live-Mutex implementation error.');
+                var err_4 = new Error(' => Implementation error, bad key.');
                 process.emit('warning', err_4);
                 return cb && cb(err_4);
+            }
+            if ([data.unlocked].filter(function (i) { return i; }).length > 1) {
+                var err_5 = new Error(' => Live-Mutex implementation error.');
+                process.emit('warning', err_5);
+                return cb && cb(err_5);
             }
             if (data.error) {
                 clearTimeout(to);

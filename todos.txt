@@ -1,4 +1,9 @@
 
+* priority lock request should be put at front of queue
+
+* provide option to just use lockUuid, and not unlock fn
+
+* lck.notify array should be a key/value hash
 
 * allow lock-requestors to force their way to obtaining a lock
 similar to unlock-requestors being able to force unlock even if they don't have the key
@@ -7,5 +12,5 @@ similar to unlock-requestors being able to force unlock even if they don't have 
 
 * unlock may be callable more than once, that should not happen.
 
-*on disconnection we could delete wsClientId key/val from this.wsToKeys
+* on disconnection we could delete wsClientId key/val from this.wsToKeys
  but there should be no real need to do that since we won't have that many clients

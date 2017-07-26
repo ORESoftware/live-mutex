@@ -1,4 +1,4 @@
-const suman = require('suman');
+import suman = require('suman');
 const Test = suman.init(module);
 const async = require('async');
 

@@ -411,7 +411,7 @@ export class Client {
 
   lock(key: string, opts: Partial<IClientLockOpts>, cb: TClientLockCB) {
 
-    assert.equal(typeof key, 'string', ' => Key passed to live-mutex#lock needs to be a string.');
+    assert.equal(typeof key, 'string', 'Key passed to live-mutex#lock needs to be a string.');
 
     this.bookkeeping[key] = this.bookkeeping[key] || {
       rawLockCount: 0,
@@ -502,9 +502,10 @@ export class Client {
       }
 
       if (data.error) {
-        process.emit('warning', new Error(data.error));
+        let err = new Error(data.error);
+        process.emit('warning', );
         clearTimeout(to);
-        return cb(data.error, false);
+        return cb(err, false);
       }
 
       if ([data.acquired, data.retry].filter(i => i).length > 1) {
@@ -563,7 +564,7 @@ export class Client {
 
   unlock(key: string, opts: Partial<IClientUnlockOpts>, cb: TClientUnlockCB) {
 
-    assert.equal(typeof key, 'string', ' => Key passed to live-mutex#unlock needs to be a string.');
+    assert.equal(typeof key, 'string', 'Key passed to live-mutex#unlock needs to be a string.');
 
     this.bookkeeping[key] = this.bookkeeping[key] || {
       rawLockCount: 0,
@@ -669,7 +670,6 @@ export class Client {
       }
       else if (data.retry === true) {
 
-        debug(' => Retrying the unlock call.');
         clearTimeout(to);
         ++opts._retryCount;
         opts._uuid = opts._uuid || uuid;

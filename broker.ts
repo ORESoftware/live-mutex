@@ -201,7 +201,7 @@ export class Broker {
 
       if (!ws.writable) {
         cleanUp();
-        return process.nextTick(cb);
+        return cb && process.nextTick(cb);
       }
 
       ws.write(JSON.stringify(data) + '\n', 'utf8', err => {
@@ -469,17 +469,13 @@ export class Broker {
     lck.pid = null;
 
     const key = data.key;
-
-    debug('\n', colors.blue.bold(' => Notify list length => '), colors.blue(notifyList.length), '\n');
-
     clearTimeout(lck.to);
     delete lck.to;
 
     let obj;
     if (obj = notifyList.shift()) {
 
-      debug(colors.cyan.bold(' => Sending ws client the acquired message.'));
-
+      // Sending ws client the "acquired" message
       // set the timeout for the next ws to acquire lock, if not within alloted time, we simple call unlock
 
       let ws = obj.ws;
@@ -553,10 +549,9 @@ export class Broker {
       });
     }
     else {
-      // => only delete lock if no client is remaining to claim it
+      // note: only delete lock if no client is remaining to claim it
+      // No other connections waiting for lock with key, so we deleted the lock
       delete locks[key];
-      debug(colors.red.bold(' => No other connections waiting for lock with key => "' + key + '"' +
-        ', so we deleted the lock.'));
     }
 
   }
@@ -615,8 +610,7 @@ export class Broker {
 
       if (lck.uuid) {
 
-        debug(' => Lock exists *and* already has a lockholder; adding ws to list of to be notified.');
-
+        // Lock exists *and* already has a lockholder; adding ws to list of to be notified
         // if we are retrying, we may attempt to call lock() more than once
         // we don't want to push the same ws object / same uuid combo to array
 
@@ -625,12 +619,7 @@ export class Broker {
         });
 
         if (!alreadyAdded) {
-          lck.notify.push({
-            ws: ws,
-            uuid: uuid,
-            pid: pid,
-            ttl: ttl
-          });
+          lck.notify.push({ws, uuid, pid, ttl});
         }
 
         this.send(ws, {
@@ -650,10 +639,7 @@ export class Broker {
         lck.to = setTimeout(() => {
           // delete locks[key];  => no, this.unlock will take care of that
           process.emit('warning', ' => Live-Mutex warning, lock object timed out for key => "' + key + '"');
-          this.unlock({
-            key: key,
-            force: true
-          });
+          this.unlock({key, force: true});
         }, ttl);
 
         addWsLockKey(this, ws, key);
@@ -675,17 +661,14 @@ export class Broker {
       debug(' => Lock does not exist, creating new lock.');
 
       locks[key] = {
-        pid: pid,
-        uuid: uuid,
+        pid,
+        uuid,
+        key,
         notify: [],
-        key: key,
         to: setTimeout(() => {
           // delete locks[key];  => no!, this.unlock will take care of that
           process.emit('warning', ' => Live-Mutex warning, lock object timed out for key => "' + key + '"');
-          this.unlock({
-            key: key,
-            force: true
-          });
+          this.unlock({key, force: true});
         }, ttl)
       };
 

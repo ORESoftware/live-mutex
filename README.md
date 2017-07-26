@@ -195,11 +195,88 @@ to see if the web-socket server is running somewhere. I have had a lot of luck w
   that we just pass errors to sub.next() instead of sub.error(), but that's just a design
   decision.
   
+  
+### Usage with Promises:
+
+```js
+
+exports.acquireLock = function(client, lockName){
+  
+  return new Promise(function(resolve,reject){
+    
+    client.lock(lockName, function(err, unlock){
+      
+      err ? reject(err) : resolve(unlock);
+      
+    });
+    
+  });
+  
+};
+
+```
+
+```js
+
+exports.acquireLock = function(client, lockName){
+  
+  return new Promise(function(resolve,reject){
+    
+    client.lock(lockName, function(err, unlock, lockUuid){
+      
+      err ? reject(err) : resolve({
+         unlock,
+         lockUuid
+      });
+      
+    });
+    
+  });
+  
+};
+
+exports.releaseLock = function(lockName, lockUuid){
+  
+   return new Promise(function(resolve,reject){
+      
+      client.unlock(lockName, lockUuid, function(err){
+          err ? reject(err): resolve();
+      });
+      
+    });
+  
+};
+
+// alternatively, if you use the unlock convenience function
+
+exports.releaseLock = function(unlock){
+  
+   return new Promise(function(resolve,reject){
+      
+      unlock(function(err){
+          err ? reject(err): resolve();
+      });
+      
+    });
+  
+};
+
+
+```
+
+
+
+
+
+
+
+### Usage with RxJS5 Observables
+  
 ```js
 
    import {Observable} from 'rxjs/Rx';
   
-   let acquireLock = function (q, name) {
+   exports.acquireLock = function (q, name) {
   
       const lock = q.lock;
       const client = q.client;
@@ -209,11 +286,12 @@ to see if the web-socket server is running somewhere. I have had a lot of luck w
           client.lock(lock, {append: name},  (err, unlock, id) => {
           
               if (err) {
-                  console.error('\n\n', ' => Error acquiring lock => \n', (err.stack || err));
+                  console.error(' => Error acquiring lock => ', (err.stack || err));
               }
   
               sub.next({
-                  error: err ? (err.stack || err) : undefined,
+                  unlock,
+                  error: err,
                   id: id,
                   name: name
               });
@@ -228,21 +306,21 @@ to see if the web-socket server is running somewhere. I have had a lot of luck w
       });
   };
   
-   let releaseLock = function (q, lockUuid) {
+   exports.releaseLock = function (q, lockUuid) {
   
       const client = q.client;
       const lock = q.lock;
   
       return Observable.create(sub => {
   
-          client.unlock(lock, lockUuid,  (err) => {
+          client.unlock(lock, lockUuid,  err => {
   
               if (err) {
-                  console.error('\n', ' => Release lock error => ', '\n', err.stack || err);
+                  console.error(' => Release lock error => ', err.stack || err);
               }
             
               sub.next({
-                  error: err ? (err.stack || err) : undefined
+                  error: err
               });
   
               sub.complete();
