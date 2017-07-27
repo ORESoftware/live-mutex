@@ -19,8 +19,8 @@ const JSONStream = require('JSONStream');
 const debug = require('debug')('live-mutex');
 import lmUtils from './utils';
 
-const loginfo = console.log.bind(console,' [live-mutex client] =>');
-const logerr = console.error.bind(console,' [live-mutex client] =>');
+const loginfo = console.log.bind(console, ' [live-mutex client] =>');
+const logerr = console.error.bind(console, ' [live-mutex client] =>');
 
 /////////////////////////////////////////////////////////////////////////
 
@@ -31,17 +31,17 @@ if (weAreDebugging) {
 
 /////////////////////////////////////////////////////////////////////////
 
-setTimeout(function(){
-  if(process.listenerCount('warning') < 1){
+setTimeout(function () {
+  if (process.listenerCount('warning') < 1) {
     loginfo('recommends you attach a process.on("warning") event handler.');
   }
 }, 1000);
 
-const totalNoop = function(){};
+const totalNoop = function () {
+};
 const asyncNoop = function (cb) {
   cb && process.nextTick(cb);
 };
-
 
 const validOptions: Array<string> = [
   'key',
@@ -162,6 +162,7 @@ export class Client {
     }
 
     if ('port' in opts) {
+
       assert(Number.isInteger(opts.port), ' => "port" option needs to be an integer.');
       assert(opts.port > 1024 && opts.port < 49152,
         ' => "port" integer needs to be in range (1025-49151).');
@@ -224,68 +225,17 @@ export class Client {
 
     const ee = new EE();
 
-    const ws = net.createConnection({port: this.port}, () => {
-      this.isOpen = true;
-      process.nextTick(() => {
-        ee.emit('open', true);
-        cb && cb(null, this);
-      });
-    });
-
-    ws.setEncoding('utf8');
+    let ws = null;
+    let connectPromise = null;
 
     this.write = function (data, cb) {
-      ws.write(JSON.stringify(data) + '\n', 'utf8', cb);
-    };
-
-    ws.on('end', () => {
-      loginfo('client stream "end" event occurred.');
-    });
-
-    this.ensure = function ($cb?: Function) {
-
-      if ($cb) {
-        if (this.isOpen) {
-          return process.nextTick($cb, null, this);
-        }
-        const cb = lmUtils.once(this, $cb);
-        let to = setTimeout(cb.bind(this, 'err:timeout'), 2000);
-        ee.once('open', () => {
-          clearTimeout(to);
-          process.nextTick(cb, null, this);
-        });
+      if (ws) {
+        ws.write(JSON.stringify(data) + '\n', 'utf8', cb);
       }
       else {
-        return new Promise((resolve, reject) => {
-          if (this.isOpen) {
-            return resolve(this);
-          }
-          let to = setTimeout(reject.bind(null, 'err:timeout'), 2000);
-          ee.once('open', () => {
-            clearTimeout(to);
-            resolve(this)
-          });
-        });
+        throw new Error('please call connect() on this Live-Mutex client, before using.');
       }
     };
-
-    ws.on('close', () => {
-      this.isOpen = false;
-    });
-
-    process.once('exit', function () {
-      ws.end();
-    });
-
-    this.close = function () {
-      return ws.end();
-    };
-
-    this.bookkeeping = {};
-    this.lockholderCount = {};
-    this.timeouts = {};
-    this.resolutions = {};
-    this.giveups = {};
 
     const onData = data => {
 
@@ -340,14 +290,83 @@ export class Client {
 
     };
 
-    ws.pipe(JSONStream.parse()).on('data', onData)
-    .once('error', function (e) {
-      this.sened(ws, {
-        error: String(e.stack || e)
-      }, function () {
-        ws.end();
-      });
+    this.ensure = this.connect = function (cb?: Function) {
+
+      if (connectPromise) {
+        return connectPromise;
+      }
+
+      return connectPromise = new Promise((resolve, reject) => {
+
+        let onFirstErr = function (e) {
+          let err = new Error('live-mutex client error => ' + (e.stack || e));
+          process.emit('warning', err);
+          reject(err);
+        };
+
+        let to = setTimeout(function () {
+          reject('live-mutex err: client connection timeout after 2000ms.');
+        }, 2000);
+
+        ws = net.createConnection({port: this.port}, () => {
+          this.isOpen = true;
+          clearTimeout(to);
+          ws.removeListener('error', onFirstErr);
+          resolve(this);
+        });
+
+        ws.once('end', () => {
+          loginfo('client stream "end" event occurred.');
+        });
+
+        ws.once('error', onFirstErr);
+        ws.on('close', () => {
+          this.isOpen = false;
+        });
+
+        ws.setEncoding('utf8');
+
+        ws.on('error', function (e) {
+          logerr('client error', e.stack || e);
+        });
+
+        ws.pipe(JSONStream.parse()).on('data', onData)
+        .once('error', function (e) {
+          this.write({
+            error: String(e.stack || e)
+          }, function () {
+            ws.end();
+          });
+        });
+      })
+      // if the user passes a callback, we fire the callback here
+      .then(function (val) {
+          cb && cb(null, val);
+          return val;
+        },
+        function (err) {
+          cb && cb(err);
+          return Promise.reject(err);
+        });
+    };
+
+    process.once('exit', function () {
+      ws && ws.end();
     });
+
+    this.close = function () {
+      return ws && ws.end();
+    };
+
+    this.bookkeeping = {};
+    this.lockholderCount = {};
+    this.timeouts = {};
+    this.resolutions = {};
+    this.giveups = {};
+
+    // if the user passes a callback, we call connect here
+    // on behalf of the user
+    cb && this.connect(cb);
 
   };
 
@@ -393,7 +412,7 @@ export class Client {
       }
 
       if (data.error) {
-        logerr(colors.bgRed(data.error),'\n');
+        logerr(colors.bgRed(data.error), '\n');
       }
 
       if ([data.acquired, data.retry].filter(i => i).length > 1) {
@@ -457,7 +476,7 @@ export class Client {
 
     if ('retry' in opts) {
       assert(Number.isInteger(opts.retry), '"retry" option must be an integer.');
-      assert(opts.retry >=0 && opts.retry <= 20, '"retry" option must be an integer between 0 and 20 inclusive.');
+      assert(opts.retry >= 0 && opts.retry <= 20, '"retry" option must be an integer between 0 and 20 inclusive.');
     }
 
     if ('ttl' in opts) {
@@ -517,7 +536,7 @@ export class Client {
 
       if (data.error) {
         let err = new Error(data.error);
-        process.emit('warning', );
+        process.emit('warning',);
         clearTimeout(to);
         return cb(err, false);
       }
@@ -607,8 +626,8 @@ export class Client {
 
     opts = opts || {};
 
-    if(cb && !opts._retryCount){
-       cb = cb.bind(this);
+    if (cb && !opts._retryCount) {
+      cb = cb.bind(this);
     }
 
     cb = cb || totalNoop;

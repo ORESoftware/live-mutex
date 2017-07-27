@@ -2,6 +2,7 @@ const async = require('async');
 const {Broker} = require('live-mutex/broker');
 const cp = require('child_process');
 const path = require('path');
+const colors = require('chalk');
 
 const multi_process_port = 3009;
 process.stderr.setMaxListeners(40);

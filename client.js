@@ -9,7 +9,6 @@ var uuidV4 = require('uuid/v4');
 var colors = require('colors/safe');
 var JSONStream = require('JSONStream');
 var debug = require('debug')('live-mutex');
-var utils_1 = require("./utils");
 var loginfo = console.log.bind(console, ' [live-mutex client] =>');
 var logerr = console.error.bind(console, ' [live-mutex client] =>');
 var weAreDebugging = require('./lib/we-are-debugging');
@@ -21,7 +20,8 @@ setTimeout(function () {
         loginfo('recommends you attach a process.on("warning") event handler.');
     }
 }, 1000);
-var totalNoop = function () { };
+var totalNoop = function () {
+};
 var asyncNoop = function (cb) {
     cb && process.nextTick(cb);
 };
@@ -93,60 +93,16 @@ var Client = (function () {
         this.lockRetryMax = opts.lockRetryMax || 3;
         this.unlockRetryMax = opts.unlockRetryMax || 3;
         var ee = new EE();
-        var ws = net.createConnection({ port: this.port }, function () {
-            _this.isOpen = true;
-            process.nextTick(function () {
-                ee.emit('open', true);
-                cb && cb(null, _this);
-            });
-        });
-        ws.setEncoding('utf8');
+        var ws = null;
+        var connectPromise = null;
         this.write = function (data, cb) {
-            ws.write(JSON.stringify(data) + '\n', 'utf8', cb);
-        };
-        ws.on('end', function () {
-            loginfo('client stream "end" event occurred.');
-        });
-        this.ensure = function ($cb) {
-            var _this = this;
-            if ($cb) {
-                if (this.isOpen) {
-                    return process.nextTick($cb, null, this);
-                }
-                var cb_1 = utils_1.default.once(this, $cb);
-                var to_1 = setTimeout(cb_1.bind(this, 'err:timeout'), 2000);
-                ee.once('open', function () {
-                    clearTimeout(to_1);
-                    process.nextTick(cb_1, null, _this);
-                });
+            if (ws) {
+                ws.write(JSON.stringify(data) + '\n', 'utf8', cb);
             }
             else {
-                return new Promise(function (resolve, reject) {
-                    if (_this.isOpen) {
-                        return resolve(_this);
-                    }
-                    var to = setTimeout(reject.bind(null, 'err:timeout'), 2000);
-                    ee.once('open', function () {
-                        clearTimeout(to);
-                        resolve(_this);
-                    });
-                });
+                throw new Error('please call connect() on this Live-Mutex client, before using.');
             }
         };
-        ws.on('close', function () {
-            _this.isOpen = false;
-        });
-        process.once('exit', function () {
-            ws.end();
-        });
-        this.close = function () {
-            return ws.end();
-        };
-        this.bookkeeping = {};
-        this.lockholderCount = {};
-        this.timeouts = {};
-        this.resolutions = {};
-        this.giveups = {};
         var onData = function (data) {
             if (data.type === 'stats') {
                 _this.setLockRequestorCount(data.key, data.lockRequestCount);
@@ -187,14 +143,66 @@ var Client = (function () {
                 logerr(colors.yellow('Live-Mutex implementation issue => message did not contain uuid =>'), '\n', util.inspect(data));
             }
         };
-        ws.pipe(JSONStream.parse()).on('data', onData)
-            .once('error', function (e) {
-            this.sened(ws, {
-                error: String(e.stack || e)
-            }, function () {
-                ws.end();
+        this.ensure = this.connect = function (cb) {
+            var _this = this;
+            if (connectPromise) {
+                return connectPromise;
+            }
+            return connectPromise = new Promise(function (resolve, reject) {
+                var onFirstErr = function (e) {
+                    var err = new Error('live-mutex client error => ' + (e.stack || e));
+                    process.emit('warning', err);
+                    reject(err);
+                };
+                var to = setTimeout(function () {
+                    reject('live-mutex err: client connection timeout after 2000ms.');
+                }, 2000);
+                ws = net.createConnection({ port: _this.port }, function () {
+                    _this.isOpen = true;
+                    clearTimeout(to);
+                    ws.removeListener('error', onFirstErr);
+                    resolve(_this);
+                });
+                ws.once('end', function () {
+                    loginfo('client stream "end" event occurred.');
+                });
+                ws.once('error', onFirstErr);
+                ws.on('close', function () {
+                    _this.isOpen = false;
+                });
+                ws.setEncoding('utf8');
+                ws.on('error', function (e) {
+                    logerr('client error', e.stack || e);
+                });
+                ws.pipe(JSONStream.parse()).on('data', onData)
+                    .once('error', function (e) {
+                    this.write({
+                        error: String(e.stack || e)
+                    }, function () {
+                        ws.end();
+                    });
+                });
+            })
+                .then(function (val) {
+                cb && cb(null, val);
+                return val;
+            }, function (err) {
+                cb && cb(err);
+                return Promise.reject(err);
             });
+        };
+        process.once('exit', function () {
+            ws && ws.end();
         });
+        this.close = function () {
+            return ws && ws.end();
+        };
+        this.bookkeeping = {};
+        this.lockholderCount = {};
+        this.timeouts = {};
+        this.resolutions = {};
+        this.giveups = {};
+        cb && this.connect(cb);
     }
     ;
     Client.create = function (opts, cb) {

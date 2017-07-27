@@ -8,7 +8,6 @@ var async = require('async');
 var colors = require('colors/safe');
 var uuidV4 = require('uuid/v4');
 var JSONStream = require('JSONStream');
-var utils_1 = require("./utils");
 var debug = require('debug')('live-mutex');
 var loginfo = console.log.bind(console, '[live-mutex broker] =>');
 var logerr = console.error.bind(console, '[live-mutex broker] =>');
@@ -170,18 +169,19 @@ var Broker = (function () {
                 });
             }
         };
-        var first = true;
+        var firstConnection = true;
         var wss = net.createServer(function (ws) {
             loginfo('client connected.');
-            process.once('exit', function () {
+            var endWS = function () {
                 try {
                     ws.end();
                 }
                 finally {
                 }
-            });
-            if (first) {
-                first = false;
+            };
+            process.once('exit', endWS);
+            if (firstConnection) {
+                firstConnection = false;
                 _this.sendStatsMessageToAllClients();
             }
             ws.once('error', function (err) {
@@ -204,7 +204,8 @@ var Broker = (function () {
                     });
                 }
             });
-            ws.pipe(JSONStream.parse()).on('data', function (v) {
+            ws.pipe(JSONStream.parse())
+                .on('data', function (v) {
                 onData(ws, v);
             })
                 .once('error', function (e) {
@@ -215,54 +216,48 @@ var Broker = (function () {
                 });
             });
         });
+        wss.on('error', function (err) {
+            logerr(err.stack || err);
+        });
         setInterval(function () {
             wss.getConnections(function (err, data) {
                 err && logerr(err);
                 data && logerr('connection information =>', data);
             });
         }, 4000);
-        wss.listen(this.port, function () {
-            _this.isOpen = true;
-            process.nextTick(function () {
-                ee.emit('open', true);
-                cb && cb(null, _this);
-            });
-        });
-        this.ensure = function ($cb) {
+        var brokerPromise = null;
+        this.ensure = this.start = function (cb) {
             var _this = this;
-            if ($cb) {
-                if (this.isOpen) {
-                    return process.nextTick($cb, null, this);
-                }
-                var cb_1 = utils_1.default.once(this, $cb);
-                var to_1 = setTimeout(cb_1.bind(this, 'err:timeout'), 2000);
-                ee.once('open', function () {
-                    clearTimeout(to_1);
-                    process.nextTick(cb_1, null, _this);
-                });
+            if (brokerPromise) {
+                return brokerPromise;
             }
-            else {
-                return new Promise(function (resolve, reject) {
-                    if (_this.isOpen) {
-                        return resolve(_this);
-                    }
-                    var to = setTimeout(reject.bind(null, 'err:timeout'), 2000);
-                    ee.once('open', function () {
-                        clearTimeout(to);
-                        resolve(_this);
-                    });
+            return brokerPromise = new Promise(function (resolve, reject) {
+                var to = setTimeout(function () {
+                    reject(new Error('Live-Mutex broker, listen action timed out.'));
+                }, 3000);
+                wss.once('error', reject);
+                wss.listen(_this.port, function () {
+                    _this.isOpen = true;
+                    clearTimeout(to);
+                    wss.removeListener('error', reject);
+                    resolve(_this);
                 });
-            }
+            })
+                .then(function (val) {
+                cb && cb(null, val);
+                return val;
+            }, function (err) {
+                cb && cb(err);
+                return Promise.reject(err);
+            });
         };
-        wss.on('error', function (err) {
-            console.error(' => WSS error => ', err.stack || err);
-        });
         this.bookkeeping = {};
         this.rejected = {};
         this.timeouts = {};
         this.locks = {};
         this.wsLock = new Map();
         this.wsToKeys = new Map();
+        cb && this.ensure(cb);
     }
     Broker.create = function (opts, cb) {
         return new Broker(opts).ensure(cb);

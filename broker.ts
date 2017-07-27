@@ -300,23 +300,25 @@ export class Broker {
 
     };
 
-    let first = true;
+    let firstConnection = true;
 
     const wss = net.createServer(ws => {
 
       loginfo('client connected.');
 
-      process.once('exit', function () {
+      let endWS = function () {
         try {
           ws.end();
         }
         finally {
           // noop
         }
-      });
+      };
 
-      if (first) {
-        first = false;
+      process.once('exit', endWS);
+
+      if (firstConnection) {
+        firstConnection = false;
         this.sendStatsMessageToAllClients();
       }
 
@@ -343,7 +345,8 @@ export class Broker {
         }
       });
 
-      ws.pipe(JSONStream.parse()).on('data', v => {
+      ws.pipe(JSONStream.parse())
+      .on('data', v => {
         onData(ws, v);
       })
       .once('error', function (e) {
@@ -356,51 +359,51 @@ export class Broker {
 
     });
 
+    wss.on('error', function (err) {
+      logerr(err.stack || err);
+    });
+
     setInterval(function () {
-      wss.getConnections(function (err,data) {
+      wss.getConnections(function (err, data) {
         err && logerr(err);
         data && logerr('connection information =>', data);
       });
     }, 4000);
 
-    wss.listen(this.port, () => {
-      this.isOpen = true;
-      process.nextTick(() => {
-        ee.emit('open', true);
-        cb && cb(null, this);
-      });
-    });
+    let brokerPromise = null;
 
-    this.ensure = function ($cb) {
+    this.ensure = this.start = function (cb?: Function) {
 
-      if ($cb) {
-        if (this.isOpen) {
-          return process.nextTick($cb, null, this);
-        }
-        const cb = lmUtils.once(this, $cb);
-        let to = setTimeout(cb.bind(this, 'err:timeout'), 2000);
-        ee.once('open', () => {
+      if (brokerPromise) {
+        return brokerPromise;
+      }
+
+      return brokerPromise = new Promise((resolve, reject) => {
+
+        let to = setTimeout(function () {
+          reject(new Error('Live-Mutex broker, listen action timed out.'))
+        }, 3000);
+
+        wss.once('error', reject);
+
+        wss.listen(this.port, () => {
+          this.isOpen = true;
           clearTimeout(to);
-          process.nextTick(cb, null, this);
+          wss.removeListener('error', reject);
+          resolve(this);
         });
-      }
-      else {
-        return new Promise((resolve, reject) => {
-          if (this.isOpen) {
-            return resolve(this);
-          }
-          let to = setTimeout(reject.bind(null, 'err:timeout'), 2000);
-          ee.once('open', () => {
-            clearTimeout(to);
-            resolve(this);
-          });
-        });
-      }
-    };
 
-    wss.on('error', function (err) {
-      console.error(' => WSS error => ', err.stack || err);
-    });
+      })
+      .then(function (val) {
+          cb && cb(null, val);
+          return val;
+        },
+        function (err) {
+          cb && cb(err);
+          return Promise.reject(err);
+        });
+
+    };
 
     this.bookkeeping = {};
     this.rejected = {};
@@ -408,6 +411,10 @@ export class Broker {
     this.locks = {};
     this.wsLock = new Map(); // keys are ws objects, values are lock keys
     this.wsToKeys = new Map(); // keys are ws objects, values are keys []
+
+    // if the user passes a callback then we call
+    // ensure() on behalf of the user
+    cb && this.ensure(cb);
 
   }
 
