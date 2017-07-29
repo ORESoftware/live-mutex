@@ -204,11 +204,11 @@ const {Client} = require('live-mutex/client');
 exports.createPool = function(opts){
   
   return Promise.all([
-     
-    
-  ])
-
-
+     new Client(opts).connect(),
+     new Client(opts).connect(),
+     new Client(opts).connect(),
+     new Client(opts).connect()
+  ]);
 }
 
 
@@ -232,6 +232,27 @@ exports.createPool = function(opts){
   
 ### Usage with Promises:
 
+This library exports lockp and unlockp, which are simply like so:
+
+```typescript
+  lockp(key: string, opts: Partial<IClientLockOpts>) {
+    return new Promise((resolve, reject) => {
+      this.lock(key, opts, function (err, val) {
+        err ? reject(err) : resolve(val);
+      });
+    });
+  }
+
+  unlockp(key: string, opts: Partial<IClientUnlockOpts>) {
+    return new Promise((resolve, reject) => {
+      this.unlock(key, opts, function (err, val) {
+        err ? reject(err) : resolve(val);
+      });
+    });
+  }
+```
+
+### If you want, you can just create your own promise wrapper like so:
 
 ```js
 

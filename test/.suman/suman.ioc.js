@@ -2,17 +2,17 @@ var http = require('http');
 module.exports = function (data) {
     return {
         dependencies: {
-            'example': function () {
-                return { 'just': 'an example' };
-            },
             'Broker': function () {
-                return require('../../broker').Broker;
+                return require('../../broker').default;
             },
             'Client': function () {
-                return require('../../client').Client;
+                return require('../../client').default;
             },
             'lmUtils': function () {
-                return require('../../utils');
+                return require('../../utils').default;
+            },
+            'Promise': function () {
+                return require('bluebird');
             }
         }
     };

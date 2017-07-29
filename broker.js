@@ -1,7 +1,6 @@
 'use strict';
 Object.defineProperty(exports, "__esModule", { value: true });
 var assert = require("assert");
-var EE = require("events");
 var net = require("net");
 var util = require("util");
 var async = require('async');
@@ -101,7 +100,6 @@ var Broker = (function () {
                 cb && cb(null);
             });
         };
-        var ee = new EE();
         var onData = function (ws, data) {
             var key = data.key;
             if (key) {
@@ -224,7 +222,7 @@ var Broker = (function () {
                 err && logerr(err);
                 data && logerr('connection information =>', data);
             });
-        }, 4000);
+        }, 8000);
         var brokerPromise = null;
         this.ensure = this.start = function (cb) {
             var _this = this;
@@ -233,7 +231,7 @@ var Broker = (function () {
             }
             return brokerPromise = new Promise(function (resolve, reject) {
                 var to = setTimeout(function () {
-                    reject(new Error('Live-Mutex broker, listen action timed out.'));
+                    reject(new Error('Live-Mutex broker error: listening action timed out.'));
                 }, 3000);
                 wss.once('error', reject);
                 wss.listen(_this.port, function () {
@@ -344,7 +342,7 @@ var Broker = (function () {
                         uuid: obj.uuid,
                         type: 'lock',
                         lockRequestCount: count,
-                        retry: true
+                        reelection: true
                     });
                 });
             }, this.timeoutToFindNewLockholder);
@@ -509,9 +507,8 @@ var Broker = (function () {
                     key: key,
                     lockRequestCount: count,
                     type: 'unlock',
-                    error: ' => You need to pass the correct uuid, or use force.',
-                    unlocked: false,
-                    retry: true
+                    error: 'You need to pass the correct uuid, or use force.',
+                    unlocked: false
                 });
             }
         }

@@ -88,10 +88,7 @@ export interface IUuidTimer {
 }
 
 export type TBrokerCB = (err: Error | null | undefined | string, val: Broker) => void;
-
-export type TEnsureCB = (cb: TBrokerCB) => void;
-export type TEnsurePromise = () => Promise<Broker>;
-export type TEnsure = TEnsurePromise | TEnsureCB;
+export type TEnsure = (cb?: TBrokerCB) => Promise<Broker>;
 
 export interface IBookkeepingHash {
   [key: string]: IBookkeeping;
@@ -219,8 +216,6 @@ export class Broker {
         cb && cb(null);
       });
     };
-
-    const ee = new EE();
 
     const onData = (ws, data) => {
 
@@ -368,7 +363,7 @@ export class Broker {
         err && logerr(err);
         data && logerr('connection information =>', data);
       });
-    }, 4000);
+    }, 8000);
 
     let brokerPromise = null;
 
@@ -381,7 +376,7 @@ export class Broker {
       return brokerPromise = new Promise((resolve, reject) => {
 
         let to = setTimeout(function () {
-          reject(new Error('Live-Mutex broker, listen action timed out.'))
+          reject(new Error('Live-Mutex broker error: listening action timed out.'))
         }, 3000);
 
         wss.once('error', reject);
@@ -418,7 +413,7 @@ export class Broker {
 
   }
 
-  static create(opts: IBrokerOptsPartial, cb ?: TBrokerCB): Promise<Broker> | void {
+  static create(opts: IBrokerOptsPartial, cb?: TBrokerCB): Promise<Broker> {
     return new Broker(opts).ensure(cb);
   }
 
@@ -522,12 +517,11 @@ export class Broker {
       this.timeouts[key] = setTimeout(() => {
 
         removeWsLockKey(this, ws, key);
-
         delete this.timeouts[key];
 
         // if this timeout occurs, that is because the first item in the notify list did not receive the
-        // acquire lock message, so we push the object back onto the end of notify list and send a retry message to all
-        // if a client receives a retry message, they will all retry to acquire the lock on this key
+        // acquire lock message, so we push the object back onto the end of notify list and send a reelection message to all
+        // if a client receives a reelection message, they will all retry to acquire the lock on this key
 
         let _lck;
         let count;
@@ -551,7 +545,7 @@ export class Broker {
             uuid: obj.uuid,
             type: 'lock',
             lockRequestCount: count,
-            retry: true
+            reelection: true
           });
         });
 
@@ -777,9 +771,8 @@ export class Broker {
           key: key,
           lockRequestCount: count,
           type: 'unlock',
-          error: ' => You need to pass the correct uuid, or use force.',
-          unlocked: false,
-          retry: true
+          error: 'You need to pass the correct uuid, or use force.',
+          unlocked: false
         });
       }
 

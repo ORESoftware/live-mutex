@@ -1,9 +1,10 @@
-var suman = require('suman');
+"use strict";
+exports.__esModule = true;
+var suman = require("suman");
 var Test = suman.init(module);
-var colors = require('colors/safe');
-var async = require('async');
-var _ = require('lodash');
-Test.create(function (assert, describe, Client, Broker, inject, it) {
+///////////////////////////////////////////////////////////
+Test.create(function (assert, describe, Client, Broker, inject, it, $deps, $core) {
+    var _ = $deps.lodash, async = $deps.async, colors = $deps.chalk;
     var arrays = [
         [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
         [1, 2, 1, 2, 111, 2, 2, 21, 1, 11, 1, 111, 1, 111, 1, 2, 2, 2, 2, 1, 2, 21, 11, 11111, 111, 1, 11, 1, 1, 1, 1, 1, 1, 1],
@@ -22,8 +23,6 @@ Test.create(function (assert, describe, Client, Broker, inject, it) {
             c: p.then(function (v) { return new Client(conf).ensure(); })
         };
     });
-    var l = _.flattenDeep(arrays).length;
-    console.log(' => length => ', l);
     describe('inject', function (c) {
         arrays.forEach(function (a) {
             describe.delay('resumes', function (resume) {

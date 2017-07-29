@@ -1,11 +1,11 @@
-const suman = require('suman');
+import suman = require('suman');
 const Test = suman.init(module);
 
-const colors = require('colors/safe');
-const async = require('async');
-const _ = require('lodash');
+///////////////////////////////////////////////////////////
 
-Test.create(function (assert, describe, Client, Broker, inject, it) {
+Test.create(function (assert, describe, Client, Broker, inject, it, $deps, $core) {
+
+  const {lodash: _, async, chalk:colors} = $deps;
 
   const arrays = [
     [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
@@ -30,8 +30,6 @@ Test.create(function (assert, describe, Client, Broker, inject, it) {
     }
   });
 
-  const l = _.flattenDeep(arrays).length;
-  console.log(' => length => ', l);
 
   describe('inject', function (c) {
 

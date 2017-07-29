@@ -14,7 +14,7 @@ Test.create(function (assert, before, describe, it, Client, Broker, lmUtils, inj
         });
     });
     before(function (h) {
-        return new Broker({ port: 3009 }).ensure();
+        return new Broker({ port: multi_process_port }).ensure();
     });
     it.cb('launches several processes', function (t) {
         var p = path.resolve(__dirname + '/../fixtures/run-in-child-process.js');

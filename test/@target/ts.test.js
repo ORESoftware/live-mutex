@@ -2,12 +2,12 @@
 exports.__esModule = true;
 var suman_1 = require("suman");
 var Test = suman_1["default"].init(module);
-var colors = require('colors/safe');
-var async = require('async');
-var _ = require('lodash');
 // import the other way, just to be sure
 var live_mutex_1 = require("live-mutex");
-Test.create(function (assert, fs, path, inject, describe, before, it) {
+/////////////////////////////////////////////////////////////////////
+Test.create(function (inject, describe, before, it, $deps, $core) {
+    var fs = $core.fs, path = $core.path, assert = $core.assert;
+    var colors = $deps.chalk, async = $deps.async, _ = $deps.lodash;
     var conf = Object.freeze({ port: 7027 });
     var p;
     inject(function () {
@@ -28,18 +28,16 @@ Test.create(function (assert, fs, path, inject, describe, before, it) {
         function lockWriteRelease(val, cb) {
             c.lock('a', function (err, unlock) {
                 if (err) {
-                    cb(err);
+                    return cb(err);
                 }
-                else {
-                    fs.appendFile(f, '\n' + String(val), function (err) {
-                        if (err) {
-                            cb(err);
-                        }
-                        else {
-                            unlock(cb);
-                        }
-                    });
-                }
+                fs.appendFile(f, '\n' + String(val), function (err) {
+                    if (err) {
+                        cb(err);
+                    }
+                    else {
+                        unlock(cb);
+                    }
+                });
             });
         }
         before.cb('write like crazy', { timeout: 30000 }, function (t) {

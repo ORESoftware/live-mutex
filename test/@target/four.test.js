@@ -1,7 +1,9 @@
-var suman = require('suman');
+'use strict';
+exports.__esModule = true;
+var suman = require("suman");
 var Test = suman.init(module);
-var Promise = require('bluebird');
-Test.create({ mode: 'parallel' }, function (assert, before, it, Client, lmUtils) {
+/////////////////////////////////////////////////////////
+Test.create({ mode: 'series' }, function (assert, before, it, Client, lmUtils, Promise) {
     var conf = Object.freeze({ port: 7987 });
     before('promise', function () {
         return lmUtils.conditionallyLaunchSocketServer(conf)
@@ -35,16 +37,7 @@ Test.create({ mode: 'parallel' }, function (assert, before, it, Client, lmUtils)
                     return t(err);
                 c.unlock('z', t);
             });
-        });
-    });
-    it.cb('yes', { timeout: 1500 }, function (t) {
-        return Client.create(conf).then(function (c) {
-            c.lock('z', function (err) {
-                if (err)
-                    return t(err);
-                c.unlock('z', t);
-            });
-        });
+        })["catch"](t);
     });
     it.cb('yes', { timeout: 1500 }, function (t) {
         Client.create(conf).then(function (c) {
@@ -53,6 +46,24 @@ Test.create({ mode: 'parallel' }, function (assert, before, it, Client, lmUtils)
                     return t(err);
                 c.unlock('z', t);
             });
-        });
+        })["catch"](t);
+    });
+    it.cb('yes', { timeout: 1500 }, function (t) {
+        Client.create(conf).then(function (c) {
+            c.lock('z', function (err) {
+                if (err)
+                    return t(err);
+                c.unlock('z', t);
+            });
+        })["catch"](t);
+    });
+    it.cb('yes', { timeout: 1500 }, function (t) {
+        Client.create(conf).then(function (c) {
+            c.lock('z', function (err) {
+                if (err)
+                    return t(err);
+                c.unlock('z', t);
+            });
+        })["catch"](t);
     });
 });

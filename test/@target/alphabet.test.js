@@ -1,4 +1,6 @@
-var suman = require('suman');
+"use strict";
+exports.__esModule = true;
+var suman = require("suman");
 var Test = suman.init(module);
 var async = require('async');
 Test.create(function (assert, before, describe, it, path, Client, Broker, lmUtils, fs, inject) {

@@ -1,4 +1,4 @@
-const suman = require('suman');
+import suman = require('suman');
 const Test = suman.init(module);
 
 Test.create(function (assert, before, describe, it, Client, Broker, lmUtils, inject, $core, $deps) {
