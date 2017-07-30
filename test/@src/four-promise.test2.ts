@@ -1,13 +1,16 @@
 'use strict';
 import suman = require('suman');
+import {Client} from "../../client";
 
 const Test = suman.init(module);
 
 /////////////////////////////////////////////////////////
 
-Test.create({mode: 'series'}, function (assert, before, it, Client, lmUtils, Promise) {
+Test.create({mode: 'series'}, function (assert, before, it, LvMtxClient: Client, lmUtils, Promise) {
 
   const conf = Object.freeze({port: 7987});
+
+  console.log('four promise tests');
 
   before('promise', function () {
 
@@ -26,13 +29,22 @@ Test.create({mode: 'series'}, function (assert, before, it, Client, lmUtils, Pro
 
   });
 
-  it.cb('yes', {timeout: 1500}, t => {
+  it('yes', {timeout: 1500}, t => {
 
-    Client.create(conf, (err, c) => {
-      if (err) return t.fail(err);
-      c.lock('z', function (err) {
-        if (err) return t(err);
-        c.unlock('z', t);
+    return LvMtxClient.create(conf).then(c => {
+      return c.lockp('z').then(function ({uuid}) {
+        return c.unlockp('z', uuid);
+      });
+    });
+
+  });
+
+  it('yes', {timeout: 1500}, t => {
+
+    const c = new LvMtxClient(conf);
+    c.ensure().then(function () {
+      return c.lock('z').then(function(){
+        return c.unlock('z');
       });
     });
 
@@ -40,20 +52,7 @@ Test.create({mode: 'series'}, function (assert, before, it, Client, lmUtils, Pro
 
   it.cb('yes', {timeout: 1500}, t => {
 
-    const c = new Client(conf);
-
-    c.ensure().then(function () {
-      c.lock('z', function (err) {
-        if (err) return t(err);
-        c.unlock('z', t);
-      });
-    }).catch(t)
-
-  });
-
-  it.cb('yes', {timeout: 1500}, t => {
-
-    Client.create(conf).then(c => {
+    LvMtxClient.create(conf).then(c => {
       c.lock('z', function (err) {
         if (err) return t(err);
         c.unlock('z', t);
@@ -65,7 +64,7 @@ Test.create({mode: 'series'}, function (assert, before, it, Client, lmUtils, Pro
 
   it.cb('yes', {timeout: 1500}, t => {
 
-    Client.create(conf).then(c => {
+    LvMtxClient.create(conf).then(c => {
       c.lock('z', function (err) {
         if (err) return t(err);
         c.unlock('z', t);
@@ -76,7 +75,7 @@ Test.create({mode: 'series'}, function (assert, before, it, Client, lmUtils, Pro
 
   it.cb('yes', {timeout: 1500}, t => {
 
-    Client.create(conf).then(function (c) {
+    LvMtxClient.create(conf).then(function (c) {
       c.lock('z', function (err) {
         if (err) return t(err);
         c.unlock('z', t);

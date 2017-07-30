@@ -14,6 +14,7 @@ var weAreDebugging = require('./lib/we-are-debugging');
 if (weAreDebugging) {
     loginfo('Live-Mutex broker is in debug mode. Timeouts are turned off.');
 }
+process.setMaxListeners(100);
 process.on('warning', function (e) {
     console.error(e.stack || e);
 });
