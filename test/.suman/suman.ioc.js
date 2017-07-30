@@ -5,6 +5,9 @@ module.exports = function (data) {
             'Broker': function () {
                 return require('../../broker').default;
             },
+            'LvMtxClient': function () {
+                return require('../../client').default;
+            },
             'Client': function () {
                 return require('../../client').default;
             },

@@ -21,6 +21,10 @@ module.exports = data => {  //load async deps for any of your suman tests
         return require('../../broker').default;
       },
 
+      'LvMtxClient': function(){
+        return require('../../client').default;
+      },
+
       'Client': function () {
         return require('../../client').default;
       },
