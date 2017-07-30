@@ -9,7 +9,6 @@ const Test = suman.init(module);
 Test.create({mode: 'series'}, function (assert, before, it, LvMtxClient: Client, lmUtils, Promise) {
 
   const conf = Object.freeze({port: 7987});
-
   console.log('four promise tests');
 
   before('promise', function () {
