@@ -15,6 +15,11 @@ Tested on *nix and MacOS - probably will work on Windows. Tested and proven on N
 
 ### Who needs it
 
+1. Library developers who want a fast locking mechanism (and who cannot install Redis)
+2. Application developers using MongoDB (MongoDB has ttl indexes on collections, but this requires a polling implementation).
+3. Developers who normally use Lockfile library, but need something faster or multi-machine. (Lockfile can really work on
+one machine, Live-Mutex can work on a network.)
+
 This library is useful for developers who need a multi-process locking mechanism, but may find it
 inconvenient or impossible to use Redis or similar. In other words, this library is designed to support other 
 libraries more so than applications. Live-Mutex offers lightweight, safe, and high-performance locking.
