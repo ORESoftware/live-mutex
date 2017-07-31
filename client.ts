@@ -564,7 +564,7 @@ export class Client {
          ${maxRetries} retries attempted.`), false);
       }
 
-      logerr(`retrying lock request for uuid ${uuid}, attempt #`, opts.__retryCount);
+      // logerr(`retrying lock request for uuid ${uuid}, attempt #`, opts.__retryCount);
       this.lock(key, opts, cb);
 
     }, lockTimeout);

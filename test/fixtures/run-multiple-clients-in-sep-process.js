@@ -33,7 +33,7 @@ Promise.all([
     let randomKey = keys[Math.floor(Math.random() * keys.length)];
     let randomClient = clients[Math.floor(Math.random() * clients.length)];
 
-    console.error('count => ', n);
+    // console.error('count => ', n);
 
     randomClient.lock(randomKey, function (err, unlock) {
 
@@ -46,7 +46,7 @@ Promise.all([
 
       let randomTime = Math.round(Math.random() * (max - min)) + min;
 
-      console.error('randomTime => ', randomTime);
+      // console.error('randomTime => ', randomTime);
 
       setTimeout(function () {
         unlock(cb);

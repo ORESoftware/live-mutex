@@ -355,7 +355,6 @@ var Client = (function () {
             if (opts.__retryCount > maxRetries) {
                 return cb(new Error("Live-Mutex client lock request timed out after " + lockTimeout + "ms,\n         " + maxRetries + " retries attempted."), false);
             }
-            logerr("retrying lock request for uuid " + uuid + ", attempt #", opts.__retryCount);
             _this.lock(key, opts, cb);
         }, lockTimeout);
         var cleanUp = function () {

@@ -2,12 +2,17 @@ const cp = require('child_process');
 const path = require('path');
 const async = require('async');
 const {Broker} = require('live-mutex/broker');
+const colors = require('chalk');
 
 //////////////////////////////////////////////////////////////////
 
 const multi_process_port = 3009;
 
 //////////////////////////////////////////////////////////////////
+
+setInterval(function(){
+  console.log(colors.magenta(util.inspect(process.memoryUsage())));
+}, 5000);
 
 new Broker({port: multi_process_port}).ensure(function () {
 
