@@ -1,4 +1,6 @@
 
+* clients should be given an array of host/port combinations to try to connect to
+
 * priority lock request should be put at front of queue
 
 * provide option to just use lockUuid, and not unlock fn

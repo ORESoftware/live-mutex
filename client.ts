@@ -10,9 +10,8 @@ import Timer = NodeJS.Timer;
 import * as net from 'net';
 
 //npm
-const ijson = require('siamese');
 const uuidV4 = require('uuid/v4');
-const colors = require('colors/safe');
+const colors = require('chalk');
 const JSONStream = require('JSONStream');
 
 //project

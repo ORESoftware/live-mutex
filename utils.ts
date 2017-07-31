@@ -10,7 +10,6 @@ import * as cp from 'child_process';
 //npm
 const ping = require('tcp-ping');
 const slp = require('strangeloop');
-const ijson = require('siamese');
 
 //project
 import {Broker} from './broker';

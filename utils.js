@@ -3,7 +3,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 var cp = require("child_process");
 var ping = require('tcp-ping');
 var slp = require('strangeloop');
-var ijson = require('siamese');
 var broker_1 = require("./broker");
 var p = require.resolve('./lib/launch-broker-child');
 exports.once = function (ctx, fn) {

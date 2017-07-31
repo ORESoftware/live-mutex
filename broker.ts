@@ -8,7 +8,7 @@ import * as util from 'util';
 
 //npm
 const async = require('async');
-const colors = require('colors/safe');
+const colors = require('chalk');
 const uuidV4 = require('uuid/v4');
 const JSONStream = require('JSONStream');
 
