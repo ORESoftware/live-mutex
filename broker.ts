@@ -28,6 +28,8 @@ if (weAreDebugging) {
   loginfo('Live-Mutex broker is in debug mode. Timeouts are turned off.');
 }
 
+process.setMaxListeners(100);
+
 process.on('warning', function (e) {
   console.error(e.stack || e);
 });
@@ -88,10 +90,7 @@ export interface IUuidTimer {
 }
 
 export type TBrokerCB = (err: Error | null | undefined | string, val: Broker) => void;
-
-export type TEnsureCB = (cb: TBrokerCB) => void;
-export type TEnsurePromise = () => Promise<Broker>;
-export type TEnsure = TEnsurePromise | TEnsureCB;
+export type TEnsure = (cb?: TBrokerCB) => Promise<Broker>;
 
 export interface IBookkeepingHash {
   [key: string]: IBookkeeping;
@@ -108,8 +107,13 @@ export interface IBookkeeping {
   unlockCount: number;
 }
 
-export interface ILookObj {
+export interface IUuidHash {
+  [key: string]: boolean
+}
+
+export interface ILockObj {
   pid: number,
+  lockholderTimeouts: IUuidHash,
   uuid: string,
   notify: Array<INotifyObj>,
   key: string,
@@ -117,7 +121,7 @@ export interface ILookObj {
 }
 
 export interface ILockHash {
-  [key: string]: ILookObj
+  [key: string]: ILockObj
 }
 
 export interface INotifyObj {
@@ -220,8 +224,6 @@ export class Broker {
       });
     };
 
-    const ee = new EE();
-
     const onData = (ws, data) => {
 
       const key = data.key;
@@ -242,7 +244,6 @@ export class Broker {
         this.unlock(data, ws);
       }
       else if (data.type === 'lock') {
-        debug(colors.blue(' => broker attempting to get lock...'));
         this.lock(data, ws);
       }
       else if (data.type === 'lock-received') {
@@ -368,7 +369,7 @@ export class Broker {
         err && logerr(err);
         data && logerr('connection information =>', data);
       });
-    }, 4000);
+    }, 8000);
 
     let brokerPromise = null;
 
@@ -381,7 +382,7 @@ export class Broker {
       return brokerPromise = new Promise((resolve, reject) => {
 
         let to = setTimeout(function () {
-          reject(new Error('Live-Mutex broker, listen action timed out.'))
+          reject(new Error('Live-Mutex broker error: listening action timed out.'))
         }, 3000);
 
         wss.once('error', reject);
@@ -418,7 +419,7 @@ export class Broker {
 
   }
 
-  static create(opts: IBrokerOptsPartial, cb ?: TBrokerCB): Promise<Broker> | void {
+  static create(opts: IBrokerOptsPartial, cb?: TBrokerCB): Promise<Broker> {
     return new Broker(opts).ensure(cb);
   }
 
@@ -502,12 +503,16 @@ export class Broker {
 
       addWsLockKey(this, ws, key);
 
-      lck.uuid = obj.uuid;
+      let uuid = lck.uuid = obj.uuid;
       lck.pid = obj.pid;
       lck.to = setTimeout(() => {
 
         // delete locks[key]; => no, this.unlock will take care of that
-        process.emit('warning', 'Live-Mutex warning, lock object timed out for key => "' + key + '"');
+        process.emit('warning', 'Live-Mutex Broker warning, lock object timed out for key => "' + key + '"');
+
+        // we set lck.lockholderTimeouts[uuid], so that when an unlock request for uuid comes into the broker
+        // we know that it timed out already, and we know not to throw an error when the lock.uuid doesn't match
+        lck.lockholderTimeouts[uuid] = true;
 
         this.unlock({
           key: key,
@@ -522,12 +527,11 @@ export class Broker {
       this.timeouts[key] = setTimeout(() => {
 
         removeWsLockKey(this, ws, key);
-
         delete this.timeouts[key];
 
         // if this timeout occurs, that is because the first item in the notify list did not receive the
-        // acquire lock message, so we push the object back onto the end of notify list and send a retry message to all
-        // if a client receives a retry message, they will all retry to acquire the lock on this key
+        // acquire lock message, so we push the object back onto the end of notify list and send a reelection message to all
+        // if a client receives a reelection message, they will all retry to acquire the lock on this key
 
         let _lck;
         let count;
@@ -551,7 +555,7 @@ export class Broker {
             uuid: obj.uuid,
             type: 'lock',
             lockRequestCount: count,
-            retry: true
+            reelection: true
           });
         });
 
@@ -610,6 +614,7 @@ export class Broker {
     const pid = data.pid;
     const ttl = weAreDebugging ? 500000000 : (data.ttl || this.lockExpiresAfter);
     const force = data.force;
+    const retryCount = data.retryCount;
 
     this.bookkeeping[key] = this.bookkeeping[key] ||
       {
@@ -636,7 +641,13 @@ export class Broker {
         });
 
         if (!alreadyAdded) {
-          lck.notify.push({ws, uuid, pid, ttl});
+          if(retryCount > 0){
+            lck.notify.unshift({ws, uuid, pid, ttl});
+          }
+          else{
+            lck.notify.push({ws, uuid, pid, ttl});
+          }
+
         }
 
         this.send(ws, {
@@ -654,9 +665,19 @@ export class Broker {
 
         clearTimeout(lck.to);
         lck.to = setTimeout(() => {
+
           // delete locks[key];  => no, this.unlock will take care of that
-          process.emit('warning', ' => Live-Mutex warning, lock object timed out for key => "' + key + '"');
-          this.unlock({key, force: true});
+          process.emit('warning', ' => Live-Mutex Broker warning, lock object timed out for key => "' + key + '"');
+
+          // we set lck.lockholderTimeouts[uuid], so that when an unlock request for uuid might come in to broker
+          // we know that it timed out already, and we do not throw an error then
+          lck.lockholderTimeouts[uuid] = true;
+
+          this.unlock({
+            key,
+            force: true
+          });
+
         }, ttl);
 
         addWsLockKey(this, ws, key);
@@ -678,12 +699,20 @@ export class Broker {
       locks[key] = {
         pid,
         uuid,
+        lockholderTimeouts: {},
         key,
         notify: [],
         to: setTimeout(() => {
+
           // delete locks[key];  => no!, this.unlock will take care of that
           process.emit('warning', ' => Live-Mutex warning, lock object timed out for key => "' + key + '"');
+
+          // we set lck.lockholderTimeouts[uuid], so that when an unlock request for uuid comes into the broker
+          // we know that it timed out already, and we know not to throw an error when the lock.uuid doesn't match
+          locks[key] && (locks[key].lockholderTimeouts[uuid] = true);
+
           this.unlock({key, force: true});
+
         }, ttl)
       };
 
@@ -768,19 +797,38 @@ export class Broker {
 
       const count = lck.notify.length;
 
-      if (uuid && ws) {
-        // if no uuid is defined, then unlock was called by something other than the client
-        // aka this library called unlock when there was a timeout
+      if (lck.lockholderTimeouts[_uuid]) {
 
-        this.send(ws, {
-          uuid: uuid,
-          key: key,
-          lockRequestCount: count,
-          type: 'unlock',
-          error: ' => You need to pass the correct uuid, or use force.',
-          unlocked: false,
-          retry: true
-        });
+        delete lck.lockholderTimeouts[_uuid];
+
+        if (uuid && ws) {
+          // if no uuid is defined, then unlock was called by something other than the client
+          // aka this library called unlock when there was a timeout
+
+          this.send(ws, {
+            uuid: uuid,
+            key: key,
+            lockRequestCount: count,
+            type: 'unlock',
+            unlocked: true
+          });
+        }
+      }
+      else {
+
+        if (uuid && ws) {
+          // if no uuid is defined, then unlock was called by something other than the client
+          // aka this library called unlock when there was a timeout
+
+          this.send(ws, {
+            uuid: uuid,
+            key: key,
+            lockRequestCount: count,
+            type: 'unlock',
+            error: 'You need to pass the correct uuid, or use force.',
+            unlocked: false
+          });
+        }
       }
 
     }

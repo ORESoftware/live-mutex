@@ -1,11 +1,12 @@
 'use strict';
-
-import suman = require('suman');
+import suman from 'suman';
 const Test = suman.init(module);
-const colors = require('colors/safe');
 
-Test.create(function (it, Broker, Client, inject, describe, before) {
+///////////////////////////////////////////////////////////////
 
+Test.create(function (it, Broker, Client, inject, describe, before, $deps) {
+
+  const {chalk: colors} = $deps;
   const conf = Object.freeze({port: 7034});
 
   inject(() => {
@@ -32,19 +33,8 @@ Test.create(function (it, Broker, Client, inject, describe, before) {
           return t.fail(err);
         }
 
-        console.log('\n', colors.yellow(' ONE lock acquired!!! => '), '\n');
-
         setTimeout(function () {
-          unlock(function (err) {
-            if (err) {
-              return t.fail(err);
-            }
-            else {
-              console.log(colors.yellow(' ONE lock released!!! => '));
-              t.done();
-            }
-
-          });
+          unlock(t.done);
         }, 1500);
 
       });
@@ -59,21 +49,8 @@ Test.create(function (it, Broker, Client, inject, describe, before) {
           return t.fail(err);
         }
 
-        console.log('\n', colors.blue(' TWO lock acquired!!! => '), '\n', id);
-
         setTimeout(function () {
-
-          c.unlock('a', id, function (err) {
-            if (err) {
-              return t.fail(err);
-            }
-            else {
-              console.log(colors.blue(' TWO lock released!!! => '));
-              t.done();
-            }
-
-          });
-
+          c.unlock('a', id, t.done);
         }, 1000);
 
       });
@@ -88,19 +65,8 @@ Test.create(function (it, Broker, Client, inject, describe, before) {
           return t.fail(err);
         }
 
-        console.log('\n', colors.green(' THREE lock acquired!!! => '), '\n', id);
-
         setTimeout(function () {
-          c.unlock('a', function (err) {
-            if (err) {
-              t.fail(err);
-            }
-            else {
-              console.log(colors.green(' THREE lock released!!! => '));
-              t.done();
-            }
-
-          });
+          c.unlock('a', t.done);
         }, 1000);
 
       });

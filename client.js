@@ -2,7 +2,6 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 var util = require("util");
 var assert = require("assert");
-var EE = require("events");
 var net = require("net");
 var ijson = require('siamese');
 var uuidV4 = require('uuid/v4');
@@ -17,7 +16,7 @@ if (weAreDebugging) {
 }
 setTimeout(function () {
     if (process.listenerCount('warning') < 1) {
-        loginfo('recommends you attach a process.on("warning") event handler.');
+        loginfo("recommends you attach a process.on('warning') event handler.");
     }
 }, 1000);
 var totalNoop = function () {
@@ -42,11 +41,13 @@ var Client = (function () {
         var opts = this.opts = $opts || {};
         assert(typeof opts === 'object', ' => Bad arguments to live-mutex client constructor.');
         if (cb) {
+            assert(typeof cb === 'function', 'optional second argument to Live-Mutex Client constructor must be a function.');
             cb = cb.bind(this);
         }
         Object.keys(opts).forEach(function (key) {
             if (validOptions.indexOf(key) < 0) {
-                throw new Error(' => Option passed to Live-Mutex#Client constructor is not a recognized option => "' + key + '"');
+                throw new Error(' => Option passed to Live-Mutex#Client constructor is ' +
+                    'not a recognized option => "' + key + '"');
             }
         });
         if ('host' in opts) {
@@ -92,15 +93,15 @@ var Client = (function () {
         this.lockTimeout = weAreDebugging ? 5000000 : (opts.lockRequestTimeout || 6000);
         this.lockRetryMax = opts.lockRetryMax || 3;
         this.unlockRetryMax = opts.unlockRetryMax || 3;
-        var ee = new EE();
         var ws = null;
         var connectPromise = null;
         this.write = function (data, cb) {
             if (ws) {
+                data.pid = process.pid;
                 ws.write(JSON.stringify(data) + '\n', 'utf8', cb);
             }
             else {
-                throw new Error('please call connect() on this Live-Mutex client, before using.');
+                throw new Error('please call connect() on this Live-Mutex client, before using the lock/unlock methods.');
             }
         };
         var onData = function (data) {
@@ -129,7 +130,6 @@ var Client = (function () {
                         _this.write({
                             uuid: uuid,
                             key: data.key,
-                            pid: process.pid,
                             type: 'lock-received-rejected'
                         });
                     }
@@ -137,6 +137,13 @@ var Client = (function () {
                 else {
                     logerr('Live-mutex implementation error, ' +
                         'no fn with that uuid in the resolutions hash => \n' + util.inspect(data));
+                    if (data.acquired === true && data.type === 'lock') {
+                        _this.write({
+                            uuid: uuid,
+                            key: data.key,
+                            type: 'lock-received-rejected'
+                        });
+                    }
                 }
             }
             else {
@@ -184,10 +191,10 @@ var Client = (function () {
                 });
             })
                 .then(function (val) {
-                cb && cb(null, val);
+                cb && (cb = cb.bind(_this)) && cb(null, val);
                 return val;
             }, function (err) {
-                cb && cb(err);
+                cb && (cb = cb.bind(_this)) && cb(err);
                 return Promise.reject(err);
             });
         };
@@ -255,6 +262,22 @@ var Client = (function () {
             type: 'lock-info-request',
         });
     };
+    Client.prototype.lockp = function (key, opts) {
+        var _this = this;
+        return new Promise(function (resolve, reject) {
+            _this.lock(key, opts, function (err, unlock, lockUuid) {
+                err ? reject(err) : resolve({ key: key, unlock: unlock, lockUuid: lockUuid });
+            });
+        });
+    };
+    Client.prototype.unlockp = function (key, opts) {
+        var _this = this;
+        return new Promise(function (resolve, reject) {
+            _this.unlock(key, opts, function (err, val) {
+                err ? reject(err) : resolve(val);
+            });
+        });
+    };
     Client.prototype.lock = function (key, opts, cb) {
         var _this = this;
         assert.equal(typeof key, 'string', 'Key passed to live-mutex#lock needs to be a string.');
@@ -280,7 +303,8 @@ var Client = (function () {
             };
         }
         opts = opts || {};
-        cb && (cb = cb.bind(this));
+        assert(typeof cb === 'function', 'callback function must be passed to Client lock() method.');
+        cb = cb.bind(this);
         if ('append' in opts) {
             assert.equal(typeof opts.append, 'string', ' => Live-Mutex usage error => ' +
                 '"append" option must be a string value.');
@@ -289,9 +313,13 @@ var Client = (function () {
             assert.equal(typeof opts.force, 'boolean', ' => Live-Mutex usage error => ' +
                 '"force" option must be a boolean value. Coerce it on your side, for safety.');
         }
-        if ('retry' in opts) {
-            assert(Number.isInteger(opts.retry), '"retry" option must be an integer.');
-            assert(opts.retry >= 0 && opts.retry <= 20, '"retry" option must be an integer between 0 and 20 inclusive.');
+        if ('maxRetries' in opts) {
+            assert(Number.isInteger(opts.maxRetries), '"retry" option must be an integer.');
+            assert(opts.maxRetries >= 0 && opts.maxRetries <= 20, '"retry" option must be an integer between 0 and 20 inclusive.');
+        }
+        if ('maxRetry' in opts) {
+            assert(Number.isInteger(opts.maxRetry), '"retry" option must be an integer.');
+            assert(opts.maxRetry >= 0 && opts.maxRetry <= 20, '"retry" option must be an integer between 0 and 20 inclusive.');
         }
         if ('ttl' in opts) {
             assert(Number.isInteger(opts.ttl), ' => Live-Mutex usage error => Please pass an integer representing milliseconds as the value for "ttl".');
@@ -301,83 +329,90 @@ var Client = (function () {
             assert(Number.isInteger(opts.lockRequestTimeout), ' => Please pass an integer representing milliseconds as the value for "ttl".');
             assert(opts.lockRequestTimeout >= 20 && opts.lockRequestTimeout <= 800000, ' => "ttl" for a lock needs to be integer between 3 and 800000 millis.');
         }
-        if (Number.isInteger(opts.retry) && opts._retryCount > opts.retry) {
-            return cb(new Error("Maximum retries " + opts.retry + " attempted."));
+        opts.__retryCount = opts.__retryCount || 0;
+        if (opts.__retryCount > 0) {
+            assert(opts._uuid, 'Live-Mutex internal error: no _uuid past to retry call.');
         }
-        if (opts._retryCount > this.lockRetryMax) {
-            return cb(new Error("Maximum retries " + this.lockRetryMax + " attempted."));
-        }
-        opts._retryCount = opts._retryCount || 0;
         var append = opts.append || '';
-        var uuid = opts._uuid || (append + uuidV4());
+        assert(typeof append === 'string', 'append option to lock() method must be of type "string".');
+        var uuid = opts._uuid = opts._uuid || (append + uuidV4());
         var ttl = opts.ttl || this.ttl;
         var lockTimeout = opts.lockRequestTimeout || this.lockTimeout;
+        var maxRetries = opts.maxRetry || opts.maxRetries || this.lockRetryMax;
+        if (opts.__retryCount > maxRetries) {
+            return cb(new Error("Maximum retries (" + maxRetries + ") attempted."), false);
+        }
+        var timedOut = false;
         var to = setTimeout(function () {
-            _this.timeouts[uuid] = true;
+            timedOut = true;
             delete _this.resolutions[uuid];
             _this.write({
                 uuid: uuid,
                 key: key,
-                pid: process.pid,
                 type: 'lock-client-timeout'
             });
+            ++opts.__retryCount;
+            if (opts.__retryCount > maxRetries) {
+                return cb(new Error("Live-Mutex client lock request timed out after " + lockTimeout + "ms,\n         " + maxRetries + " retries attempted."), false);
+            }
+            _this.lock(key, opts, cb);
         }, lockTimeout);
+        var cleanUp = function () {
+            clearTimeout(to);
+            delete _this.resolutions[uuid];
+        };
+        var callbackWithError = function (errMsg) {
+            cleanUp();
+            var err = errMsg instanceof Error ? errMsg : new Error(errMsg);
+            process.emit('warning', err);
+            cb(err, false);
+        };
         this.resolutions[uuid] = function (err, data) {
-            _this.setLockRequestorCount(key, data.lockRequestCount);
+            if (timedOut) {
+                return;
+            }
+            if (err) {
+                return callbackWithError(err);
+            }
             if (String(key) !== String(data.key)) {
-                clearTimeout(to);
-                delete _this.resolutions[uuid];
-                var err_1 = new Error("Live-Mutex bad key, 1 -> ', " + key + ", 2 -> " + data.key);
-                process.emit('warning', err_1);
-                return cb(err_1, false);
+                return callbackWithError("Live-Mutex bad key, 1 -> ', " + key + ", 2 -> " + data.key);
             }
+            _this.setLockRequestorCount(key, data.lockRequestCount);
             if (data.error) {
-                var err_2 = new Error(data.error);
-                process.emit('warning');
-                clearTimeout(to);
-                return cb(err_2, false);
-            }
-            if ([data.acquired, data.retry].filter(function (i) { return i; }).length > 1) {
-                process.emit('error', 'Nasty Live-Mutex implementation error.');
+                return callbackWithError(data.error);
             }
             if (data.acquired === true) {
-                clearTimeout(to);
-                delete _this.resolutions[uuid];
+                cleanUp();
                 _this.bookkeeping[key].lockCount++;
                 _this.write({
                     uuid: uuid,
                     key: key,
-                    pid: process.pid,
                     type: 'lock-received'
                 });
                 if (data.uuid !== uuid) {
-                    var err_3 = new Error("Live-Mutex error, mismatch in uuids -> " + data.uuid + ", -> " + uuid);
-                    process.emit('warning', err_3);
-                    cb(err_3, false);
+                    return callbackWithError("Live-Mutex error, mismatch in uuids -> '" + data.uuid + "', -> '" + uuid + "'.");
                 }
                 else {
                     cb(null, _this.unlock.bind(_this, key, { _uuid: uuid }), data.uuid);
                 }
             }
-            else if (data.retry === true) {
-                clearTimeout(to);
-                opts._retryCount++;
-                opts._uuid = opts._uuid || uuid;
-                logerr('retrying lock request, attempt #', opts._retryCount);
+            else if (data.reelection === true) {
+                cleanUp();
                 _this.lock(key, opts, cb);
             }
             else if (data.acquired === false) {
-                if (opts.retry) {
+                if (opts.wait === false) {
+                    cleanUp();
                     _this.giveups[uuid] = true;
-                    clearTimeout(to);
                     cb(null, false, data.uuid);
                 }
             }
             else {
-                process.emit('warning', new Error("fallthrough in condition [1]"));
+                callbackWithError("fallthrough in condition [1]");
             }
         };
         this.write({
+            retryCount: opts.__retryCount,
             uuid: uuid,
             key: key,
             type: 'lock',
@@ -409,10 +444,7 @@ var Client = (function () {
             };
         }
         opts = opts || {};
-        if (cb && !opts._retryCount) {
-            cb = cb.bind(this);
-        }
-        cb = cb || totalNoop;
+        cb && (cb = cb.bind(this));
         if ('force' in opts) {
             assert.equal(typeof opts.force, 'boolean', ' => Live-Mutex usage error => ' +
                 '"force" option must be a boolean value. Coerce it on your side, for safety.');
@@ -421,65 +453,62 @@ var Client = (function () {
             assert(Number.isInteger(opts.lockRequestTimeout), ' => Please pass an integer representing milliseconds as the value for "ttl".');
             assert(opts.lockRequestTimeout >= 20 && opts.lockRequestTimeout <= 800000, ' => "ttl" for a lock needs to be integer between 3 and 800000 millis.');
         }
-        opts._retryCount = opts._retryCount || 0;
-        if (opts._retryCount > this.unlockRetryMax) {
-            var err = new Error(' => Maximum retries reached.');
-            process.emit('warning', err);
-            return cb && cb(err);
-        }
         var uuid = uuidV4();
         var unlockTimeout = opts.unlockRequestTimeout || this.unlockTimeout;
+        var timedOut = false;
         var to = setTimeout(function () {
+            timedOut = true;
             delete _this.resolutions[uuid];
             _this.timeouts[uuid] = true;
             var err = new Error('Unlock request timed out.');
             process.emit('warning', err);
-            cb(err);
+            cb && cb(err);
         }, unlockTimeout);
+        var cleanUp = function () {
+            clearTimeout(to);
+            delete _this.resolutions[uuid];
+        };
+        var callbackWithError = function (errMsg) {
+            cleanUp();
+            var err = errMsg instanceof Error ? errMsg : new Error(errMsg);
+            process.emit('warning', err);
+            cb && cb(err);
+        };
         this.resolutions[uuid] = function (err, data) {
+            if (timedOut) {
+                return;
+            }
             _this.setLockRequestorCount(key, data.lockRequestCount);
             if (String(key) !== String(data.key)) {
-                var err_4 = new Error(' => Implementation error, bad key.');
-                process.emit('warning', err_4);
-                return cb && cb(err_4);
-            }
-            if ([data.unlocked].filter(function (i) { return i; }).length > 1) {
-                var err_5 = new Error(' => Live-Mutex implementation error.');
-                process.emit('warning', err_5);
-                return cb && cb(err_5);
+                return callbackWithError('Live-Mutex implementation error, bad key.');
             }
             if (data.error) {
-                clearTimeout(to);
-                process.emit('warning', new Error(data.error));
-                return cb && cb(data.error);
+                return callbackWithError(data.error);
             }
             if (data.unlocked === true) {
-                clearTimeout(to);
+                cleanUp();
                 _this.bookkeeping[key].unlockCount++;
-                delete _this.resolutions[uuid];
                 _this.write({
                     uuid: uuid,
                     key: key,
-                    pid: process.pid,
                     type: 'unlock-received'
                 });
                 cb && cb(null, data.uuid);
             }
-            else if (data.retry === true) {
-                clearTimeout(to);
-                ++opts._retryCount;
-                opts._uuid = opts._uuid || uuid;
-                _this.unlock(key, opts, cb);
+            else if (data.unlocked === false) {
+                cleanUp();
+                cb && cb(data);
             }
             else {
-                process.emit('warning', 'fallthrough in conditional [2], Live-Mutex failure.');
+                callbackWithError('fallthrough in conditional [2], Live-Mutex failure.');
             }
         };
+        var force = (opts.__retryCount > 0) ? true : !!opts.force;
         this.write({
             _uuid: opts._uuid,
             uuid: uuid,
             key: key,
-            force: (opts._retryCount > 0) ? !!opts.force : false,
+            force: force,
             type: 'unlock'
         });
     };

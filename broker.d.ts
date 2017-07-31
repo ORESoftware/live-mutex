@@ -19,9 +19,7 @@ export interface IUuidTimer {
     [key: string]: Timer;
 }
 export declare type TBrokerCB = (err: Error | null | undefined | string, val: Broker) => void;
-export declare type TEnsureCB = (cb: TBrokerCB) => void;
-export declare type TEnsurePromise = () => Promise<Broker>;
-export declare type TEnsure = TEnsurePromise | TEnsureCB;
+export declare type TEnsure = (cb?: TBrokerCB) => Promise<Broker>;
 export interface IBookkeepingHash {
     [key: string]: IBookkeeping;
 }
@@ -34,15 +32,19 @@ export interface IBookkeeping {
     lockCount: number;
     unlockCount: number;
 }
-export interface ILookObj {
+export interface IUuidHash {
+    [key: string]: boolean;
+}
+export interface ILockObj {
     pid: number;
+    lockholderTimeouts: IUuidHash;
     uuid: string;
     notify: Array<INotifyObj>;
     key: string;
     to: Timer;
 }
 export interface ILockHash {
-    [key: string]: ILookObj;
+    [key: string]: ILockObj;
 }
 export interface INotifyObj {
     ws: Socket;
@@ -66,7 +68,7 @@ export declare class Broker {
     bookkeeping: IBookkeepingHash;
     isOpen: boolean;
     constructor($opts: IBrokerOptsPartial, cb?: IErrorFirstCB);
-    static create(opts: IBrokerOptsPartial, cb?: TBrokerCB): Promise<Broker> | void;
+    static create(opts: IBrokerOptsPartial, cb?: TBrokerCB): Promise<Broker>;
     sendStatsMessageToAllClients(): void;
     ensureNewLockHolder(lck: any, data: any): void;
     retrieveLockInfo(data: any, ws: any): void;

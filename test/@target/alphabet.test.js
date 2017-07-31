@@ -1,4 +1,6 @@
-var suman = require('suman');
+"use strict";
+exports.__esModule = true;
+var suman = require("suman");
 var Test = suman.init(module);
 var async = require('async');
 Test.create(function (assert, before, describe, it, path, Client, Broker, lmUtils, fs, inject) {
@@ -51,6 +53,7 @@ Test.create(function (assert, before, describe, it, path, Client, Broker, lmUtil
         it.cb('10 chars of each, in order', { timeout: 300 }, function (t) {
             var readable = fs.createReadStream(p);
             readable.once('error', t.fail);
+            readable.once('end', t.done);
             readable.on('readable', function () {
                 var index = 0;
                 var chunk;
@@ -59,7 +62,6 @@ Test.create(function (assert, before, describe, it, path, Client, Broker, lmUtil
                     assert.equal(String(chunk), alphabet[temp]);
                     index++;
                 }
-                t.done();
             });
         });
     });

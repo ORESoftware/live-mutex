@@ -37,7 +37,10 @@ Promise.all([
 
     randomClient.lock(randomKey, function (err, unlock) {
 
-      if (err) {
+      if (err && String(err.message || err).match(/lock request timed out/)) {
+        return cb(null);
+      }
+      else if(err){
         return cb(err);
       }
 

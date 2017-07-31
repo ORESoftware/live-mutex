@@ -1,15 +1,29 @@
-const async = require('async');
-const {Broker} = require('live-mutex/broker');
 const cp = require('child_process');
 const path = require('path');
+const async = require('async');
+const {Broker} = require('live-mutex/broker');
+const util = require('util');
 const colors = require('chalk');
 
-const multi_process_port = 3009;
+const multi_process_port = 3019;
 process.stderr.setMaxListeners(40);
 
-new Broker({port: multi_process_port}).ensure().then(function () {
+let prev = null;
+setInterval(function () {
+  let mem = process.memoryUsage();
+  if(prev){
+    const diff = (mem.heapUsed - prev.heapUsed);
+    console.log('diff:', diff);
+    const diffPercentage = diff / prev.heapUsed;
+    console.log('diffPercentage:', diffPercentage);
+  }
+  console.log(colors.magenta(util.inspect(mem)));
+  prev = mem;
+}, 2000);
 
-  const p = path.resolve(__dirname + '/../fixtures/run-multiple-clients-in-sep-process.js');
+new Broker({port: multi_process_port}).ensure(function () {
+
+  const p = path.resolve(__dirname + '/../../fixtures/run-multiple-clients-in-sep-process.js');
 
   async.times(15, function (n, cb) {
 
@@ -45,15 +59,21 @@ new Broker({port: multi_process_port}).ensure().then(function () {
 
   }, function (err, result) {
 
-    console.log('arguments', arguments);
+    console.log('\narguments:', arguments);
 
     if (result) {
       console.log(result);
     }
 
+    process.exit(1);
+
   });
 
 });
+
+
+
+
 
 
 

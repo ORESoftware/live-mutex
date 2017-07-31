@@ -7,39 +7,39 @@
 // which is actually pretty cool
 // ******************************************************************************************************************
 
-
 const http = require('http');
 
+/////////////////////////////////////////////////////////////
 
 module.exports = data => {  //load async deps for any of your suman tests
 
-    return {
+  return {
 
+    dependencies: {
 
-        dependencies: {
+      'Broker': function () {
+        return require('../../broker').default;
+      },
 
-          //synchronous dependency acquisition
-          'example': function () {
-            return {'just':'an example'};
-          },
+      'LvMtxClient': function(){
+        return require('../../client').default;
+      },
 
-          'Broker': function(){
-            return require('../../broker').Broker;
-          },
+      'Client': function () {
+        return require('../../client').default;
+      },
 
-          'Client': function(){
-            return require('../../client').Client;
-          },
+      'lmUtils': function () {
+        return require('../../utils').default;
+      },
 
-          'lmUtils': function(){
-            return require('../../utils');
-          }
+      'Promise': function () {
+        return require('bluebird');
 
-        }
-
-
+      }
 
     }
 
+  }
 
 };

@@ -1,9 +1,10 @@
 'use strict';
 exports.__esModule = true;
-var suman = require("suman");
-var Test = suman.init(module);
-var colors = require('colors/safe');
-Test.create(function (it, Broker, Client, inject, describe, before) {
+var suman_1 = require("suman");
+var Test = suman_1["default"].init(module);
+///////////////////////////////////////////////////////////////
+Test.create(function (it, Broker, Client, inject, describe, before, $deps) {
+    var colors = $deps.chalk;
     var conf = Object.freeze({ port: 7034 });
     inject(function () {
         return {
@@ -22,17 +23,8 @@ Test.create(function (it, Broker, Client, inject, describe, before) {
                 if (err) {
                     return t.fail(err);
                 }
-                console.log('\n', colors.yellow(' ONE lock acquired!!! => '), '\n');
                 setTimeout(function () {
-                    unlock(function (err) {
-                        if (err) {
-                            return t.fail(err);
-                        }
-                        else {
-                            console.log(colors.yellow(' ONE lock released!!! => '));
-                            t.done();
-                        }
-                    });
+                    unlock(t.done);
                 }, 1500);
             });
         });
@@ -41,17 +33,8 @@ Test.create(function (it, Broker, Client, inject, describe, before) {
                 if (err) {
                     return t.fail(err);
                 }
-                console.log('\n', colors.blue(' TWO lock acquired!!! => '), '\n', id);
                 setTimeout(function () {
-                    c.unlock('a', id, function (err) {
-                        if (err) {
-                            return t.fail(err);
-                        }
-                        else {
-                            console.log(colors.blue(' TWO lock released!!! => '));
-                            t.done();
-                        }
-                    });
+                    c.unlock('a', id, t.done);
                 }, 1000);
             });
         });
@@ -60,17 +43,8 @@ Test.create(function (it, Broker, Client, inject, describe, before) {
                 if (err) {
                     return t.fail(err);
                 }
-                console.log('\n', colors.green(' THREE lock acquired!!! => '), '\n', id);
                 setTimeout(function () {
-                    c.unlock('a', function (err) {
-                        if (err) {
-                            t.fail(err);
-                        }
-                        else {
-                            console.log(colors.green(' THREE lock released!!! => '));
-                            t.done();
-                        }
-                    });
+                    c.unlock('a', t.done);
                 }, 1000);
             });
         });

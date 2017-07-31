@@ -1,5 +1,8 @@
-var suman = require('suman');
+"use strict";
+exports.__esModule = true;
+var suman = require("suman");
 var Test = suman.init(module);
+/////////////////////////////////////////////////////
 Test.create({ mode: 'parallel' }, function (assert, before, it, Client, lmUtils) {
     var conf = Object.freeze({ port: 7888 });
     before('promise', function () {

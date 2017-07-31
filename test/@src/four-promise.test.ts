@@ -1,8 +1,10 @@
-const suman = require('suman');
+'use strict';
+import suman = require('suman');
 const Test = suman.init(module);
-const Promise = require('bluebird');
 
-Test.create({mode: 'parallel'}, function (assert, before, it, Client, lmUtils) {
+/////////////////////////////////////////////////////////
+
+Test.create({mode: 'series'}, function (assert, before, it, Client, lmUtils, Promise) {
 
   const conf = Object.freeze({port: 7987});
 
@@ -44,17 +46,7 @@ Test.create({mode: 'parallel'}, function (assert, before, it, Client, lmUtils) {
         if (err) return t(err);
         c.unlock('z', t);
       });
-    });
-  });
-
-  it.cb('yes', {timeout: 1500}, t => {
-
-    return Client.create(conf).then(c => {
-      c.lock('z', function (err) {
-        if (err) return t(err);
-        c.unlock('z', t);
-      });
-    });
+    }).catch(t)
 
   });
 
@@ -65,7 +57,30 @@ Test.create({mode: 'parallel'}, function (assert, before, it, Client, lmUtils) {
         if (err) return t(err);
         c.unlock('z', t);
       });
-    });
+
+    }).catch(t);
+
+  });
+
+  it.cb('yes', {timeout: 1500}, t => {
+
+    Client.create(conf).then(c => {
+      c.lock('z', function (err) {
+        if (err) return t(err);
+        c.unlock('z', t);
+      });
+    }).catch(t);
+
+  });
+
+  it.cb('yes', {timeout: 1500}, t => {
+
+    Client.create(conf).then(function (c) {
+      c.lock('z', function (err) {
+        if (err) return t(err);
+        c.unlock('z', t);
+      });
+    }).catch(t);
 
   });
 
