@@ -9,6 +9,10 @@
 
   <style>
 
+    #visualisation {
+      padding: 0 20px;
+    }
+    
     .axis path {
       fill: none;
       stroke: #777;
@@ -34,13 +38,11 @@
 
     <script>
 
-      var heapTotal = JSON.parse('{{{$heapTotal}}}');
-      var heapUsed = JSON.parse('{{{$heapUsed}}}');
-      var rss = JSON.parse('{{{$rss}}}');
+      let heapTotal = JSON.parse('{{{heapTotal}}}');
+      let heapUsed = JSON.parse('{{{heapUsed}}}');
+      let rss = JSON.parse('{{{rss}}}');
 
       const values = heapTotal.concat(heapUsed).concat(rss).reduce(function (prev, curr) {
-
-        console.log('curr => ', curr);
 
         return {
           xMin: Math.min(prev.xMin, curr.x),
@@ -58,7 +60,7 @@
 
       console.log('values => ', values);
 
-      var vis = d3.select('#visualisation'),
+      let vis = d3.select('#visualisation'),
         WIDTH = 1200,
         HEIGHT = 800,
         MARGINS = {
@@ -88,7 +90,7 @@
       .attr('transform', 'translate(' + (MARGINS.left) + ',0)')
       .call(yAxis);
 
-      var lineGen = d3.svg.line()
+      let lineGen = d3.svg.line()
       .x(function (d) {
         return xScale(d.x);
       })

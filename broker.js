@@ -167,9 +167,11 @@ var Broker = (function () {
                 });
             }
         };
+        var connectedClients = new Map();
         var firstConnection = true;
         var wss = net.createServer(function (ws) {
             loginfo('client connected.');
+            connectedClients.set(ws, true);
             var endWS = function () {
                 try {
                     ws.end();
@@ -177,12 +179,19 @@ var Broker = (function () {
                 finally {
                 }
             };
-            process.once('exit', endWS);
             if (firstConnection) {
                 firstConnection = false;
                 _this.sendStatsMessageToAllClients();
             }
-            ws.once('error', function (err) {
+            ws.once('disconnect', function () {
+                ws.removeAllListeners();
+                connectedClients.delete(ws);
+            });
+            ws.once('end', function () {
+                ws.removeAllListeners();
+                connectedClients.delete(ws);
+            });
+            ws.on('error', function (err) {
                 logerr('client error', err.stack || err, '\n');
             });
             if (!_this.wsToKeys.get(ws)) {
@@ -214,6 +223,20 @@ var Broker = (function () {
                 });
             });
         });
+        var sigEvent = function (event) {
+            return function () {
+                logerr(event + " received.");
+                connectedClients.forEach(function (v, k, map) {
+                    k.destroy();
+                });
+                wss.close(function () {
+                    process.exit(1);
+                });
+            };
+        };
+        process.once('exit', sigEvent('exit'));
+        process.once('SIGINT', sigEvent('SIGINT'));
+        process.once('SIGTERM', sigEvent('SIGTERM'));
         wss.on('error', function (err) {
             logerr(err.stack || err);
         });

@@ -2,7 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 var cp = require("child_process");
 var ping = require('tcp-ping');
-var sl = require('strangeloop');
+var slp = require('strangeloop');
 var ijson = require('siamese');
 var broker_1 = require("./broker");
 var p = require.resolve('./lib/launch-broker-child');
@@ -40,25 +40,32 @@ exports.launchSocketServer = function (obj, cb) {
             }
         });
     }
-    return sl.conditionalReturn(fn, cb);
+    return slp.conditionalReturn(fn, cb);
 };
 exports.conditionallyLaunchSocketServer = exports.launchSocketServer;
 exports.launchBrokerInChildProcess = function (opts, cb) {
     var host = opts.host || 'localhost';
     var port = opts.port || 8019;
     var detached = !!opts.detached;
-    console.log('opts => ', opts);
+    console.log('\n');
+    console.log('Live-Mutex launch broker options:');
+    console.log('host => ', host);
+    console.log('port => ', port);
+    console.log('detached => ', detached);
+    console.log('\n');
     function fn(cb) {
         ping.probe(host, port, function (err, available) {
             if (err) {
                 cb(err);
             }
             else if (available) {
+                console.log("live-mutex brower was already live at " + host + ":" + port + ".");
                 cb(null, {
                     alreadyRunning: true
                 });
             }
             else {
+                console.log("live-mutex is launching new broker at " + 'localhost' + ":" + port + ".");
                 var n_1 = cp.spawn('node', [p], {
                     detached: detached,
                     env: Object.assign({}, process.env, {
@@ -68,6 +75,11 @@ exports.launchBrokerInChildProcess = function (opts, cb) {
                 if (detached) {
                     n_1.unref();
                 }
+                process.once('exit', function () {
+                    if (!detached) {
+                        n_1.kill('SIGINT');
+                    }
+                });
                 n_1.stderr.setEncoding('utf8');
                 n_1.stdout.setEncoding('utf8');
                 n_1.stderr.pipe(process.stderr);
@@ -87,7 +99,7 @@ exports.launchBrokerInChildProcess = function (opts, cb) {
             }
         });
     }
-    return sl.conditionalReturn(fn, cb);
+    return slp.conditionalReturn(fn, cb);
 };
 var $exports = module.exports;
 exports.default = $exports;

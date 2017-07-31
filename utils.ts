@@ -9,7 +9,7 @@ import * as cp from 'child_process';
 
 //npm
 const ping = require('tcp-ping');
-const sl = require('strangeloop');
+const slp = require('strangeloop');
 const ijson = require('siamese');
 
 //project
@@ -62,7 +62,7 @@ export const launchSocketServer = function (obj, cb) {
     });
   }
 
-  return sl.conditionalReturn(fn, cb);
+  return slp.conditionalReturn(fn, cb);
 };
 
 // alias
@@ -74,7 +74,12 @@ export const launchBrokerInChildProcess = function (opts, cb) {
   const port = opts.port || 8019;
   const detached = !!opts.detached;
 
-  console.log('opts => ', opts);
+  console.log('\n');
+  console.log('Live-Mutex launch broker options:');
+  console.log('host => ', host);
+  console.log('port => ', port);
+  console.log('detached => ', detached);
+  console.log('\n');
 
   function fn(cb) {
 
@@ -84,11 +89,14 @@ export const launchBrokerInChildProcess = function (opts, cb) {
         cb(err)
       }
       else if (available) {
+        console.log(`live-mutex brower was already live at ${host}:${port}.`);
         cb(null, {
           alreadyRunning: true
         });
       }
       else {
+
+        console.log(`live-mutex is launching new broker at ${'localhost'}:${port}.`);
 
         const n = cp.spawn('node', [p], {
           detached,
@@ -100,6 +108,12 @@ export const launchBrokerInChildProcess = function (opts, cb) {
         if(detached){
           n.unref();
         }
+
+        process.once('exit', function(){
+          if(!detached){
+            n.kill('SIGINT');
+          }
+        });
 
         n.stderr.setEncoding('utf8');
         n.stdout.setEncoding('utf8');
@@ -128,7 +142,7 @@ export const launchBrokerInChildProcess = function (opts, cb) {
 
   }
 
-  return sl.conditionalReturn(fn, cb);
+  return slp.conditionalReturn(fn, cb);
 
 };
 

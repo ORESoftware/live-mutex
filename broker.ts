@@ -301,11 +301,15 @@ export class Broker {
 
     };
 
+    const connectedClients = new Map();
+
     let firstConnection = true;
 
     const wss = net.createServer(ws => {
 
       loginfo('client connected.');
+
+      connectedClients.set(ws, true);
 
       let endWS = function () {
         try {
@@ -316,14 +320,22 @@ export class Broker {
         }
       };
 
-      process.once('exit', endWS);
-
       if (firstConnection) {
         firstConnection = false;
         this.sendStatsMessageToAllClients();
       }
 
-      ws.once('error', function (err) {
+      ws.once('disconnect', function () {
+        ws.removeAllListeners();
+        connectedClients.delete(ws);
+      });
+
+      ws.once('end', function () {
+        ws.removeAllListeners();
+        connectedClients.delete(ws);
+      });
+
+      ws.on('error', function (err) {
         logerr('client error', err.stack || err, '\n');
       });
 
@@ -359,6 +371,23 @@ export class Broker {
       });
 
     });
+
+    let sigEvent = function (event) {
+      return function () {
+        logerr(`${event} received.`);
+        connectedClients.forEach(function (v, k, map) {
+          // destroy each connected client
+          k.destroy();
+        });
+        wss.close(function () {
+          process.exit(1);
+        });
+      }
+    };
+
+    process.once('exit', sigEvent('exit'));
+    process.once('SIGINT', sigEvent('SIGINT'));
+    process.once('SIGTERM', sigEvent('SIGTERM'));
 
     wss.on('error', function (err) {
       logerr(err.stack || err);
@@ -641,10 +670,10 @@ export class Broker {
         });
 
         if (!alreadyAdded) {
-          if(retryCount > 0){
+          if (retryCount > 0) {
             lck.notify.unshift({ws, uuid, pid, ttl});
           }
-          else{
+          else {
             lck.notify.push({ws, uuid, pid, ttl});
           }
 
