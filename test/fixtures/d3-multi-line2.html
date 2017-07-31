@@ -34,27 +34,40 @@
 
     <script>
 
-      var heapTotal = [
-        {x: Date.now() - 500, y: 100},
-        {x: Date.now(), y: 125},
-        {x: Date.now() + 500, y: 150},
-      ];
+      var heapTotal = [{
+        x: Date.now() - 500,
+        y: 100
+      }, {
+        x: Date.now(),
+        y: 125
+      }, {
+        x: Date.now() + 500,
+        y: 150
+      }];
 
-      var heapUsed = [
-        {x: Date.now() - 500, y: 110},
-        {x: Date.now(), y: 111},
-        {x: Date.now() + 500, y: 112},
-      ];
+      var heapUsed = [{
+        x: Date.now() - 500,
+        y: 110
+      }, {
+        x: Date.now(),
+        y: 111
+      }, {
+        x: Date.now() + 500,
+        y: 112
+      }];
 
-      var rss = [
-        {x: Date.now() - 500, y: 44},
-        {x: Date.now(), y: 44},
-        {x: Date.now() + 500, y: 44},
-      ];
+      var rss = [{
+        x: Date.now() - 500,
+        y: 44
+      }, {
+        x: Date.now(),
+        y: 44
+      }, {
+        x: Date.now() + 500,
+        y: 44
+      }];
 
       const values = heapTotal.concat(heapUsed).concat(rss).reduce(function (prev, curr) {
-
-        console.log('curr => ', curr);
 
         return {
           xMin: Math.min(prev.xMin, curr.x),
@@ -70,8 +83,6 @@
         yMax: -1
       });
 
-      console.log('values => ', values);
-
       var vis = d3.select('#visualisation'),
         WIDTH = 1200,
         HEIGHT = 800,
@@ -81,14 +92,13 @@
           bottom: 20,
           left: 50
         },
-        xScale = d3.scale.linear().range([MARGINS.left, WIDTH - MARGINS.right]).domain([values.xMin*.9, values.xMax*1.15]),
-        yScale = d3.scale.linear().range([HEIGHT - MARGINS.top, MARGINS.bottom]).domain([values.yMin*.9, values.yMax*1.15]),
-//        xScale = d3.scale.linear().domain([values.xMin - 100, values.xMax + 100]).range([0,9999999]),
-//        yScale = d3.scale.linear().range([values.yMin - 100, values.yMax + 100]).domain([0,9999999]),
-//        xScale = d3.scale.linear().domain([Date.now() - 400000, Date.now() + 40000]),
-//        yScale = d3.scale.linear().range([values.yMin - 100, values.yMax + 100]),
-        xAxis = d3.svg.axis().scale(xScale),
-        yAxis = d3.svg.axis().scale(yScale).orient('left');
+        xScale = d3.scale.linear().range([MARGINS.left, WIDTH - MARGINS.right]).domain([values.xMin, values.xMax]),
+        yScale = d3.scale.linear().range([HEIGHT - MARGINS.top, MARGINS.bottom]).domain([0.95 * values.yMin, values.yMax]),
+        xAxis = d3.svg.axis()
+        .scale(xScale),
+        yAxis = d3.svg.axis()
+        .scale(yScale)
+        .orient('left');
 
       vis.attr("width", WIDTH)
       .attr("height", HEIGHT);
@@ -130,8 +140,8 @@
       .attr('stroke-width', 2)
       .attr('fill', 'none');
 
-
     </script>
+
   </div>
 
 </div>

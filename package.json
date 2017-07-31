@@ -35,6 +35,7 @@
     "@types/lodash": "^4.14.50",
     "@types/node": "^7.0.33",
     "bluebird": "^3.4.7",
+    "handlebars": "^4.0.10",
     "lockfile": "^1.0.3",
     "lodash": "^4.17.3",
     "node-redis-warlock": "^0.2.0",
