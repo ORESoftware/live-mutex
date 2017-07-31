@@ -118,7 +118,6 @@ var Broker = (function () {
                 _this.unlock(data, ws);
             }
             else if (data.type === 'lock') {
-                debug(colors.blue(' => broker attempting to get lock...'));
                 _this.lock(data, ws);
             }
             else if (data.type === 'lock-received') {
@@ -310,10 +309,11 @@ var Broker = (function () {
             var ws_1 = obj.ws;
             var ttl = weAreDebugging ? 50000000 : (obj.ttl || this.lockExpiresAfter);
             addWsLockKey(this, ws_1, key);
-            lck.uuid = obj.uuid;
+            var uuid_1 = lck.uuid = obj.uuid;
             lck.pid = obj.pid;
             lck.to = setTimeout(function () {
-                process.emit('warning', 'Live-Mutex warning, lock object timed out for key => "' + key + '"');
+                process.emit('warning', 'Live-Mutex Broker warning, lock object timed out for key => "' + key + '"');
+                lck.lockholderTimeouts[uuid_1] = true;
                 _this.unlock({
                     key: key,
                     force: true
@@ -389,6 +389,7 @@ var Broker = (function () {
         var pid = data.pid;
         var ttl = weAreDebugging ? 500000000 : (data.ttl || this.lockExpiresAfter);
         var force = data.force;
+        var retryCount = data.retryCount;
         this.bookkeeping[key] = this.bookkeeping[key] ||
             {
                 rawLockCount: 0,
@@ -404,7 +405,12 @@ var Broker = (function () {
                     return String(item.uuid) === String(uuid);
                 });
                 if (!alreadyAdded) {
-                    lck.notify.push({ ws: ws, uuid: uuid, pid: pid, ttl: ttl });
+                    if (retryCount > 0) {
+                        lck.notify.unshift({ ws: ws, uuid: uuid, pid: pid, ttl: ttl });
+                    }
+                    else {
+                        lck.notify.push({ ws: ws, uuid: uuid, pid: pid, ttl: ttl });
+                    }
                 }
                 this.send(ws, {
                     key: key,
@@ -419,8 +425,12 @@ var Broker = (function () {
                 lck.uuid = uuid;
                 clearTimeout(lck.to);
                 lck.to = setTimeout(function () {
-                    process.emit('warning', ' => Live-Mutex warning, lock object timed out for key => "' + key + '"');
-                    _this.unlock({ key: key, force: true });
+                    process.emit('warning', ' => Live-Mutex Broker warning, lock object timed out for key => "' + key + '"');
+                    lck.lockholderTimeouts[uuid] = true;
+                    _this.unlock({
+                        key: key,
+                        force: true
+                    });
                 }, ttl);
                 addWsLockKey(this, ws, key);
                 this.send(ws, {
@@ -437,10 +447,12 @@ var Broker = (function () {
             locks[key] = {
                 pid: pid,
                 uuid: uuid,
+                lockholderTimeouts: {},
                 key: key,
                 notify: [],
                 to: setTimeout(function () {
                     process.emit('warning', ' => Live-Mutex warning, lock object timed out for key => "' + key + '"');
+                    locks[key] && (locks[key].lockholderTimeouts[uuid] = true);
                     _this.unlock({ key: key, force: true });
                 }, ttl)
             };
@@ -502,15 +514,29 @@ var Broker = (function () {
         }
         else if (lck) {
             var count = lck.notify.length;
-            if (uuid && ws) {
-                this.send(ws, {
-                    uuid: uuid,
-                    key: key,
-                    lockRequestCount: count,
-                    type: 'unlock',
-                    error: 'You need to pass the correct uuid, or use force.',
-                    unlocked: false
-                });
+            if (lck.lockholderTimeouts[_uuid]) {
+                delete lck.lockholderTimeouts[_uuid];
+                if (uuid && ws) {
+                    this.send(ws, {
+                        uuid: uuid,
+                        key: key,
+                        lockRequestCount: count,
+                        type: 'unlock',
+                        unlocked: true
+                    });
+                }
+            }
+            else {
+                if (uuid && ws) {
+                    this.send(ws, {
+                        uuid: uuid,
+                        key: key,
+                        lockRequestCount: count,
+                        type: 'unlock',
+                        error: 'You need to pass the correct uuid, or use force.',
+                        unlocked: false
+                    });
+                }
             }
         }
         else {

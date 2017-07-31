@@ -32,15 +32,19 @@ export interface IBookkeeping {
     lockCount: number;
     unlockCount: number;
 }
-export interface ILookObj {
+export interface IUuidHash {
+    [key: string]: boolean;
+}
+export interface ILockObj {
     pid: number;
+    lockholderTimeouts: IUuidHash;
     uuid: string;
     notify: Array<INotifyObj>;
     key: string;
     to: Timer;
 }
 export interface ILockHash {
-    [key: string]: ILookObj;
+    [key: string]: ILockObj;
 }
 export interface INotifyObj {
     ws: Socket;

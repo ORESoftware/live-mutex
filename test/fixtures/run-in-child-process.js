@@ -11,35 +11,38 @@ for (let i = 0; i < times; i++) {
 }
 
 let min = 5;
-let max = 100;
+let max = 4000;
 
-process.on('warning', function(e){
-   console.error(e.stack || e);
+process.on('warning', function (e) {
+  console.error(e.stack || e);
 });
 
 const port = parseInt(process.env.multi_process_port);
 
 const client = new Client({port}, function (err) {
 
-  if(err){
+  if (err) {
     throw err;
   }
 
   async.timesLimit(100000, 200, function (n, cb) {
 
     let randomKey = keys[Math.floor(Math.random() * keys.length)];
-    console.error('count',n, 'randomKey', randomKey);
+    console.log('count', n, 'randomKey', randomKey);
 
     client.lock(randomKey, function (err, unlock) {
 
-      if(err){
+      if (err && String(err.message || err).match(/lock request timed out/)) {
+        return cb(null);
+      }
+      else if(err){
         return cb(err);
       }
 
-      let randomTime = Math.round(Math.random()*(max - min)) + min;
-      console.error('random time => ',randomTime);
+      let randomTime = Math.round(Math.random() * (max - min)) + min;
+      console.error('random time => ', randomTime);
 
-      setTimeout(function(){
+      setTimeout(function () {
         unlock(cb);
       }, randomTime)
 

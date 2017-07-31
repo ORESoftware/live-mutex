@@ -36,11 +36,6 @@ Test.create({mode: 'series'}, function (assert, before, it, LvMtxClient: Client,
 
   });
 
-  it('yes', {timeout: 1500}, t => {
-
-    throw new Error('bogus');
-
-  });
 
   it('yes', {timeout: 1500}, t => {
 

@@ -231,6 +231,7 @@ export class Client {
 
     this.write = function (data, cb) {
       if (ws) {
+        data.pid = process.pid;
         ws.write(JSON.stringify(data) + '\n', 'utf8', cb);
       }
       else {
@@ -274,7 +275,6 @@ export class Client {
             this.write({
               uuid: uuid,
               key: data.key,
-              pid: process.pid,
               type: 'lock-received-rejected'
             });
           }
@@ -282,6 +282,13 @@ export class Client {
         else {
           logerr('Live-mutex implementation error, ' +
             'no fn with that uuid in the resolutions hash => \n' + util.inspect(data));
+          if(data.acquired === true && data.type === 'lock'){
+            this.write({
+              uuid: uuid,
+              key: data.key,
+              type: 'lock-received-rejected'
+            });
+          }
         }
       }
       else {
@@ -521,8 +528,14 @@ export class Client {
 
     opts.__retryCount = opts.__retryCount || 0;
 
+    if (opts.__retryCount > 0) {
+      assert(opts._uuid, 'Live-Mutex internal error: no _uuid past to retry call.');
+    }
+
     const append = opts.append || '';
-    const uuid = opts._uuid || (append + uuidV4());
+    assert(typeof append === 'string', 'append option to lock() method must be of type "string".');
+
+    const uuid = opts._uuid = opts._uuid || (append + uuidV4());
     const ttl = opts.ttl || this.ttl;
     const lockTimeout = opts.lockRequestTimeout || this.lockTimeout;
     const maxRetries = opts.maxRetry || opts.maxRetries || this.lockRetryMax;
@@ -535,25 +548,23 @@ export class Client {
     const to = setTimeout(() => {
 
       timedOut = true;
-      this.timeouts[uuid] = true;
+      // this.timeouts[uuid] = true;
       delete this.resolutions[uuid];
 
       this.write({
         uuid,
         key,
-        pid: process.pid,
         type: 'lock-client-timeout'
       });
 
-      opts.__retryCount++;
+      ++opts.__retryCount;
 
       if (opts.__retryCount > maxRetries) {
         return cb(new Error(`Live-Mutex client lock request timed out after ${lockTimeout}ms,
          ${maxRetries} retries attempted.`), false);
       }
 
-      opts._uuid = opts._uuid || uuid;
-      logerr('retrying lock request, attempt #', opts.__retryCount);
+      logerr(`retrying lock request for uuid ${uuid}, attempt #`, opts.__retryCount);
       this.lock(key, opts, cb);
 
     }, lockTimeout);
@@ -597,7 +608,6 @@ export class Client {
         this.write({
           uuid: uuid,
           key: key,
-          pid: process.pid,
           type: 'lock-received'
         });
 
@@ -605,6 +615,7 @@ export class Client {
           return callbackWithError(`Live-Mutex error, mismatch in uuids -> '${data.uuid}', -> '${uuid}'.`);
         }
         else {
+
           // cb(null, {
           //   key,
           //   unlock: this.unlock.bind(this, key, {_uuid: uuid}),
@@ -633,6 +644,7 @@ export class Client {
     };
 
     this.write({
+      retryCount: opts.__retryCount,
       uuid: uuid,
       key: key,
       type: 'lock',
@@ -709,7 +721,7 @@ export class Client {
       cleanUp();
       let err = errMsg instanceof Error ? errMsg : new Error(errMsg);
       process.emit('warning', err);
-      cb(err);
+      cb && cb(err);
     };
 
     this.resolutions[uuid] = (err, data) => {
@@ -721,7 +733,7 @@ export class Client {
       this.setLockRequestorCount(key, data.lockRequestCount);
 
       if (String(key) !== String(data.key)) {
-       return callbackWithError('Live-Mutex implementation error, bad key.');
+        return callbackWithError('Live-Mutex implementation error, bad key.');
       }
 
       if (data.error) {
@@ -734,7 +746,6 @@ export class Client {
         this.write({
           uuid: uuid,
           key: key,
-          pid: process.pid,
           type: 'unlock-received'
         });
 
@@ -752,12 +763,14 @@ export class Client {
 
     };
 
+    let force = (opts.__retryCount > 0) ? true : !!opts.force;
+
     this.write({
       _uuid: opts._uuid,
       uuid: uuid,
       key: key,
       // we only use force if we have to retry
-      force: (opts.__retryCount > 0) ? !!opts.force : false,
+      force: force,
       type: 'unlock'
     });
   }

@@ -97,6 +97,7 @@ var Client = (function () {
         var connectPromise = null;
         this.write = function (data, cb) {
             if (ws) {
+                data.pid = process.pid;
                 ws.write(JSON.stringify(data) + '\n', 'utf8', cb);
             }
             else {
@@ -129,7 +130,6 @@ var Client = (function () {
                         _this.write({
                             uuid: uuid,
                             key: data.key,
-                            pid: process.pid,
                             type: 'lock-received-rejected'
                         });
                     }
@@ -137,6 +137,13 @@ var Client = (function () {
                 else {
                     logerr('Live-mutex implementation error, ' +
                         'no fn with that uuid in the resolutions hash => \n' + util.inspect(data));
+                    if (data.acquired === true && data.type === 'lock') {
+                        _this.write({
+                            uuid: uuid,
+                            key: data.key,
+                            type: 'lock-received-rejected'
+                        });
+                    }
                 }
             }
             else {
@@ -323,8 +330,12 @@ var Client = (function () {
             assert(opts.lockRequestTimeout >= 20 && opts.lockRequestTimeout <= 800000, ' => "ttl" for a lock needs to be integer between 3 and 800000 millis.');
         }
         opts.__retryCount = opts.__retryCount || 0;
+        if (opts.__retryCount > 0) {
+            assert(opts._uuid, 'Live-Mutex internal error: no _uuid past to retry call.');
+        }
         var append = opts.append || '';
-        var uuid = opts._uuid || (append + uuidV4());
+        assert(typeof append === 'string', 'append option to lock() method must be of type "string".');
+        var uuid = opts._uuid = opts._uuid || (append + uuidV4());
         var ttl = opts.ttl || this.ttl;
         var lockTimeout = opts.lockRequestTimeout || this.lockTimeout;
         var maxRetries = opts.maxRetry || opts.maxRetries || this.lockRetryMax;
@@ -334,20 +345,17 @@ var Client = (function () {
         var timedOut = false;
         var to = setTimeout(function () {
             timedOut = true;
-            _this.timeouts[uuid] = true;
             delete _this.resolutions[uuid];
             _this.write({
                 uuid: uuid,
                 key: key,
-                pid: process.pid,
                 type: 'lock-client-timeout'
             });
-            opts.__retryCount++;
+            ++opts.__retryCount;
             if (opts.__retryCount > maxRetries) {
                 return cb(new Error("Live-Mutex client lock request timed out after " + lockTimeout + "ms,\n         " + maxRetries + " retries attempted."), false);
             }
-            opts._uuid = opts._uuid || uuid;
-            logerr('retrying lock request, attempt #', opts.__retryCount);
+            logerr("retrying lock request for uuid " + uuid + ", attempt #", opts.__retryCount);
             _this.lock(key, opts, cb);
         }, lockTimeout);
         var cleanUp = function () {
@@ -380,7 +388,6 @@ var Client = (function () {
                 _this.write({
                     uuid: uuid,
                     key: key,
-                    pid: process.pid,
                     type: 'lock-received'
                 });
                 if (data.uuid !== uuid) {
@@ -406,6 +413,7 @@ var Client = (function () {
             }
         };
         this.write({
+            retryCount: opts.__retryCount,
             uuid: uuid,
             key: key,
             type: 'lock',
@@ -465,7 +473,7 @@ var Client = (function () {
             cleanUp();
             var err = errMsg instanceof Error ? errMsg : new Error(errMsg);
             process.emit('warning', err);
-            cb(err);
+            cb && cb(err);
         };
         this.resolutions[uuid] = function (err, data) {
             if (timedOut) {
@@ -484,7 +492,6 @@ var Client = (function () {
                 _this.write({
                     uuid: uuid,
                     key: key,
-                    pid: process.pid,
                     type: 'unlock-received'
                 });
                 cb && cb(null, data.uuid);
@@ -497,11 +504,12 @@ var Client = (function () {
                 callbackWithError('fallthrough in conditional [2], Live-Mutex failure.');
             }
         };
+        var force = (opts.__retryCount > 0) ? true : !!opts.force;
         this.write({
             _uuid: opts._uuid,
             uuid: uuid,
             key: key,
-            force: (opts.__retryCount > 0) ? !!opts.force : false,
+            force: force,
             type: 'unlock'
         });
     };

@@ -28,9 +28,6 @@ Test.create({ mode: 'series' }, function (assert, before, it, LvMtxClient, lmUti
         });
     });
     it('yes', { timeout: 1500 }, function (t) {
-        throw new Error('bogus');
-    });
-    it('yes', { timeout: 1500 }, function (t) {
         var c = new LvMtxClient(conf);
         return c.ensure().then(function () {
             return c.lockp('z').then(function () {
