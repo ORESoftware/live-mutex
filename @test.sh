@@ -34,4 +34,4 @@ if [[ -z ${WHICH_SUMAN} || "${NODE_ENV}" != "local" ]]; then
     npm install github:sumanjs/suman#rebase_branch
 fi
 
-suman test/@src/*.ts --force --inherit-stdio
+./node_modules/.bin/suman test/@src/*.ts --force --inherit-stdio
