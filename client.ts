@@ -300,6 +300,7 @@ export class Client {
     this.ensure = this.connect = function (cb?: Function) {
 
       if (connectPromise) {
+        cb && cb(null);
         return connectPromise;
       }
 

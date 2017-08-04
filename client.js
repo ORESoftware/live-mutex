@@ -152,6 +152,7 @@ var Client = (function () {
         this.ensure = this.connect = function (cb) {
             var _this = this;
             if (connectPromise) {
+                cb && cb(null);
                 return connectPromise;
             }
             return connectPromise = new Promise(function (resolve, reject) {
