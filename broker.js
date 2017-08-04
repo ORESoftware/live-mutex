@@ -223,9 +223,14 @@ var Broker = (function () {
                 });
             });
         });
+        var callable = true;
         var sigEvent = function (event) {
             return function () {
-                logerr(event + " received.");
+                if (!callable) {
+                    return;
+                }
+                callable = false;
+                logerr(event + " event has occurred.");
                 connectedClients.forEach(function (v, k, map) {
                     k.destroy();
                 });
@@ -235,17 +240,22 @@ var Broker = (function () {
             };
         };
         process.once('exit', sigEvent('exit'));
+        process.once('uncaughtException', sigEvent('uncaughtException'));
         process.once('SIGINT', sigEvent('SIGINT'));
         process.once('SIGTERM', sigEvent('SIGTERM'));
         wss.on('error', function (err) {
             logerr(err.stack || err);
         });
+        var count = null;
         setInterval(function () {
             wss.getConnections(function (err, data) {
                 err && logerr(err);
-                data && logerr('connection information =>', data);
+                if (data && data !== count) {
+                    count = data;
+                    logerr('connection information =>', data);
+                }
             });
-        }, 8000);
+        }, 3000);
         var brokerPromise = null;
         this.ensure = this.start = function (cb) {
             var _this = this;

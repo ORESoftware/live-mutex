@@ -162,7 +162,7 @@ var Client = (function () {
                 };
                 var to = setTimeout(function () {
                     reject('live-mutex err: client connection timeout after 2000ms.');
-                }, 2000);
+                }, 3000);
                 ws = net.createConnection({ port: _this.port }, function () {
                     _this.isOpen = true;
                     clearTimeout(to);

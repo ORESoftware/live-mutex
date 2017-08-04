@@ -7,7 +7,7 @@ const colors = require('chalk');
 const fs = require('fs');
 const Handlebars = require('handlebars');
 
-//////////////////////////////////////////
+////////////////////////////////////////////////////////////////
 
 const source = fs.readFileSync(path.resolve(__dirname + '/../../fixtures/d3-multi-line-plot.html'));
 const template = Handlebars.compile(String(source));
@@ -19,33 +19,39 @@ const multi_process_port = 3019;
 process.stderr.setMaxListeners(40);
 
 const plotData = {
-  $rss: [],
-  $heapTotal: [],
-  $heapUsed: []
+  rss: [],
+  heapTotal: [],
+  heapUsed: []
 };
 
+let firstNow = null;
 const interval = setInterval(function () {
   const mem = process.memoryUsage();
-  const now = Date.now();
-  plotData.$rss.push({x: now, y: mem.rss});
-  plotData.$heapTotal.push({x: now, y: mem.heapTotal});
-  plotData.$heapUsed.push({x: now, y: mem.heapUsed});
+  if (!firstNow) {
+    firstNow = Date.now();
+  }
+  const now = Date.now() - firstNow;
+  plotData.rss.push({x: now, y: mem.rss});
+  plotData.heapTotal.push({x: now, y: mem.heapTotal});
+  plotData.heapUsed.push({x: now, y: mem.heapUsed});
   console.log(colors.magenta(util.inspect(mem)));
-}, 2000);
+}, 500);
 
-setTimeout(function () {
-
+let onFinish = function () {
   clearInterval(interval);
-  plotData.$rss = JSON.stringify(plotData.$rss);
-  plotData.$heapTotal = JSON.stringify(plotData.$heapTotal);
-  plotData.$heapUsed = JSON.stringify(plotData.$heapUsed);
+  plotData.rss = JSON.stringify(plotData.rss);
+  plotData.heapTotal = JSON.stringify(plotData.heapTotal);
+  plotData.heapUsed = JSON.stringify(plotData.heapUsed);
 
   const htmlResult = template(plotData);
   let p = path.resolve(__dirname + '/../../fixtures/d3-multi-line-plot-output.html');
   fs.writeFileSync(p, htmlResult);
+  console.log('all done writing file.');
   process.exit(0);
+};
 
-}, 100000);
+process.once('SIGINT', onFinish);
+setTimeout(onFinish, 1000000);
 
 new Broker({port: multi_process_port}).ensure(function () {
 

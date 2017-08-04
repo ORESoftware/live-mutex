@@ -313,7 +313,7 @@ export class Client {
 
         let to = setTimeout(function () {
           reject('live-mutex err: client connection timeout after 2000ms.');
-        }, 2000);
+        }, 3000);
 
         ws = net.createConnection({port: this.port}, () => {
           this.isOpen = true;
