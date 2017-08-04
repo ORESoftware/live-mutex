@@ -372,9 +372,14 @@ export class Broker {
 
     });
 
+    let callable = true;
     let sigEvent = function (event) {
       return function () {
-        logerr(`${event} received.`);
+        if (!callable) {
+          return;
+        }
+        callable = false;
+        logerr(`${event} event has occurred.`);
         connectedClients.forEach(function (v, k, map) {
           // destroy each connected client
           k.destroy();
@@ -386,6 +391,7 @@ export class Broker {
     };
 
     process.once('exit', sigEvent('exit'));
+    process.once('uncaughtException', sigEvent('uncaughtException'));
     process.once('SIGINT', sigEvent('SIGINT'));
     process.once('SIGTERM', sigEvent('SIGTERM'));
 
@@ -393,12 +399,17 @@ export class Broker {
       logerr(err.stack || err);
     });
 
+    let count = null;
+
     setInterval(function () {
       wss.getConnections(function (err, data) {
         err && logerr(err);
-        data && logerr('connection information =>', data);
+        if (data && data !== count) {
+          count = data;
+          logerr('connection information =>', data);
+        }
       });
-    }, 8000);
+    }, 3000);
 
     let brokerPromise = null;
 

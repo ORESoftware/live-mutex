@@ -24,17 +24,20 @@ const plotData = {
   heapUsed: []
 };
 
+let firstNow = null;
 const interval = setInterval(function () {
   const mem = process.memoryUsage();
-  const now = Date.now();
+  if (!firstNow) {
+    firstNow = Date.now();
+  }
+  const now = Date.now() - firstNow;
   plotData.rss.push({x: now, y: mem.rss});
   plotData.heapTotal.push({x: now, y: mem.heapTotal});
   plotData.heapUsed.push({x: now, y: mem.heapUsed});
   console.log(colors.magenta(util.inspect(mem)));
-}, 2000);
+}, 500);
 
-setTimeout(function () {
-
+let onFinish = function () {
   clearInterval(interval);
   plotData.rss = JSON.stringify(plotData.rss);
   plotData.heapTotal = JSON.stringify(plotData.heapTotal);
@@ -43,9 +46,12 @@ setTimeout(function () {
   const htmlResult = template(plotData);
   let p = path.resolve(__dirname + '/../../fixtures/d3-multi-line-plot-output.html');
   fs.writeFileSync(p, htmlResult);
+  console.log('all done writing file.');
   process.exit(0);
+};
 
-}, 100000);
+process.once('SIGINT', onFinish);
+setTimeout(onFinish, 100000);
 
 new Broker({port: multi_process_port}).ensure(function () {
 

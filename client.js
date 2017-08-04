@@ -152,6 +152,7 @@ var Client = (function () {
         this.ensure = this.connect = function (cb) {
             var _this = this;
             if (connectPromise) {
+                cb && cb(null);
                 return connectPromise;
             }
             return connectPromise = new Promise(function (resolve, reject) {
@@ -162,7 +163,7 @@ var Client = (function () {
                 };
                 var to = setTimeout(function () {
                     reject('live-mutex err: client connection timeout after 2000ms.');
-                }, 2000);
+                }, 3000);
                 ws = net.createConnection({ port: _this.port }, function () {
                     _this.isOpen = true;
                     clearTimeout(to);
