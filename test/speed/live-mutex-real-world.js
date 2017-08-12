@@ -9,17 +9,21 @@ process.on('unhandledRejection', function (e) {
   console.error('unhandledRejection => ', e.stack || e);
 });
 
-const totalTime = 50000;
+const totalTime = 5000;
 const intervalTimeSeed = 100;
-const countSeed = 100;
+const countSeed = 300;
+const randTimeoutSeed = 10;
 let lockCount = 0;
+
 
 let finishedQueueing = false;
 setTimeout(function () {
   finishedQueueing = true;
 }, totalTime);
 
-///////////////////////////////////////////////////////////////////
+// with max concurrency@5000, countSeed@100, randTimeoutSeed@10, we get ~.132 lock cycles per millisecond
+// with max concurrency@5000 and countSeed@1000, randTimeoutSeed@10, we get ~.123 lock cycles per millisecond
+///////////////////////////////////////////////////////////////////////////////////////
 
 lmUtils.launchBrokerInChildProcess(conf, function () {
 
@@ -28,7 +32,7 @@ lmUtils.launchBrokerInChildProcess(conf, function () {
 
     const q = async.queue(function (task, cb) {
       task(cb);
-    }, 500);  // max concurrency
+    }, 5000);  // max concurrency
 
     const start = Date.now();
 
@@ -49,7 +53,7 @@ lmUtils.launchBrokerInChildProcess(conf, function () {
             }
             else {
               lockCount++;
-              let randTime = Math.ceil(Math.random() * 10);
+              let randTime = Math.ceil(Math.random() * randTimeoutSeed);
               setTimeout(function () {
                 unlock(cb);
               }, randTime);

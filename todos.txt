@@ -16,3 +16,12 @@ similar to unlock-requestors being able to force unlock even if they don't have 
 
 * on disconnection we could delete wsClientId key/val from this.wsToKeys
  but there should be no real need to do that since we won't have that many clients
+
+ /////////////////
+
+ created new benchmarks, you were right about some things - what really made a difference was using a random setTimeout,
+ using that, things started to favor Lockfile and Warlock again. However, there is an extremely non-linear relationship
+ between concurrency and performance, once you get concurrency above certain levels, the performance of lockfile and warlock
+ just plummets, whereas LM stays fairly linear. There's a tremendous difference there, night and day.
+ It's just a matter of how much concurrency you need. If you need a really high level of concurrency for your locking,
+ LM is way way better.

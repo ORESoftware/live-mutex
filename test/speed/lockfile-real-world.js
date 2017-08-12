@@ -9,9 +9,10 @@ process.on('unhandledRejection', function (e) {
   console.error('unhandledRejection => ', e.stack || e);
 });
 
-const totalTime = 50000;
+const totalTime = 5000;
 const intervalTimeSeed = 100;
-const countSeed = 100;
+const countSeed = 200;
+const randTimeoutSeed = 10;
 let lockCount = 0;
 
 let finishedQueueing = false;
@@ -19,11 +20,13 @@ setTimeout(function () {
   finishedQueueing = true;
 }, totalTime);
 
+// with max concurrency@5000, countSeed@100, randTimeoutSeed@10, we get ~.043 lock cycles per millisecond
+// with max concurrency@5000, countSeed@200, randTimeoutSeed@10, we get ~.020 lock cycles per millisecond
 ///////////////////////////////////////////////////////////////////
 
 const q = async.queue(function (task, cb) {
   task(cb);
-}, 500); // max concurrency
+}, 5000); // max concurrency
 
 const start = Date.now();
 
@@ -45,7 +48,7 @@ let onRandomInterval = function () {
         }
         else {
           lockCount++;
-          let randTime = Math.ceil(Math.random() * 10);
+          let randTime = Math.ceil(Math.random() * randTimeoutSeed);
           setTimeout(function () {
             lf.unlock(file, cb);
           }, randTime);

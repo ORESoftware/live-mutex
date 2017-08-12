@@ -15,7 +15,8 @@ process.on('unhandledRejection', function (e) {
 
 const totalTime = 5000;
 const intervalTimeSeed = 100;
-const countSeed = 100;
+const countSeed = 400;
+const randTimeoutSeed = 10;
 let lockCount = 0;
 
 let finishedQueueing = false;
@@ -23,14 +24,16 @@ setTimeout(function () {
   finishedQueueing = true;
 }, totalTime);
 
-///////////////////////////////////////////////////////////////////
+// with max concurrency@5000, countSeed@100, randTimeoutSeed@10 we get ~.240 lock cycles per millisecond
+// with max concurrency@5000, countSeed@200, randTimeoutSeed@10 we get ~.238 lock cycles per millisecond
+//////////////////////////////////////////////////////////////////////////////////////
 
 const q = async.queue(function (task, cb) {
   task(cb);
-}, 500);  // max concurrency
+}, 5000);  // max concurrency
 
 const start = Date.now();
-const ttl = 3; // Lifetime of the lock
+const ttl = 100; // Lifetime of the lock
 const maxAttempts = 400000; // Max number of times to try setting the lock before erroring
 
 function firstEnsureKeyIsUnlocked(key, cb) {
@@ -67,7 +70,7 @@ firstEnsureKeyIsUnlocked(key, function (err) {
             if (typeof unlock === 'function') {
 
               lockCount++;
-              let randTime = Math.ceil(Math.random() * 10);
+              let randTime = Math.ceil(Math.random() * randTimeoutSeed);
               setTimeout(function () {
                 unlock(cb);
               }, randTime);
@@ -96,7 +99,7 @@ firstEnsureKeyIsUnlocked(key, function (err) {
     }
 
     const diff = Date.now() - start;
-    console.log(' => Time required for lockfile => ', diff);
+    console.log(' => Time required for warlock => ', diff);
     console.log(' => Lock/unlock cycles per millisecond => ', Number(lockCount / diff).toFixed(3));
     process.exit(0);
   };
