@@ -49,7 +49,10 @@ lmUtils.launchBrokerInChildProcess(conf, function () {
             }
             else {
               lockCount++;
-              unlock(cb);
+              let randTime = Math.ceil(Math.random() * 10);
+              setTimeout(function () {
+                unlock(cb);
+              }, randTime);
             }
           });
         });

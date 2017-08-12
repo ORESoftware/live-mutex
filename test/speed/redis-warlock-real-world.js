@@ -31,7 +31,7 @@ const q = async.queue(function (task, cb) {
 
 const start = Date.now();
 const ttl = 3; // Lifetime of the lock
-const maxAttempts = 4000; // Max number of times to try setting the lock before erroring
+const maxAttempts = 400000; // Max number of times to try setting the lock before erroring
 
 function firstEnsureKeyIsUnlocked(key, cb) {
   warlock.unlock(key, true, cb);
@@ -65,14 +65,17 @@ firstEnsureKeyIsUnlocked(key, function (err) {
           else {
 
             if (typeof unlock === 'function') {
-              // console.log('unlocking...' + i++);
+
               lockCount++;
-              unlock(cb);
+              let randTime = Math.ceil(Math.random() * 10);
+              setTimeout(function () {
+                unlock(cb);
+              }, randTime);
+
             }
             else {
-              // Could not acquire lock
-              console.log('Could not acquire lock');
-              process.nextTick(cb);
+              // Could not acquire lock ?
+              throw 'Could not acquire lock';
             }
           }
         });

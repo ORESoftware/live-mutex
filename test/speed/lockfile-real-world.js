@@ -45,7 +45,10 @@ let onRandomInterval = function () {
         }
         else {
           lockCount++;
-          lf.unlock(file, cb);
+          let randTime = Math.ceil(Math.random() * 10);
+          setTimeout(function () {
+            lf.unlock(file, cb);
+          }, randTime);
         }
       });
     });
