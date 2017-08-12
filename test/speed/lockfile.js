@@ -11,7 +11,7 @@ let i = 0;
 
 async.each(a, function (val, cb) {
 
-  const w = Math.ceil(Math.random() * 3);
+  const w = Math.ceil(Math.random() * 20);
 
   lf.lock(file, {wait: w, retries: 5000, stale: 500}, function (err) {
     if (err) {
