@@ -28,6 +28,7 @@ if [[ ${IS_LOCALLY_SYMLINKED} != *"affirmative"* || ${IS_GLOBALLY_SYMLINKED} != 
     npm link "${LIB_NAME}" # create a global symlink for this library, so that we can create a local symlink
 fi
 
+
 WHICH_SUMAN=$(which suman);
 if [[ -z ${WHICH_SUMAN} || "${NODE_ENV}" != "local" ]]; then
     echo "installing suman locally (rebase?)";
