@@ -1,9 +1,12 @@
 node_modules
 .idea
+test
 *.log
 *.sh
 *.md
 *.json
+*.txt
+suman.conf.js
 .gitignore
 .npmignore
 *.ts

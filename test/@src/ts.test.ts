@@ -1,20 +1,19 @@
 'use strict';
-
 import suman from 'suman';
 const Test = suman.init(module);
 
-const colors = require('colors/safe');
-const async = require('async');
-const _ = require('lodash');
-
 // import the other way, just to be sure
-import {Client, Broker, lmUtils}  from 'live-mutex';
+import {Client, Broker, lmUtils} from 'live-mutex';
 
-Test.create(function (assert, fs, path, inject, describe, before, it) {
+/////////////////////////////////////////////////////////////////////
 
+Test.create(function (inject, describe, before, it, $deps, $core) {
+
+  const {fs, path, assert} = $core;
+  const {chalk: colors, async, lodash: _} = $deps;
   const conf = Object.freeze({port: 7027});
 
-  let p ;
+  let p;
 
   inject(() => {
     return {
@@ -40,19 +39,19 @@ Test.create(function (assert, fs, path, inject, describe, before, it) {
 
       c.lock('a', function (err, unlock) {
         if (err) {
-          cb(err);
+          return cb(err);
         }
-        else {
-          fs.appendFile(f, '\n' + String(val), function (err) {
-            if (err) {
-              cb(err);
-            }
-            else {
-              unlock(cb);
-            }
 
-          });
-        }
+        fs.appendFile(f, '\n' + String(val), function (err) {
+          if (err) {
+            cb(err);
+          }
+          else {
+            unlock(cb);
+          }
+
+        });
+
       });
     }
 

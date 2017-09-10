@@ -9,12 +9,12 @@ import * as cp from 'child_process';
 
 //npm
 const ping = require('tcp-ping');
-const strangeloop = require('strangeloop');
-const ijson = require('siamese');
+const slp = require('strangeloop');
 
 //project
-const {Broker} = require('./broker');
+import {Broker} from './broker';
 const p = require.resolve('./lib/launch-broker-child');
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -61,17 +61,24 @@ export const launchSocketServer = function (obj, cb) {
     });
   }
 
-  return strangeloop.conditionalReturn(fn, cb);
+  return slp.conditionalReturn(fn, cb);
 };
 
 // alias
 export const conditionallyLaunchSocketServer = launchSocketServer;
 
-export const launchBrokerInChildProcess = function (conf, cb) {
+export const launchBrokerInChildProcess = function (opts, cb) {
 
-  const host = conf.host || 'localhost';
-  const port = conf.port || 8019;
-  const detached = !!conf.detached;
+  const host = opts.host || 'localhost';
+  const port = opts.port || 8019;
+  const detached = !!opts.detached;
+
+  console.log('\n');
+  console.log('Live-Mutex launch broker options:');
+  console.log('host => ', host);
+  console.log('port => ', port);
+  console.log('detached => ', detached);
+  console.log('\n');
 
   function fn(cb) {
 
@@ -81,43 +88,62 @@ export const launchBrokerInChildProcess = function (conf, cb) {
         cb(err)
       }
       else if (available) {
-        cb(null);
+        console.log(`live-mutex brower was already live at ${host}:${port}.`);
+        cb(null, {
+          alreadyRunning: true
+        });
       }
       else {
 
+        console.log(`live-mutex is launching new broker at ${'localhost'}:${port}.`);
+
         const n = cp.spawn('node', [p], {
           detached,
-          stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
-        });
-
-        n.once('message', function (data) {
-
-          n.disconnect();
-          n.unref();
-
-          ijson.parse(data).then(function (d) {
-            if (d.error) {
-              cb(d.error);
-            }
-            else {
-              cb(null);
-            }
+          env: Object.assign({}, process.env, {
+            LIVE_MUTEX_PORT: port
           })
-          .catch(cb);
-
         });
 
-        n.send({host, port});
+        if(detached){
+          n.unref();
+        }
+
+        process.once('exit', function(){
+          if(!detached){
+            n.kill('SIGINT');
+          }
+        });
+
+        n.stderr.setEncoding('utf8');
+        n.stdout.setEncoding('utf8');
+
+        n.stderr.pipe(process.stderr);
+
+        let data = '';
+
+        n.stdout.on('data', function (d) {
+          console.log('stdout => ', d);
+          data += d;
+          if (String(data).match(/live-mutex broker is listening/)) {
+            console.log('matched');
+            n.stdout.removeAllListeners();
+            if(detached){
+              n.unref();
+            }
+
+            cb(null, n);
+          }
+        });
+
       }
 
     });
 
   }
 
-  return strangeloop.conditionalReturn(fn, cb);
+  return slp.conditionalReturn(fn, cb);
 
 };
-
 
 const $exports = module.exports;
 export default $exports;

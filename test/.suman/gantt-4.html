@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Gantt Chart Example 1</title>
+  <link type="text/css" href="http://mbostock.github.io/d3/style.css" rel="stylesheet"/>
+
+
+  <style>
+    html, body, #wrapper {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+    }
+
+    .chart {
+      font-family: Arial, sans-serif;
+      font-size: 12px;
+    }
+
+    .axis path, .axis line {
+      fill: none;
+      stroke: #000;
+      shape-rendering: crispEdges;
+    }
+
+    .bar {
+      fill: #33b5e5;
+    }
+
+    .bar-failed {
+      fill: #CC0000;
+    }
+
+    .bar-running {
+      fill: #669900;
+    }
+
+    .bar-succeeded {
+      fill: #33b5e5;
+    }
+
+    .bar-killed {
+      fill: #ffbb33;
+    }
+
+    #forkme_banner {
+      display: block;
+      position: absolute;
+      top: 0;
+      right: 10px;
+      z-index: 10;
+      padding: 10px 50px 10px 10px;
+      color: #fff;
+      background: url('http://dk8996.github.io/Gantt-Chart/images/blacktocat.png') #0090ff no-repeat 95% 50%;
+      font-weight: 700;
+      box-shadow: 0 0 10px rgba(0, 0, 0, .5);
+      border-bottom-left-radius: 2px;
+      border-bottom-right-radius: 2px;
+      text-decoration: none;
+    }
+  </style>
+
+</head>
+<body>
+
+<script type="text/javascript" src="http://d3js.org/d3.v3.min.js"></script>
+<script type="text/javascript" src="http://static.mentful.com/gantt-chart-d3v2.js"></script>
+
+
+<script>
+  let tasksOriginal = [
+    {
+      "startDate": new Date("Sun Dec 09 01:36:45 EST 2012"),
+      "endDate": new Date("Sun Dec 09 02:36:45 EST 2012"),
+      "taskName": "E Job",
+      "status": "RUNNING"
+    },
+    {
+      "startDate": new Date("Sun Dec 09 04:56:32 EST 2012"),
+      "endDate": new Date("Sun Dec 09 06:35:47 EST 2012"),
+      "taskName": "A Job",
+      "status": "RUNNING"
+    },
+    {
+      "startDate": new Date("Sun Dec 09 06:29:53 EST 2012"),
+      "endDate": new Date("Sun Dec 09 06:34:04 EST 2012"),
+      "taskName": "D Job",
+      "status": "RUNNING"
+    },
+    {
+      "startDate": new Date("Sun Dec 09 05:35:21 EST 2012"),
+      "endDate": new Date("Sun Dec 09 06:21:22 EST 2012"),
+      "taskName": "P Job",
+      "status": "RUNNING"
+    },
+    {
+      "startDate": new Date("Sun Dec 09 05:00:06 EST 2012"),
+      "endDate": new Date("Sun Dec 09 05:05:07 EST 2012"),
+      "taskName": "D Job",
+      "status": "RUNNING"
+    },
+    {
+      "startDate": new Date("Sun Dec 09 03:46:59 EST 2012"),
+      "endDate": new Date("Sun Dec 09 04:54:19 EST 2012"),
+      "taskName": "P Job",
+      "status": "RUNNING"
+    },
+    {
+      "startDate": new Date("Sun Dec 09 04:02:45 EST 2012"),
+      "endDate": new Date("Sun Dec 09 04:48:56 EST 2012"),
+      "taskName": "N Job",
+      "status": "RUNNING"
+    },
+    {
+      "startDate": new Date("Sun Dec 09 03:27:35 EST 2012"),
+      "endDate": new Date("Sun Dec 09 03:58:43 EST 2012"),
+      "taskName": "E Job",
+      "status": "SUCCEEDED"
+    },
+    {
+      "startDate": new Date("Sun Dec 09 01:40:11 EST 2012"),
+      "endDate": new Date("Sun Dec 09 03:26:35 EST 2012"),
+      "taskName": "A Job",
+      "status": "SUCCEEDED"
+    },
+    {
+      "startDate": new Date("Sun Dec 09 03:00:03 EST 2012"),
+      "endDate": new Date("Sun Dec 09 03:09:51 EST 2012"),
+      "taskName": "D Job",
+      "status": "SUCCEEDED"
+    },
+    {
+      "startDate": new Date("Sun Dec 09 01:21:00 EST 2012"),
+      "endDate": new Date("Sun Dec 09 02:51:42 EST 2012"),
+      "taskName": "P Job",
+      "status": "SUCCEEDED"
+    },
+    {
+      "startDate": new Date("Sun Dec 09 01:08:42 EST 2012"),
+      "endDate": new Date("Sun Dec 09 01:33:42 EST 2012"),
+      "taskName": "N Job",
+      "status": "FAILED"
+    },
+    {
+      "startDate": new Date("Sun Dec 09 00:27:15 EST 2012"),
+      "endDate": new Date("Sun Dec 09 00:54:56 EST 2012"),
+      "taskName": "E Job",
+      "status": "SUCCEEDED"
+    },
+    {
+      "startDate": new Date("Sun Dec 09 00:29:48 EST 2012"),
+      "endDate": new Date("Sun Dec 09 00:44:50 EST 2012"),
+      "taskName": "D Job",
+      "status": "SUCCEEDED"
+    },
+    {
+      "startDate": new Date("Sun Dec 09 07:39:21 EST 2012"),
+      "endDate": new Date("Sun Dec 09 07:43:22 EST 2012"),
+      "taskName": "P Job",
+      "status": "RUNNING"
+    },
+    {
+      "startDate": new Date("Sun Dec 09 07:00:06 EST 2012"),
+      "endDate": new Date("Sun Dec 09 07:05:07 EST 2012"),
+      "taskName": "D Job",
+      "status": "RUNNING"
+    },
+    {
+      "startDate": new Date("Sun Dec 09 08:46:59 EST 2012"),
+      "endDate": new Date("Sun Dec 09 09:54:19 EST 2012"),
+      "taskName": "P Job",
+      "status": "RUNNING"
+    },
+    {
+      "startDate": new Date("Sun Dec 09 09:02:45 EST 2012"),
+      "endDate": new Date("Sun Dec 09 09:48:56 EST 2012"),
+      "taskName": "N Job",
+      "status": "RUNNING"
+    },
+    {
+      "startDate": new Date("Sun Dec 09 08:27:35 EST 2012"),
+      "endDate": new Date("Sun Dec 09 08:58:43 EST 2012"),
+      "taskName": "E Job",
+      "status": "SUCCEEDED"
+    },
+    {
+      "startDate": new Date("Sun Dec 09 08:40:11 EST 2012"),
+      "endDate": new Date("Sun Dec 09 08:46:35 EST 2012"),
+      "taskName": "A Job",
+      "status": "SUCCEEDED"
+    },
+    {
+      "startDate": new Date("Sun Dec 09 08:00:03 EST 2012"),
+      "endDate": new Date("Sun Dec 09 08:09:51 EST 2012"),
+      "taskName": "D Job",
+      "status": "SUCCEEDED"
+    },
+    {
+      "startDate": new Date("Sun Dec 09 10:21:00 EST 2012"),
+      "endDate": new Date("Sun Dec 09 10:51:42 EST 2012"),
+      "taskName": "P Job",
+      "status": "SUCCEEDED"
+    },
+    {
+      "startDate": new Date("Sun Dec 09 11:08:42 EST 2012"),
+      "endDate": new Date("Sun Dec 09 11:33:42 EST 2012"),
+      "taskName": "N Job",
+      "status": "FAILED"
+    },
+    {
+      "startDate": new Date("Sun Dec 09 12:27:15 EST 2012"),
+      "endDate": new Date("Sun Dec 09 12:54:56 EST 2012"),
+      "taskName": "E Job",
+      "status": "SUCCEEDED"
+    },
+    {
+      "startDate": new Date("Sat Dec 08 23:12:24 EST 2012"),
+      "endDate": new Date("Sun Dec 09 00:26:13 EST 2012"),
+      "taskName": "A Job",
+      "status": "KILLED"
+    }];
+
+  let tasksRaw = JSON.parse('[{"startDate":1501621381507,"endDate":1501621387483,"transformStartDate":1501621381359,"transformEndDate":1501621381504,"taskName":"/Users/alexamil/WebstormProjects/oresoftware/live-mutex/test/@src/alphabet.test.ts","status":"SUCCEEDED"},{"startDate":1501621381510,"endDate":1501621382586,"transformStartDate":1501621381366,"transformEndDate":1501621381508,"taskName":"/Users/alexamil/WebstormProjects/oresoftware/live-mutex/test/@src/four-promise.test.ts","status":"SUCCEEDED"},{"startDate":1501621381501,"endDate":1501621382587,"transformStartDate":1501621381369,"transformEndDate":1501621381492,"taskName":"/Users/alexamil/WebstormProjects/oresoftware/live-mutex/test/@src/four-promise.test2.ts","status":"SUCCEEDED"},{"startDate":1501621381678,"endDate":1501621386225,"transformStartDate":1501621381511,"transformEndDate":1501621381674,"taskName":"/Users/alexamil/WebstormProjects/oresoftware/live-mutex/test/@src/one.test.ts","status":"SUCCEEDED"},{"startDate":1501621381695,"endDate":1501621382824,"transformStartDate":1501621381514,"transformEndDate":1501621381692,"taskName":"/Users/alexamil/WebstormProjects/oresoftware/live-mutex/test/@src/ts.test.ts","status":"SUCCEEDED"},{"startDate":1501621381690,"endDate":1501621386415,"transformStartDate":1501621381516,"transformEndDate":1501621381685,"taskName":"/Users/alexamil/WebstormProjects/oresoftware/live-mutex/test/@src/two.test.ts","status":"SUCCEEDED"},{"startDate":1501621381885,"endDate":1501621382872,"transformStartDate":1501621381678,"transformEndDate":1501621381880,"taskName":"/Users/alexamil/WebstormProjects/oresoftware/live-mutex/test/@src/z.test.ts","status":"SUCCEEDED"}]');
+
+  let tasks = [];
+
+  tasksRaw.forEach(function (t) {
+
+    // we have two separate tasks per item, one for transform, one for run
+    if (t.transformStartDate && t.transformEndDate) {
+      tasks.push({
+        taskName: t.taskName,
+        startDate: new Date(t.transformStartDate),
+        endDate: new Date(t.transformEndDate),
+        status: 'SUCCEEDED'
+      });
+    }
+
+    if (t.startDate && t.endDate) {
+      tasks.push({
+        taskName: t.taskName,
+        startDate: new Date(t.startDate),
+        endDate: new Date(t.endDate),
+        status: t.status
+      });
+    }
+  });
+
+  let taskStatus = {
+    "SUCCEEDED": "bar",
+    "FAILED": "bar-failed",
+    "RUNNING": "bar-running",
+    "KILLED": "bar-killed"
+  };
+
+  let taskNamesOriginal = ["D Job", "P Job", "E Job", "A Job", "N Job"];
+
+  let taskNames = tasks.map(function (t) {
+    return t.taskName;
+  });
+
+  tasks.sort(function (a, b) {
+    return a.endDate - b.endDate;
+  });
+
+  let maxDate = tasks[tasks.length - 1].endDate;
+
+  tasks.sort(function (a, b) {
+    return a.startDate - b.startDate;
+  });
+
+  let minDate = tasks[0].startDate;
+
+  let format = "%H:%M:%S";
+  let gantt = d3.gantt().taskTypes(taskNames).taskStatus(taskStatus).tickFormat(format);
+
+  gantt(tasks);
+
+</script>
+
+
+</body>
+</html>

@@ -28,15 +28,16 @@ export interface IBookkeeping {
     unlockCount: number;
 }
 export declare type TClientCB = (err: Error | string | null | undefined, c?: Client) => void;
-export declare type TEnsureCB = (cb: TClientCB) => void;
-export declare type TEnsurePromise = () => Promise<Client>;
-export declare type TEnsure = TEnsurePromise | TEnsureCB;
+export declare type TEnsure = (cb?: TClientCB) => Promise<Client>;
 export interface IUuidBooleanHash {
     [key: string]: boolean;
 }
 export interface IClientLockOpts {
 }
 export interface IClientUnlockOpts {
+}
+export interface ILockHolderCount {
+    [key: string]: number;
 }
 export declare type TClientLockCB = (err: Error | string | null | undefined, unlock: Function | false, id?: string) => void;
 export declare type TClientUnlockCB = (err: Error | string | null | undefined, uuid?: string) => void;
@@ -55,15 +56,23 @@ export declare class Client {
     resolutions: IClientResolution;
     bookkeeping: IBookkeepingHash;
     ensure: TEnsure;
+    connect: TEnsure;
     giveups: IUuidBooleanHash;
+    write: Function;
+    isOpen: boolean;
+    lockholderCount: ILockHolderCount;
+    close: Function;
     constructor($opts: TClientOptions, cb?: TClientCB);
-    static create(opts: TClientOptions, cb: TClientCB): Promise<Client>;
+    static create(opts: TClientOptions, cb?: TClientCB): Promise<Client>;
     addListener(key: any, fn: any): void;
     setLockRequestorCount(key: any, val: any): void;
     getLockholderCount(key: any): number;
     requestLockInfo(key: any, opts: any, cb: any): void;
-    lock(key: string, opts: Partial<IClientLockOpts>, cb: TClientLockCB): any;
-    unlock(key: string, opts: Partial<IClientUnlockOpts>, cb: TClientUnlockCB): void;
+    lockp(key: string, opts: Partial<IClientLockOpts>): Promise<{}>;
+    unlockp(key: string, opts: Partial<IClientUnlockOpts>): Promise<{}>;
+    lock(key: string, opts: Partial<IClientLockOpts>, cb: TClientLockCB): void;
+    unlock(key: string, opts: Partial<IClientUnlockOpts>, cb?: TClientUnlockCB): void;
 }
-declare const $exports: any;
-export default $exports;
+export declare const LMClient: typeof Client;
+export declare const LvMtxClient: typeof Client;
+export default Client;

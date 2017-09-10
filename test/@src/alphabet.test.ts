@@ -1,4 +1,5 @@
-const suman = require('suman');
+import suman = require('suman');
+
 const Test = suman.init(module);
 const async = require('async');
 
@@ -75,6 +76,7 @@ Test.create(function (assert, before, describe, it, path, Client, Broker, lmUtil
       const readable = fs.createReadStream(p);
 
       readable.once('error', t.fail);
+      readable.once('end', t.done);
 
       readable.on('readable', function () {
 
@@ -87,7 +89,6 @@ Test.create(function (assert, before, describe, it, path, Client, Broker, lmUtil
           index++;
         }
 
-        t.done();
       });
     });
 

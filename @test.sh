@@ -2,16 +2,19 @@
 
 cd $(dirname "$0");
 
-LIB_NAME="live-mutex";
+if [[ ! -d "./node_modules" ]]; then
+    echo "error: node_modules directory is not present...run npm install as needed.";
+fi
 
-npm rebuild &&  # rebuild must be successfuly
+LIB_NAME="live-mutex";
 
 WHICH_SUMAN_TOOLS=$(which suman-tools);
 
+# with the PATH set, we can pick up local NPM executables
 export PATH=${PATH}:./node_modules/.bin
 
 if [[ -z ${WHICH_SUMAN_TOOLS} ]]; then
-npm install suman-tools;
+    npm install suman-tools;
 fi
 
 IS_GLOBALLY_SYMLINKED=`suman-tools --is-symlinked-globally="${LIB_NAME}"`
@@ -27,12 +30,9 @@ fi
 
 
 WHICH_SUMAN=$(which suman);
-if [[ " " || -z ${WHICH_SUMAN} ]]; then
- echo "installing suman locally";
- npm install github:sumanjs/suman#rebase_branch
+if [[ -z ${WHICH_SUMAN} || "${NODE_ENV}" != "local" ]]; then
+    echo "installing suman locally (rebase?)";
+    npm install -g github:sumanjs/suman#rebase_branch
 fi
 
-#suman test/src/*.js --inherit-stdio --force
-
-suman test/src/four.test.js
-
+suman test/@src/*.ts --inherit-stdio --inherit-all-stdio
