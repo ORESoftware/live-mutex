@@ -59,8 +59,6 @@ The NPM lockfile library works OK for the same purpose, but Live-Mutex is:
 * much more performant than NPM lockfile for real-life scenarios with lots of concurrent lock requests
 * does not require any polling, which is why it's more performant
 * uses TCP, so could also more easily work across machines, not just across processes on the same machine
-* I would have just used NPM lockfile, but I saw some weird behavior/bugs that I could not rationalize, so I decided
-to write something that I understood and might perform better.
 
 
 ## Usage and Best Practices
