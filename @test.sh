@@ -32,7 +32,7 @@ fi
 WHICH_SUMAN=$(which suman);
 if [[ -z ${WHICH_SUMAN} || "${NODE_ENV}" != "local" ]]; then
     echo "installing suman locally (rebase?)";
-    npm install -g github:sumanjs/suman#rebase_branch
+    npm install -g suman
 fi
 
 suman test/@src/*.ts --inherit-stdio --inherit-all-stdio
