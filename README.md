@@ -245,7 +245,7 @@ exports.createPool = function(opts){
   
 ### Usage with Promises:
 
-This library exports lockp and unlockp, which are simply like so:
+This library exports `lockp` and `unlockp` methods for the client, which are simply implemented like so:
 
 ```typescript
   lockp(key: string, opts: Partial<IClientLockOpts>) {
@@ -265,7 +265,7 @@ This library exports lockp and unlockp, which are simply like so:
   }
 ```
 
-## To use with async/await, it simply looks like:
+## To use these methods with async/await, it simply looks like:
 
 ```typescript
     await client.lockp('a');
@@ -274,7 +274,7 @@ This library exports lockp and unlockp, which are simply like so:
 ```
    
 
-### If you want, you can just create your own promise wrapper like so:
+### If you want, you can just create your own promise wrapper in your app, like so:
 
 ```js
 

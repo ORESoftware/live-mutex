@@ -229,13 +229,11 @@ export class Client {
     let connectPromise = null;
 
     this.write = function (data, cb) {
-      if (ws) {
-        data.pid = process.pid;
-        ws.write(JSON.stringify(data) + '\n', 'utf8', cb);
-      }
-      else {
+      if (!ws) {
         throw new Error('please call connect() on this Live-Mutex client, before using the lock/unlock methods.');
       }
+      data.pid = process.pid;
+      ws.write(JSON.stringify(data) + '\n', 'utf8', cb);
     };
 
     const onData = data => {
