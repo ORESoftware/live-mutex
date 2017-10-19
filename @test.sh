@@ -35,4 +35,4 @@ if [[ -z ${WHICH_SUMAN} || "${NODE_ENV}" != "local" ]]; then
     npm install -g suman --silent
 fi
 
-suman test/@src/*.ts --inherit-stdio # --inherit-all-stdio
+suman test/@src/*.ts #--inherit-stdio # --inherit-all-stdio
