@@ -267,6 +267,15 @@ This library exports lockp and unlockp, which are simply like so:
   }
 ```
 
+## To use with async/await, it simply looks like:
+
+```typescript
+    await client.lockp('a');
+    await Promise.delay(100);
+    return client.unlockp('a');
+```
+   
+
 ### If you want, you can just create your own promise wrapper like so:
 
 ```js
