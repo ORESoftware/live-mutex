@@ -419,7 +419,10 @@ export class Broker {
         return brokerPromise.then(function (val) {
           cb && cb(null, val);
           return val;
-        }, cb);
+        }, function (err) {
+          cb && cb(err);
+          return Promise.reject(err);
+        });
       }
 
       return brokerPromise = new Promise((resolve, reject) => {
@@ -798,11 +801,6 @@ export class Broker {
 
     if (_uuid && lck && lck.uuid !== undefined) {
       same = (String(lck.uuid) === String(_uuid));
-      if (!same) {
-        console.error('! => same is => ', same);
-        console.error('! => lck.uuid is => ', lck.uuid);
-        console.error('! => unlock._uuid is => ', _uuid);
-      }
     }
 
     if (lck && (same || force)) {

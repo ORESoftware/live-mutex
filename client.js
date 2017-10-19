@@ -134,7 +134,7 @@ var Client = (function () {
                     }
                 }
                 else {
-                    logerr('Live-mutex implementation error, ' +
+                    logerr('Live-mutex implementation warning, ' +
                         'no fn with that uuid in the resolutions hash => \n' + util.inspect(data));
                     if (data.acquired === true && data.type === 'lock') {
                         _this.write({
@@ -155,7 +155,10 @@ var Client = (function () {
                 return connectPromise.then(function (val) {
                     cb && cb(null, val);
                     return val;
-                }, cb);
+                }, function (err) {
+                    cb && cb(err);
+                    return Promise.reject(err);
+                });
             }
             return connectPromise = new Promise(function (resolve, reject) {
                 var onFirstErr = function (e) {

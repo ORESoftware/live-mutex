@@ -279,9 +279,9 @@ export class Client {
           }
         }
         else {
-          logerr('Live-mutex implementation error, ' +
+          logerr('Live-mutex implementation warning, ' +
             'no fn with that uuid in the resolutions hash => \n' + util.inspect(data));
-          if(data.acquired === true && data.type === 'lock'){
+          if (data.acquired === true && data.type === 'lock') {
             this.write({
               uuid: uuid,
               key: data.key,
@@ -300,10 +300,13 @@ export class Client {
     this.ensure = this.connect = function (cb?: Function) {
 
       if (connectPromise) {
-        return connectPromise.then(function(val){
+        return connectPromise.then(function (val) {
           cb && cb(null, val);
           return val;
-        }, cb);
+        }, function (err) {
+          cb && cb(err);
+          return Promise.reject(err);
+        });
       }
 
       return connectPromise = new Promise((resolve, reject) => {
