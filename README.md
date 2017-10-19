@@ -117,8 +117,7 @@ const {LMClient, LvMtxClient} = require('live-mutex/client');  // these are simp
 import {Client, Broker, lmUtils}  from 'live-mutex';
 
 ```
-## Using the library
-
+## Using the library with vanilla callbacks
 
 ```js
 const opts = {port: '<port>' , host: '<host>'};
@@ -251,8 +250,8 @@ This library exports lockp and unlockp, which are simply like so:
 ```typescript
   lockp(key: string, opts: Partial<IClientLockOpts>) {
     return new Promise((resolve, reject) => {
-      this.lock(key, opts, function (err, val) {
-        err ? reject(err) : resolve(val);
+      this.lock(key, opts, function (err, unlock, lockUuid) {
+        err ? reject(err) : resolve({key, unlock, lockUuid});
       });
     });
   }

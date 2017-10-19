@@ -324,7 +324,8 @@ var Broker = (function () {
             }
             results.filter(function (r) {
                 return r && r.error;
-            }).forEach(function (err) {
+            })
+                .forEach(function (err) {
                 console.error(err.stack || err);
             });
             var diff = Date.now() - time;

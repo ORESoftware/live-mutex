@@ -508,7 +508,8 @@ export class Broker {
 
       results.filter(function (r) {
         return r && r.error;
-      }).forEach(function (err) {
+      })
+      .forEach(function (err) {
         console.error(err.stack || err);
       });
 
