@@ -25,7 +25,7 @@ Test.create(function (assert, describe, Client, Broker, inject, it, $deps, $core
     });
     describe('inject', function (c) {
         arrays.forEach(function (a) {
-            describe.delay('resumes', function (resume) {
+            describe.delay('resumes', function (b) {
                 async.map(a, function (val, cb) {
                     cb(null, function (t) {
                         c.lock(String(val), function (err, unlock, id) {
@@ -34,11 +34,7 @@ Test.create(function (assert, describe, Client, Broker, inject, it, $deps, $core
                             }
                             else {
                                 setTimeout(function () {
-                                    c.unlock(String(val), {
-                                        force: false,
-                                        _uuid: id
-                                    }, t.done);
-                                    // client.unlock(String(val), id, t.done);
+                                    c.unlock(String(val), { force: false, _uuid: id }, t.done);
                                 }, 100);
                             }
                         });
@@ -47,10 +43,10 @@ Test.create(function (assert, describe, Client, Broker, inject, it, $deps, $core
                     if (err) {
                         throw err;
                     }
-                    resume(results);
+                    b.resume(results);
                 });
-                describe('handles results', { parallel: true }, function () {
-                    var fns = this.getResumeValue();
+                describe.parallel('handles results', function (b) {
+                    var fns = b.getResumeValue();
                     fns.forEach(function (fn) {
                         it.cb('locks/unlocks', fn);
                     });

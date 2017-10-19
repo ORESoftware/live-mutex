@@ -1,11 +1,11 @@
 import suman = require('suman');
-const Test = suman.init(module);
+const {Test} = suman.init(module);
 
 ///////////////////////////////////////////////////////////
 
 Test.create(function (assert, describe, Client, Broker, inject, it, $deps, $core) {
 
-  const {lodash: _, async, chalk:colors} = $deps;
+  const {lodash: _, async, chalk: colors} = $deps;
 
   const arrays = [
     [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
@@ -30,12 +30,11 @@ Test.create(function (assert, describe, Client, Broker, inject, it, $deps, $core
     }
   });
 
-
   describe('inject', function (c) {
 
     arrays.forEach(a => {
 
-      describe.delay('resumes', function (resume) {
+      describe.delay('resumes', function (b) {
 
         async.map(a, function (val, cb) {
 
@@ -46,11 +45,7 @@ Test.create(function (assert, describe, Client, Broker, inject, it, $deps, $core
               }
               else {
                 setTimeout(function () {
-                  c.unlock(String(val), {
-                    force: false,
-                    _uuid: id
-                  }, t.done);
-                  // client.unlock(String(val), id, t.done);
+                  c.unlock(String(val), {force: false, _uuid: id}, t.done);
                 }, 100);
               }
             });
@@ -61,12 +56,12 @@ Test.create(function (assert, describe, Client, Broker, inject, it, $deps, $core
             throw err;
           }
 
-          resume(results);
+          b.resume(results);
         });
 
-        describe('handles results', {parallel: true}, function () {
+        describe.parallel('handles results', b => {
 
-          const fns = this.getResumeValue();
+          const fns = b.getResumeValue();
 
           fns.forEach(fn => {
 
