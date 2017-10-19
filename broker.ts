@@ -416,7 +416,10 @@ export class Broker {
     this.ensure = this.start = function (cb?: Function) {
 
       if (brokerPromise) {
-        return brokerPromise;
+        return brokerPromise.then(function (val) {
+          cb && cb(null, val);
+          return val;
+        }, cb);
       }
 
       return brokerPromise = new Promise((resolve, reject) => {

@@ -152,8 +152,10 @@ var Client = (function () {
         this.ensure = this.connect = function (cb) {
             var _this = this;
             if (connectPromise) {
-                cb && cb(null);
-                return connectPromise;
+                return connectPromise.then(function (val) {
+                    cb && cb(null, val);
+                    return val;
+                }, cb);
             }
             return connectPromise = new Promise(function (resolve, reject) {
                 var onFirstErr = function (e) {

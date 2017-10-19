@@ -300,8 +300,10 @@ export class Client {
     this.ensure = this.connect = function (cb?: Function) {
 
       if (connectPromise) {
-        cb && cb(null);
-        return connectPromise;
+        return connectPromise.then(function(val){
+          cb && cb(null, val);
+          return val;
+        }, cb);
       }
 
       return connectPromise = new Promise((resolve, reject) => {

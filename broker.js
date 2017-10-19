@@ -260,7 +260,10 @@ var Broker = (function () {
         this.ensure = this.start = function (cb) {
             var _this = this;
             if (brokerPromise) {
-                return brokerPromise;
+                return brokerPromise.then(function (val) {
+                    cb && cb(null, val);
+                    return val;
+                }, cb);
             }
             return brokerPromise = new Promise(function (resolve, reject) {
                 var to = setTimeout(function () {
