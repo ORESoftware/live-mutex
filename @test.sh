@@ -32,7 +32,8 @@ fi
 WHICH_SUMAN=$(which suman);
 if [[ -z ${WHICH_SUMAN} || "${NODE_ENV}" != "local" ]]; then
     echo "installing suman locally...";
-    npm install -g suman@latest --silent
+#    npm install -g sumanjs@latest --silent
+     npm install -g "github:sumanjs/suman#feature_alexamil_1508459456817" 2> /dev/null
 fi
 
 suman --coverage test/@src/*.ts #--inherit-stdio # --inherit-all-stdio
