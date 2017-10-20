@@ -26,7 +26,7 @@
     "siamese": "^2.0.4",
     "strangeloop": "0.0.10001",
     "tcp-ping": "^0.1.1",
-    "uuid": "^3.0.1"
+    "uuid": "^3.1.0"
   },
   "devDependencies": {
     "@types/async": "^2.0.38",
@@ -39,7 +39,6 @@
     "lockfile": "^1.0.3",
     "lodash": "^4.17.3",
     "node-redis-warlock": "^0.2.0",
-    "redis": "^2.6.3",
-    "uuid": "^3.1.0"
+    "redis": "^2.6.3"
   }
 }
