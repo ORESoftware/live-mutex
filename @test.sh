@@ -32,7 +32,7 @@ fi
 WHICH_SUMAN=$(which suman);
 if [[ -z ${WHICH_SUMAN} || "${NODE_ENV}" != "local" ]]; then
     echo "installing suman locally...";
-    npm install -g suman --silent
+    npm install -g suman@latest --silent
 fi
 
 suman test/@src/*.ts #--inherit-stdio # --inherit-all-stdio
