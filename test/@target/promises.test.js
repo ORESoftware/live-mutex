@@ -42,7 +42,7 @@ var Promise = require('bluebird');
 Test.create(function (it, Broker, Client, inject, describe, before, $deps) {
     var _this = this;
     var colors = $deps.chalk;
-    var conf = Object.freeze({ port: 7034 });
+    var conf = Object.freeze({ port: 7035 });
     before(function (h) { return new Broker(conf).start(); });
     before('get client', function (h) {
         return new Client(conf).ensure().then(function (c) {

@@ -1,7 +1,7 @@
 "use strict";
 exports.__esModule = true;
 var suman = require("suman");
-var Test = suman.init(module);
+var Test = suman.init(module).Test;
 ///////////////////////////////////////////////////////////
 Test.create(function (assert, describe, Client, Broker, inject, it, $deps, $core) {
     var _ = $deps.lodash, async = $deps.async, colors = $deps.chalk;

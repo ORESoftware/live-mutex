@@ -9,7 +9,7 @@ const Promise = require('bluebird');
 Test.create(function (it, Broker, Client, inject, describe, before, $deps) {
 
   const {chalk: colors} = $deps;
-  const conf = Object.freeze({port: 7034});
+  const conf = Object.freeze({port: 7035});
 
   before(h => new Broker(conf).start());
 
@@ -20,7 +20,6 @@ Test.create(function (it, Broker, Client, inject, describe, before, $deps) {
   });
 
   describe('injected', function () {
-
     it('locks/unlocks', t => {
       const c = t.$inject.client;
       return c.lockp('a').then(function (v) {
@@ -30,12 +29,10 @@ Test.create(function (it, Broker, Client, inject, describe, before, $deps) {
   });
 
   it('locks/unlocks', t => {
-
     const c = t.$inject.client;
     return c.lockp('a').then(function (v) {
       return c.unlockp('a');
     });
-
   });
 
   it('locks/unlocks', async t => {
