@@ -299,12 +299,13 @@ export class Client {
 
       if (connectPromise) {
         return connectPromise.then(function (val) {
-          cb && cb(null, val);
-          return val;
-        }, function (err) {
-          cb && cb(err);
-          return Promise.reject(err);
-        });
+            cb && cb(null, val);
+            return val;
+          },
+          function (err) {
+            cb && cb(err);
+            return Promise.reject(err);
+          });
       }
 
       return connectPromise = new Promise((resolve, reject) => {

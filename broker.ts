@@ -417,12 +417,13 @@ export class Broker {
 
       if (brokerPromise) {
         return brokerPromise.then(function (val) {
-          cb && cb(null, val);
-          return val;
-        }, function (err) {
-          cb && cb(err);
-          return Promise.reject(err);
-        });
+            cb && cb(null, val);
+            return val;
+          },
+          function (err) {
+            cb && cb(err);
+            return Promise.reject(err);
+          });
       }
 
       return brokerPromise = new Promise((resolve, reject) => {
