@@ -205,28 +205,6 @@ to see if the web-socket server is running somewhere. I have had a lot of luck w
 
 ```
 
-## Creating a simple client pool
-
-In most cases, a single client is sufficient, and this is true many types of networked clients using async I/O.
-However, if you test and find a client pool might be beneficial. Try this:
-
-```js
-
-const {Client} = require('live-mutex/client');
-
-exports.createPool = function(opts){
-  
-  return Promise.all([
-     new Client(opts).connect(),
-     new Client(opts).connect(),
-     new Client(opts).connect(),
-     new Client(opts).connect()
-  ]);
-}
-
-
-```
-
   
 ## Usage with Promises and RxJS5 Observables:
   
@@ -389,5 +367,28 @@ exports.releaseLock = function(unlock){
           }
       });
   };
+
+```
+
+## Creating a simple client pool
+
+In most cases, a single client is sufficient, and this is true many types of networked clients using async I/O.
+You almost certainly do not need more than one client.
+However, if you do some empirical test, and find a client pool might be beneficial/faster, etc. Try this:
+
+```js
+
+const {Client} = require('live-mutex/client');
+
+exports.createPool = function(opts){
+  
+  return Promise.all([
+     new Client(opts).connect(),
+     new Client(opts).connect(),
+     new Client(opts).connect(),
+     new Client(opts).connect()
+  ]);
+}
+
 
 ```
