@@ -1,10 +1,11 @@
 'use strict';
-import suman from 'suman';
-const Test = suman.init(module);
+import * as suman from 'suman';
+const {Test} = suman.init(module);
+
 
 ///////////////////////////////////////////////////////////////
 
-Test.create(function (it, Broker, Client, inject, describe, before, $deps) {
+Test.create('aa',function (it, Broker, Client, inject, describe, before, $deps) {
 
   const {chalk: colors} = $deps;
   const conf = Object.freeze({port: 7034});

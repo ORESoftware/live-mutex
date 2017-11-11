@@ -6,7 +6,7 @@
   "typings": "index.d.ts",
   "types": "index.d.ts",
   "scripts": {
-    "test": "./@test.sh"
+    "test": "./scripts/test.sh"
   },
   "repository": {
     "type": "git",

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
-cd $(dirname "$0");
 
-if [[ ! -d "./node_modules" ]]; then
+if [[ ! -d "node_modules" ]]; then
     echo "error: node_modules directory is not present...run npm install as needed.";
+    exit 1;
 fi
 
 LIB_NAME="live-mutex";
@@ -11,7 +11,7 @@ LIB_NAME="live-mutex";
 WHICH_SUMAN_TOOLS=$(which suman-tools);
 
 # with the PATH set, we can pick up local NPM executables
-export PATH=${PATH}:./node_modules/.bin
+export PATH=${PATH}:"$(pwd)/node_modules/.bin"
 
 if [[ -z ${WHICH_SUMAN_TOOLS} ]]; then
     npm install suman-tools;
@@ -32,8 +32,8 @@ fi
 WHICH_SUMAN=$(which suman);
 if [[ -z ${WHICH_SUMAN} || "${NODE_ENV}" != "local" ]]; then
     echo "installing suman locally...";
-#    npm install -g sumanjs@latest --silent
-     npm install -g "sumanjs/suman#feature_alexamil_1508459456817" 2> /dev/null
+    npm install -g suman@latest --silent
+    #  npm install -g "sumanjs/suman" 2> /dev/null
 fi
 
 suman --coverage test/@src/*.ts #--inherit-stdio # --inherit-all-stdio
