@@ -3,12 +3,12 @@ const Test = suman.init(module);
 
 /////////////////////////////////////////////////////
 
-Test.create({mode: 'parallel'}, function (assert, before, it, Client, lmUtils) {
+Test.create({mode: 'parallel'}, ['Client', 'lmUtils', function (b, assert, before, it) {
 
+  const {lmUtils, Client} = b.ioc;
   const conf = Object.freeze({port: 7888});
 
   before('promise', function () {
-
     return lmUtils.conditionallyLaunchSocketServer(conf)
     .then(null, function (err) {
       if (err) {
@@ -17,9 +17,7 @@ Test.create({mode: 'parallel'}, function (assert, before, it, Client, lmUtils) {
       else {
         throw new Error('no error passed to reject handler');
       }
-
     });
-
   });
 
   it.cb('yes', {timeout: 30000}, t => {
@@ -68,4 +66,4 @@ Test.create({mode: 'parallel'}, function (assert, before, it, Client, lmUtils) {
 
   });
 
-});
+}]);

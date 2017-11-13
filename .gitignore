@@ -3,6 +3,8 @@ node_modules
 .idea
 coverage
 .nyc_output
+.vscode
+.vs_code
 
 ### matching
 *.log

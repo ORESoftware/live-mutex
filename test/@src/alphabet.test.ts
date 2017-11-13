@@ -1,9 +1,12 @@
 import suman = require('suman');
-
 const Test = suman.init(module);
 const async = require('async');
 
-Test.create(function (assert, before, describe, it, path, Client, Broker, lmUtils, fs, inject) {
+////////////////////////////////////////////////////////
+
+Test.create(['Broker', 'Client', 'lmUtils', (b, assert, before, describe, it, path, fs, inject) => {
+
+  const {Client, Broker, lmUtils} = b.ioc;
 
   const alphabet = 'abcdefghijklmnopqrstuvwxyz';
   const a2z = alphabet.split('');
@@ -33,7 +36,7 @@ Test.create(function (assert, before, describe, it, path, Client, Broker, lmUtil
     fs.writeFile(p, '', h);
   });
 
-  describe('post', function () {
+  describe('post', function (b) {
 
     before.cb('yo', h => {
 
@@ -94,4 +97,4 @@ Test.create(function (assert, before, describe, it, path, Client, Broker, lmUtil
 
   });
 
-});
+}]);

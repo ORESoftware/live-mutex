@@ -1,13 +1,13 @@
 'use strict';
-import suman = require('suman');
-import {Client} from "../../client";
 
+import suman = require('suman');
 const Test = suman.init(module);
 
 /////////////////////////////////////////////////////////
 
-Test.create({mode: 'series'}, function (assert, before, it, LvMtxClient: Client, lmUtils, Promise) {
+Test.create({mode: 'series'}, ['LvMtxClient', 'lmUtils', 'Promise', function (b, assert, before, it,) {
 
+  const {LvMtxClient, lmUtils, Promise} = b.ioc;
   const conf = Object.freeze({port: 7988});
   console.log('four promise tests');
 
@@ -35,7 +35,6 @@ Test.create({mode: 'series'}, function (assert, before, it, LvMtxClient: Client,
     });
 
   });
-
 
   it('yes', {timeout: 1500}, t => {
 
@@ -73,4 +72,4 @@ Test.create({mode: 'series'}, function (assert, before, it, LvMtxClient: Client,
     });
   });
 
-});
+}]);

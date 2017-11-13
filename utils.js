@@ -45,13 +45,7 @@ exports.conditionallyLaunchSocketServer = exports.launchSocketServer;
 exports.launchBrokerInChildProcess = function (opts, cb) {
     var host = opts.host || 'localhost';
     var port = opts.port || 8019;
-    var detached = !!opts.detached;
-    console.log('\n');
-    console.log('Live-Mutex launch broker options:');
-    console.log('host => ', host);
-    console.log('port => ', port);
-    console.log('detached => ', detached);
-    console.log('\n');
+    var detached = Boolean(opts.detached);
     function fn(cb) {
         ping.probe(host, port, function (err, available) {
             if (err) {
@@ -60,11 +54,13 @@ exports.launchBrokerInChildProcess = function (opts, cb) {
             else if (available) {
                 console.log("live-mutex brower was already live at " + host + ":" + port + ".");
                 cb(null, {
+                    host: host,
+                    port: port,
                     alreadyRunning: true
                 });
             }
             else {
-                console.log("live-mutex is launching new broker at " + 'localhost' + ":" + port + ".");
+                console.log("live-mutex is launching new broker at '" + host + ":" + port + "'.");
                 var n_1 = cp.spawn('node', [p], {
                     detached: detached,
                     env: Object.assign({}, process.env, {
@@ -82,17 +78,20 @@ exports.launchBrokerInChildProcess = function (opts, cb) {
                 n_1.stderr.setEncoding('utf8');
                 n_1.stdout.setEncoding('utf8');
                 n_1.stderr.pipe(process.stderr);
-                var data_1 = '';
+                var stdout_1 = '';
                 n_1.stdout.on('data', function (d) {
-                    console.log('stdout => ', d);
-                    data_1 += d;
-                    if (String(data_1).match(/live-mutex broker is listening/)) {
-                        console.log('matched');
+                    stdout_1 += String(d);
+                    if (stdout_1.match(/live-mutex broker is listening/i)) {
                         n_1.stdout.removeAllListeners();
                         if (detached) {
                             n_1.unref();
                         }
-                        cb(null, n_1);
+                        cb(null, {
+                            liveMutexProcess: n_1,
+                            host: host,
+                            port: port,
+                            detached: detached
+                        });
                     }
                 });
             }

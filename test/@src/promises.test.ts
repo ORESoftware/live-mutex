@@ -4,10 +4,11 @@ import * as suman from 'suman';
 const {Test} = suman.init(module);
 const Promise = require('bluebird');
 
-///////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////
 
-Test.create(function (it, Broker, Client, inject, describe, before, $deps) {
+Test.create(['Broker', 'Client', function (b, it, inject, describe, before, $deps) {
 
+  const {Broker, Client} = b.ioc;
   const {chalk: colors} = $deps;
   const conf = Object.freeze({port: 7035});
 
@@ -19,7 +20,7 @@ Test.create(function (it, Broker, Client, inject, describe, before, $deps) {
     });
   });
 
-  describe('injected', function () {
+  describe('injected', function (b) {
     it('locks/unlocks', t => {
       const c = t.$inject.client;
       return c.lockp('a').then(function (v) {
@@ -42,4 +43,4 @@ Test.create(function (it, Broker, Client, inject, describe, before, $deps) {
     return c.unlockp('a');
   });
 
-});
+}]);

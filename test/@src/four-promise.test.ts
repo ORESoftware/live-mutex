@@ -1,15 +1,16 @@
 'use strict';
+
 import suman = require('suman');
 const Test = suman.init(module);
 
 /////////////////////////////////////////////////////////
 
-Test.create({mode: 'series'}, function (assert, before, it, Client, lmUtils, Promise) {
+Test.create({mode: 'series'}, ['Client', 'lmUtils', 'Promise', function (b, assert, before, it) {
 
+  const {Client, lmUtils, Promise} = b.ioc;
   const conf = Object.freeze({port: 7987});
 
-  before('promise', function () {
-
+  before(function () {
     return lmUtils.conditionallyLaunchSocketServer(conf)
     .then(function (data) {
       return Promise.delay(30);
@@ -20,9 +21,7 @@ Test.create({mode: 'series'}, function (assert, before, it, Client, lmUtils, Pro
       else {
         throw new Error('no error passed to reject handler');
       }
-
     });
-
   });
 
   it.cb('yes', {timeout: 1500}, t => {
@@ -40,7 +39,6 @@ Test.create({mode: 'series'}, function (assert, before, it, Client, lmUtils, Pro
   it.cb('yes', {timeout: 1500}, t => {
 
     const c = new Client(conf);
-
     c.ensure().then(function () {
       c.lock('z', function (err) {
         if (err) return t(err);
@@ -57,7 +55,6 @@ Test.create({mode: 'series'}, function (assert, before, it, Client, lmUtils, Pro
         if (err) return t(err);
         c.unlock('z', t);
       });
-
     }).catch(t);
 
   });
@@ -84,4 +81,4 @@ Test.create({mode: 'series'}, function (assert, before, it, Client, lmUtils, Pro
 
   });
 
-});
+}]);

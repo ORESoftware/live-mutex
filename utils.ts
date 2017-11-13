@@ -71,31 +71,26 @@ export const launchBrokerInChildProcess = function (opts, cb) {
 
   const host = opts.host || 'localhost';
   const port = opts.port || 8019;
-  const detached = !!opts.detached;
-
-  console.log('\n');
-  console.log('Live-Mutex launch broker options:');
-  console.log('host => ', host);
-  console.log('port => ', port);
-  console.log('detached => ', detached);
-  console.log('\n');
+  const detached = Boolean(opts.detached);
 
   function fn(cb) {
 
     ping.probe(host, port, function (err, available) {
 
       if (err) {
-        cb(err)
+         cb(err)
       }
       else if (available) {
         console.log(`live-mutex brower was already live at ${host}:${port}.`);
         cb(null, {
+          host,
+          port,
           alreadyRunning: true
         });
       }
       else {
 
-        console.log(`live-mutex is launching new broker at ${'localhost'}:${port}.`);
+        console.log(`live-mutex is launching new broker at '${host}:${port}'.`);
 
         const n = cp.spawn('node', [p], {
           detached,
@@ -119,19 +114,25 @@ export const launchBrokerInChildProcess = function (opts, cb) {
 
         n.stderr.pipe(process.stderr);
 
-        let data = '';
-
+        let stdout = '';
         n.stdout.on('data', function (d) {
-          console.log('stdout => ', d);
-          data += d;
-          if (String(data).match(/live-mutex broker is listening/)) {
-            console.log('matched');
+
+          stdout += String(d);
+
+          if (stdout.match(/live-mutex broker is listening/i)) {
+
             n.stdout.removeAllListeners();
+
             if(detached){
               n.unref();
             }
 
-            cb(null, n);
+            cb(null, {
+              liveMutexProcess: n,
+              host,
+              port,
+              detached
+            });
           }
         });
 

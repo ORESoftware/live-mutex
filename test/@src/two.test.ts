@@ -3,8 +3,9 @@ const {Test} = suman.init(module);
 
 ///////////////////////////////////////////////////////////
 
-Test.create(function (assert, describe, Client, Broker, inject, it, $deps, $core) {
+Test.create(['Broker', 'Client', function (b, assert, describe, inject, it, $deps, $core) {
 
+  const {Client, Broker} = b.ioc;
   const {lodash: _, async, chalk: colors} = $deps;
 
   const arrays = [
@@ -30,7 +31,7 @@ Test.create(function (assert, describe, Client, Broker, inject, it, $deps, $core
     }
   });
 
-  describe('inject', function (c) {
+  describe('inject', function (b, c) {
 
     arrays.forEach(a => {
 
@@ -77,4 +78,4 @@ Test.create(function (assert, describe, Client, Broker, inject, it, $deps, $core
 
   });
 
-});
+}]);

@@ -7,7 +7,7 @@ import {Client, Broker, lmUtils} from 'live-mutex';
 
 /////////////////////////////////////////////////////////////////////
 
-Test.create(function (inject, describe, before, it, $deps, $core) {
+Test.create([function (b, inject, describe, before, it, $deps, $core) {
 
   const {fs, path, assert} = $core;
   const {chalk: colors, async, lodash: _} = $deps;
@@ -33,7 +33,7 @@ Test.create(function (inject, describe, before, it, $deps, $core) {
     fs.writeFile(f, '', t);
   });
 
-  describe('inject', function (c) {
+  describe('inject', function (b, c) {
 
     function lockWriteRelease(val, cb) {
 
@@ -85,4 +85,4 @@ Test.create(function (inject, describe, before, it, $deps, $core) {
 
   });
 
-});
+}]);

@@ -2,11 +2,11 @@
 import * as suman from 'suman';
 const {Test} = suman.init(module);
 
-
 ///////////////////////////////////////////////////////////////
 
-Test.create('aa',function (it, Broker, Client, inject, describe, before, $deps) {
+Test.create(['Broker', 'Client', function (b, it, inject, describe, before, $deps) {
 
+  const {Broker, Client} = b.ioc;
   const {chalk: colors} = $deps;
   const conf = Object.freeze({port: 7034});
 
@@ -24,7 +24,7 @@ Test.create('aa',function (it, Broker, Client, inject, describe, before, $deps) 
     });
   });
 
-  describe('injected', function () {
+  describe('injected', function (b) {
 
     it.cb('locks/unlocks', t => {
 
@@ -75,4 +75,4 @@ Test.create('aa',function (it, Broker, Client, inject, describe, before, $deps) 
 
   });
 
-});
+}]);

@@ -38,45 +38,46 @@ exports.__esModule = true;
 var suman = require("suman");
 var Test = suman.init(module).Test;
 var Promise = require('bluebird');
-///////////////////////////////////////////////////////////////
-Test.create(function (it, Broker, Client, inject, describe, before, $deps) {
-    var _this = this;
-    var colors = $deps.chalk;
-    var conf = Object.freeze({ port: 7035 });
-    before(function (h) { return new Broker(conf).start(); });
-    before('get client', function (h) {
-        return new Client(conf).ensure().then(function (c) {
-            h.$inject.client = c;
+///////////////////////////////////////////////////////////////////////////////////////
+Test.create(['Broker', 'Client', function (b, it, inject, describe, before, $deps) {
+        var _this = this;
+        var _a = b.ioc, Broker = _a.Broker, Client = _a.Client;
+        var colors = $deps.chalk;
+        var conf = Object.freeze({ port: 7035 });
+        before(function (h) { return new Broker(conf).start(); });
+        before('get client', function (h) {
+            return new Client(conf).ensure().then(function (c) {
+                h.$inject.client = c;
+            });
         });
-    });
-    describe('injected', function () {
+        describe('injected', function (b) {
+            it('locks/unlocks', function (t) {
+                var c = t.$inject.client;
+                return c.lockp('a').then(function (v) {
+                    return c.unlockp('a');
+                });
+            });
+        });
         it('locks/unlocks', function (t) {
             var c = t.$inject.client;
             return c.lockp('a').then(function (v) {
                 return c.unlockp('a');
             });
         });
-    });
-    it('locks/unlocks', function (t) {
-        var c = t.$inject.client;
-        return c.lockp('a').then(function (v) {
-            return c.unlockp('a');
-        });
-    });
-    it('locks/unlocks', function (t) { return __awaiter(_this, void 0, void 0, function () {
-        var c;
-        return __generator(this, function (_a) {
-            switch (_a.label) {
-                case 0:
-                    c = t.$inject.client;
-                    return [4 /*yield*/, c.lockp('a')];
-                case 1:
-                    _a.sent();
-                    return [4 /*yield*/, Promise.delay(100)];
-                case 2:
-                    _a.sent();
-                    return [2 /*return*/, c.unlockp('a')];
-            }
-        });
-    }); });
-});
+        it('locks/unlocks', function (t) { return __awaiter(_this, void 0, void 0, function () {
+            var c;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        c = t.$inject.client;
+                        return [4 /*yield*/, c.lockp('a')];
+                    case 1:
+                        _a.sent();
+                        return [4 /*yield*/, Promise.delay(100)];
+                    case 2:
+                        _a.sent();
+                        return [2 /*return*/, c.unlockp('a')];
+                }
+            });
+        }); });
+    }]);
