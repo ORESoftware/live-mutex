@@ -11,22 +11,18 @@ Test.create(['Broker', 'Client', 'lmUtils', function (b, assert, before, describ
         assert.equal(a2z.length, 26, ' => Western alphabet is messed up.');
         var num = 100;
         var conf = Object.freeze({ port: 7028 });
-        inject(function () {
-            return {
-                broker: new Broker(conf).ensure()
-            };
+        inject(function (j) {
+            j.register('broker', new Broker(conf).ensure());
         });
-        var client;
-        before('get client', function (h) {
-            return new Client(conf).ensure().then(function (c) {
-                client = c;
-            });
+        inject(function (j) {
+            j.register('client', new Client(conf).ensure());
         });
         var p = path.resolve(__dirname + '/../fixtures/alphabet.test');
         before.cb('clean up file', function (h) {
             fs.writeFile(p, '', h);
         });
         describe('post', function (b) {
+            var client = b.getInjectedValue('client');
             before.cb('yo', function (h) {
                 async.each(a2z, function (val, cb) {
                     client.lock('foo', function (err, unlock) {

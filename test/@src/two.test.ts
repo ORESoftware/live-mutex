@@ -16,22 +16,18 @@ Test.create(['Broker', 'Client', function (b, assert, describe, inject, it, $dep
   ];
 
   const conf = Object.freeze({port: 7037});
-
-  let p;
-
-  inject(() => {
-    return {
-      broker: p = new Broker(conf).ensure()
-    }
+  
+  inject(j => {
+    j.register('broker', new Broker(conf).ensure());
+  });
+  
+  inject(j => {
+    j.register('client', new Client(conf).ensure());
   });
 
-  inject(() => {
-    return {
-      c: p.then(v => new Client(conf).ensure())
-    }
-  });
-
-  describe('inject', function (b, c) {
+  describe('inject', b => {
+    
+    const c = b.getInjectedValue('client');
 
     arrays.forEach(a => {
 

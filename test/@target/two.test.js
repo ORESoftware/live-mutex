@@ -13,18 +13,14 @@ Test.create(['Broker', 'Client', function (b, assert, describe, inject, it, $dep
             [1, 2, 3, 4, 5, 6, 7, 8, 9]
         ];
         var conf = Object.freeze({ port: 7037 });
-        var p;
-        inject(function () {
-            return {
-                broker: p = new Broker(conf).ensure()
-            };
+        inject(function (j) {
+            j.register('broker', new Broker(conf).ensure());
         });
-        inject(function () {
-            return {
-                c: p.then(function (v) { return new Client(conf).ensure(); })
-            };
+        inject(function (j) {
+            j.register('client', new Client(conf).ensure());
         });
-        describe('inject', function (b, c) {
+        describe('inject', function (b) {
+            var c = b.getInjectedValue('client');
             arrays.forEach(function (a) {
                 describe.delay('resumes', function (b) {
                     async.map(a, function (val, cb) {
