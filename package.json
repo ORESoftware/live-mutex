@@ -1,6 +1,6 @@
 {
   "name": "live-mutex",
-  "version": "0.0.10027",
+  "version": "0.0.10028",
   "description": "Simple mutex that uses a TCP server; useful if you cannot install Redis, etc.",
   "main": "index.js",
   "typings": "index.d.ts",
