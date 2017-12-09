@@ -18,7 +18,7 @@ process.setMaxListeners(100);
 process.on('warning', function (e) {
     console.error(e.stack || e);
 });
-function addWsLockKey(broker, ws, key) {
+var addWsLockKey = function (broker, ws, key) {
     var v;
     if (!(v = broker.wsLock.get(ws))) {
         v = [];
@@ -27,8 +27,8 @@ function addWsLockKey(broker, ws, key) {
     if (v.indexOf(key) < 0) {
         v.push(key);
     }
-}
-function removeWsLockKey(broker, ws, key) {
+};
+var removeWsLockKey = function (broker, ws, key) {
     var v;
     if (v = broker.wsLock.get(ws)) {
         var i = v.indexOf(key);
@@ -37,7 +37,7 @@ function removeWsLockKey(broker, ws, key) {
             return true;
         }
     }
-}
+};
 var validOptions = [
     'lockExpiresAfter',
     'timeoutToFindNewLockholder',
@@ -539,7 +539,7 @@ var Broker = (function () {
             this.wsLock.forEach(function (v, k) {
                 var keys = _this.wsLock.get(k);
                 if (keys) {
-                    var i = keys.indexOf[key];
+                    var i = keys.indexOf(key);
                     if (i >= 0) {
                         keys.splice(i, 1);
                     }

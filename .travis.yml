@@ -18,7 +18,7 @@ addons:
 before_install: 'if [[ `npm -v` != 5* ]]; then npm i -g npm@5; fi'
 install:
   - npm install
-script: './@test.sh'
+script: './scripts/test.sh'
 after_script: 'npm install coveralls && cat coverage/lcov.info | ./node_modules/.bin/coveralls'
 notifications:
   email: false
