@@ -14,7 +14,7 @@ WHICH_SUMAN_TOOLS=$(which suman-tools);
 export PATH=${PATH}:"$(pwd)/node_modules/.bin"
 
 if [[ -z ${WHICH_SUMAN_TOOLS} ]]; then
-    npm install suman-tools;
+    npm install -g suman-tools;
 fi
 
 IS_GLOBALLY_SYMLINKED=`suman-tools --is-symlinked-globally="${LIB_NAME}"`
@@ -35,5 +35,7 @@ if [[ -z ${WHICH_SUMAN} || "${NODE_ENV}" != "local" ]]; then
     npm install -g suman@latest --silent
     #  npm install -g "sumanjs/suman" 2> /dev/null
 fi
+
+npm link suman
 
 suman --coverage test/@src/*.ts #--inherit-stdio # --inherit-all-stdio

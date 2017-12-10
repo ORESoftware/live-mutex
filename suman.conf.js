@@ -23,6 +23,7 @@ module.exports = Object.freeze({
   browser: 'Firefox',                 // browser to open test results with
 
   //boolean
+  viewGantt: true,
   errorsOnly: false,
   replayErrorsAtRunnerEnd: true,
   allowArrowFunctionsForTestSuites: false,

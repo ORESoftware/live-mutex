@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Gantt Chart Example 1</title>
+  <link type="text/css" href="http://mbostock.github.io/d3/style.css" rel="stylesheet"/>
+
+
+  <style>
+    html, body, #wrapper {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+    }
+
+    .chart {
+      font-family: Arial, sans-serif;
+      font-size: 12px;
+    }
+
+    .axis path, .axis line {
+      fill: none;
+      stroke: #000;
+      shape-rendering: crispEdges;
+    }
+
+    .bar {
+      fill: #33b5e5;
+    }
+
+    .bar-failed {
+      fill: #CC0000;
+    }
+
+    .bar-running {
+      fill: #669900;
+    }
+
+    .bar-succeeded {
+      fill: #33b5e5;
+    }
+
+    .bar-killed {
+      fill: #ffbb33;
+    }
+
+    #forkme_banner {
+      display: block;
+      position: absolute;
+      top: 0;
+      right: 10px;
+      z-index: 10;
+      padding: 10px 50px 10px 10px;
+      color: #fff;
+      background: url('http://dk8996.github.io/Gantt-Chart/images/blacktocat.png') #0090ff no-repeat 95% 50%;
+      font-weight: 700;
+      box-shadow: 0 0 10px rgba(0, 0, 0, .5);
+      border-bottom-left-radius: 2px;
+      border-bottom-right-radius: 2px;
+      text-decoration: none;
+    }
+  </style>
+
+</head>
+<body>
+
+<script type="text/javascript" src="http://d3js.org/d3.v3.min.js"></script>
+<script type="text/javascript" src="http://static.mentful.com/gantt-chart-d3v2.js"></script>
+
+
+<script>
+
+  let tasksOriginalExample = [
+    {
+      "startDate": new Date("Sun Dec 09 01:36:45 EST 2012"),
+      "endDate": new Date("Sun Dec 09 02:36:45 EST 2012"),
+      "taskName": "E Job",
+      "status": "RUNNING"
+    },
+    {
+      "startDate": new Date("Sun Dec 09 04:56:32 EST 2012"),
+      "endDate": new Date("Sun Dec 09 06:35:47 EST 2012"),
+      "taskName": "A Job",
+      "status": "RUNNING"
+    },
+    {
+      "startDate": new Date("Sun Dec 09 06:29:53 EST 2012"),
+      "endDate": new Date("Sun Dec 09 06:34:04 EST 2012"),
+      "taskName": "D Job",
+      "status": "RUNNING"
+    }
+  ];
+
+  let tasksRaw = JSON.parse('[{"startDate":1512889891771,"endDate":1512889893103,"transformStartDate":1512889891603,"transformEndDate":1512889891763,"taskName":"/Users/alexamil/WebstormProjects/oresoftware/live-mutex/test/@src/alphabet.test.ts","status":"SUCCEEDED"},{"startDate":1512889891761,"endDate":1512889892940,"transformStartDate":1512889891608,"transformEndDate":1512889891749,"taskName":"/Users/alexamil/WebstormProjects/oresoftware/live-mutex/test/@src/four-promise.test.ts","status":"SUCCEEDED"},{"startDate":1512889891778,"endDate":1512889893098,"transformStartDate":1512889891611,"transformEndDate":1512889891763,"taskName":"/Users/alexamil/WebstormProjects/oresoftware/live-mutex/test/@src/four-promise.test2.ts","status":"SUCCEEDED"},{"startDate":1512889891936,"endDate":1512889897015,"transformStartDate":1512889891752,"transformEndDate":1512889891926,"taskName":"/Users/alexamil/WebstormProjects/oresoftware/live-mutex/test/@src/one.test.ts","status":"SUCCEEDED"},{"startDate":1512889891967,"endDate":1512889893283,"transformStartDate":1512889891765,"transformEndDate":1512889891956,"taskName":"/Users/alexamil/WebstormProjects/oresoftware/live-mutex/test/@src/promises.test.ts","status":"SUCCEEDED"},{"startDate":1512889891986,"endDate":1512889893131,"transformStartDate":1512889891778,"transformEndDate":1512889891980,"taskName":"/Users/alexamil/WebstormProjects/oresoftware/live-mutex/test/@src/ts.test.ts","status":"SUCCEEDED"},{"startDate":1512889892135,"endDate":1512889896766,"transformStartDate":1512889891926,"transformEndDate":1512889892130,"taskName":"/Users/alexamil/WebstormProjects/oresoftware/live-mutex/test/@src/two.test.ts","status":"SUCCEEDED"},{"startDate":1512889892166,"endDate":1512889893271,"transformStartDate":1512889891957,"transformEndDate":1512889892157,"taskName":"/Users/alexamil/WebstormProjects/oresoftware/live-mutex/test/@src/z.test.ts","status":"SUCCEEDED"}]');
+
+  let tasks = [];
+
+  tasksRaw.forEach(function (t) {
+
+    // we have two separate tasks per item, one for transform, one for run
+    if (t.transformStartDate && t.transformEndDate) {
+      tasks.push({
+        taskName: t.taskName,
+        startDate: new Date(t.transformStartDate),
+        endDate: new Date(t.transformEndDate),
+        status: 'SUCCEEDED'
+      });
+    }
+
+    if (t.startDate && t.endDate) {
+      tasks.push({
+        taskName: t.taskName,
+        startDate: new Date(t.startDate),
+        endDate: new Date(t.endDate),
+        status: t.status
+      });
+    }
+  });
+
+  let taskStatus = {
+    "SUCCEEDED": "bar",
+    "FAILED": "bar-failed",
+    "RUNNING": "bar-running",
+    "KILLED": "bar-killed"
+  };
+
+
+  let taskNames = tasks.map(function (t) {
+    return t.taskName;
+  });
+
+  tasks.sort(function (a, b) {
+    return a.endDate - b.endDate;
+  });
+
+
+  tasks.sort(function (a, b) {
+    return a.startDate - b.startDate;
+  });
+
+  let format = "%H:%M:%S";
+  let gantt = d3.gantt().taskTypes(taskNames).taskStatus(taskStatus).tickFormat(format);
+
+  gantt(tasks);
+
+</script>
+
+
+</body>
+</html>

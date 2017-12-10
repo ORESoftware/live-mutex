@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>
+    Title
+  </title>
+  <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+</head>
+<body>
+
+
+<script type="text/javascript">
+
+  google.charts.load("current", {packages: ["timeline"]});
+  google.charts.setOnLoadCallback(drawChart);
+
+  function drawChart() {
+    var container = document.getElementById('suman-test-timeline');
+    var chart = new google.visualization.Timeline(container);
+    var dataTable = new google.visualization.DataTable();
+
+    dataTable.addColumn({type: 'string', id: 'Term'});
+    dataTable.addColumn({type: 'string', id: 'Name'});
+    dataTable.addColumn({type: 'date', id: 'Start'});
+    dataTable.addColumn({type: 'date', id: 'End'});
+
+    let tasksRaw = JSON.parse('[{"startDate":1512889891761,"endDate":1512889892940,"transformStartDate":1512889891608,"transformEndDate":1512889891749,"taskName":"four-promise.test.ts","status":"SUCCEEDED"},{"startDate":1512889891771,"endDate":1512889893103,"transformStartDate":1512889891603,"transformEndDate":1512889891763,"taskName":"alphabet.test.ts","status":"SUCCEEDED"},{"startDate":1512889891778,"endDate":1512889893098,"transformStartDate":1512889891611,"transformEndDate":1512889891763,"taskName":"four-promise.test2.ts","status":"SUCCEEDED"},{"startDate":1512889891936,"endDate":1512889897015,"transformStartDate":1512889891752,"transformEndDate":1512889891926,"taskName":"one.test.ts","status":"SUCCEEDED"},{"startDate":1512889891967,"endDate":1512889893283,"transformStartDate":1512889891765,"transformEndDate":1512889891956,"taskName":"promises.test.ts","status":"SUCCEEDED"},{"startDate":1512889891986,"endDate":1512889893131,"transformStartDate":1512889891778,"transformEndDate":1512889891980,"taskName":"ts.test.ts","status":"SUCCEEDED"},{"startDate":1512889892135,"endDate":1512889896766,"transformStartDate":1512889891926,"transformEndDate":1512889892130,"taskName":"two.test.ts","status":"SUCCEEDED"},{"startDate":1512889892166,"endDate":1512889893271,"transformStartDate":1512889891957,"transformEndDate":1512889892157,"taskName":"z.test.ts","status":"SUCCEEDED"}]');
+
+    let tasks = [];
+    let colors = [];
+
+    tasksRaw.forEach(function (t, i) {
+
+      // we have two separate tasks per item, one for transform, one for run
+      if (t.transformStartDate && t.transformEndDate) {
+        tasks.push([
+          String(i + 1),
+          t.taskName,
+          new Date(t.transformStartDate),
+          new Date(t.transformEndDate),
+        ]);
+      }
+
+      if (t.startDate && t.endDate) {
+
+        if (t.status === 'FAILED') {
+          colors.push('yellow');
+        }
+        else if (t.status === 'SUCCEEDED') {
+          colors.push('green');
+        }
+        else {
+          colors.push('blue');
+        }
+
+        tasks.push([
+          String(i + 1),
+          t.taskName,
+          new Date(t.startDate),
+          new Date(t.endDate)
+        ]);
+      }
+    });
+
+    dataTable.addRows(tasks);
+
+    // dataTable.addRows([
+    //   ['1', 'George Washington', new Date(1789, 3, 30), new Date(1797, 2, 4)],
+    //   ['2', 'John Adams', new Date(1797, 2, 4), new Date(1801, 2, 4)],
+    //   ['3', 'Thomas Jefferson', new Date(1801, 2, 4), new Date(1809, 2, 4)]
+    // ]);
+
+    var options = {
+      colors: colors
+      // timeline: { singleColor: '#8d8' },
+    };
+
+    chart.draw(dataTable, options);
+  }
+
+
+</script>
+
+<div id="suman-test-timeline" style="height: 900px;"></div>
+
+</body>
+</html>
