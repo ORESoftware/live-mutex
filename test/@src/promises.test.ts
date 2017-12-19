@@ -16,13 +16,13 @@ Test.create(['Broker', 'Client', function (b, it, inject, describe, before, $dep
 
   before('get client', h => {
     return new Client(conf).ensure().then(function (c) {
-      h.$inject.client = c;
+      h.supply.client = c;
     });
   });
 
   describe('injected', function (b) {
     it('locks/unlocks', t => {
-      const c = t.$inject.client;
+      const c = t.supply.client;
       return c.lockp('a').then(function (v) {
         return c.unlockp('a');
       });
@@ -30,14 +30,14 @@ Test.create(['Broker', 'Client', function (b, it, inject, describe, before, $dep
   });
 
   it('locks/unlocks', t => {
-    const c = t.$inject.client;
+    const c = t.supply.client;
     return c.lockp('a').then(function (v) {
       return c.unlockp('a');
     });
   });
 
   it('locks/unlocks', async t => {
-    const c = t.$inject.client;
+    const c = t.supply.client;
     await c.lockp('a');
     await Promise.delay(100);
     return c.unlockp('a');

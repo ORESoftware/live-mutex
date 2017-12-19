@@ -13,7 +13,7 @@
     "url": "git+https://github.com/ORESoftware/live-mutex.git"
   },
   "author": "Olegzandr",
-  "license": "ISC",
+  "license": "MIT",
   "bugs": {
     "url": "https://github.com/ORESoftware/live-mutex/issues"
   },

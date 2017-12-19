@@ -6,7 +6,6 @@ var Test = suman.init(module);
 Test.create({ mode: 'series' }, ['LvMtxClient', 'lmUtils', 'Promise', function (b, assert, before, it) {
         var _a = b.ioc, LvMtxClient = _a.LvMtxClient, lmUtils = _a.lmUtils, Promise = _a.Promise;
         var conf = Object.freeze({ port: 7988 });
-        console.log('four promise tests');
         before('promise', function () {
             return lmUtils.conditionallyLaunchSocketServer(conf)
                 .then(function (data) {

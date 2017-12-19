@@ -47,19 +47,19 @@ Test.create(['Broker', 'Client', function (b, it, inject, describe, before, $dep
         before(function (h) { return new Broker(conf).start(); });
         before('get client', function (h) {
             return new Client(conf).ensure().then(function (c) {
-                h.$inject.client = c;
+                h.supply.client = c;
             });
         });
         describe('injected', function (b) {
             it('locks/unlocks', function (t) {
-                var c = t.$inject.client;
+                var c = t.supply.client;
                 return c.lockp('a').then(function (v) {
                     return c.unlockp('a');
                 });
             });
         });
         it('locks/unlocks', function (t) {
-            var c = t.$inject.client;
+            var c = t.supply.client;
             return c.lockp('a').then(function (v) {
                 return c.unlockp('a');
             });
@@ -69,7 +69,7 @@ Test.create(['Broker', 'Client', function (b, it, inject, describe, before, $dep
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0:
-                        c = t.$inject.client;
+                        c = t.supply.client;
                         return [4 /*yield*/, c.lockp('a')];
                     case 1:
                         _a.sent();
