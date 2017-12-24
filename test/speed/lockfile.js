@@ -2,7 +2,7 @@ const path = require('path');
 const async = require('async');
 const lf = require('lockfile');
 
-const a = Array.apply(null, {length: 1000});
+const a = Array.apply(null, {length: 100});
 const file = path.resolve(process.env.HOME + '/speed-test.lock');
 
 const start = Date.now();
