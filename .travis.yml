@@ -16,10 +16,9 @@ addons:
     packages:
       - g++-4.8
 
-before_install: 'if [[ `npm -v` != 5* ]]; then npm i -g npm@5; fi'
-install:
-  - npm install
+before_install: './scripts/travis/before_install.sh'
+install: './scripts/travis/install.sh'
 script: './scripts/test.sh'
-after_script: 'npm install coveralls && cat coverage/lcov.info | ./node_modules/.bin/coveralls'
+after_script: './scripts/travis/after_script.sh'
 notifications:
   email: false
