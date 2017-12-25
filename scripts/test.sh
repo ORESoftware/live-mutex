@@ -8,7 +8,7 @@ fi
 
 LIB_NAME="live-mutex";
 
-WHICH_SUMAN_TOOLS=$(which suman-tools);
+WHICH_SUMAN_TOOLS="$(which suman-tools)";
 
 # with the PATH set, we can pick up local NPM executables
 export PATH=${PATH}:"$(pwd)/node_modules/.bin"
@@ -29,13 +29,13 @@ if [[ ${IS_LOCALLY_SYMLINKED} != *"affirmative"* || ${IS_GLOBALLY_SYMLINKED} != 
 fi
 
 
-WHICH_SUMAN=$(which suman);
+WHICH_SUMAN="$(which suman)";
 if [[ -z ${WHICH_SUMAN} || "${NODE_ENV}" != "local" ]]; then
-    echo "installing suman locally...";
+    echo "installing suman globally...";
     npm install -g suman@latest --silent
-    #  npm install -g "sumanjs/suman" 2> /dev/null
 fi
 
+echo "linking global suman to local node_modules...";
 npm link suman
 
-suman --coverage test/@src/*.ts #--inherit-stdio # --inherit-all-stdio
+suman --coverage test/@src/*.ts --inherit-all-stdio #--inherit-stdio
