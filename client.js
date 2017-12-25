@@ -6,7 +6,6 @@ var net = require("net");
 var uuidV4 = require('uuid/v4');
 var colors = require('chalk');
 var JSONStream = require('JSONStream');
-var debug = require('debug')('live-mutex');
 var loginfo = console.log.bind(console, ' [live-mutex client] =>');
 var logerr = console.error.bind(console, ' [live-mutex client] =>');
 var weAreDebugging = require('./lib/we-are-debugging');
@@ -16,6 +15,9 @@ if (weAreDebugging) {
 setTimeout(function () {
     if (process.listenerCount('warning') < 1) {
         loginfo("recommends you attach a process.on('warning') event handler.");
+    }
+    if (process.listenerCount('error') < 1) {
+        loginfo("recommends you attach a process.on('error') event handler.");
     }
 }, 1000);
 var totalNoop = function () {
@@ -115,13 +117,13 @@ var Client = (function () {
                 var fn = _this.resolutions[uuid];
                 var to = _this.timeouts[uuid];
                 if (fn && to) {
-                    throw new Error('Function and timeout both exist => Live-Mutex implementation error.');
+                    process.emit('error', new Error('Function and timeout both exist => Live-Mutex implementation error.'));
                 }
                 if (fn) {
                     fn.call(_this, null, data);
                 }
                 else if (to) {
-                    logerr('Client side lock/unlock request timed-out.');
+                    process.emit('warning', new Error('Client side lock/unlock request timed-out.'));
                     delete _this.timeouts[uuid];
                     if (data.type === 'lock') {
                         _this.write({
@@ -132,8 +134,8 @@ var Client = (function () {
                     }
                 }
                 else {
-                    logerr('Live-mutex implementation warning, ' +
-                        'no fn with that uuid in the resolutions hash => \n' + util.inspect(data));
+                    process.emit('warning', new Error('Live-mutex implementation warning, ' +
+                        'no fn with that uuid in the resolutions hash => ' + util.inspect(data)));
                     if (data.acquired === true && data.type === 'lock') {
                         _this.write({
                             uuid: uuid,
@@ -144,17 +146,20 @@ var Client = (function () {
                 }
             }
             else {
-                logerr(colors.yellow('Live-Mutex implementation issue => message did not contain uuid =>'), '\n', util.inspect(data));
+                process.emit('warning', 'potential Live-Mutex implementation error => message did not contain uuid =>' + util.inspect(data));
             }
         };
         this.ensure = this.connect = function (cb) {
             var _this = this;
+            if (cb && typeof cb !== 'function') {
+                throw new Error('optional argument to ensure/connect must be a function.');
+            }
             if (connectPromise) {
                 return connectPromise.then(function (val) {
-                    cb && cb(null, val);
+                    cb && cb.call(_this, null, val);
                     return val;
                 }, function (err) {
-                    cb && cb(err);
+                    cb && cb.call(this, err);
                     return Promise.reject(err);
                 });
             }
@@ -174,7 +179,7 @@ var Client = (function () {
                     resolve(_this);
                 });
                 ws.once('end', function () {
-                    loginfo('client stream "end" event occurred.');
+                    process.emit('info', 'client stream "end" event occurred.');
                 });
                 ws.once('error', onFirstErr);
                 ws.on('close', function () {
@@ -182,7 +187,7 @@ var Client = (function () {
                 });
                 ws.setEncoding('utf8');
                 ws.on('error', function (e) {
-                    logerr('client error', e.stack || e);
+                    process.emit('error', 'live-mutex client error: ' + e.stack || util.inspect(e));
                 });
                 ws.pipe(JSONStream.parse()).on('data', onData)
                     .once('error', function (e) {
@@ -194,10 +199,10 @@ var Client = (function () {
                 });
             })
                 .then(function (val) {
-                cb && (cb = cb.bind(_this)) && cb(null, val);
+                cb && cb.call(_this, null, val);
                 return val;
             }, function (err) {
-                cb && (cb = cb.bind(_this)) && cb(err);
+                cb && cb.call(_this, err);
                 return Promise.reject(err);
             });
         };
@@ -249,7 +254,7 @@ var Client = (function () {
                 throw new Error(' => Live-Mutex implementation error => bad key.');
             }
             if (data.error) {
-                logerr(colors.bgRed(data.error), '\n');
+                process.emit('error', data.error);
             }
             if ([data.acquired, data.retry].filter(function (i) { return i; }).length > 1) {
                 throw new Error(' => Live-Mutex implementation error.');

@@ -7,12 +7,11 @@ var async = require('async');
 var colors = require('chalk');
 var uuidV4 = require('uuid/v4');
 var JSONStream = require('JSONStream');
-var debug = require('debug')('live-mutex');
 var loginfo = console.log.bind(console, '[live-mutex broker] =>');
 var logerr = console.error.bind(console, '[live-mutex broker] =>');
 var weAreDebugging = require('./lib/we-are-debugging');
 if (weAreDebugging) {
-    loginfo('Live-Mutex broker is in debug mode. Timeouts are turned off.');
+    logerr('Live-Mutex broker is in debug mode. Timeouts are turned off.');
 }
 process.setMaxListeners(100);
 process.on('warning', function (e) {
@@ -95,7 +94,7 @@ var Broker = (function () {
             }
             ws.write(JSON.stringify(data) + '\n', 'utf8', function (err) {
                 if (err) {
-                    logerr(err.stack || err, '\n');
+                    process.emit('warning', err);
                     cleanUp();
                 }
                 cb && cb(null);
@@ -135,7 +134,7 @@ var Broker = (function () {
                 var lck = _this.locks[key];
                 var uuid = data.uuid;
                 if (!lck) {
-                    logerr('Lock must have expired.');
+                    process.emit('warning', "Lock for key \"" + key + "\" has probably expired.");
                     return;
                 }
                 var ln = lck.notify.length;
@@ -149,7 +148,7 @@ var Broker = (function () {
             else if (data.type === 'lock-received-rejected') {
                 var lck = _this.locks[key];
                 if (!lck) {
-                    logerr('Lock must have expired.');
+                    process.emit('warning', "Lock for key \"" + key + "\" has probably expired.");
                     return;
                 }
                 _this.rejected[data.uuid] = true;
@@ -159,7 +158,7 @@ var Broker = (function () {
                 _this.retrieveLockInfo(data, ws);
             }
             else {
-                logerr(colors.red.bold("implementation error, bad data sent to broker => \n" + util.inspect(data)));
+                process.emit('error', "implementation error, bad data sent to broker => " + util.inspect(data));
                 _this.send(ws, {
                     key: data.key,
                     uuid: data.uuid,
@@ -170,7 +169,7 @@ var Broker = (function () {
         var connectedClients = new Map();
         var firstConnection = true;
         var wss = net.createServer(function (ws) {
-            loginfo('client connected.');
+            process.emit('info', 'client has connected to live-mutex broker.');
             connectedClients.set(ws, true);
             var endWS = function () {
                 try {
@@ -192,7 +191,7 @@ var Broker = (function () {
                 connectedClients.delete(ws);
             });
             ws.on('error', function (err) {
-                logerr('client error', err.stack || err, '\n');
+                process.emit('error', new Error('live-mutex client error ' + (err.stack || err)));
             });
             if (!_this.wsToKeys.get(ws)) {
                 _this.wsToKeys.set(ws, []);
@@ -230,7 +229,7 @@ var Broker = (function () {
                     return;
                 }
                 callable = false;
-                logerr(event + " event has occurred.");
+                process.emit('warning', event + " event has occurred.");
                 connectedClients.forEach(function (v, k, map) {
                     k.destroy();
                 });
@@ -244,27 +243,32 @@ var Broker = (function () {
         process.once('SIGINT', sigEvent('SIGINT'));
         process.once('SIGTERM', sigEvent('SIGTERM'));
         wss.on('error', function (err) {
-            logerr(err.stack || err);
+            process.emit('error', new Error('live-mutex broker error' + (err.stack || err)));
         });
         var count = null;
         setInterval(function () {
             wss.getConnections(function (err, data) {
-                err && logerr(err);
-                if (data && data !== count) {
+                if (err) {
+                    process.emit('warning', err);
+                }
+                else if (data !== count) {
                     count = data;
-                    logerr('connection information =>', data);
+                    process.emit('info', 'live-mutex connection information: ' + data);
                 }
             });
-        }, 3000);
+        }, 8000);
         var brokerPromise = null;
         this.ensure = this.start = function (cb) {
             var _this = this;
+            if (cb && typeof cb !== 'function') {
+                throw new Error('optional argument to ensure/connect must be a function.');
+            }
             if (brokerPromise) {
                 return brokerPromise.then(function (val) {
-                    cb && cb(null, val);
+                    cb && cb.call(_this, null, val);
                     return val;
                 }, function (err) {
-                    cb && cb(err);
+                    cb && cb.call(this, err);
                     return Promise.reject(err);
                 });
             }
@@ -281,10 +285,10 @@ var Broker = (function () {
                 });
             })
                 .then(function (val) {
-                cb && cb(null, val);
+                cb && cb.call(_this, null, val);
                 return val;
             }, function (err) {
-                cb && cb(err);
+                cb && cb.call(this, err);
                 return Promise.reject(err);
             });
         };
@@ -575,7 +579,7 @@ var Broker = (function () {
             }
         }
         else {
-            console.error(colors.red.bold(' => Live-Mutex Usage / implementation error => this should not happen => no lock with key => '), colors.red('"' + key + '"'));
+            process.emit('error', new Error('Live-Mutex implementation error => no lock with key => "' + key + '"'));
             this.wsLock.forEach(function (v, k) {
                 var keys = _this.wsLock.get(k);
                 if (keys) {
@@ -593,7 +597,7 @@ var Broker = (function () {
                     lockRequestCount: 0,
                     type: 'unlock',
                     unlocked: true,
-                    error: ' => Live-Mutex warning => no lock with key [1] => "' + key + '"'
+                    error: 'Live-Mutex warning => no lock with key [1] => "' + key + '"'
                 });
             }
         }

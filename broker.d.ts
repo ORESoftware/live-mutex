@@ -63,6 +63,7 @@ export declare class Broker {
     timeouts: IUuidTimer;
     locks: ILockHash;
     ensure: TEnsure;
+    start: TEnsure;
     wsLock: Map<Socket, Array<string>>;
     wsToKeys: Map<Socket, Array<string>>;
     bookkeeping: IBookkeepingHash;

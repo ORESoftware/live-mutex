@@ -16,8 +16,6 @@ const JSONStream = require('JSONStream');
 import lmUtils from './utils';
 import Timer = NodeJS.Timer;
 import Socket = NodeJS.Socket;
-
-const debug = require('debug')('live-mutex');
 const loginfo = console.log.bind(console, '[live-mutex broker] =>');
 const logerr = console.error.bind(console, '[live-mutex broker] =>');
 
@@ -25,7 +23,7 @@ const logerr = console.error.bind(console, '[live-mutex broker] =>');
 
 const weAreDebugging = require('./lib/we-are-debugging');
 if (weAreDebugging) {
-  loginfo('Live-Mutex broker is in debug mode. Timeouts are turned off.');
+  logerr('Live-Mutex broker is in debug mode. Timeouts are turned off.');
 }
 
 process.setMaxListeners(100);
@@ -145,6 +143,7 @@ export class Broker {
   timeouts: IUuidTimer;
   locks: ILockHash;
   ensure: TEnsure;
+  start: TEnsure;
   wsLock: Map<Socket, Array<string>>;  // Array<uuid> to be exact
   wsToKeys: Map<Socket, Array<string>>;
   bookkeeping: IBookkeepingHash;
@@ -217,7 +216,7 @@ export class Broker {
       
       ws.write(JSON.stringify(data) + '\n', 'utf8', err => {
         if (err) {
-          logerr(err.stack || err, '\n');
+          process.emit('warning', err);
           cleanUp();
         }
         cb && cb(null);
@@ -263,7 +262,7 @@ export class Broker {
         const lck = this.locks[key];
         const uuid = data.uuid;
         if (!lck) {
-          logerr('Lock must have expired.');
+          process.emit('warning', `Lock for key "${key}" has probably expired.`);
           return;
         }
         
@@ -280,7 +279,7 @@ export class Broker {
       else if (data.type === 'lock-received-rejected') {
         const lck = this.locks[key];
         if (!lck) {
-          logerr('Lock must have expired.');
+          process.emit('warning', `Lock for key "${key}" has probably expired.`);
           return;
         }
         this.rejected[data.uuid] = true;
@@ -290,7 +289,8 @@ export class Broker {
         this.retrieveLockInfo(data, ws);
       }
       else {
-        logerr(colors.red.bold(`implementation error, bad data sent to broker => \n${util.inspect(data)}`));
+        
+        process.emit('error', `implementation error, bad data sent to broker => ${util.inspect(data)}`);
         
         this.send(ws, {
           key: data.key,
@@ -307,8 +307,7 @@ export class Broker {
     
     const wss = net.createServer(ws => {
       
-      loginfo('client connected.');
-      
+      process.emit('info', 'client has connected to live-mutex broker.');
       connectedClients.set(ws, true);
       
       let endWS = function () {
@@ -336,7 +335,7 @@ export class Broker {
       });
       
       ws.on('error', function (err) {
-        logerr('client error', err.stack || err, '\n');
+        process.emit('error', new Error('live-mutex client error ' + (err.stack || err)));
       });
       
       if (!this.wsToKeys.get(ws)) {
@@ -380,7 +379,7 @@ export class Broker {
           return;
         }
         callable = false;
-        logerr(`${event} event has occurred.`);
+        process.emit('warning', `${event} event has occurred.`);
         connectedClients.forEach(function (v, k, map) {
           // destroy each connected client
           k.destroy();
@@ -397,32 +396,38 @@ export class Broker {
     process.once('SIGTERM', sigEvent('SIGTERM'));
     
     wss.on('error', function (err) {
-      logerr(err.stack || err);
+      process.emit('error', new Error('live-mutex broker error' + (err.stack || err)));
     });
     
     let count = null;
     
     setInterval(function () {
       wss.getConnections(function (err, data) {
-        err && logerr(err);
-        if (data && data !== count) {
+        if (err) {
+          process.emit('warning', err);
+        }
+        else if (data !== count) {
           count = data;
-          logerr('connection information =>', data);
+          process.emit('info', 'live-mutex connection information: ' + data);
         }
       });
-    }, 3000);
+    }, 8000);
     
     let brokerPromise = null;
     
     this.ensure = this.start = function (cb?: Function) {
       
+      if (cb && typeof cb !== 'function') {
+        throw new Error('optional argument to ensure/connect must be a function.');
+      }
+      
       if (brokerPromise) {
-        return brokerPromise.then(function (val) {
-            cb && cb(null, val);
+        return brokerPromise.then((val) => {
+            cb && cb.call(this, null, val);
             return val;
           },
           function (err) {
-            cb && cb(err);
+            cb && cb.call(this, err);
             return Promise.reject(err);
           });
       }
@@ -443,12 +448,12 @@ export class Broker {
         });
         
       })
-      .then(function (val) {
-          cb && cb(null, val);
+      .then((val) => {
+          cb && cb.call(this, null, val);
           return val;
         },
         function (err) {
-          cb && cb(err);
+          cb && cb.call(this, err);
           return Promise.reject(err);
         });
       
@@ -879,8 +884,7 @@ export class Broker {
     }
     else {
       
-      console.error(colors.red.bold(' => Live-Mutex Usage / implementation error => this should not happen => no lock with key => '),
-        colors.red('"' + key + '"'));
+      process.emit('error', new Error('Live-Mutex implementation error => no lock with key => "' + key + '"'));
       
       // since the lock no longer exists for this key, remove ownership of this key
       this.wsLock.forEach((v, k) => {
@@ -903,7 +907,7 @@ export class Broker {
           lockRequestCount: 0,
           type: 'unlock',
           unlocked: true,
-          error: ' => Live-Mutex warning => no lock with key [1] => "' + key + '"'
+          error: 'Live-Mutex warning => no lock with key [1] => "' + key + '"'
         });
       }
     }

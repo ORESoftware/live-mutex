@@ -38,4 +38,4 @@ fi
 echo "linking global suman to local node_modules...";
 npm link suman
 
-suman --coverage test/@src/*.ts --inherit-all-stdio #--inherit-stdio
+suman --coverage test/@src/*.ts # --inherit-all-stdio #--inherit-stdio
