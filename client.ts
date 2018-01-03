@@ -145,11 +145,10 @@ export class Client {
     
     this.isOpen = false;
     const opts = this.opts = $opts || {};
-    assert(typeof opts === 'object', ' => Bad arguments to live-mutex client constructor.');
+    assert(typeof opts === 'object', 'Bad arguments to live-mutex client constructor - options must be an object.');
     
     if (cb) {
-      assert(typeof cb === 'function',
-        'optional second argument to Live-Mutex Client constructor must be a function.');
+      assert(typeof cb === 'function', 'optional second argument to Live-Mutex Client constructor must be a function.');
       cb = cb.bind(this)
     }
     
@@ -167,8 +166,7 @@ export class Client {
     if ('port' in opts) {
       
       assert(Number.isInteger(opts.port), ' => "port" option needs to be an integer.');
-      assert(opts.port > 1024 && opts.port < 49152,
-        ' => "port" integer needs to be in range (1025-49151).');
+      assert(opts.port > 1024 && opts.port < 49152, ' => "port" integer needs to be in range (1025-49151).');
     }
     
     if ('listener' in opts) {
@@ -394,8 +392,8 @@ export class Client {
   }
   
   addListener(key, fn) {
-    assert.equal(typeof key, 'string', ' => Key is not a string.');
-    assert.equal(typeof fn, 'function', ' => fn is not a function type.');
+    assert.equal(typeof key, 'string', 'key is not a string.');
+    assert.equal(typeof fn, 'function', 'fn is not a function type.');
     const a = this.listeners[key] = this.listeners[key] || [];
     a.push(fn);
   }
@@ -412,7 +410,7 @@ export class Client {
     return this.lockholderCount[key] || 0;
   }
   
-  requestLockInfo(key, opts, cb) {
+  requestLockInfo(key, opts?, cb?) {
     
     assert.equal(typeof key, 'string', ' => Key passed to live-mutex#lock needs to be a string.');
     
@@ -452,7 +450,7 @@ export class Client {
     
   }
   
-  lockp(key: string, opts: Partial<IClientLockOpts>) {
+  lockp(key: string, opts?: Partial<IClientLockOpts>) {
     return new Promise((resolve, reject) => {
       this.lock(key, opts, function (err, unlock, lockUuid) {
         err ? reject(err) : resolve({key, unlock, lockUuid});
@@ -460,7 +458,7 @@ export class Client {
     });
   }
   
-  unlockp(key: string, opts: Partial<IClientUnlockOpts>) {
+  unlockp(key: string, opts?: Partial<IClientUnlockOpts>) {
     return new Promise((resolve, reject) => {
       this.unlock(key, opts, function (err, val) {
         err ? reject(err) : resolve(val);
