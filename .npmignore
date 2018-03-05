@@ -12,13 +12,13 @@ test
 *.txt
 *.ts
 *.yml
-
+*.html
+*.lock
 
 ### files
 suman.conf.js
 .gitignore
 .npmignore
-package-lock.json
 yarn.lock
 
 
