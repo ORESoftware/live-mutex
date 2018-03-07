@@ -26,13 +26,9 @@ const plotData = {
   heapUsed: []
 };
 
-let firstNow = null;
-
+const firstNow = Date.now();
 const interval = setInterval(function () {
   const mem = process.memoryUsage();
-  if(!firstNow){
-    firstNow = Date.now();
-  }
   const now = Date.now() - firstNow;
   plotData.rss.push({x: now, y: mem.rss});
   plotData.heapTotal.push({x: now, y: mem.heapTotal});
@@ -40,7 +36,7 @@ const interval = setInterval(function () {
   console.log(colors.magenta(util.inspect(mem)));
 }, 500);
 
-let onFinish = function(){
+let onFinish = function () {
   clearInterval(interval);
   plotData.rss = JSON.stringify(plotData.rss);
   plotData.heapTotal = JSON.stringify(plotData.heapTotal);
