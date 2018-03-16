@@ -2,45 +2,102 @@
 
 import * as suman from 'suman';
 const {Test} = suman.init(module);
-const Promise = require('bluebird');
+global.Promise = require('bluebird');
 
 ///////////////////////////////////////////////////////////////////////////////////////
 
 Test.create(['Broker', 'Client', function (b, it, inject, describe, before, $deps) {
-
+  
   const {Broker, Client} = b.ioc;
   const {chalk: colors} = $deps;
   const conf = Object.freeze({port: 7035});
-
+  
   before(h => new Broker(conf).start());
-
+  
   before('get client', h => {
     return new Client(conf).ensure().then(function (c) {
       h.supply.client = c;
     });
   });
-
-  describe('injected', function (b) {
+  
+  describe('do all in parallel', {parallel: true}, b => {
+    
+    describe('injected', function (b) {
+      it('locks/unlocks', t => {
+        const c = t.supply.client;
+        return c.lockp('a').then(function (v) {
+          return c.unlockp('a');
+        });
+      });
+    });
+    
     it('locks/unlocks', t => {
       const c = t.supply.client;
       return c.lockp('a').then(function (v) {
         return c.unlockp('a');
       });
     });
-  });
-
-  it('locks/unlocks', t => {
-    const c = t.supply.client;
-    return c.lockp('a').then(function (v) {
+    
+    const promhelper = function (unlock) {
+      return new Promise(function (resolve, reject) {
+        unlock(function (err) {
+          err ? reject(err) : resolve();
+        });
+      });
+    };
+    
+    const makePromiseProvider = function (unlock) {
+      return function (input: string) {
+        return Promise.resolve(input).then(function () {
+          return new Promise(function (resolve, reject) {
+            unlock(function (err) {
+              err ? reject(err) : resolve();
+            });
+          });
+        });
+      }
+    };
+    
+    it('locks/unlocks super special 1', t => {
+      const c = t.supply.client;
+      return c.lockp('foo').then(function ({unlock}) {
+        return promhelper(unlock);
+      });
+    });
+    
+    it('locks/unlocks super special 2', async t => {
+      const c = t.supply.client;
+      const {unlock} = await c.lockp('foo');
+      return promhelper(unlock);
+    });
+    
+    it('locks/unlocks super special 2', async t => {
+      const c = t.supply.client;
+      const {unlock} = await c.lockp('foo');
+      const provider = makePromiseProvider(unlock);
+      // do some other async stuff
+      const v = await Promise.resolve(123);
+      return provider(String(v));
+    });
+    
+    it('locks/unlocks super special 3', t => {
+      const c = t.supply.client;
+      return c.lockp('foo').then(function ({unlock}) {
+        return new Promise(function (resolve, reject) {
+          unlock(function (err) {
+            err ? reject(err) : resolve();
+          });
+        });
+      });
+    });
+    
+    it('locks/unlocks', async t => {
+      const c = t.supply.client;
+      await c.lockp('a');
+      await Promise.delay(100);
       return c.unlockp('a');
     });
+    
   });
-
-  it('locks/unlocks', async t => {
-    const c = t.supply.client;
-    await c.lockp('a');
-    await Promise.delay(100);
-    return c.unlockp('a');
-  });
-
+  
 }]);

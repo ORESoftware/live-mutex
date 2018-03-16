@@ -245,10 +245,23 @@ This library exports `lockp` and `unlockp` methods for the client, which are sim
 
 ## To use these methods with async/await, it simply looks like:
 
-```typescript
+```js
     await client.lockp('a');
     await Promise.delay(100);
     return client.unlockp('a');
+```
+
+you can also use the unlock() convenience callback like so:
+
+```js
+    return c.lockp('foo').then(function ({unlock}) {
+      return new Promise(function (resolve, reject) {
+        unlock(function (err) {
+          err ? reject(err) : resolve();
+        });
+      });
+    });
+
 ```
    
 

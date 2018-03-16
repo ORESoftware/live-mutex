@@ -37,7 +37,7 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
 exports.__esModule = true;
 var suman = require("suman");
 var Test = suman.init(module).Test;
-var Promise = require('bluebird');
+global.Promise = require('bluebird');
 ///////////////////////////////////////////////////////////////////////////////////////
 Test.create(['Broker', 'Client', function (b, it, inject, describe, before, $deps) {
         var _this = this;
@@ -50,34 +50,102 @@ Test.create(['Broker', 'Client', function (b, it, inject, describe, before, $dep
                 h.supply.client = c;
             });
         });
-        describe('injected', function (b) {
+        describe('do all in parallel', { parallel: true }, function (b) {
+            describe('injected', function (b) {
+                it('locks/unlocks', function (t) {
+                    var c = t.supply.client;
+                    return c.lockp('a').then(function (v) {
+                        return c.unlockp('a');
+                    });
+                });
+            });
             it('locks/unlocks', function (t) {
                 var c = t.supply.client;
                 return c.lockp('a').then(function (v) {
                     return c.unlockp('a');
                 });
             });
-        });
-        it('locks/unlocks', function (t) {
-            var c = t.supply.client;
-            return c.lockp('a').then(function (v) {
-                return c.unlockp('a');
+            var promhelper = function (unlock) {
+                return new Promise(function (resolve, reject) {
+                    unlock(function (err) {
+                        err ? reject(err) : resolve();
+                    });
+                });
+            };
+            var makePromiseProvider = function (unlock) {
+                return function (input) {
+                    return Promise.resolve(input).then(function () {
+                        return new Promise(function (resolve, reject) {
+                            unlock(function (err) {
+                                err ? reject(err) : resolve();
+                            });
+                        });
+                    });
+                };
+            };
+            it('locks/unlocks super special 1', function (t) {
+                var c = t.supply.client;
+                return c.lockp('foo').then(function (_a) {
+                    var unlock = _a.unlock;
+                    return promhelper(unlock);
+                });
             });
-        });
-        it('locks/unlocks', function (t) { return __awaiter(_this, void 0, void 0, function () {
-            var c;
-            return __generator(this, function (_a) {
-                switch (_a.label) {
-                    case 0:
-                        c = t.supply.client;
-                        return [4 /*yield*/, c.lockp('a')];
-                    case 1:
-                        _a.sent();
-                        return [4 /*yield*/, Promise.delay(100)];
-                    case 2:
-                        _a.sent();
-                        return [2 /*return*/, c.unlockp('a')];
-                }
+            it('locks/unlocks super special 2', function (t) { return __awaiter(_this, void 0, void 0, function () {
+                var c, unlock;
+                return __generator(this, function (_a) {
+                    switch (_a.label) {
+                        case 0:
+                            c = t.supply.client;
+                            return [4 /*yield*/, c.lockp('foo')];
+                        case 1:
+                            unlock = (_a.sent()).unlock;
+                            return [2 /*return*/, promhelper(unlock)];
+                    }
+                });
+            }); });
+            it('locks/unlocks super special 2', function (t) { return __awaiter(_this, void 0, void 0, function () {
+                var c, unlock, provider, v;
+                return __generator(this, function (_a) {
+                    switch (_a.label) {
+                        case 0:
+                            c = t.supply.client;
+                            return [4 /*yield*/, c.lockp('foo')];
+                        case 1:
+                            unlock = (_a.sent()).unlock;
+                            provider = makePromiseProvider(unlock);
+                            return [4 /*yield*/, Promise.resolve(123)];
+                        case 2:
+                            v = _a.sent();
+                            return [2 /*return*/, provider(String(v))];
+                    }
+                });
+            }); });
+            it('locks/unlocks super special 3', function (t) {
+                var c = t.supply.client;
+                return c.lockp('foo').then(function (_a) {
+                    var unlock = _a.unlock;
+                    return new Promise(function (resolve, reject) {
+                        unlock(function (err) {
+                            err ? reject(err) : resolve();
+                        });
+                    });
+                });
             });
-        }); });
+            it('locks/unlocks', function (t) { return __awaiter(_this, void 0, void 0, function () {
+                var c;
+                return __generator(this, function (_a) {
+                    switch (_a.label) {
+                        case 0:
+                            c = t.supply.client;
+                            return [4 /*yield*/, c.lockp('a')];
+                        case 1:
+                            _a.sent();
+                            return [4 /*yield*/, Promise.delay(100)];
+                        case 2:
+                            _a.sent();
+                            return [2 /*return*/, c.unlockp('a')];
+                    }
+                });
+            }); });
+        });
     }]);
