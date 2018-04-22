@@ -194,6 +194,8 @@ export class Broker {
     this.host = opts.host || '127.0.0.1';
     this.port = opts.port || 6970;
     
+    const self = this;
+    
     this.send = function (ws, data, cb) {
       
       let cleanUp = () => {
@@ -201,7 +203,8 @@ export class Broker {
         if (key) {
           const isOwnsKey = removeWsLockKey(this, ws, key);
           if (isOwnsKey) {
-            this.unlock({
+            console.log('unlock was called 4.');
+            self.unlock({
               key: key,
               force: true
             }, ws);
@@ -210,14 +213,18 @@ export class Broker {
       };
       
       if (!ws.writable) {
-        cleanUp();
+        console.error('socket is not writable 1.');
+        process.emit('warning', new Error('socket is not writable 1.'));
+        // cleanUp();
         return cb && process.nextTick(cb);
       }
       
       ws.write(JSON.stringify(data) + '\n', 'utf8', err => {
         if (err) {
+          console.error('socket is not writable 2.');
+          process.emit('warning', new Error('socket is not writable 2.'));
           process.emit('warning', err);
-          cleanUp();
+          // cleanUp();
         }
         cb && cb(null);
       });
@@ -240,6 +247,7 @@ export class Broker {
       }
       
       if (data.type === 'unlock') {
+        console.log('called unlock 5');
         this.unlock(data, ws);
       }
       else if (data.type === 'lock') {
@@ -290,7 +298,7 @@ export class Broker {
       }
       else {
         
-        process.emit('error', `implementation error, bad data sent to broker => ${util.inspect(data)}`);
+        process.emit('warning', `implementation error, bad data sent to broker => ${util.inspect(data)}`);
         
         this.send(ws, {
           key: data.key,
@@ -335,7 +343,7 @@ export class Broker {
       });
       
       ws.on('error', function (err) {
-        process.emit('error', new Error('live-mutex client error ' + (err.stack || err)));
+        process.emit('warning', new Error('live-mutex client error ' + (err.stack || err)));
       });
       
       if (!this.wsToKeys.get(ws)) {
@@ -344,17 +352,17 @@ export class Broker {
       
       ws.once('end', () => {
         let keys;
-        if (keys = this.wsLock.get(ws)) {
-          keys.forEach(k => {
-            removeWsLockKey(this, ws, k);
-            if (this.locks[k]) {
-              this.unlock({
-                force: true,
-                key: k
-              }, ws);
-            }
-          });
-        }
+        // if (keys = this.wsLock.get(ws)) {
+        //   keys.forEach(k => {
+        //     removeWsLockKey(this, ws, k);
+        //     if (this.locks[k]) {
+        //       this.unlock({
+        //         force: true,
+        //         key: k
+        //       }, ws);
+        //     }
+        //   });
+        // }
       });
       
       ws.pipe(JSONStream.parse())
@@ -390,18 +398,23 @@ export class Broker {
       }
     };
     
+    process.on('uncaughtException', function(err){
+       console.error('Uncaught Exception:', err.stack || err);
+    });
+    
     process.once('exit', sigEvent('exit'));
     process.once('uncaughtException', sigEvent('uncaughtException'));
     process.once('SIGINT', sigEvent('SIGINT'));
     process.once('SIGTERM', sigEvent('SIGTERM'));
     
     wss.on('error', function (err) {
-      process.emit('error', new Error('live-mutex broker error' + (err.stack || err)));
+      process.emit('warning', new Error('live-mutex broker error' + (err.stack || err)));
     });
     
     let count = null;
     
-    setInterval(function () {
+    setInterval(() => {
+      // console.log('the locks:', util.inspect(this.locks));
       wss.getConnections(function (err, data) {
         if (err) {
           process.emit('warning', err);
@@ -411,7 +424,7 @@ export class Broker {
           process.emit('info', 'live-mutex connection information: ' + data);
         }
       });
-    }, 8000);
+    }, 3000);
     
     let brokerPromise = null;
     
@@ -559,6 +572,9 @@ export class Broker {
       
       let uuid = lck.uuid = obj.uuid;
       lck.pid = obj.pid;
+  
+      console.log('ttl is 3:', ttl);
+  
       lck.to = setTimeout(() => {
         
         // delete locks[key]; => no, this.unlock will take care of that
@@ -568,6 +584,7 @@ export class Broker {
         // we know that it timed out already, and we know not to throw an error when the lock.uuid doesn't match
         lck.lockholderTimeouts[uuid] = true;
         
+        console.log('unlock was called 3.');
         this.unlock({
           key: key,
           force: true
@@ -628,6 +645,7 @@ export class Broker {
     else {
       // note: only delete lock if no client is remaining to claim it
       // No other connections waiting for lock with key, so we deleted the lock
+      console.log('deleting the lock lulz...');
       delete locks[key];
     }
     
@@ -701,7 +719,6 @@ export class Broker {
           else {
             lck.notify.push({ws, uuid, pid, ttl});
           }
-          
         }
         
         this.send(ws, {
@@ -718,15 +735,20 @@ export class Broker {
         lck.uuid = uuid;
         
         clearTimeout(lck.to);
+        
+        console.log('ttl is 1:', ttl);
+        
         lck.to = setTimeout(() => {
           
           // delete locks[key];  => no, this.unlock will take care of that
-          process.emit('warning', ' => Live-Mutex Broker warning, lock object timed out for key => "' + key + '"');
+          process.emit('warning', 'Live-Mutex Broker warning, lock object timed out for key => "' + key + '"');
           
           // we set lck.lockholderTimeouts[uuid], so that when an unlock request for uuid might come in to broker
           // we know that it timed out already, and we do not throw an error then
           lck.lockholderTimeouts[uuid] = true;
-          
+  
+          console.log('unlock was called 1:', ttl);
+  
           this.unlock({
             key,
             force: true
@@ -749,7 +771,8 @@ export class Broker {
     else {
       
       addWsLockKey(this, ws, key);
-      
+      console.log('ttl is 2:', ttl);
+  
       locks[key] = {
         pid,
         uuid,
@@ -759,12 +782,12 @@ export class Broker {
         to: setTimeout(() => {
           
           // delete locks[key];  => no!, this.unlock will take care of that
-          process.emit('warning', ' => Live-Mutex warning, lock object timed out for key => "' + key + '"');
-          
+          process.emit('warning', 'Live-Mutex warning, lock object timed out for key => "' + key + '"');
           // we set lck.lockholderTimeouts[uuid], so that when an unlock request for uuid comes into the broker
           // we know that it timed out already, and we know not to throw an error when the lock.uuid doesn't match
           locks[key] && (locks[key].lockholderTimeouts[uuid] = true);
           
+          console.log('calling unlock 2.');
           this.unlock({key, force: true});
           
         }, ttl)
@@ -782,6 +805,8 @@ export class Broker {
   }
   
   unlock(data: Object, ws?: Socket) {
+    
+    console.log('unlock was called.');
     
     const locks = this.locks;
     const key = data.key;
@@ -884,7 +909,7 @@ export class Broker {
     }
     else {
       
-      process.emit('error', new Error('Live-Mutex implementation error => no lock with key => "' + key + '"'));
+      process.emit('warning', new Error('Live-Mutex implementation error => no lock with key => "' + key + '"'));
       
       // since the lock no longer exists for this key, remove ownership of this key
       this.wsLock.forEach((v, k) => {

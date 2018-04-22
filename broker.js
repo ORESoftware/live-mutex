@@ -74,6 +74,7 @@ var Broker = (function () {
         this.timeoutToFindNewLockholder = weAreDebugging ? 5000000 : (opts.timeoutToFindNewLockholder || 4500);
         this.host = opts.host || '127.0.0.1';
         this.port = opts.port || 6970;
+        var self = this;
         this.send = function (ws, data, cb) {
             var _this = this;
             var cleanUp = function () {
@@ -81,7 +82,8 @@ var Broker = (function () {
                 if (key) {
                     var isOwnsKey = removeWsLockKey(_this, ws, key);
                     if (isOwnsKey) {
-                        _this.unlock({
+                        console.log('unlock was called 4.');
+                        self.unlock({
                             key: key,
                             force: true
                         }, ws);
@@ -89,13 +91,15 @@ var Broker = (function () {
                 }
             };
             if (!ws.writable) {
-                cleanUp();
+                console.error('socket is not writable 1.');
+                process.emit('warning', new Error('socket is not writable 1.'));
                 return cb && process.nextTick(cb);
             }
             ws.write(JSON.stringify(data) + '\n', 'utf8', function (err) {
                 if (err) {
+                    console.error('socket is not writable 2.');
+                    process.emit('warning', new Error('socket is not writable 2.'));
                     process.emit('warning', err);
-                    cleanUp();
                 }
                 cb && cb(null);
             });
@@ -114,6 +118,7 @@ var Broker = (function () {
                 }
             }
             if (data.type === 'unlock') {
+                console.log('called unlock 5');
                 _this.unlock(data, ws);
             }
             else if (data.type === 'lock') {
@@ -158,7 +163,7 @@ var Broker = (function () {
                 _this.retrieveLockInfo(data, ws);
             }
             else {
-                process.emit('error', "implementation error, bad data sent to broker => " + util.inspect(data));
+                process.emit('warning', "implementation error, bad data sent to broker => " + util.inspect(data));
                 _this.send(ws, {
                     key: data.key,
                     uuid: data.uuid,
@@ -191,24 +196,13 @@ var Broker = (function () {
                 connectedClients.delete(ws);
             });
             ws.on('error', function (err) {
-                process.emit('error', new Error('live-mutex client error ' + (err.stack || err)));
+                process.emit('warning', new Error('live-mutex client error ' + (err.stack || err)));
             });
             if (!_this.wsToKeys.get(ws)) {
                 _this.wsToKeys.set(ws, []);
             }
             ws.once('end', function () {
                 var keys;
-                if (keys = _this.wsLock.get(ws)) {
-                    keys.forEach(function (k) {
-                        removeWsLockKey(_this, ws, k);
-                        if (_this.locks[k]) {
-                            _this.unlock({
-                                force: true,
-                                key: k
-                            }, ws);
-                        }
-                    });
-                }
             });
             ws.pipe(JSONStream.parse())
                 .on('data', function (v) {
@@ -238,12 +232,15 @@ var Broker = (function () {
                 });
             };
         };
+        process.on('uncaughtException', function (err) {
+            console.error('Uncaught Exception:', err.stack || err);
+        });
         process.once('exit', sigEvent('exit'));
         process.once('uncaughtException', sigEvent('uncaughtException'));
         process.once('SIGINT', sigEvent('SIGINT'));
         process.once('SIGTERM', sigEvent('SIGTERM'));
         wss.on('error', function (err) {
-            process.emit('error', new Error('live-mutex broker error' + (err.stack || err)));
+            process.emit('warning', new Error('live-mutex broker error' + (err.stack || err)));
         });
         var count = null;
         setInterval(function () {
@@ -256,7 +253,7 @@ var Broker = (function () {
                     process.emit('info', 'live-mutex connection information: ' + data);
                 }
             });
-        }, 8000);
+        }, 3000);
         var brokerPromise = null;
         this.ensure = this.start = function (cb) {
             var _this = this;
@@ -355,9 +352,11 @@ var Broker = (function () {
             addWsLockKey(this, ws_1, key);
             var uuid_1 = lck.uuid = obj.uuid;
             lck.pid = obj.pid;
+            console.log('ttl is 3:', ttl);
             lck.to = setTimeout(function () {
                 process.emit('warning', 'Live-Mutex Broker warning, lock object timed out for key => "' + key + '"');
                 lck.lockholderTimeouts[uuid_1] = true;
+                console.log('unlock was called 3.');
                 _this.unlock({
                     key: key,
                     force: true
@@ -401,6 +400,7 @@ var Broker = (function () {
             });
         }
         else {
+            console.log('deleting the lock lulz...');
             delete locks[key];
         }
     };
@@ -468,9 +468,11 @@ var Broker = (function () {
                 lck.pid = pid;
                 lck.uuid = uuid;
                 clearTimeout(lck.to);
+                console.log('ttl is 1:', ttl);
                 lck.to = setTimeout(function () {
-                    process.emit('warning', ' => Live-Mutex Broker warning, lock object timed out for key => "' + key + '"');
+                    process.emit('warning', 'Live-Mutex Broker warning, lock object timed out for key => "' + key + '"');
                     lck.lockholderTimeouts[uuid] = true;
+                    console.log('unlock was called 1:', ttl);
                     _this.unlock({
                         key: key,
                         force: true
@@ -488,6 +490,7 @@ var Broker = (function () {
         }
         else {
             addWsLockKey(this, ws, key);
+            console.log('ttl is 2:', ttl);
             locks[key] = {
                 pid: pid,
                 uuid: uuid,
@@ -495,8 +498,9 @@ var Broker = (function () {
                 key: key,
                 notify: [],
                 to: setTimeout(function () {
-                    process.emit('warning', ' => Live-Mutex warning, lock object timed out for key => "' + key + '"');
+                    process.emit('warning', 'Live-Mutex warning, lock object timed out for key => "' + key + '"');
                     locks[key] && (locks[key].lockholderTimeouts[uuid] = true);
+                    console.log('calling unlock 2.');
                     _this.unlock({ key: key, force: true });
                 }, ttl)
             };
@@ -511,6 +515,7 @@ var Broker = (function () {
     };
     Broker.prototype.unlock = function (data, ws) {
         var _this = this;
+        console.log('unlock was called.');
         var locks = this.locks;
         var key = data.key;
         var uuid = data.uuid;
@@ -579,7 +584,7 @@ var Broker = (function () {
             }
         }
         else {
-            process.emit('error', new Error('Live-Mutex implementation error => no lock with key => "' + key + '"'));
+            process.emit('warning', new Error('Live-Mutex implementation error => no lock with key => "' + key + '"'));
             this.wsLock.forEach(function (v, k) {
                 var keys = _this.wsLock.get(k);
                 if (keys) {

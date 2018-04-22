@@ -35,7 +35,7 @@ setTimeout(function () {
   if (process.listenerCount('error') < 1) {
     loginfo(`recommends you attach a process.on('error') event handler.`);
   }
-}, 1000);
+}, 5000);
 
 const totalNoop = function () {
 };
@@ -546,6 +546,7 @@ export class Client {
     
     const uuid = opts._uuid = opts._uuid || (append + uuidV4());
     const ttl = opts.ttl || this.ttl;
+    console.log('ttl is:', ttl);
     const lockTimeout = opts.lockRequestTimeout || this.lockTimeout;
     const maxRetries = opts.maxRetry || opts.maxRetries || this.lockRetryMax;
     

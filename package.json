@@ -5,6 +5,10 @@
   "main": "index.js",
   "typings": "index.d.ts",
   "types": "index.d.ts",
+  "bin": {
+    "lm_acquire_lock": "lib/lm-acquire-lock.js",
+    "lm_release_lock": "lib/lm-release-lock.js"
+  },
   "scripts": {
     "test": "./scripts/test.sh"
   },

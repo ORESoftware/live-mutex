@@ -67,9 +67,9 @@ export declare class Client {
     addListener(key: any, fn: any): void;
     setLockRequestorCount(key: any, val: any): void;
     getLockholderCount(key: any): number;
-    requestLockInfo(key: any, opts: any, cb: any): void;
-    lockp(key: string, opts: Partial<IClientLockOpts>): Promise<{}>;
-    unlockp(key: string, opts: Partial<IClientUnlockOpts>): Promise<{}>;
+    requestLockInfo(key: any, opts?: any, cb?: any): void;
+    lockp(key: string, opts?: Partial<IClientLockOpts>): Promise<{}>;
+    unlockp(key: string, opts?: Partial<IClientUnlockOpts>): Promise<{}>;
     lock(key: string, opts: Partial<IClientLockOpts>, cb: TClientLockCB): void;
     unlock(key: string, opts: Partial<IClientUnlockOpts>, cb?: TClientUnlockCB): void;
 }

@@ -52,7 +52,7 @@ exports.launchBrokerInChildProcess = function (opts, cb) {
                 cb(err);
             }
             else if (available) {
-                console.log("live-mutex brower was already live at " + host + ":" + port + ".");
+                console.log("live-mutex broker/server was already live at " + host + ":" + port + ".");
                 cb(null, {
                     host: host,
                     port: port,

@@ -19,7 +19,7 @@ setTimeout(function () {
     if (process.listenerCount('error') < 1) {
         loginfo("recommends you attach a process.on('error') event handler.");
     }
-}, 1000);
+}, 5000);
 var totalNoop = function () {
 };
 var asyncNoop = function (cb) {
@@ -40,7 +40,7 @@ var Client = (function () {
         var _this = this;
         this.isOpen = false;
         var opts = this.opts = $opts || {};
-        assert(typeof opts === 'object', ' => Bad arguments to live-mutex client constructor.');
+        assert(typeof opts === 'object', 'Bad arguments to live-mutex client constructor - options must be an object.');
         if (cb) {
             assert(typeof cb === 'function', 'optional second argument to Live-Mutex Client constructor must be a function.');
             cb = cb.bind(this);
@@ -224,8 +224,8 @@ var Client = (function () {
         return new Client(opts).ensure(cb);
     };
     Client.prototype.addListener = function (key, fn) {
-        assert.equal(typeof key, 'string', ' => Key is not a string.');
-        assert.equal(typeof fn, 'function', ' => fn is not a function type.');
+        assert.equal(typeof key, 'string', 'key is not a string.');
+        assert.equal(typeof fn, 'function', 'fn is not a function type.');
         var a = this.listeners[key] = this.listeners[key] || [];
         a.push(fn);
     };
@@ -345,6 +345,7 @@ var Client = (function () {
         assert(typeof append === 'string', 'append option to lock() method must be of type "string".');
         var uuid = opts._uuid = opts._uuid || (append + uuidV4());
         var ttl = opts.ttl || this.ttl;
+        console.log('ttl is:', ttl);
         var lockTimeout = opts.lockRequestTimeout || this.lockTimeout;
         var maxRetries = opts.maxRetry || opts.maxRetries || this.lockRetryMax;
         if (opts.__retryCount > maxRetries) {
