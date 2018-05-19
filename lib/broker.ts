@@ -310,10 +310,9 @@ export class Broker {
     };
     
     const connectedClients = new Map();
-    
     let firstConnection = true;
     
-    const wss = net.createServer(ws => {
+    const wss = net.createServer(function (ws) {
       
       process.emit('info', 'client has connected to live-mutex broker.');
       connectedClients.set(ws, true);
@@ -329,7 +328,6 @@ export class Broker {
       
       if (firstConnection) {
         firstConnection = false;
-        this.sendStatsMessageToAllClients();
       }
       
       ws.once('disconnect', function () {
@@ -346,8 +344,8 @@ export class Broker {
         process.emit('warning', new Error('live-mutex client error ' + (err.stack || err)));
       });
       
-      if (!this.wsToKeys.get(ws)) {
-        this.wsToKeys.set(ws, []);
+      if (!self.wsToKeys.get(ws)) {
+        self.wsToKeys.set(ws, []);
       }
       
       ws.once('end', () => {
@@ -366,12 +364,12 @@ export class Broker {
       });
       
       ws.pipe(JSONStream.parse())
-      .on('data', v => {
+      .on('data', function (v) {
         onData(ws, v);
       })
       .once('error', function (e) {
-        this.send(ws, {
-            error: String(e.stack || e)
+        self.send(ws, {
+            error: String(e && e.stack || e)
           },
           function () {
             ws.end();
@@ -381,7 +379,7 @@ export class Broker {
     });
     
     let callable = true;
-    let sigEvent = function (event) {
+    let sigEvent = function (event: any) {
       return function () {
         if (!callable) {
           return;
@@ -398,8 +396,8 @@ export class Broker {
       }
     };
     
-    process.on('uncaughtException', function(err){
-       console.error('Uncaught Exception:', err.stack || err);
+    process.on('uncaughtException', function (err) {
+      console.error('Uncaught Exception:', err.stack || err);
     });
     
     process.once('exit', sigEvent('exit'));
@@ -411,22 +409,7 @@ export class Broker {
       process.emit('warning', new Error('live-mutex broker error' + (err.stack || err)));
     });
     
-    let count = null;
-    
-    setInterval(() => {
-      // console.log('the locks:', util.inspect(this.locks));
-      wss.getConnections(function (err, data) {
-        if (err) {
-          process.emit('warning', err);
-        }
-        else if (data !== count) {
-          count = data;
-          process.emit('info', 'live-mutex connection information: ' + data);
-        }
-      });
-    }, 3000);
-    
-    let brokerPromise = null;
+    let brokerPromise: Promise<any> = null;
     
     this.ensure = this.start = function (cb?: Function) {
       
@@ -435,17 +418,17 @@ export class Broker {
       }
       
       if (brokerPromise) {
-        return brokerPromise.then((val) => {
-            cb && cb.call(this, null, val);
+        return brokerPromise.then(function (val) {
+            cb && cb.call(self, null, val);
             return val;
           },
           function (err) {
-            cb && cb.call(this, err);
+            cb && cb.call(self, err);
             return Promise.reject(err);
           });
       }
       
-      return brokerPromise = new Promise((resolve, reject) => {
+      return brokerPromise = new Promise(function (resolve, reject) {
         
         let to = setTimeout(function () {
           reject(new Error('Live-Mutex broker error: listening action timed out.'))
@@ -453,20 +436,20 @@ export class Broker {
         
         wss.once('error', reject);
         
-        wss.listen(this.port, () => {
-          this.isOpen = true;
+        wss.listen(self.port, () => {
+          self.isOpen = true;
           clearTimeout(to);
           wss.removeListener('error', reject);
-          resolve(this);
+          resolve(self);
         });
         
       })
-      .then((val) => {
-          cb && cb.call(this, null, val);
+      .then(function (val) {
+          cb && cb.call(self, null, val);
           return val;
         },
         function (err) {
-          cb && cb.call(this, err);
+          cb && cb.call(self, err);
           return Promise.reject(err);
         });
       
@@ -487,61 +470,6 @@ export class Broker {
   
   static create(opts: IBrokerOptsPartial, cb?: TBrokerCB): Promise<Broker> {
     return new Broker(opts).ensure(cb);
-  }
-  
-  sendStatsMessageToAllClients() {
-    
-    const time = Date.now();
-    
-    // for each client and for each key, we send a message
-    const clients = this.wsToKeys.keys();
-    
-    async.mapSeries(clients, (ws, cb) => {
-      
-      const keys = this.wsToKeys.get(ws);
-      // const keys = obj.keys;
-      
-      async.mapSeries(keys, (k, cb) => {
-        
-        const lck = this.locks[k];
-        let len = lck ? lck.notify.length : 0;
-        
-        this.send(ws, {
-            type: 'stats',
-            key: k,
-            lockRequestCount: len
-          },
-          
-          err => {
-            cb(null, {
-              error: err
-            })
-          });
-        
-      }, cb);
-      
-    }, (err, results) => {
-      
-      if (err) {
-        throw err;
-      }
-      
-      results.filter(function (r) {
-        return r && r.error;
-      })
-      .forEach(function (err) {
-        console.error(err.stack || err);
-      });
-      
-      const diff = Date.now() - time;
-      const wait = Math.max(1, 1000 - diff);
-      
-      setTimeout(() => {
-        this.sendStatsMessageToAllClients();
-      }, wait);
-      
-    });
-    
   }
   
   ensureNewLockHolder(lck, data) {
@@ -572,9 +500,9 @@ export class Broker {
       
       let uuid = lck.uuid = obj.uuid;
       lck.pid = obj.pid;
-  
+      
       console.log('ttl is 3:', ttl);
-  
+      
       lck.to = setTimeout(() => {
         
         // delete locks[key]; => no, this.unlock will take care of that
@@ -746,9 +674,9 @@ export class Broker {
           // we set lck.lockholderTimeouts[uuid], so that when an unlock request for uuid might come in to broker
           // we know that it timed out already, and we do not throw an error then
           lck.lockholderTimeouts[uuid] = true;
-  
+          
           console.log('unlock was called 1:', ttl);
-  
+          
           this.unlock({
             key,
             force: true
@@ -772,7 +700,7 @@ export class Broker {
       
       addWsLockKey(this, ws, key);
       console.log('ttl is 2:', ttl);
-  
+      
       locks[key] = {
         pid,
         uuid,
