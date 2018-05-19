@@ -13,27 +13,28 @@ const uuidV4 = require('uuid/v4');
 const JSONStream = require('JSONStream');
 
 //project
-import {Socket} from 'net';
-const loginfo = console.log.bind(console, '[live-mutex broker] =>');
-const logerr = console.error.bind(console, '[live-mutex broker] =>');
+const log = {
+  info: console.log.bind(console, ' [live-mutex broker]'),
+  error: console.error.bind(console, ' [live-mutex broker]')
+};
 
 ///////////////////////////////////////////////////////////////////
 
 const weAreDebugging = require('./lib/we-are-debugging');
 if (weAreDebugging) {
-  logerr('Live-Mutex broker is in debug mode. Timeouts are turned off.');
+  log.error('broker is in debug mode. Timeouts are turned off.');
 }
 
 process.setMaxListeners(100);
 
-process.on('warning', function (e) {
-  console.error(e.stack || e);
+process.on('warning', function (e: any) {
+  log.error('warning:', e && e.stack || e);
 });
 
 ///////////////////////////////////////////////////////////////////
 
-const addWsLockKey = function (broker, ws, key) {
-  let v;
+const addWsLockKey = function (broker: Broker, ws: net.Socket, key: string) {
+  let v: Array<any>;
   if (!(v = broker.wsLock.get(ws))) {
     v = [];
     broker.wsLock.set(ws, v);
@@ -43,8 +44,8 @@ const addWsLockKey = function (broker, ws, key) {
   }
 };
 
-const removeWsLockKey = function (broker, ws, key) {
-  let v;
+const removeWsLockKey = function (broker: Broker, ws: net.Socket, key: string) {
+  let v: Array<any>;
   if (v = broker.wsLock.get(ws)) {
     const i = v.indexOf(key);
     if (i >= 0) {
@@ -74,15 +75,15 @@ export type IBrokerOptsPartial = Partial<IBrokerOpts>
 export type IErrorFirstCB = (err: Error | null | undefined | string, val?: any) => void;
 
 export interface IBrokerSend {
-  (ws: Socket, data: any, cb?: IErrorFirstCB): void;
+  (ws: net.Socket, data: any, cb?: IErrorFirstCB): void;
 }
 
 export interface IUuidWSHash {
-  [key: string]: Socket
+  [key: string]: net.Socket
 }
 
 export interface IUuidTimer {
-  [key: string]: Timer
+  [key: string]: NodeJS.Timer
 }
 
 export type TBrokerCB = (err: Error | null | undefined | string, val: Broker) => void;
@@ -113,7 +114,7 @@ export interface ILockObj {
   uuid: string,
   notify: Array<INotifyObj>,
   key: string,
-  to: Timer
+  to: NodeJS.Timer
 }
 
 export interface ILockHash {
@@ -121,7 +122,7 @@ export interface ILockHash {
 }
 
 export interface INotifyObj {
-  ws: Socket,
+  ws: net.Socket,
   uuid: string,
   pid: number,
   ttl: number
@@ -142,8 +143,8 @@ export class Broker {
   locks: ILockHash;
   ensure: TEnsure;
   start: TEnsure;
-  wsLock: Map<Socket, Array<string>>;  // Array<uuid> to be exact
-  wsToKeys: Map<Socket, Array<string>>;
+  wsLock: Map<net.Socket, Array<string>>;  // Array<uuid> to be exact
+  wsToKeys: Map<net.Socket, Array<string>>;
   bookkeeping: IBookkeepingHash;
   isOpen: boolean;
   
@@ -217,9 +218,8 @@ export class Broker {
         return cb && process.nextTick(cb);
       }
       
-      ws.write(JSON.stringify(data) + '\n', 'utf8', function (err) {
+      ws.write(JSON.stringify(data) + '\n', 'utf8', function (err: any) {
         if (err) {
-          console.error('socket is not writable 2.');
           process.emit('warning', new Error('socket is not writable 2.'));
           process.emit('warning', err);
           // cleanUp();
@@ -228,12 +228,12 @@ export class Broker {
       });
     };
     
-    const onData = function (ws, data) {
+    const onData = function (ws: net.Socket, data: any) {
       
       const key = data.key;
       
       if (key) {
-        let v;
+        let v: Array<any>;
         if (!(v = self.wsToKeys.get(ws))) {
           v = [];
           self.wsToKeys.set(ws, v);
@@ -362,10 +362,10 @@ export class Broker {
       });
       
       ws.pipe(JSONStream.parse())
-      .on('data', function (v) {
+      .on('data', function (v: any) {
         onData(ws, v);
       })
-      .once('error', function (e) {
+      .once('error', function (e: any) {
         self.send(ws, {
             error: String(e && e.stack || e)
           },
@@ -394,8 +394,8 @@ export class Broker {
       }
     };
     
-    process.on('uncaughtException', function (err) {
-      console.error('Uncaught Exception:', err.stack || err);
+    process.on('uncaughtException', function (e: any) {
+      log.error('Uncaught Exception:', e && e.stack || e);
     });
     
     process.once('exit', sigEvent('exit'));
@@ -470,7 +470,7 @@ export class Broker {
     return new Broker(opts).ensure(cb);
   }
   
-  ensureNewLockHolder(lck, data) {
+  ensureNewLockHolder(lck: ILockObj, data: any) {
     
     const locks = this.locks;
     const notifyList = lck.notify;
@@ -485,7 +485,9 @@ export class Broker {
     clearTimeout(lck.to);
     delete lck.to;
     
-    let obj;
+    const self = this;
+    
+    let obj: any;
     if (obj = notifyList.shift()) {
       
       // Sending ws client the "acquired" message
@@ -499,9 +501,7 @@ export class Broker {
       let uuid = lck.uuid = obj.uuid;
       lck.pid = obj.pid;
       
-      console.log('ttl is 3:', ttl);
-      
-      lck.to = setTimeout(() => {
+      lck.to = setTimeout(function () {
         
         // delete locks[key]; => no, this.unlock will take care of that
         process.emit('warning', 'Live-Mutex Broker warning, lock object timed out for key => "' + key + '"');
@@ -511,7 +511,7 @@ export class Broker {
         lck.lockholderTimeouts[uuid] = true;
         
         console.log('unlock was called 3.');
-        this.unlock({
+        self.unlock({
           key: key,
           force: true
         });
@@ -521,10 +521,10 @@ export class Broker {
       clearTimeout(this.timeouts[key]);
       delete this.timeouts[key];
       
-      this.timeouts[key] = setTimeout(() => {
+      this.timeouts[key] = setTimeout(function () {
         
         removeWsLockKey(this, ws, key);
-        delete this.timeouts[key];
+        delete self.timeouts[key];
         
         // if this timeout occurs, that is because the first item in the notify list did not receive the
         // acquire lock message, so we push the object back onto the end of notify list and send a reelection message to all
@@ -543,12 +543,12 @@ export class Broker {
           count = 0;
         }
         
-        if (!this.rejected[obj.uuid]) {
+        if (!self.rejected[obj.uuid]) {
           notifyList.push(obj);
         }
         
-        notifyList.forEach((obj) => {
-          this.send(obj.ws, {
+        notifyList.forEach(function (obj: any) {
+          self.send(obj.ws, {
             key: data.key,
             uuid: obj.uuid,
             type: 'lock',
@@ -557,7 +557,7 @@ export class Broker {
           });
         });
         
-      }, this.timeoutToFindNewLockholder);
+      }, self.timeoutToFindNewLockholder);
       
       let count = lck.notify.length;
       
@@ -577,7 +577,7 @@ export class Broker {
     
   }
   
-  retrieveLockInfo(data, ws: Socket) {
+  retrieveLockInfo(data: any, ws: net.Socket) {
     
     const locks = this.locks;
     const key = data.key;
@@ -603,7 +603,7 @@ export class Broker {
     
   }
   
-  lock(data: any, ws: Socket) {
+  lock(data: any, ws: net.Socket) {
     
     const locks = this.locks;
     const key = data.key;
@@ -730,9 +730,7 @@ export class Broker {
     
   }
   
-  unlock(data: any, ws?: Socket) {
-    
-    console.log('unlock was called.');
+  unlock(data: any, ws?: net.Socket) {
     
     const locks = this.locks;
     const key = data.key;
@@ -740,6 +738,8 @@ export class Broker {
     const _uuid = data._uuid;
     const force = data.force;
     const lck = locks[key];
+    
+    const self = this;
     
     this.bookkeeping[key] = this.bookkeeping[key] || {
       rawLockCount: 0,
@@ -781,8 +781,8 @@ export class Broker {
         });
       }
       
-      this.wsLock.forEach((v, k) => {
-        const keys = this.wsLock.get(k);
+      this.wsLock.forEach(function (v, k) {
+        const keys = self.wsLock.get(k);
         if (keys) {
           const i = keys.indexOf(key);
           if (i >= 0) {
@@ -838,8 +838,8 @@ export class Broker {
       process.emit('warning', new Error('Live-Mutex implementation error => no lock with key => "' + key + '"'));
       
       // since the lock no longer exists for this key, remove ownership of this key
-      this.wsLock.forEach((v, k) => {
-        const keys = this.wsLock.get(k);
+      this.wsLock.forEach(function (v, k) {
+        const keys = self.wsLock.get(k);
         if (keys) {
           const i = keys.indexOf[key];
           if (i >= 0) {

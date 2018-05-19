@@ -10,33 +10,33 @@ const uuidV4 = require('uuid/v4');
 const JSONStream = require('JSONStream');
 
 //project
-import lmUtils from './utils';
-const loginfo = console.log.bind(console, ' [live-mutex client] =>');
-const logerr = console.error.bind(console, ' [live-mutex client] =>');
+const log = {
+  info: console.log.bind(console, ' [live-mutex client]'),
+  error: console.error.bind(console, ' [live-mutex client]')
+};
 
 /////////////////////////////////////////////////////////////////////////
 
 import {weAreDebugging} from './we-are-debugging';
-
 if (weAreDebugging) {
-  loginfo('Live-Mutex client is in debug mode. Timeouts are turned off.');
+  log.info('Live-Mutex client is in debug mode. Timeouts are turned off.');
 }
 
 /////////////////////////////////////////////////////////////////////////
 
 setTimeout(function () {
   if (process.listenerCount('warning') < 1) {
-    loginfo(`recommends you attach a process.on('warning') event handler.`);
+    log.info(`recommends you attach a process.on('warning') event handler.`);
   }
   if (process.listenerCount('error') < 1) {
-    loginfo(`recommends you attach a process.on('error') event handler.`);
+    log.info(`recommends you attach a process.on('error') event handler.`);
   }
 }, 5000);
 
 const totalNoop = function () {
 };
 
-const asyncNoop = function (cb) {
+const asyncNoop = function (cb?: Function) {
   cb && process.nextTick(cb);
 };
 
@@ -51,7 +51,6 @@ const validOptions: Array<string> = [
   'lockRetryMax'
 ];
 
-////////////////// typings /////////////////////////////////////////////
 
 export interface IClientOptions {
   key: string,
@@ -96,11 +95,11 @@ export interface IUuidBooleanHash {
 }
 
 export interface IClientLockOpts {
-
+  
 }
 
 export interface IClientUnlockOpts {
-
+  
 }
 
 export interface ILockHolderCount {
@@ -215,8 +214,8 @@ export class Client {
     this.lockRetryMax = opts.lockRetryMax || 3;
     this.unlockRetryMax = opts.unlockRetryMax || 3;
     
-    let ws : net.Socket = null;
-    let connectPromise : Promise<any> = null;
+    let ws: net.Socket = null;
+    let connectPromise: Promise<any> = null;
     
     const self = this;
     
@@ -228,7 +227,7 @@ export class Client {
       ws.write(JSON.stringify(data) + '\n', 'utf8', cb);
     };
     
-    const onData = function(data: any) {
+    const onData = function (data: any) {
       
       if (data.type === 'stats') {
         self.setLockRequestorCount(data.key, data.lockRequestCount);
@@ -296,7 +295,7 @@ export class Client {
       }
       
       if (connectPromise) {
-        return connectPromise.then(function(val) {
+        return connectPromise.then(function (val) {
             cb && cb.call(self, null, val);
             return val;
           },
@@ -306,7 +305,7 @@ export class Client {
           });
       }
       
-      return connectPromise = new Promise(function(resolve, reject) {
+      return connectPromise = new Promise(function (resolve, reject) {
         
         let onFirstErr = function (e: any) {
           let err = new Error('live-mutex client error => ' + (e && e.stack || e));
@@ -350,7 +349,7 @@ export class Client {
         });
       })
       // if the user passes a callback, we fire the callback here
-      .then(function(val) {
+      .then(function (val) {
           cb && cb.call(self, null, val);
           return val;
         },
@@ -383,7 +382,6 @@ export class Client {
   static create(opts: TClientOptions, cb?: TClientCB): Promise<Client> {
     return new Client(opts).ensure(cb);
   }
-  
   
   setLockRequestorCount(key: string, val: any): void {
     this.lockholderCount[key] = val;
@@ -539,7 +537,7 @@ export class Client {
     
     const self = this;
     let timedOut = false;
-    const to = setTimeout(function() {
+    const to = setTimeout(function () {
       
       timedOut = true;
       // this.timeouts[uuid] = true;
@@ -568,14 +566,14 @@ export class Client {
       delete this.resolutions[uuid];
     };
     
-    let callbackWithError = (errMsg) => {
+    let callbackWithError = (err: any) => {
       cleanUp();
-      let err = errMsg instanceof Error ? errMsg : new Error(errMsg);
+      err = err instanceof Error ? err : new Error(err);
       process.emit('warning', err);
       cb(err, false);
     };
     
-    this.resolutions[uuid] = function(err, data)  {
+    this.resolutions[uuid] = function (err, data) {
       
       if (timedOut) {
         return;
@@ -589,7 +587,7 @@ export class Client {
         return callbackWithError(`Live-Mutex bad key, 1 -> ', ${key}, 2 -> ${data.key}`);
       }
       
-      this.setLockRequestorCount(key, data.lockRequestCount);
+      self.setLockRequestorCount(key, data.lockRequestCount);
       
       if (data.error) {
         return callbackWithError(data.error);
@@ -597,9 +595,9 @@ export class Client {
       
       if (data.acquired === true) {
         cleanUp();
-        this.bookkeeping[key].lockCount++;
+        self.bookkeeping[key].lockCount++;
         
-        this.write({
+        self.write({
           uuid: uuid,
           key: key,
           type: 'lock-received'
@@ -616,18 +614,18 @@ export class Client {
           //   lockUuid: data.uuid,
           // });
           
-          cb(null, this.unlock.bind(this, key, {_uuid: uuid}), data.uuid);
+          cb(null, self.unlock.bind(this, key, {_uuid: uuid}), data.uuid);
         }
       }
       
       else if (data.reelection === true) {
         cleanUp();
-        this.lock(key, opts, cb);
+        self.lock(key, opts, cb);
       }
       else if (data.acquired === false) {
         if (opts.wait === false) {
           cleanUp();
-          this.giveups[uuid] = true;
+          self.giveups[uuid] = true;
           cb(null, false, data.uuid);
         }
       }
@@ -647,7 +645,7 @@ export class Client {
     
   }
   
-  unlock(key: string, opts: Partial<IClientUnlockOpts>, cb?: TClientUnlockCB) {
+  unlock(key: string, opts: any, cb?: TClientUnlockCB) {
     
     assert.equal(typeof key, 'string', 'Key passed to live-mutex#unlock needs to be a string.');
     
@@ -711,9 +709,9 @@ export class Client {
       delete this.resolutions[uuid];
     };
     
-    let callbackWithError = (errMsg) => {
+    let callbackWithError = (err: any) => {
       cleanUp();
-      let err = errMsg instanceof Error ? errMsg : new Error(errMsg);
+      err = err instanceof Error ? err : new Error(err);
       process.emit('warning', err);
       cb && cb(err);
     };
@@ -757,7 +755,7 @@ export class Client {
       
     };
     
-    let force = (opts.__retryCount > 0) ? true : !!opts.force;
+    let force = (opts.__retryCount > 0) ? true : Boolean(opts.force);
     
     this.write({
       _uuid: opts._uuid,
