@@ -13,6 +13,8 @@ dist/*
 ### files
 package-lock.json
 yarn.lock
+client.js
+broker.js
 
 ### matching
 !dist/README.md
