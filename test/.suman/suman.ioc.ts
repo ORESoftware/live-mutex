@@ -18,19 +18,19 @@ module.exports = data => {  //load async deps for any of your suman tests
     dependencies: {
 
       'Broker': function () {
-        return require('../../broker').default;
+        return import('../../dist/broker-1').then(v => v.default || v);
       },
 
       'LvMtxClient': function(){
-        return require('../../client').default;
+        return import('../../dist/client').then(v => v.default || v);
       },
 
       'Client': function () {
-        return require('../../client').default;
+        return import('../../dist/client').then(v => v.default || v);
       },
 
       'lmUtils': function () {
-        return require('../../utils').default;
+        return import('../../dist/utils')
       },
 
       'Promise': function () {

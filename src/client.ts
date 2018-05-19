@@ -6,7 +6,7 @@ import * as assert from 'assert';
 import * as net from 'net';
 
 //npm
-import uuidV4 from 'uuid/v4';
+import uuidV4 = require('uuid/v4');
 import {createParser} from "./json-parser";
 
 //project
@@ -338,7 +338,8 @@ export class Client {
           process.emit('warning', new Error('live-mutex client error: ' + e.stack || util.inspect(e)));
         });
         
-        ws.pipe(createParser()).on('data', onData)
+        ws.pipe(createParser())
+        .on('data', onData)
         .once('error', function (e: any) {
           self.write({
               error: String(e && e.stack || e)
@@ -440,6 +441,38 @@ export class Client {
   }
   
   unlockp(key: string, opts?: Partial<IClientUnlockOpts>) {
+    return new Promise((resolve, reject) => {
+      this.unlock(key, opts, function (err, val) {
+        err ? reject(err) : resolve(val);
+      });
+    });
+  }
+  
+  acquire(key: string, opts?: Partial<IClientLockOpts>) {
+    return new Promise((resolve, reject) => {
+      this.lock(key, opts, function (err, unlock, lockUuid) {
+        err ? reject(err) : resolve({key, unlock, lockUuid});
+      });
+    });
+  }
+  
+  release(key: string, opts?: Partial<IClientUnlockOpts>) {
+    return new Promise((resolve, reject) => {
+      this.unlock(key, opts, function (err, val) {
+        err ? reject(err) : resolve(val);
+      });
+    });
+  }
+  
+  acquireLock(key: string, opts?: Partial<IClientLockOpts>) {
+    return new Promise((resolve, reject) => {
+      this.lock(key, opts, function (err, unlock, lockUuid) {
+        err ? reject(err) : resolve({key, unlock, lockUuid});
+      });
+    });
+  }
+  
+  releaseLock(key: string, opts?: Partial<IClientUnlockOpts>) {
     return new Promise((resolve, reject) => {
       this.unlock(key, opts, function (err, val) {
         err ? reject(err) : resolve(val);

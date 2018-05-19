@@ -20,7 +20,7 @@ Test.create({ mode: 'series' }, ['LvMtxClient', 'lmUtils', 'Promise', function (
             });
         });
         it('yes', { timeout: 1500 }, function (t) {
-            return LvMtxClient.create(conf).then(function (c) {
+            return LvMtxClient.create(conf).ensure().then(function (c) {
                 return c.lockp('z').then(function (_a) {
                     var lockUuid = _a.lockUuid;
                     return c.unlockp('z', lockUuid);
@@ -36,21 +36,21 @@ Test.create({ mode: 'series' }, ['LvMtxClient', 'lmUtils', 'Promise', function (
             });
         });
         it('yes', { timeout: 1500 }, function (t) {
-            return LvMtxClient.create(conf).then(function (c) {
+            return LvMtxClient.create(conf).ensure().then(function (c) {
                 return c.lockp('z').then(function () {
                     return c.unlockp('z');
                 });
             });
         });
         it('yes', { timeout: 1500 }, function (t) {
-            return LvMtxClient.create(conf).then(function (c) {
+            return LvMtxClient.create(conf).ensure().then(function (c) {
                 return c.lockp('z').then(function () {
                     return c.unlockp('z');
                 });
             });
         });
         it('yes', { timeout: 1500 }, function (t) {
-            return LvMtxClient.create(conf).then(function (c) {
+            return LvMtxClient.create(conf).ensure().then(function (c) {
                 return c.lockp('z').then(function () {
                     return c.unlockp('z');
                 });

@@ -26,7 +26,7 @@ Test.create({mode: 'series'}, ['LvMtxClient', 'lmUtils', 'Promise', function (b,
   });
   
   it('yes', {timeout: 1500}, t => {
-    return LvMtxClient.create(conf).then(c => {
+    return LvMtxClient.create(conf).ensure().then(c => {
       return c.lockp('z').then(function ({lockUuid}) {
         return c.unlockp('z', lockUuid);
       });
@@ -43,7 +43,7 @@ Test.create({mode: 'series'}, ['LvMtxClient', 'lmUtils', 'Promise', function (b,
   });
   
   it('yes', {timeout: 1500}, t => {
-    return LvMtxClient.create(conf).then(c => {
+    return LvMtxClient.create(conf).ensure().then(c => {
       return c.lockp('z').then(function () {
         return c.unlockp('z');
       });
@@ -51,7 +51,7 @@ Test.create({mode: 'series'}, ['LvMtxClient', 'lmUtils', 'Promise', function (b,
   });
   
   it('yes', {timeout: 1500}, t => {
-    return LvMtxClient.create(conf).then(c => {
+    return LvMtxClient.create(conf).ensure().then(c => {
       return c.lockp('z').then(function () {
         return c.unlockp('z');
       });
@@ -59,7 +59,7 @@ Test.create({mode: 'series'}, ['LvMtxClient', 'lmUtils', 'Promise', function (b,
   });
   
   it('yes', {timeout: 1500}, t => {
-    return LvMtxClient.create(conf).then(c => {
+    return LvMtxClient.create(conf).ensure().then(c => {
       return c.lockp('z').then(() => {
         return c.unlockp('z');
       });

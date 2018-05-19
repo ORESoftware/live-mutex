@@ -1,2 +1,2 @@
-module.exports = function (suite) {
+module.exports = (suite) => {
 };

@@ -20,7 +20,8 @@ Test.create({ mode: 'series' }, ['Client', 'lmUtils', 'Promise', function (b, as
             });
         });
         it.cb('yes', { timeout: 1500 }, function (t) {
-            Client.create(conf, function (err, c) {
+            var c = Client.create(conf);
+            c.ensure(function (err, c) {
                 if (err)
                     return t.fail(err);
                 c.lock('z', function (err) {
@@ -30,9 +31,18 @@ Test.create({ mode: 'series' }, ['Client', 'lmUtils', 'Promise', function (b, as
                 });
             });
         });
-        it.cb('yes', { timeout: 1500 }, function (t) {
+        it('yes', { timeout: 1500 }, function (t) {
             var c = new Client(conf);
-            c.ensure().then(function () {
+            return c.ensure().then(function () {
+                c.lock('z', function (err) {
+                    if (err)
+                        return t(err);
+                    c.unlock('z', t);
+                });
+            });
+        });
+        it.cb('yes', { timeout: 1500 }, function (t) {
+            Client.create(conf).ensure().then(function (c) {
                 c.lock('z', function (err) {
                     if (err)
                         return t(err);
@@ -41,30 +51,18 @@ Test.create({ mode: 'series' }, ['Client', 'lmUtils', 'Promise', function (b, as
             })["catch"](t);
         });
         it.cb('yes', { timeout: 1500 }, function (t) {
-            Client.create(conf).then(function (c) {
-                c.lock('z', function (err) {
-                    if (err)
-                        return t(err);
-                    c.unlock('z', t);
+            return Client.create(conf).ensure().then(function (c) {
+                return c.lockp('z').then(function (_a) {
+                    var unlock = _a.unlock;
+                    return unlock(t);
                 });
-            })["catch"](t);
+            });
         });
-        it.cb('yes', { timeout: 1500 }, function (t) {
-            Client.create(conf).then(function (c) {
-                c.lock('z', function (err) {
-                    if (err)
-                        return t(err);
-                    c.unlock('z', t);
+        it('yes', { timeout: 1500 }, function (t) {
+            return Client.create(conf).ensure().then(function (c) {
+                return c.lockp('z').then(function () {
+                    return c.unlockp('z');
                 });
-            })["catch"](t);
-        });
-        it.cb('yes', { timeout: 1500 }, function (t) {
-            Client.create(conf).then(function (c) {
-                c.lock('z', function (err) {
-                    if (err)
-                        return t(err);
-                    c.unlock('z', t);
-                });
-            })["catch"](t);
+            });
         });
     }]);

@@ -1,6 +1,7 @@
 'use strict';
 
 import suman = require('suman');
+
 const Test = suman.init(module);
 
 /////////////////////////////////////////////////////////
@@ -27,8 +28,21 @@ Test.create({mode: 'series'}, ['Client', 'lmUtils', 'Promise', function (b, asse
   
   it.cb('yes', {timeout: 1500}, t => {
     
-    Client.create(conf, (err, c) => {
+    const c = Client.create(conf);
+    c.ensure((err, c) => {
       if (err) return t.fail(err);
+      c.lock('z', function (err) {
+        if (err) return t(err);
+        c.unlock('z', t);
+      });
+    });
+    
+  });
+  
+  it('yes', {timeout: 1500}, t => {
+    
+    const c = new Client(conf);
+    return c.ensure().then(function () {
       c.lock('z', function (err) {
         if (err) return t(err);
         c.unlock('z', t);
@@ -39,19 +53,7 @@ Test.create({mode: 'series'}, ['Client', 'lmUtils', 'Promise', function (b, asse
   
   it.cb('yes', {timeout: 1500}, t => {
     
-    const c = new Client(conf);
-    c.ensure().then(function () {
-      c.lock('z', function (err) {
-        if (err) return t(err);
-        c.unlock('z', t);
-      });
-    }).catch(t)
-    
-  });
-  
-  it.cb('yes', {timeout: 1500}, t => {
-    
-    Client.create(conf).then(c => {
+    Client.create(conf).ensure().then(c => {
       c.lock('z', function (err) {
         if (err) return t(err);
         c.unlock('z', t);
@@ -62,23 +64,20 @@ Test.create({mode: 'series'}, ['Client', 'lmUtils', 'Promise', function (b, asse
   
   it.cb('yes', {timeout: 1500}, t => {
     
-    Client.create(conf).then(c => {
-      c.lock('z', function (err) {
-        if (err) return t(err);
-        c.unlock('z', t);
+    return Client.create(conf).ensure().then(c => {
+      return c.lockp('z').then(function ({unlock}) {
+        return unlock(t);
       });
-    }).catch(t);
-    
+    });
   });
   
-  it.cb('yes', {timeout: 1500}, t => {
+  it('yes', {timeout: 1500}, t => {
     
-    Client.create(conf).then(function (c) {
-      c.lock('z', function (err) {
-        if (err) return t(err);
-        c.unlock('z', t);
+    return Client.create(conf).ensure().then((c) => {
+      return c.lockp('z').then(() => {
+        return c.unlockp('z');
       });
-    }).catch(t);
+    });
     
   });
   
