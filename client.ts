@@ -788,6 +788,6 @@ export class Client {
 }
 
 // aliases
+export default Client;
 export const LMClient = Client;
 export const LvMtxClient = Client;
-export default Client;

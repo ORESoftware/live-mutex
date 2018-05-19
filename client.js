@@ -1,5 +1,4 @@
 'use strict';
-Object.defineProperty(exports, "__esModule", { value: true });
 var util = require("util");
 var assert = require("assert");
 var net = require("net");
@@ -524,6 +523,7 @@ var Client = (function () {
     return Client;
 }());
 exports.Client = Client;
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.default = Client;
 exports.LMClient = Client;
 exports.LvMtxClient = Client;
-exports.default = Client;

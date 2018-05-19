@@ -1,5 +1,4 @@
 'use strict';
-Object.defineProperty(exports, "__esModule", { value: true });
 var assert = require("assert");
 var net = require("net");
 var util = require("util");
@@ -612,4 +611,5 @@ var Broker = (function () {
 exports.Broker = Broker;
 exports.LvMtxBroker = Broker;
 exports.LMBroker = Broker;
+Object.defineProperty(exports, "__esModule", { value: true });
 exports.default = Broker;

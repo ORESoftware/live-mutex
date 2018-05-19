@@ -1,5 +1,4 @@
 'use strict';
-Object.defineProperty(exports, "__esModule", { value: true });
 var cp = require("child_process");
 var ping = require('tcp-ping');
 var slp = require('strangeloop');
@@ -100,4 +99,5 @@ exports.launchBrokerInChildProcess = function (opts, cb) {
     return slp.conditionalReturn(fn, cb);
 };
 var $exports = module.exports;
+Object.defineProperty(exports, "__esModule", { value: true });
 exports.default = $exports;

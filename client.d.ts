@@ -73,6 +73,6 @@ export declare class Client {
     lock(key: string, opts: Partial<IClientLockOpts>, cb: TClientLockCB): void;
     unlock(key: string, opts: Partial<IClientUnlockOpts>, cb?: TClientUnlockCB): void;
 }
+export default Client;
 export declare const LMClient: typeof Client;
 export declare const LvMtxClient: typeof Client;
-export default Client;
