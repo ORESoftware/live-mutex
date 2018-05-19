@@ -10,7 +10,7 @@ import * as util from 'util';
 import {createParser} from "./json-parser";
 
 //project
-const log = {
+export const log = {
   info: console.log.bind(console, ' [live-mutex broker]'),
   error: console.error.bind(console, ' [live-mutex broker]')
 };
@@ -48,6 +48,14 @@ const removeWsLockKey = function (broker: Broker, ws: net.Socket, key: string) {
       v.splice(i, 1);
       return true;
     }
+  }
+};
+
+const removeKeyFromWsLock = function (keys: Array<string>, key: string) {
+  const i = keys.indexOf(key);
+  if (i >= 0) {
+    keys.splice(i, 1);
+    return true;
   }
 };
 
@@ -110,6 +118,7 @@ export interface ILockObj {
   uuid: string,
   notify: Array<INotifyObj>,
   key: string,
+  isViaShell: boolean
   to: NodeJS.Timer
 }
 
@@ -191,18 +200,12 @@ export class Broker {
     
     const self = this;
     
-    this.send = function (ws, data, cb) {
+    this.send = (ws, data, cb) => {
       
       let cleanUp = () => {
-        const key = data.key;
-        if (key) {
-          const isOwnsKey = removeWsLockKey(this, ws, key);
-          if (isOwnsKey) {
-            self.unlock({
-              key: key,
-              force: true
-            }, ws);
-          }
+        const key = data && data.key;
+        if (key && removeWsLockKey(this, ws, key)) {
+          self.unlock({key: key, force: true}, ws);
         }
       };
       
@@ -222,7 +225,7 @@ export class Broker {
       });
     };
     
-    const onData = function (ws: net.Socket, data: any) {
+    const onData = (ws: net.Socket, data: any) => {
       
       const key = data.key;
       
@@ -303,9 +306,7 @@ export class Broker {
     const connectedClients = new Map();
     let firstConnection = true;
     
-    const wss = net.createServer(function (ws) {
-      
-      // process.emit('info', 'client has connected to live-mutex broker.');
+    const wss = net.createServer((ws) => {
       
       connectedClients.set(ws, true);
       
@@ -327,9 +328,30 @@ export class Broker {
         connectedClients.delete(ws);
       });
       
-      ws.once('end', function () {
+      ws.once('end', () => {
+        
         ws.removeAllListeners();
         connectedClients.delete(ws);
+        
+        // let keys;
+        // if (keys = this.wsLock.get(ws)) {
+        //   keys.forEach(k => {
+        //     removeWsLockKey(this, ws, k);
+        //     if (this.locks[k]) {
+        //       this.unlock({force: true, key: k}, ws);
+        //     }
+        //   });
+        // }
+        
+        let keys;
+        if (keys = this.wsLock.get(ws)) {
+          keys.forEach(k => {
+            if (this.locks[k] && this.locks[k].isViaShell === false) {
+              removeKeyFromWsLock(keys, k);
+              this.unlock({force: true, key: k}, ws);
+            }
+          });
+        }
       });
       
       ws.on('error', function (err) {
@@ -339,21 +361,6 @@ export class Broker {
       if (!self.wsToKeys.get(ws)) {
         self.wsToKeys.set(ws, []);
       }
-      
-      ws.once('end', () => {
-        let keys;
-        // if (keys = this.wsLock.get(ws)) {
-        //   keys.forEach(k => {
-        //     removeWsLockKey(this, ws, k);
-        //     if (this.locks[k]) {
-        //       this.unlock({
-        //         force: true,
-        //         key: k
-        //       }, ws);
-        //     }
-        //   });
-        // }
-      });
       
       ws.pipe(createParser())
       .on('data', function (v: any) {
@@ -367,7 +374,6 @@ export class Broker {
             ws.end();
           });
       });
-      
     });
     
     let callable = true;
@@ -403,7 +409,7 @@ export class Broker {
     
     let brokerPromise: Promise<any> = null;
     
-    this.ensure = this.start = function (cb?: Function) {
+    this.ensure = this.start = (cb?: Function) => {
       
       if (cb && typeof cb !== 'function') {
         throw new Error('optional argument to ensure/connect must be a function.');
@@ -420,7 +426,7 @@ export class Broker {
           });
       }
       
-      return brokerPromise = new Promise(function (resolve, reject) {
+      return brokerPromise = new Promise((resolve, reject) => {
         
         let to = setTimeout(function () {
           reject(new Error('Live-Mutex broker error: listening action timed out.'))
@@ -513,7 +519,7 @@ export class Broker {
       clearTimeout(this.timeouts[key]);
       delete this.timeouts[key];
       
-      this.timeouts[key] = setTimeout(function () {
+      this.timeouts[key] = setTimeout(() => {
         
         removeWsLockKey(this, ws, key);
         delete self.timeouts[key];
@@ -599,6 +605,7 @@ export class Broker {
     
     const locks = this.locks;
     const key = data.key;
+    const isViaShell = Boolean(data.isViaShell);
     const lck = locks[key];
     const uuid = data.uuid;
     const pid = data.pid;
@@ -654,21 +661,28 @@ export class Broker {
         
         clearTimeout(lck.to);
         
-        lck.to = setTimeout(() => {
+        if (isViaShell === false) {
           
-          // delete locks[key];  => no, this.unlock will take care of that
-          process.emit('warning', new Error('Live-Mutex Broker warning, lock object timed out for key => "' + key + '"'));
+          // if we are locking with the shell, there is not timeout
+          // otherwise if we are using the lib programmatically
+          // we use a timeout
           
-          // we set lck.lockholderTimeouts[uuid], so that when an unlock request for uuid might come in to broker
-          // we know that it timed out already, and we do not throw an error then
-          lck.lockholderTimeouts[uuid] = true;
-          
-          this.unlock({
-            key,
-            force: true
-          });
-          
-        }, ttl);
+          lck.to = setTimeout(() => {
+            
+            // delete locks[key];  => no, this.unlock will take care of that
+            process.emit('warning', new Error('Live-Mutex Broker warning, lock object timed out for key => "' + key + '"'));
+            
+            // we set lck.lockholderTimeouts[uuid], so that when an unlock request for uuid might come in to broker
+            // we know that it timed out already, and we do not throw an error then
+            lck.lockholderTimeouts[uuid] = true;
+            
+            this.unlock({
+              key,
+              force: true
+            });
+            
+          }, ttl);
+        }
         
         addWsLockKey(this, ws, key);
         
@@ -689,20 +703,23 @@ export class Broker {
       locks[key] = {
         pid,
         uuid,
+        isViaShell,
         lockholderTimeouts: {},
         key,
         notify: [],
-        to: setTimeout(() => {
-          
+        to: null
+      };
+      
+      if (isViaShell === false) {
+        locks[key].to = setTimeout(() => {
           // delete locks[key];  => no!, this.unlock will take care of that
           process.emit('warning', new Error('Live-Mutex warning, lock object timed out for key => "' + key + '"'));
           // we set lck.lockholderTimeouts[uuid], so that when an unlock request for uuid comes into the broker
           // we know that it timed out already, and we know not to throw an error when the lock.uuid doesn't match
           locks[key] && (locks[key].lockholderTimeouts[uuid] = true);
           this.unlock({key, force: true});
-          
-        }, ttl)
-      };
+        }, ttl);
+      }
       
       this.send(ws, {
         uuid: uuid,
@@ -835,7 +852,7 @@ export class Broker {
       
       if (ws) {
         
-        process.emit('warning', new Error('Live-Mutex warning, no lock with key [2] => "' + key + '"'));
+        process.emit('warning', new Error(`Live-Mutex warning, [2] no lock with key => '${key}'.`));
         
         this.send(ws, {
           uuid: uuid,
@@ -843,7 +860,7 @@ export class Broker {
           lockRequestCount: 0,
           type: 'unlock',
           unlocked: true,
-          error: 'Live-Mutex warning => no lock with key [1] => "' + key + '"'
+          error: `Live-Mutex warning => [1] no lock with key  => '${key}'.`
         });
       }
     }

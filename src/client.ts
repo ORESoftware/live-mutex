@@ -10,7 +10,7 @@ import uuidV4 = require('uuid/v4');
 import {createParser} from "./json-parser";
 
 //project
-const log = {
+export const log = {
   info: console.log.bind(console, ' [live-mutex client]'),
   error: console.error.bind(console, ' [live-mutex client]')
 };
@@ -208,8 +208,8 @@ export class Client {
     this.host = opts.host || 'localhost';
     this.port = opts.port || 6970;
     this.ttl = weAreDebugging ? 5000000 : (opts.ttl || 3000);
-    this.unlockTimeout = weAreDebugging ? 5000000 : (opts.unlockRequestTimeout || 3000);
-    this.lockTimeout = weAreDebugging ? 5000000 : (opts.lockRequestTimeout || 6000);
+    this.unlockTimeout = weAreDebugging ? 5000000 : (opts.unlockRequestTimeout || 4000);
+    this.lockTimeout = weAreDebugging ? 5000000 : (opts.lockRequestTimeout || 3000);
     this.lockRetryMax = opts.lockRetryMax || 3;
     this.unlockRetryMax = opts.unlockRetryMax || 3;
     
@@ -407,7 +407,7 @@ export class Client {
     this.resolutions[uuid] = (err, data) => {
       if (String(key) !== String(data.key)) {
         delete this.resolutions[uuid];
-        throw new Error(' => Live-Mutex implementation error => bad key.');
+        throw new Error('Live-Mutex implementation error => bad key.');
       }
       
       if (data.error) {
@@ -415,7 +415,7 @@ export class Client {
       }
       
       if ([data.acquired, data.retry].filter(i => i).length > 1) {
-        throw new Error(' => Live-Mutex implementation error.');
+        throw new Error('Live-Mutex implementation error.');
       }
       
       if (data.lockInfo === true) {
@@ -576,13 +576,14 @@ export class Client {
       delete self.resolutions[uuid];
       self.write({uuid, key, type: 'lock-client-timeout'});
       ++opts.__retryCount;
+  
+      log.error(`retrying lock request for key '${key}', uuid '${uuid}', attempt #`, opts.__retryCount);
       
-      if (opts.__retryCount > maxRetries) {
-        return cb(new Error(`Live-Mutex client lock request timed out after ${lockTimeout}ms,
-         ${maxRetries} retries attempted.`), false);
+      if (opts.__retryCount >= maxRetries) {
+        return cb(new Error(` => Live-Mutex client lock request timed out after ${lockTimeout * opts.__retryCount} ms, ` +
+          `${maxRetries} retries attempted.`), false);
       }
       
-      // logerr(`retrying lock request for uuid ${uuid}, attempt #`, opts.__retryCount);
       self.lock(key, opts, cb);
       
     }, lockTimeout);
@@ -657,6 +658,7 @@ export class Client {
     };
     
     this.write({
+      isViaShell: opts.isViaShell,
       retryCount: opts.__retryCount,
       uuid: uuid,
       key: key,
