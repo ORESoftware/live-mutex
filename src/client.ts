@@ -560,7 +560,6 @@ export class Client {
     
     const uuid = opts._uuid = opts._uuid || (append + uuidV4());
     const ttl = opts.ttl || this.ttl;
-    console.log('ttl is:', ttl);
     const lockTimeout = opts.lockRequestTimeout || this.lockTimeout;
     const maxRetries = opts.maxRetry || opts.maxRetries || this.lockRetryMax;
     
@@ -575,13 +574,7 @@ export class Client {
       timedOut = true;
       // this.timeouts[uuid] = true;
       delete self.resolutions[uuid];
-      
-      self.write({
-        uuid,
-        key,
-        type: 'lock-client-timeout'
-      });
-      
+      self.write({uuid, key, type: 'lock-client-timeout'});
       ++opts.__retryCount;
       
       if (opts.__retryCount > maxRetries) {

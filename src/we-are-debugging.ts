@@ -24,7 +24,7 @@ const expressions = [
 const isDebug = expressions.some(x => execArgs.indexOf(x) > -1);
 
 if (process.env.SUMAN_DEBUG === 'yes') {
-    console.log('\n => Exec args => ', util.inspect(execArgs), '\n');
+    console.log('=> Exec args => ', util.inspect(execArgs), '\n');
 }
 
 if (isDebug) {

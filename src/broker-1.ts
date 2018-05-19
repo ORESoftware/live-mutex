@@ -239,7 +239,6 @@ export class Broker {
       }
       
       if (data.type === 'unlock') {
-        console.log('called unlock 5');
         self.unlock(data, ws);
       }
       else if (data.type === 'lock') {
@@ -686,7 +685,6 @@ export class Broker {
     else {
       
       addWsLockKey(this, ws, key);
-      console.log('ttl is 2:', ttl);
       
       locks[key] = {
         pid,

@@ -12,18 +12,10 @@ Test.create({mode: 'series'}, ['Client', 'lmUtils', 'Promise', function (b, asse
   const conf = Object.freeze({port: 7987});
   
   before(function () {
-    return lmUtils.conditionallyLaunchSocketServer(conf)
+    return lmUtils.conditionallyLaunchSocketServerp(conf)
     .then(function (data) {
-        return Promise.delay(30);
-      },
-      function (err) {
-        if (err) {
-          console.error(err.stack);
-        }
-        else {
-          throw new Error('no error passed to reject handler');
-        }
-      });
+      return Promise.delay(300);
+    });
   });
   
   it.cb('yes', {timeout: 1500}, t => {

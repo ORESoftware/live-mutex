@@ -7,15 +7,7 @@ Test.create({ mode: 'parallel' }, ['Client', 'lmUtils', function (b, assert, bef
         var _a = b.ioc, lmUtils = _a.lmUtils, Client = _a.Client;
         var conf = Object.freeze({ port: 7888 });
         before('promise', function () {
-            return lmUtils.conditionallyLaunchSocketServer(conf)
-                .then(null, function (err) {
-                if (err) {
-                    console.error(err.stack);
-                }
-                else {
-                    throw new Error('no error passed to reject handler');
-                }
-            });
+            return lmUtils.conditionallyLaunchSocketServerp(conf);
         });
         it.cb('yes', { timeout: 30000 }, function (t) {
             var client = new Client(conf, function () {
