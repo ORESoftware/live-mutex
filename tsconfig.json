@@ -3,25 +3,19 @@
     "outDir": "dist",
     "declaration": true,
     "baseUrl": ".",
-    "types": [
-      "node",
-      "lodash",
-      "async",
-      "core-js"
-    ],
     "target": "es6",
     "module": "commonjs",
     "noImplicitAny": true,
     "removeComments": true,
-    "allowUnreachableCode": true,
+    "allowUnreachableCode": false,
     "lib": [
       "es2015",
-      "es2016"
+      "es2016",
+      "es2017"
     ]
   },
   "compileOnSave": false,
-  "exclude": [
-    "test",
-    "node_modules"
+  "include": [
+    "lib"
   ]
 }

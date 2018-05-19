@@ -35,4 +35,4 @@ if (inDebugMode) {
     console.log('=> we are debugging with the debug execArg');
 }
 
-module.exports = global.weAreDebugging = (isDebug || inDebugMode);
+export const weAreDebugging = (isDebug || inDebugMode);

@@ -2,6 +2,7 @@
 ### folders
 node_modules
 .idea
+lib
 test
 
 ### matching files

@@ -13,9 +13,7 @@ const uuidV4 = require('uuid/v4');
 const JSONStream = require('JSONStream');
 
 //project
-import lmUtils from './utils';
-import Timer = NodeJS.Timer;
-import Socket = NodeJS.Socket;
+import {Socket} from 'net';
 const loginfo = console.log.bind(console, '[live-mutex broker] =>');
 const logerr = console.error.bind(console, '[live-mutex broker] =>');
 
@@ -219,7 +217,7 @@ export class Broker {
         return cb && process.nextTick(cb);
       }
       
-      ws.write(JSON.stringify(data) + '\n', 'utf8', err => {
+      ws.write(JSON.stringify(data) + '\n', 'utf8', function (err) {
         if (err) {
           console.error('socket is not writable 2.');
           process.emit('warning', new Error('socket is not writable 2.'));
@@ -230,15 +228,15 @@ export class Broker {
       });
     };
     
-    const onData = (ws, data) => {
+    const onData = function (ws, data) {
       
       const key = data.key;
       
       if (key) {
         let v;
-        if (!(v = this.wsToKeys.get(ws))) {
+        if (!(v = self.wsToKeys.get(ws))) {
           v = [];
-          this.wsToKeys.set(ws, v);
+          self.wsToKeys.set(ws, v);
         }
         let index = v.indexOf(key);
         if (index < 0) {
@@ -248,26 +246,26 @@ export class Broker {
       
       if (data.type === 'unlock') {
         console.log('called unlock 5');
-        this.unlock(data, ws);
+        self.unlock(data, ws);
       }
       else if (data.type === 'lock') {
-        this.lock(data, ws);
+        self.lock(data, ws);
       }
       else if (data.type === 'lock-received') {
-        this.bookkeeping[data.key].lockCount++;
-        clearTimeout(this.timeouts[data.key]);
-        delete this.timeouts[data.key];
+        self.bookkeeping[data.key].lockCount++;
+        clearTimeout(self.timeouts[data.key]);
+        delete self.timeouts[data.key];
       }
       else if (data.type === 'unlock-received') {
         const key = data.key;
-        clearTimeout(this.timeouts[key]);
-        delete this.timeouts[key];
-        this.bookkeeping[key].unlockCount++;
+        clearTimeout(self.timeouts[key]);
+        delete self.timeouts[key];
+        self.bookkeeping[key].unlockCount++;
       }
       else if (data.type === 'lock-client-timeout') {
         
         // if the client times out, we don't want to send them any more messages
-        const lck = this.locks[key];
+        const lck = self.locks[key];
         const uuid = data.uuid;
         if (!lck) {
           process.emit('warning', `Lock for key "${key}" has probably expired.`);
@@ -285,22 +283,22 @@ export class Broker {
         
       }
       else if (data.type === 'lock-received-rejected') {
-        const lck = this.locks[key];
+        const lck = self.locks[key];
         if (!lck) {
           process.emit('warning', `Lock for key "${key}" has probably expired.`);
           return;
         }
-        this.rejected[data.uuid] = true;
-        this.ensureNewLockHolder(lck, data);
+        self.rejected[data.uuid] = true;
+        self.ensureNewLockHolder(lck, data);
       }
       else if (data.type === 'lock-info-request') {
-        this.retrieveLockInfo(data, ws);
+        self.retrieveLockInfo(data, ws);
       }
       else {
         
         process.emit('warning', `implementation error, bad data sent to broker => ${util.inspect(data)}`);
         
-        this.send(ws, {
+        self.send(ws, {
           key: data.key,
           uuid: data.uuid,
           error: 'Malformed data sent to Live-Mutex broker.'
@@ -533,7 +531,8 @@ export class Broker {
         // if a client receives a reelection message, they will all retry to acquire the lock on this key
         
         let _lck;
-        let count;
+        let count: number;
+        
         // if this timeout happens, then we can no longer cross-verify uuid's
         if (_lck = locks[key]) {
           _lck.uuid = undefined;
@@ -573,13 +572,12 @@ export class Broker {
     else {
       // note: only delete lock if no client is remaining to claim it
       // No other connections waiting for lock with key, so we deleted the lock
-      console.log('deleting the lock lulz...');
       delete locks[key];
     }
     
   }
   
-  retrieveLockInfo(data, ws) {
+  retrieveLockInfo(data, ws: Socket) {
     
     const locks = this.locks;
     const key = data.key;
@@ -598,14 +596,14 @@ export class Broker {
     this.send(ws, {
       key, uuid, lockholderUUID,
       lockRequestCount,
-      isLocked: !!isLocked,
+      isLocked: Boolean(isLocked),
       lockInfo: true,
       type: 'lock-info-response'
     });
     
   }
   
-  lock(data, ws) {
+  lock(data: any, ws: Socket) {
     
     const locks = this.locks;
     const key = data.key;
@@ -732,7 +730,7 @@ export class Broker {
     
   }
   
-  unlock(data: Object, ws?: Socket) {
+  unlock(data: any, ws?: Socket) {
     
     console.log('unlock was called.');
     
