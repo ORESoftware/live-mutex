@@ -6,7 +6,7 @@ import * as assert from 'assert';
 import * as net from 'net';
 
 //npm
-const uuidV4 = require('uuid/v4');
+import uuidV4 from 'uuid/v4';
 import {createParser} from "./json-parser";
 
 //project

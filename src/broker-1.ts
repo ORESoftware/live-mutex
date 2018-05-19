@@ -207,7 +207,6 @@ export class Broker {
       };
       
       if (!ws.writable) {
-        console.error('socket is not writable 1.');
         process.emit('warning', new Error('socket is not writable 1.'));
         // cleanUp();
         return cb && process.nextTick(cb);
