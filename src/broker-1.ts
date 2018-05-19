@@ -7,10 +7,7 @@ import * as net from 'net';
 import * as util from 'util';
 
 //npm
-const async = require('async');
-const colors = require('chalk');
-const uuidV4 = require('uuid/v4');
-const JSONStream = require('JSONStream');
+import {createParser} from "./json-parser";
 
 //project
 const log = {
@@ -26,7 +23,6 @@ if (weAreDebugging) {
 }
 
 process.setMaxListeners(100);
-
 process.on('warning', function (e: any) {
   log.error('warning:', e && e.stack || e);
 });
@@ -202,7 +198,6 @@ export class Broker {
         if (key) {
           const isOwnsKey = removeWsLockKey(this, ws, key);
           if (isOwnsKey) {
-            console.log('unlock was called 4.');
             self.unlock({
               key: key,
               force: true
@@ -362,7 +357,7 @@ export class Broker {
         // }
       });
       
-      ws.pipe(JSONStream.parse())
+      ws.pipe(createParser())
       .on('data', function (v: any) {
         onData(ws, v);
       })
@@ -510,8 +505,6 @@ export class Broker {
         // we set lck.lockholderTimeouts[uuid], so that when an unlock request for uuid comes into the broker
         // we know that it timed out already, and we know not to throw an error when the lock.uuid doesn't match
         lck.lockholderTimeouts[uuid] = true;
-        
-        console.log('unlock was called 3.');
         self.unlock({
           key: key,
           force: true
@@ -635,7 +628,7 @@ export class Broker {
         // if we are retrying, we may attempt to call lock() more than once
         // we don't want to push the same ws object / same uuid combo to array
         
-        const alreadyAdded = lck.notify.some(function (item) {
+        const alreadyAdded = lck.notify.some((item) => {
           return String(item.uuid) === String(uuid);
         });
         
@@ -663,8 +656,6 @@ export class Broker {
         
         clearTimeout(lck.to);
         
-        console.log('ttl is 1:', ttl);
-        
         lck.to = setTimeout(() => {
           
           // delete locks[key];  => no, this.unlock will take care of that
@@ -673,8 +664,6 @@ export class Broker {
           // we set lck.lockholderTimeouts[uuid], so that when an unlock request for uuid might come in to broker
           // we know that it timed out already, and we do not throw an error then
           lck.lockholderTimeouts[uuid] = true;
-          
-          console.log('unlock was called 1:', ttl);
           
           this.unlock({
             key,
@@ -713,8 +702,6 @@ export class Broker {
           // we set lck.lockholderTimeouts[uuid], so that when an unlock request for uuid comes into the broker
           // we know that it timed out already, and we know not to throw an error when the lock.uuid doesn't match
           locks[key] && (locks[key].lockholderTimeouts[uuid] = true);
-          
-          console.log('calling unlock 2.');
           this.unlock({key, force: true});
           
         }, ttl)
@@ -782,7 +769,7 @@ export class Broker {
         });
       }
       
-      this.wsLock.forEach(function (v, k) {
+      this.wsLock.forEach((v, k) => {
         const keys = self.wsLock.get(k);
         if (keys) {
           const i = keys.indexOf(key);
@@ -839,7 +826,7 @@ export class Broker {
       process.emit('warning', new Error('Live-Mutex implementation error => no lock with key => "' + key + '"'));
       
       // since the lock no longer exists for this key, remove ownership of this key
-      this.wsLock.forEach(function (v, k) {
+      this.wsLock.forEach((v, k) => {
         const keys = self.wsLock.get(k);
         if (keys) {
           const i = keys.indexOf[key];
@@ -851,7 +838,7 @@ export class Broker {
       
       if (ws) {
         
-        process.emit('warning', new Error('Live-Mutex warning, => no lock with key [2] => "' + key + '"'));
+        process.emit('warning', new Error('Live-Mutex warning, no lock with key [2] => "' + key + '"'));
         
         this.send(ws, {
           uuid: uuid,

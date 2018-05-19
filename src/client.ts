@@ -7,7 +7,7 @@ import * as net from 'net';
 
 //npm
 const uuidV4 = require('uuid/v4');
-const JSONStream = require('JSONStream');
+import {createParser} from "./json-parser";
 
 //project
 const log = {
@@ -50,7 +50,6 @@ const validOptions: Array<string> = [
   'unlockRetryMax',
   'lockRetryMax'
 ];
-
 
 export interface IClientOptions {
   key: string,
@@ -219,7 +218,7 @@ export class Client {
     
     const self = this;
     
-    this.write = function (data: any, cb: Function) {
+    this.write = (data: any, cb: Function) => {
       if (!ws) {
         throw new Error('please call connect() on this Live-Mutex client, before using the lock/unlock methods.');
       }
@@ -227,7 +226,7 @@ export class Client {
       ws.write(JSON.stringify(data) + '\n', 'utf8', cb);
     };
     
-    const onData = function (data: any) {
+    const onData = (data: any) => {
       
       if (data.type === 'stats') {
         self.setLockRequestorCount(data.key, data.lockRequestCount);
@@ -288,7 +287,7 @@ export class Client {
       
     };
     
-    this.ensure = this.connect = function (cb?: Function) {
+    this.ensure = this.connect = (cb?: Function) => {
       
       if (cb && typeof cb !== 'function') {
         throw new Error('optional argument to ensure/connect must be a function.');
@@ -305,7 +304,7 @@ export class Client {
           });
       }
       
-      return connectPromise = new Promise(function (resolve, reject) {
+      return connectPromise = new Promise((resolve, reject) => {
         
         let onFirstErr = function (e: any) {
           let err = new Error('live-mutex client error => ' + (e && e.stack || e));
@@ -339,17 +338,18 @@ export class Client {
           process.emit('warning', new Error('live-mutex client error: ' + e.stack || util.inspect(e)));
         });
         
-        ws.pipe(JSONStream.parse()).on('data', onData)
+        ws.pipe(createParser()).on('data', onData)
         .once('error', function (e: any) {
           self.write({
-            error: String(e.stack || e)
-          }, function () {
-            ws.end();
-          });
+              error: String(e && e.stack || e)
+            },
+            function () {
+              ws.end();
+            });
         });
       })
       // if the user passes a callback, we fire the callback here
-      .then(function (val) {
+      .then((val) => {
           cb && cb.call(self, null, val);
           return val;
         },
@@ -359,11 +359,11 @@ export class Client {
         });
     };
     
-    process.once('exit', function () {
+    process.once('exit', () => {
       ws && ws.end();
     });
     
-    this.close = function () {
+    this.close = () => {
       return ws && ws.end();
     };
     
@@ -379,8 +379,8 @@ export class Client {
     
   };
   
-  static create(opts: TClientOptions, cb?: TClientCB): Promise<Client> {
-    return new Client(opts).ensure(cb);
+  static create(opts: TClientOptions): Client {
+    return new Client(opts);
   }
   
   setLockRequestorCount(key: string, val: any): void {
@@ -537,7 +537,7 @@ export class Client {
     
     const self = this;
     let timedOut = false;
-    const to = setTimeout(function () {
+    const to = setTimeout(() => {
       
       timedOut = true;
       // this.timeouts[uuid] = true;
@@ -573,7 +573,7 @@ export class Client {
       cb(err, false);
     };
     
-    this.resolutions[uuid] = function (err, data) {
+    this.resolutions[uuid] = (err, data) => {
       
       if (timedOut) {
         return;
