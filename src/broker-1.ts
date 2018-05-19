@@ -20,7 +20,7 @@ const log = {
 
 ///////////////////////////////////////////////////////////////////
 
-const weAreDebugging = require('./lib/we-are-debugging');
+import {weAreDebugging} from './we-are-debugging';
 if (weAreDebugging) {
   log.error('broker is in debug mode. Timeouts are turned off.');
 }
@@ -268,7 +268,7 @@ export class Broker {
         const lck = self.locks[key];
         const uuid = data.uuid;
         if (!lck) {
-          process.emit('warning', `Lock for key "${key}" has probably expired.`);
+          process.emit('warning', new Error(`Lock for key "${key}" has probably expired.`));
           return;
         }
         
@@ -285,7 +285,7 @@ export class Broker {
       else if (data.type === 'lock-received-rejected') {
         const lck = self.locks[key];
         if (!lck) {
-          process.emit('warning', `Lock for key "${key}" has probably expired.`);
+          process.emit('warning', new Error(`Lock for key "${key}" has probably expired.`));
           return;
         }
         self.rejected[data.uuid] = true;
@@ -296,7 +296,7 @@ export class Broker {
       }
       else {
         
-        process.emit('warning', `implementation error, bad data sent to broker => ${util.inspect(data)}`);
+        process.emit('warning', new Error(`implementation error, bad data sent to broker => ${util.inspect(data)}`));
         
         self.send(ws, {
           key: data.key,
@@ -312,7 +312,8 @@ export class Broker {
     
     const wss = net.createServer(function (ws) {
       
-      process.emit('info', 'client has connected to live-mutex broker.');
+      // process.emit('info', 'client has connected to live-mutex broker.');
+      
       connectedClients.set(ws, true);
       
       let endWS = function () {
@@ -383,7 +384,7 @@ export class Broker {
           return;
         }
         callable = false;
-        process.emit('warning', `${event} event has occurred.`);
+        process.emit('warning', new Error(`${event} event has occurred.`));
         connectedClients.forEach(function (v, k, map) {
           // destroy each connected client
           k.destroy();
@@ -504,7 +505,7 @@ export class Broker {
       lck.to = setTimeout(function () {
         
         // delete locks[key]; => no, this.unlock will take care of that
-        process.emit('warning', 'Live-Mutex Broker warning, lock object timed out for key => "' + key + '"');
+        process.emit('warning', new Error('Live-Mutex Broker warning, lock object timed out for key => "' + key + '"'));
         
         // we set lck.lockholderTimeouts[uuid], so that when an unlock request for uuid comes into the broker
         // we know that it timed out already, and we know not to throw an error when the lock.uuid doesn't match
@@ -667,7 +668,7 @@ export class Broker {
         lck.to = setTimeout(() => {
           
           // delete locks[key];  => no, this.unlock will take care of that
-          process.emit('warning', 'Live-Mutex Broker warning, lock object timed out for key => "' + key + '"');
+          process.emit('warning', new Error('Live-Mutex Broker warning, lock object timed out for key => "' + key + '"'));
           
           // we set lck.lockholderTimeouts[uuid], so that when an unlock request for uuid might come in to broker
           // we know that it timed out already, and we do not throw an error then
@@ -708,7 +709,7 @@ export class Broker {
         to: setTimeout(() => {
           
           // delete locks[key];  => no!, this.unlock will take care of that
-          process.emit('warning', 'Live-Mutex warning, lock object timed out for key => "' + key + '"');
+          process.emit('warning', new Error('Live-Mutex warning, lock object timed out for key => "' + key + '"'));
           // we set lck.lockholderTimeouts[uuid], so that when an unlock request for uuid comes into the broker
           // we know that it timed out already, and we know not to throw an error when the lock.uuid doesn't match
           locks[key] && (locks[key].lockholderTimeouts[uuid] = true);
@@ -850,7 +851,7 @@ export class Broker {
       
       if (ws) {
         
-        process.emit('warning', 'Live-Mutex warning, => no lock with key [2] => "' + key + '"');
+        process.emit('warning', new Error('Live-Mutex warning, => no lock with key [2] => "' + key + '"'));
         
         this.send(ws, {
           uuid: uuid,

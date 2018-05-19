@@ -1,4 +1,5 @@
-const {Broker} = require('../broker');
+
+import {Broker} from './broker-1';
 
 const port = parseInt(process.env.LIVE_MUTEX_PORT || '6970');
 

@@ -247,7 +247,7 @@ export class Client {
         const to = self.timeouts[uuid];
         
         if (fn && to) {
-          process.emit('error', new Error('Function and timeout both exist => Live-Mutex implementation error.'));
+          process.emit('warning', new Error('Function and timeout both exist => Live-Mutex implementation error.'));
         }
         
         if (fn) {
@@ -283,7 +283,7 @@ export class Client {
       }
       else {
         process.emit('warning',
-          'potential Live-Mutex implementation error => message did not contain uuid =>' + util.inspect(data));
+          new Error('potential Live-Mutex implementation error => message did not contain uuid =>' + util.inspect(data)));
       }
       
     };
@@ -325,7 +325,7 @@ export class Client {
         });
         
         ws.once('end', () => {
-          process.emit('info', 'client stream "end" event occurred.');
+          process.emit('warning', new Error('client stream "end" event occurred.'));
         });
         
         ws.once('error', onFirstErr);
@@ -336,7 +336,7 @@ export class Client {
         ws.setEncoding('utf8');
         
         ws.on('error', function (e) {
-          process.emit('error', 'live-mutex client error: ' + e.stack || util.inspect(e));
+          process.emit('warning', new Error('live-mutex client error: ' + e.stack || util.inspect(e)));
         });
         
         ws.pipe(JSONStream.parse()).on('data', onData)
@@ -410,7 +410,7 @@ export class Client {
       }
       
       if (data.error) {
-        process.emit('error', data.error);
+        process.emit('warning', data.error);
       }
       
       if ([data.acquired, data.retry].filter(i => i).length > 1) {
@@ -596,12 +596,7 @@ export class Client {
       if (data.acquired === true) {
         cleanUp();
         self.bookkeeping[key].lockCount++;
-        
-        self.write({
-          uuid: uuid,
-          key: key,
-          type: 'lock-received'
-        });
+        self.write({uuid: uuid, key: key, type: 'lock-received'});
         
         if (data.uuid !== uuid) {
           return callbackWithError(`Live-Mutex error, mismatch in uuids -> '${data.uuid}', -> '${uuid}'.`);

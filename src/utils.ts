@@ -1,10 +1,6 @@
 'use strict';
 
 //core
-import * as util from 'util';
-import * as path from 'path';
-import * as assert from 'assert';
-import * as EE from 'events';
 import * as cp from 'child_process';
 
 //npm
@@ -12,8 +8,8 @@ const ping = require('tcp-ping');
 const slp = require('strangeloop');
 
 //project
-import {Broker} from './broker';
-const p = require.resolve('./lib/launch-broker-child');
+import {Broker} from './broker-1';
+const p = require.resolve('./launch-broker-child');
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -145,6 +141,3 @@ export const launchBrokerInChildProcess = function (opts, cb) {
   return slp.conditionalReturn(fn, cb);
 
 };
-
-const $exports = module.exports;
-export default $exports;
