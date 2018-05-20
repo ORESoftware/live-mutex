@@ -69,10 +69,10 @@ export interface IUuidTimeoutBool {
   [key: string]: boolean
 }
 
-export type IErrorFirstDataCB = (err: Error | null | undefined | string, val?: any) => void;
+export type ErrFirstDataCallback = (err: any, val?: any) => void;
 
 export interface IClientResolution {
-  [key: string]: IErrorFirstDataCB
+  [key: string]: ErrFirstDataCallback
 }
 
 export interface IBookkeepingHash {
@@ -86,18 +86,18 @@ export interface IBookkeeping {
   unlockCount: number;
 }
 
-export type TClientCB = (err: Error | string | null | undefined, c?: Client) => void;
-export type TEnsure = (cb?: TClientCB) => Promise<Client>;
+export type LMClientCallBack = (err: any, c?: Client) => void;
+export type Ensure = (cb?: LMClientCallBack) => Promise<Client>;
 
 export interface IUuidBooleanHash {
   [key: string]: boolean;
 }
 
-export interface IClientLockOpts {
+export interface LMClientLockOpts {
   
 }
 
-export interface IClientUnlockOpts {
+export interface LMClientUnlockOpts {
   
 }
 
@@ -105,8 +105,11 @@ export interface ILockHolderCount {
   [key: string]: number;
 }
 
-export type TClientLockCB = (err: Error | string | null | undefined, unlock: Function | false, id?: string) => void;
-export type TClientUnlockCB = (err: Error | string | null | undefined, uuid?: string) => void;
+export type LMLockSuccessData = { acquired: boolean, key: string, unlock?: LMClientUnlockConvenienceCallback, lockUuid: string };
+export type LMClientLockCallBack = (err: any, val: LMLockSuccessData) => void;
+export type LMClientUnlockCallBack = (err: any, uuid?: string) => void;
+export type ErrorFirstCallBack = (err: any) => void;
+export type LMClientUnlockConvenienceCallback = (fn: ErrorFirstCallBack) => void;
 
 ////////////////////////////////////////////////////////////////
 
@@ -125,8 +128,8 @@ export class Client {
   timeouts: IUuidTimeoutBool;
   resolutions: IClientResolution;
   bookkeeping: IBookkeepingHash;
-  ensure: TEnsure;
-  connect: TEnsure;
+  ensure: Ensure;
+  connect: Ensure;
   giveups: IUuidBooleanHash;
   write: Function;
   isOpen: boolean;
@@ -135,10 +138,10 @@ export class Client {
   
   ////////////////////////////////////////////////////////////////
   
-  constructor($opts: TClientOptions, cb?: TClientCB) {
+  constructor(o: TClientOptions, cb?: LMClientCallBack) {
     
     this.isOpen = false;
-    const opts = this.opts = $opts || {};
+    const opts = this.opts = o || {};
     assert(typeof opts === 'object', 'Bad arguments to live-mutex client constructor - options must be an object.');
     
     if (cb) {
@@ -158,7 +161,6 @@ export class Client {
     }
     
     if ('port' in opts) {
-      
       assert(Number.isInteger(opts.port), ' => "port" option needs to be an integer.');
       assert(opts.port > 1024 && opts.port < 49152, ' => "port" integer needs to be in range (1025-49151).');
     }
@@ -204,7 +206,6 @@ export class Client {
     }
     
     this.listeners = {};
-    
     this.host = opts.host || 'localhost';
     this.port = opts.port || 6970;
     this.ttl = weAreDebugging ? 5000000 : (opts.ttl || 3000);
@@ -281,8 +282,9 @@ export class Client {
         }
       }
       else {
-        process.emit('warning',
-          new Error('potential Live-Mutex implementation error => message did not contain uuid =>' + util.inspect(data)));
+        process.emit('warning', new Error(
+          'potential Live-Mutex implementation error => message did not contain uuid =>' + util.inspect(data))
+        );
       }
       
     };
@@ -293,7 +295,7 @@ export class Client {
         throw new Error('optional argument to ensure/connect must be a function.');
       }
       
-      if (connectPromise) {
+      if (connectPromise && ws.writable) {
         return connectPromise.then((val) => {
             cb && cb.call(self, null, val);
             return val;
@@ -302,6 +304,13 @@ export class Client {
             cb && cb.call(self, err);
             return Promise.reject(err);
           });
+      }
+      
+      if (ws) {
+        ws.removeAllListeners();
+        ws.destroy(function (err) {
+          err && log.error(err.message || err);
+        });
       }
       
       return connectPromise = new Promise((resolve, reject) => {
@@ -341,12 +350,9 @@ export class Client {
         ws.pipe(createParser())
         .on('data', onData)
         .once('error', function (e: any) {
-          self.write({
-              error: String(e && e.stack || e)
-            },
-            function () {
-              ws.end();
-            });
+          self.write({error: String(e && e.stack || e)}, function () {
+            ws.end();
+          });
         });
       })
       // if the user passes a callback, we fire the callback here
@@ -432,15 +438,15 @@ export class Client {
     
   }
   
-  lockp(key: string, opts?: Partial<IClientLockOpts>) {
+  lockp(key: string, opts?: Partial<LMClientLockOpts>): Promise<LMLockSuccessData> {
     return new Promise((resolve, reject) => {
-      this.lock(key, opts, function (err, unlock, lockUuid) {
-        err ? reject(err) : resolve({key, unlock, lockUuid});
+      this.lock(key, opts, function (err, val) {
+        err ? reject(err) : resolve(val);
       });
     });
   }
   
-  unlockp(key: string, opts?: Partial<IClientUnlockOpts>) {
+  unlockp(key: string, opts?: Partial<LMClientUnlockOpts>) {
     return new Promise((resolve, reject) => {
       this.unlock(key, opts, function (err, val) {
         err ? reject(err) : resolve(val);
@@ -448,49 +454,33 @@ export class Client {
     });
   }
   
-  acquire(key: string, opts?: Partial<IClientLockOpts>) {
-    return new Promise((resolve, reject) => {
-      this.lock(key, opts, function (err, unlock, lockUuid) {
-        err ? reject(err) : resolve({key, unlock, lockUuid});
-      });
-    });
+  acquire(key: string, opts?: Partial<LMClientLockOpts>) {
+    return this.lockp.apply(this, arguments);
   }
   
-  release(key: string, opts?: Partial<IClientUnlockOpts>) {
-    return new Promise((resolve, reject) => {
-      this.unlock(key, opts, function (err, val) {
-        err ? reject(err) : resolve(val);
-      });
-    });
+  release(key: string, opts?: Partial<LMClientUnlockOpts>) {
+    return this.unlockp.apply(this, arguments);
   }
   
-  acquireLock(key: string, opts?: Partial<IClientLockOpts>) {
-    return new Promise((resolve, reject) => {
-      this.lock(key, opts, function (err, unlock, lockUuid) {
-        err ? reject(err) : resolve({key, unlock, lockUuid});
-      });
-    });
+  acquireLock(key: string, opts?: Partial<LMClientLockOpts>) {
+    return this.lockp.apply(this, arguments);
   }
   
-  releaseLock(key: string, opts?: Partial<IClientUnlockOpts>) {
-    return new Promise((resolve, reject) => {
-      this.unlock(key, opts, function (err, val) {
-        err ? reject(err) : resolve(val);
-      });
-    });
+  releaseLock(key: string, opts?: Partial<LMClientUnlockOpts>) {
+    return this.unlockp.apply(this, arguments);
   }
   
   promisifyUnlock(fn: Function) {
     return new Promise((resolve, reject) => {
       fn(function (err, val) {
         err ? reject(err) : resolve(val);
-      })
+      });
     });
   }
   
-  lock(key: string, opts: any, cb?: TClientLockCB) {
+  lock(key: string, opts: any, cb?: LMClientLockCallBack) {
     
-    assert.equal(typeof key, 'string', 'Key passed to live-mutex#lock needs to be a string.');
+    assert.equal(typeof key, 'string', 'Key passed to live-mutex #lock needs to be a string.');
     
     this.bookkeeping[key] = this.bookkeeping[key] || {
       rawLockCount: 0,
@@ -568,7 +558,7 @@ export class Client {
     const maxRetries = opts.maxRetry || opts.maxRetries || this.lockRetryMax;
     
     if (opts.__retryCount > maxRetries) {
-      return cb(new Error(`Maximum retries (${maxRetries}) attempted.`), false);
+      return cb(new Error(`Maximum retries (${maxRetries}) attempted.`), {acquired: false, key, lockUuid: uuid});
     }
     
     const self = this;
@@ -585,7 +575,8 @@ export class Client {
       
       if (opts.__retryCount >= maxRetries) {
         return cb(new Error(` => Live-Mutex client lock request timed out after ${lockTimeout * opts.__retryCount} ms, ` +
-          `${maxRetries} retries attempted.`), false);
+          `${maxRetries} retries attempted.`),
+          {acquired: false, key, lockUuid: uuid});
       }
       
       self.lock(key, opts, cb);
@@ -601,7 +592,7 @@ export class Client {
       cleanUp();
       err = err instanceof Error ? err : new Error(err);
       process.emit('warning', err);
-      cb(err, false);
+      cb(err, {acquired: false, key, lockUuid: uuid});
     };
     
     this.resolutions[uuid] = (err, data) => {
@@ -625,6 +616,7 @@ export class Client {
       }
       
       if (data.acquired === true) {
+        
         cleanUp();
         self.bookkeeping[key].lockCount++;
         self.write({uuid: uuid, key: key, type: 'lock-received'});
@@ -632,16 +624,16 @@ export class Client {
         if (data.uuid !== uuid) {
           return callbackWithError(`Live-Mutex error, mismatch in uuids -> '${data.uuid}', -> '${uuid}'.`);
         }
-        else {
-          
-          // cb(null, {
-          //   key,
-          //   unlock: this.unlock.bind(this, key, {_uuid: uuid}),
-          //   lockUuid: data.uuid,
-          // });
-          
-          cb(null, self.unlock.bind(this, key, {_uuid: uuid}), data.uuid);
-        }
+        
+        cb(null, {
+          acquired: true,
+          key,
+          unlock: self.unlock.bind(self, key, {_uuid: uuid}),
+          lockUuid: data.uuid
+        });
+        
+        // cb(null, self.unlock.bind(this, key, {_uuid: uuid}), data.uuid);
+        
       }
       
       else if (data.reelection === true) {
@@ -652,7 +644,11 @@ export class Client {
         if (opts.wait === false) {
           cleanUp();
           self.giveups[uuid] = true;
-          cb(null, false, data.uuid);
+          cb(null, {
+            key,
+            acquired: false,
+            lockUuid: data.uuid
+          });
         }
       }
       else {
@@ -672,9 +668,9 @@ export class Client {
     
   }
   
-  unlock(key: string, opts: any, cb?: TClientUnlockCB) {
+  unlock(key: string, opts: any, cb?: LMClientUnlockCallBack) {
     
-    assert.equal(typeof key, 'string', 'Key passed to live-mutex#unlock needs to be a string.');
+    assert.equal(typeof key, 'string', 'Key passed to live-mutex #unlock needs to be a string.');
     
     this.bookkeeping[key] = this.bookkeeping[key] || {
       rawLockCount: 0,
@@ -690,14 +686,10 @@ export class Client {
       opts = {};
     }
     else if (typeof opts === 'boolean') {
-      opts = {
-        force: opts
-      };
+      opts = {force: opts};
     }
     else if (typeof opts === 'string') {
-      opts = {
-        _uuid: opts
-      };
+      opts = {_uuid: opts};
     }
     
     opts = opts || {};

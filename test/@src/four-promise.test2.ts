@@ -3,11 +3,14 @@
 import suman = require('suman');
 const Test = suman.init(module);
 
+import {LvMtxClient} from "../../dist";
+import {lmUtils} from "../../dist";
+
 /////////////////////////////////////////////////////////
 
-Test.create({mode: 'series'}, ['LvMtxClient', 'lmUtils', 'Promise', function (b, assert, before, it,) {
+Test.create({mode: 'series'}, ['Promise', function (b, assert, before, it,) {
   
-  const {LvMtxClient, lmUtils, Promise} = b.ioc;
+  const {Promise} = b.ioc;
   const conf = Object.freeze({port: 7988});
   
   before('promise', function () {

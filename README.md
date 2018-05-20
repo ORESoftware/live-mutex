@@ -108,8 +108,7 @@ const {Broker} = require('live-mutex/broker');
 const {Client} = require('live-mutex/client');
 const lmUtils = require('live-mutex/utils');
 
-// there are also aliases, which are more descriptive:
-
+// there are aliases, which are more descriptive:
 const {LMBroker, LvMtxBroker} = require('live-mutex/broker');  // these are simply aliases of Broker
 const {LMClient, LvMtxClient} = require('live-mutex/client');  // these are simply aliases of Client
 
