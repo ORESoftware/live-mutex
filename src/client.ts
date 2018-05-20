@@ -294,7 +294,7 @@ export class Client {
       }
       
       if (connectPromise) {
-        return connectPromise.then(function (val) {
+        return connectPromise.then((val) => {
             cb && cb.call(self, null, val);
             return val;
           },
@@ -480,7 +480,7 @@ export class Client {
     });
   }
   
-  lock(key: string, opts: any, cb: TClientLockCB) {
+  lock(key: string, opts: any, cb?: TClientLockCB) {
     
     assert.equal(typeof key, 'string', 'Key passed to live-mutex#lock needs to be a string.');
     
@@ -498,14 +498,10 @@ export class Client {
       opts = {};
     }
     else if (typeof opts === 'boolean') {
-      opts = {
-        force: opts
-      };
+      opts = {force: opts};
     }
     else if (typeof opts === 'number') {
-      opts = {
-        ttl: opts
-      };
+      opts = {ttl: opts};
     }
     
     opts = opts || {} as TClientOptions;
@@ -576,7 +572,7 @@ export class Client {
       delete self.resolutions[uuid];
       self.write({uuid, key, type: 'lock-client-timeout'});
       ++opts.__retryCount;
-  
+      
       log.error(`retrying lock request for key '${key}', uuid '${uuid}', attempt #`, opts.__retryCount);
       
       if (opts.__retryCount >= maxRetries) {

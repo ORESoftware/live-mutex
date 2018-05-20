@@ -82,11 +82,7 @@ new Broker({port: multi_process_port}).ensure(function () {
         console.error('stderr => ', data);
       }
 
-      cb(code, {
-        code,
-        stderr: data
-      });
-
+      cb(code, {code, stderr: data});
     });
 
   }, function (err, result) {
