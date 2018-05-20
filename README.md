@@ -164,7 +164,7 @@ lmUtils.conditionallyLaunchSocketServer(opts, function(err){
      const client = new Client(opts);
      // calling ensure before each critical section means that we ensure we have a connected client
      return client.ensure().then(c =>  {
-       return client.acquire('<key>').then({key,id}) => {
+       return client.acquire('<key>').then(({key,id}) => {
              return client.release('<key>', id);
          });
      });
@@ -257,15 +257,15 @@ which are simply implemented like so:
 
 ```typescript
 
-  acquire(key: string, opts: Partial<IClientLockOpts>) {
+  acquire(key: string, opts?: Partial<IClientLockOpts>) {
     return new Promise((resolve, reject) => {
-      this.lock(key, opts, function (err, unlock, lockUuid) {
-        err ? reject(err) : resolve({key, unlock, lockUuid});
+      this.lock(key, opts, function (err, v) {
+        err ? reject(err) : resolve(v);
       });
     });
   }
 
-  release(key: string, opts: Partial<IClientUnlockOpts>) {
+  release(key: string, opts?: Partial<IClientUnlockOpts>) {
     return new Promise((resolve, reject) => {
       this.unlock(key, opts, function (err, val) {
         err ? reject(err) : resolve(val);
@@ -273,19 +273,19 @@ which are simply implemented like so:
     });
   }
   
-  acquireLock(key: string, opts: Partial<IClientLockOpts>) {
+  acquireLock(key: string, opts?: Partial<IClientLockOpts>) {
      // same as acquire
   }
 
-  releaseLock(key: string, opts: Partial<IClientUnlockOpts>) {
+  releaseLock(key: string, opts?: Partial<IClientUnlockOpts>) {
       // same as release
   }
  
-  lockp(key: string, opts: Partial<IClientLockOpts>) {
+  lockp(key: string, opts?: Partial<IClientLockOpts>) {
      // same as acquire
   }
 
-  unlockp(key: string, opts: Partial<IClientUnlockOpts>) {
+  unlockp(key: string, opts?: Partial<IClientUnlockOpts>) {
       // same as release
   }
   
@@ -304,8 +304,8 @@ you can also use the unlock() convenience callback like so:
 ```js
     return c.lockp('foo').then(function ({unlock}) {
       return new Promise(function (resolve, reject) {
-        unlock(function (err) {
-          err ? reject(err) : resolve();
+        unlock(function (err, v) {
+          err ? reject(err) : resolve(v);
         });
       });
     });

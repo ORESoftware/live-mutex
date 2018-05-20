@@ -16,6 +16,8 @@ docs
 *.yml
 *.html
 *.lock
+*.tgz
+
 
 ### files
 suman.conf.js
