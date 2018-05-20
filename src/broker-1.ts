@@ -18,6 +18,7 @@ export const log = {
 ///////////////////////////////////////////////////////////////////
 
 import {weAreDebugging} from './we-are-debugging';
+import * as fs from "fs";
 if (weAreDebugging) {
   log.error('broker is in debug mode. Timeouts are turned off.');
 }
@@ -134,6 +135,8 @@ export interface INotifyObj {
 }
 
 ////////////////////////////////////////////////////////
+
+const SOCKETFILE = '/tmp/unix.sock';
 
 export class Broker {
   
@@ -436,6 +439,21 @@ export class Broker {
         }, 3000);
         
         wss.once('error', reject);
+  
+        try{
+          fs.unlinkSync('/tmp/unix.sock');
+          // fs.writeFileSync('/tmp/unix.sock','');
+        }
+        catch(err){
+          // throw err;
+        }
+  
+        // wss.listen(SOCKETFILE, () => {
+        //   self.isOpen = true;
+        //   clearTimeout(to);
+        //   wss.removeListener('error', reject);
+        //   resolve(self);
+        // });
         
         wss.listen(self.port, () => {
           self.isOpen = true;

@@ -15,7 +15,6 @@ const countSeed = 300;
 const randTimeoutSeed = 10;
 let lockCount = 0;
 
-
 let finishedQueueing = false;
 setTimeout(function () {
   finishedQueueing = true;
@@ -26,63 +25,65 @@ setTimeout(function () {
 ///////////////////////////////////////////////////////////////////////////////////////
 
 lmUtils.launchBrokerInChildProcess(conf, function () {
-
+  
   const client = new Client(conf);
   client.ensure().then(function () {
-
+    
     const q = async.queue(function (task, cb) {
       task(cb);
     }, 5000);  // max concurrency
-
+    
     const start = Date.now();
-
+    
     let onRandomInterval = function () {
-
+      
       const randTime = Math.ceil(Math.random() * intervalTimeSeed);
       const randCount = Math.ceil(Math.random() * countSeed);
-
+      
       if (finishedQueueing === false) {
         setTimeout(onRandomInterval, randTime);
       }
-
+      
       for (let i = 0; i < randCount; i++) {
+        
         q.push(function (cb) {
-          client.lock('foo', function (err, unlock) {
+          client.lock('foo', function (err, {unlock}) {
+            
             if (err) {
-              cb(err);
+              return cb(err);
             }
-            else {
-              lockCount++;
-              let randTime = Math.ceil(Math.random() * randTimeoutSeed);
-              setTimeout(function () {
-                unlock(cb);
-              }, randTime);
-            }
+            
+            lockCount++;
+            let randTime = Math.ceil(Math.random() * randTimeoutSeed);
+            setTimeout(function () {
+              unlock(cb);
+            }, randTime);
+            
           });
         });
       }
     };
-
+    
     onRandomInterval();
-
+    
     q.drain = function complete(err) {
-
+      
       if (err) {
         throw err;
       }
-
+      
       if (finishedQueueing === false) {
         return onRandomInterval();
       }
-
+      
       const diff = Date.now() - start;
       console.log(' => Time required for live-mutex => ', diff);
       console.log(' => Lock/unlock cycles per millisecond => ', Number(lockCount / diff).toFixed(3));
       process.exit(0);
     };
-
+    
   });
-
+  
 });
 
 

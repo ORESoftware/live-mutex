@@ -4,6 +4,7 @@
 import * as util from 'util';
 import * as assert from 'assert';
 import * as net from 'net';
+import * as fs from 'fs';
 
 //npm
 import uuidV4 = require('uuid/v4');
@@ -112,6 +113,8 @@ export type ErrorFirstCallBack = (err: any) => void;
 export type LMClientUnlockConvenienceCallback = (fn: ErrorFirstCallBack) => void;
 
 ////////////////////////////////////////////////////////////////
+
+const SOCKETFILE = '/tmp/unix.sock';
 
 export class Client {
   
@@ -331,6 +334,13 @@ export class Client {
           ws.removeListener('error', onFirstErr);
           resolve(this);
         });
+        
+        // ws = net.createConnection(SOCKETFILE, () => {
+        //   self.isOpen = true;
+        //   clearTimeout(to);
+        //   ws.removeListener('error', onFirstErr);
+        //   resolve(this);
+        // });
         
         ws.once('end', () => {
           process.emit('warning', new Error('client stream "end" event occurred.'));

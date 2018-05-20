@@ -136,7 +136,7 @@ lmUtils.conditionallyLaunchSocketServer(opts, function(err){
              
     const client = new Client(opts, function(err){
      // you will need to handle err
-       client.lock('<key>', function(err, unlock){
+       client.lock('<key>', function(err, {unlock}){
           unlock(function(err){ // use the unlock convenience callback
                               
           });
@@ -145,8 +145,8 @@ lmUtils.conditionallyLaunchSocketServer(opts, function(err){
        
        
     // using the "unlock()" convenience callback is basically equivalent to doing this:     
-    client.lock('<key>', function(err, unlock, id){
-       client.unlock('<key>', id, function(err){
+    client.lock('<key>', function(err, {unlock, lockUuid}){
+       client.unlock('<key>', lockUuid, function(err){
            
        });
     });
@@ -157,7 +157,6 @@ lmUtils.conditionallyLaunchSocketServer(opts, function(err){
         
         
     //  simple usage without the call id (this is less safe):
-      
     const client = new Client(opts);
     
     client.ensure().then(function(c){

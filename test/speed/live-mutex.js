@@ -12,42 +12,43 @@ process.on('unhandledRejection', function (e) {
 ///////////////////////////////////////////////////////////////////
 
 lmUtils.launchBrokerInChildProcess(conf, function () {
-
+  
   const client = new Client(conf);
-
+  
   client.ensure().then(function () {
-
+    
     const a = Array.apply(null, {length: 1000});
     const start = Date.now();
-
+    
     var i = 0;
-    async.each(a, function (val, cb) {
-
-      client.lock('foo', function (err, unlock) {
+    async.eachLimit(a, 500, function (val, cb) {
+      
+      client.lock('foo', function (err, {unlock}) {
         if (err) {
-          cb(err);
+          return cb(err);
         }
-        else {
-          // console.log('unlocking...' + i++);
-          // client.unlock('foo',cb);
-          unlock(cb);
-        }
+        
+        // console.log('unlocking...' + i++);
+        // client.unlock('foo',cb);
+        
+        unlock(cb);
+        
       });
-
+      
     }, function complete(err) {
-
+      
       if (err) {
         throw err;
       }
-
+      
       const diff = Date.now() - start;
       console.log(' => Time required for live-mutex => ', diff);
-      console.log(' => Lock/unlock cycles per millisecond => ', Number(a.length/diff).toFixed(3));
+      console.log(' => Lock/unlock cycles per millisecond => ', Number(a.length / diff).toFixed(3));
       process.exit(0);
     });
-
+    
   });
-
+  
 });
 
 
