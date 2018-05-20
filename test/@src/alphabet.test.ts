@@ -4,7 +4,10 @@ import suman = require('suman');
 const Test = suman.init(module);
 const async = require('async');
 
-import {Client, Broker} from "../../dist";
+// import {Client, Broker} from "../../dist";
+
+import {Client} from "../../client";
+import {Broker} from "../../broker";
 
 ////////////////////////////////////////////////////////
 

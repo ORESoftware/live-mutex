@@ -3,7 +3,9 @@ exports.__esModule = true;
 var suman = require("suman");
 var Test = suman.init(module);
 var async = require('async');
-var dist_1 = require("../../dist");
+// import {Client, Broker} from "../../dist";
+var client_1 = require("../../client");
+var broker_1 = require("../../broker");
 ////////////////////////////////////////////////////////
 Test.create(['lmUtils', function (b, assert, before, describe, it, path, fs, inject) {
         var lmUtils = b.ioc.lmUtils;
@@ -13,10 +15,10 @@ Test.create(['lmUtils', function (b, assert, before, describe, it, path, fs, inj
         var num = 100;
         var conf = Object.freeze({ port: 7028 });
         inject(function (j) {
-            j.register('broker', new dist_1.Broker(conf).ensure());
+            j.register('broker', new broker_1.Broker(conf).ensure());
         });
         inject(function (j) {
-            j.register('client', new dist_1.Client(conf).ensure());
+            j.register('client', new client_1.Client(conf).ensure());
         });
         var p = path.resolve(__dirname + '/../fixtures/alphabet.test');
         before.cb('clean up file', function (h) {

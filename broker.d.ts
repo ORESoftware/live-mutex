@@ -1,1 +1,1 @@
-export * from './dist/broker-1';
+export * from './dist/broker';
