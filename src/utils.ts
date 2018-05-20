@@ -7,7 +7,7 @@ import * as cp from 'child_process';
 const ping = require('tcp-ping');
 
 //project
-import {Broker} from './broker-1';
+import {Broker} from './broker';
 const p = require.resolve('./launch-broker-child');
 const log = {
   info: console.log.bind(console, ' [live-mutex utils]'),

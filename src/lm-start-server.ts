@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 'use strict';
 
-import {Broker, log} from "./broker-1";
+import {Broker, log} from "./broker";
 
 const port = parseInt(process.argv[3] || process.env.live_mutex_port || '6970');
 

@@ -1,4 +1,4 @@
-import {Broker} from './broker-1';
+import {Broker} from './broker';
 
 const port = parseInt(process.argv[2] || process.env.LIVE_MUTEX_PORT || '6970');
 

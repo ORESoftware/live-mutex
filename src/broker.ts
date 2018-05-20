@@ -363,7 +363,7 @@ export class Broker {
       });
       
       ws.on('error', function (err) {
-        process.emit('warning', new Error('live-mutex client error ' + (err.stack || err)));
+        process.emit('warning', new Error('live-mutex client error ' + (err && err.stack || err)));
       });
       
       if (!self.wsToKeys.get(ws)) {
@@ -441,15 +441,15 @@ export class Broker {
         }, 3000);
         
         wss.once('error', reject);
-  
-        try{
+        
+        try {
           fs.unlinkSync('/tmp/unix.sock');
           // fs.writeFileSync('/tmp/unix.sock','');
         }
-        catch(err){
+        catch (err) {
           // throw err;
         }
-  
+        
         // wss.listen(SOCKETFILE, () => {
         //   self.isOpen = true;
         //   clearTimeout(to);
@@ -489,8 +489,8 @@ export class Broker {
     
   }
   
-  static create(opts: IBrokerOptsPartial, cb?: TBrokerCB): Promise<Broker> {
-    return new Broker(opts).ensure(cb);
+  static create(opts: IBrokerOptsPartial): Broker {
+    return new Broker(opts);
   }
   
   inspect(data: any, ws: net.Socket) {
@@ -504,15 +504,15 @@ export class Broker {
       case 'lockcount':
       case 'lock-count':
       case 'lock_count':
-        return this.send(ws, {'inspectResult': 5});
+        return this.send(ws, {inspectResult: 5});
       
       case 'clientcount':
       case 'client-count':
       case 'client_count':
-        return this.send(ws, {'inspectResult': 17});
+        return this.send(ws, {inspectResult: 17});
       
       default:
-        return this.send(ws, {'inspectResult': 25});
+        return this.send(ws, {inspectResult: 25});
     }
     
   }
@@ -634,8 +634,8 @@ export class Broker {
     const lockRequestCount = lck ? lck.notify.length : -1;
     
     if (isLocked && lockRequestCount > 0) {
-      console.error(' => Live-Mutex implementation warning, lock is unlocked but ' +
-        'notify array has at least one item, for key => ', key);
+      process.emit('warning', new Error(' => Live-Mutex implementation warning, lock is unlocked but ' +
+        'notify array has at least one item, for key => ' + key));
     }
     
     this.send(ws, {
@@ -660,13 +660,12 @@ export class Broker {
     const force = data.force;
     const retryCount = data.retryCount;
     
-    this.bookkeeping[key] = this.bookkeeping[key] ||
-      {
-        rawLockCount: 0,
-        rawUnlockCount: 0,
-        lockCount: 0,
-        unlockCount: 0
-      };
+    this.bookkeeping[key] = this.bookkeeping[key] || {
+      rawLockCount: 0,
+      rawUnlockCount: 0,
+      lockCount: 0,
+      unlockCount: 0
+    };
     
     this.bookkeeping[key].rawLockCount++;
     

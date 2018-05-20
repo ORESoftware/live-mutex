@@ -2,8 +2,9 @@
 ### folders
 node_modules
 .idea
-lib
+src
 test
+docs
 
 ### matching files
 *.log

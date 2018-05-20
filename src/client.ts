@@ -20,6 +20,7 @@ export const log = {
 /////////////////////////////////////////////////////////////////////////
 
 import {weAreDebugging} from './we-are-debugging';
+import Timer = NodeJS.Timer;
 if (weAreDebugging) {
   log.info('Live-Mutex client is in debug mode. Timeouts are turned off.');
 }
@@ -107,7 +108,9 @@ export interface ILockHolderCount {
   [key: string]: number;
 }
 
-export type LMLockSuccessData = { acquired: boolean, key: string, unlock?: LMClientUnlockConvenienceCallback, lockUuid: string };
+export type LMLockSuccessData = {
+  acquired: boolean, key: string, unlock?: LMClientUnlockConvenienceCallback, lockUuid: string, id: string
+};
 export type LMClientLockCallBack = (err: any, val: LMLockSuccessData) => void;
 export type LMClientUnlockCallBack = (err: any, uuid?: string) => void;
 export type ErrorFirstCallBack = (err: any) => void;
@@ -137,7 +140,6 @@ export class Client {
   giveups: IUuidBooleanHash;
   write: Function;
   isOpen: boolean;
-  lockholderCount: ILockHolderCount;
   close: Function;
   
   ////////////////////////////////////////////////////////////////
@@ -225,18 +227,13 @@ export class Client {
     
     this.write = (data: any, cb: Function) => {
       if (!ws) {
-        throw new Error('please call connect() on this Live-Mutex client, before using the lock/unlock methods.');
+        throw new Error('please call ensure()/connect() on this Live-Mutex client, before using the lock/unlock methods.');
       }
       data.pid = process.pid;
       ws.write(JSON.stringify(data) + '\n', 'utf8', cb);
     };
     
     const onData = (data: any) => {
-      
-      if (data.type === 'stats') {
-        self.setLockRequestorCount(data.key, data.lockRequestCount);
-        return;
-      }
       
       const uuid = data.uuid;
       
@@ -386,7 +383,6 @@ export class Client {
     };
     
     this.bookkeeping = {};
-    this.lockholderCount = {};
     this.timeouts = {};
     this.resolutions = {};
     this.giveups = {};
@@ -399,14 +395,6 @@ export class Client {
   
   static create(opts: TClientOptions): Client {
     return new Client(opts);
-  }
-  
-  setLockRequestorCount(key: string, val: any): void {
-    this.lockholderCount[key] = val;
-  }
-  
-  getLockholderCount(key: string): number {
-    return this.lockholderCount[key] || 0;
   }
   
   requestLockInfo(key: string, opts?: any, cb?: Function) {
@@ -489,6 +477,18 @@ export class Client {
     });
   }
   
+  private cleanUp(to: Timer, uuid: string) {
+    clearTimeout(to);
+    delete this.resolutions[uuid];
+  }
+  
+  private callbackWithError(err: any, uuid: string, cb: Function, key: string, to: Timer) {
+    this.cleanUp(to, uuid);
+    err = err instanceof Error ? err : new Error(err);
+    process.emit('warning', err);
+    cb(err, {acquired: false, key, lockUuid: uuid});
+  };
+  
   lock(key: string, opts: any, cb?: LMClientLockCallBack) {
     
     assert.equal(typeof key, 'string', 'Key passed to live-mutex #lock needs to be a string.');
@@ -569,7 +569,12 @@ export class Client {
     const maxRetries = opts.maxRetry || opts.maxRetries || this.lockRetryMax;
     
     if (opts.__retryCount > maxRetries) {
-      return cb(new Error(`Maximum retries (${maxRetries}) attempted.`), {acquired: false, key, lockUuid: uuid});
+      return cb(new Error(`Maximum retries (${maxRetries}) attempted.`), {
+        acquired: false,
+        key,
+        lockUuid: uuid,
+        id: uuid
+      });
     }
     
     const self = this;
@@ -587,24 +592,11 @@ export class Client {
       if (opts.__retryCount >= maxRetries) {
         return cb(new Error(` => Live-Mutex client lock request timed out after ${lockTimeout * opts.__retryCount} ms, ` +
           `${maxRetries} retries attempted.`),
-          {acquired: false, key, lockUuid: uuid});
+          {acquired: false, key, lockUuid: uuid, id: uuid});
       }
       
       self.lock(key, opts, cb);
-      
     }, lockTimeout);
-    
-    let cleanUp = () => {
-      clearTimeout(to);
-      delete this.resolutions[uuid];
-    };
-    
-    let callbackWithError = (err: any) => {
-      cleanUp();
-      err = err instanceof Error ? err : new Error(err);
-      process.emit('warning', err);
-      cb(err, {acquired: false, key, lockUuid: uuid});
-    };
     
     this.resolutions[uuid] = (err, data) => {
       
@@ -613,57 +605,66 @@ export class Client {
       }
       
       if (err) {
-        return callbackWithError(err);
+        return this.callbackWithError(err, uuid, cb, key, to);
+      }
+      
+      if (!data) {
+        return this.callbackWithError('no data received from broker.', uuid, cb, key, to);
+      }
+      
+      if (data.uuid !== uuid) {
+        return this.callbackWithError(
+          `Live-Mutex error, mismatch in uuids -> '${data.uuid}', -> '${uuid}'.`,
+          uuid, cb, key, to
+        );
       }
       
       if (String(key) !== String(data.key)) {
-        return callbackWithError(`Live-Mutex bad key, 1 -> ', ${key}, 2 -> ${data.key}`);
+        return this.callbackWithError(
+          `Live-Mutex bad key, [1] => '${key}', [2] -> ${data.key}`,
+          uuid, cb, key, to
+        );
       }
       
-      self.setLockRequestorCount(key, data.lockRequestCount);
-      
       if (data.error) {
-        return callbackWithError(data.error);
+        return this.callbackWithError(data.error, uuid, cb, key, to);
       }
       
       if (data.acquired === true) {
         
-        cleanUp();
+        this.cleanUp(to, uuid);
         self.bookkeeping[key].lockCount++;
         self.write({uuid: uuid, key: key, type: 'lock-received'});
-        
-        if (data.uuid !== uuid) {
-          return callbackWithError(`Live-Mutex error, mismatch in uuids -> '${data.uuid}', -> '${uuid}'.`);
-        }
-        
-        cb(null, {
-          acquired: true,
-          key,
-          unlock: self.unlock.bind(self, key, {_uuid: uuid}),
-          lockUuid: data.uuid
-        });
-        
-        // cb(null, self.unlock.bind(this, key, {_uuid: uuid}), data.uuid);
+        const boundUnlock = self.unlock.bind(self, key, {_uuid: uuid});
+        boundUnlock.acquired = true;
+        boundUnlock.key = key;
+        boundUnlock.unlock = boundUnlock;
+        boundUnlock.lockUuid = data.uuid;
+        cb(null, boundUnlock);
         
       }
-      
       else if (data.reelection === true) {
-        cleanUp();
+        
+        this.cleanUp(to, uuid);
         self.lock(key, opts, cb);
+        
       }
       else if (data.acquired === false) {
+        
         if (opts.wait === false) {
-          cleanUp();
+          this.cleanUp(to, uuid);
           self.giveups[uuid] = true;
           cb(null, {
             key,
             acquired: false,
-            lockUuid: data.uuid
+            lockUuid: uuid,
+            id: uuid
           });
         }
+        
       }
       else {
-        callbackWithError(`fallthrough in condition [1]`);
+        this.callbackWithError(`fallthrough in condition [1]`, uuid, cb, key, to);
       }
       
     };
@@ -679,7 +680,11 @@ export class Client {
     
   }
   
-  unlock(key: string, opts: any, cb?: LMClientUnlockCallBack) {
+  noop() {
+  
+  }
+  
+  unlock(key: string, opts?: any, cb?: LMClientUnlockCallBack) {
     
     assert.equal(typeof key, 'string', 'Key passed to live-mutex #unlock needs to be a string.');
     
@@ -705,6 +710,7 @@ export class Client {
     
     opts = opts || {};
     cb && (cb = cb.bind(this));
+    cb = cb || this.noop;
     
     if ('force' in opts) {
       assert.equal(typeof opts.force, 'boolean', ' => Live-Mutex usage error => ' +
@@ -734,36 +740,32 @@ export class Client {
       
     }, unlockTimeout);
     
-    let cleanUp = () => {
-      clearTimeout(to);
-      delete this.resolutions[uuid];
-    };
-    
-    let callbackWithError = (err: any) => {
-      cleanUp();
-      err = err instanceof Error ? err : new Error(err);
-      process.emit('warning', err);
-      cb && cb(err);
-    };
-    
     this.resolutions[uuid] = (err, data) => {
       
       if (timedOut) {
         return;
       }
       
-      this.setLockRequestorCount(key, data.lockRequestCount);
+      if (err) {
+        return this.callbackWithError(err, uuid, cb, key, to);
+      }
+      
+      if (!data) {
+        return this.callbackWithError('Live-Mutex implementation error, bad key.',
+          uuid, cb, key, to);
+      }
       
       if (String(key) !== String(data.key)) {
-        return callbackWithError('Live-Mutex implementation error, bad key.');
+        return this.callbackWithError('Live-Mutex implementation error, bad key.',
+          uuid, cb, key, to);
       }
       
       if (data.error) {
-        return callbackWithError(data.error);
+        return this.callbackWithError(data.error, uuid, cb, key, to);
       }
       
       if (data.unlocked === true) {
-        cleanUp();
+        this.cleanUp(to, uuid);
         this.bookkeeping[key].unlockCount++;
         this.write({
           uuid: uuid,
@@ -776,11 +778,12 @@ export class Client {
       else if (data.unlocked === false) {
         // data.error will most likely be defined as well
         // so this may never get hit
-        cleanUp();
+        this.cleanUp(to, uuid);
         cb && cb(data);
       }
       else {
-        callbackWithError('fallthrough in conditional [2], Live-Mutex failure.');
+        this.callbackWithError('fallthrough in conditional [2], Live-Mutex failure.',
+          uuid, cb, key, to);
       }
       
     };

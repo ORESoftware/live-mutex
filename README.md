@@ -159,22 +159,29 @@ lmUtils.conditionallyLaunchSocketServer(opts, function(err){
       // for convenience and safety, you can use the unlock callback, which is bound
       // to the right key and internal call-id 
              
-    const client = new Client(opts, function(err){
-     // you will need to handle err
-       client.lock('<key>', function(err, {unlock}){
-          unlock(function(err){ // use the unlock convenience callback
-                              
-          });
-       });
-    });
+     // here is the recommended way with promises
+     
+     const client = new Client(opts);
+     // calling ensure before each critical section means that we ensure we have a connected client
+     return client.ensure().then(c =>  {
+       return client.acquire('<key>').then({key,id}) => {
+             return client.release('<key>', id);
+         });
+     });
        
        
-    // using the "unlock()" convenience callback is basically equivalent to doing this:     
-    client.lock('<key>', function(err, {unlock, lockUuid}){
-       client.unlock('<key>', lockUuid, function(err){
-           
+   // using vanilla callbacks (higher performance + a convenience unlock function)
+    client.ensure(function(err){
+       // handle any err your way
+       client.lock('<key>', function(err, unlock){
+            // handle any err your way
+             unlock(function(err){  // unlock is bound to the right key and request uuid
+                 // handle any err your way, p
+             });
        });
     });
+    
+   
       
     // note: using this id ensures that the unlock call corresponds with the original corresponding lock call
     // otherwise what could happen in your program is that you could call
@@ -289,7 +296,7 @@ which are simply implemented like so:
 ```js
     await client.lockp('a');
     await Promise.delay(100);
-    return client.unlockp('a');
+    await client.unlockp('a');
 ```
 
 you can also use the unlock() convenience callback like so:
@@ -304,125 +311,15 @@ you can also use the unlock() convenience callback like so:
     });
 
 ```
-   
-
-### If you want, you can just create your own promise wrapper in your app, like so:
-
-```js
-
-exports.acquireLock = function(lockName){
-  
-  return new Promise(function(resolve,reject){
-    
-    client.lock(lockName, function(err, unlock, lockUuid){
-      
-      err ? reject(err) : resolve({
-         unlock,
-         lockUuid
-      });
-      
-    });
-    
-  });
-  
-};
-
-exports.releaseLock = function(lockName, lockUuid){
-  
-   return new Promise(function(resolve,reject){
-      
-      client.unlock(lockName, lockUuid, function(err){
-          err ? reject(err): resolve();
-      });
-      
-    });
-  
-};
-
-// alternatively, if you use the unlock convenience function, 
-// releaseLock can be implemented more simply as:
-
-exports.releaseLock = function(unlock){
-  
-   return new Promise(function(resolve,reject){
-      
-      unlock(function(err){
-          err ? reject(err): resolve();
-      });
-      
-    });
-  
-};
-
-
-```
 
 
 
 ### Usage with RxJS5 Observables
+ => see docs/examples.md
   
-```js
+### Usage with ES6 Promises
+ => see docs/examples.md
 
-   import {Observable} from 'rxjs/Rx';
-  
-   exports.acquireLock = function (q, name) {
-  
-      const lock = q.lock;
-      const client = q.client;
-  
-      return Observable.create(sub => {
-  
-          client.lock(lock, {append: name},  (err, unlock, id) => {
-          
-              if (err) {
-                  console.error(' => Error acquiring lock => ', (err.stack || err));
-              }
-  
-              sub.next({
-                  unlock,
-                  error: err,
-                  id: id,
-                  name: name
-              });
-  
-              sub.complete();
-  
-          });
-  
-          return function () {
-              console.log('disposing acquireLock()');
-          }
-      });
-  };
-  
-   exports.releaseLock = function (q, lockUuid) {
-  
-      const client = q.client;
-      const lock = q.lock;
-  
-      return Observable.create(sub => {
-  
-          client.unlock(lock, lockUuid,  err => {
-  
-              if (err) {
-                  console.error(' => Release lock error => ', err.stack || err);
-              }
-            
-              sub.next({
-                  error: err
-              });
-  
-              sub.complete();
-  
-          });
-  
-          return function () {
-               console.log('disposing releaseLock()');
-          }
-      });
-  };
-
-```
 
 ## Creating a simple client pool
 
