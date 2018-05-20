@@ -480,6 +480,14 @@ export class Client {
     });
   }
   
+  promisifyUnlock(fn: Function) {
+    return new Promise((resolve, reject) => {
+      fn(function (err, val) {
+        err ? reject(err) : resolve(val);
+      })
+    });
+  }
+  
   lock(key: string, opts: any, cb?: TClientLockCB) {
     
     assert.equal(typeof key, 'string', 'Key passed to live-mutex#lock needs to be a string.');

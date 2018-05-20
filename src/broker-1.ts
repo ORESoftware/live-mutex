@@ -241,7 +241,12 @@ export class Broker {
         }
       }
       
-      if (data.type === 'unlock') {
+      console.log('my data:', data);
+      
+      if (data.inspectCommand) {
+        self.inspect(data, ws);
+      }
+      else if (data.type === 'unlock') {
         self.unlock(data, ws);
       }
       else if (data.type === 'lock') {
@@ -470,6 +475,30 @@ export class Broker {
     return new Broker(opts).ensure(cb);
   }
   
+  inspect(data: object, ws: net.Socket) {
+    
+    if (typeof data.inspectCommand !== 'string') {
+      return this.send(ws, {error: 'inspectCommand was not a string'});
+    }
+    
+    switch (data.inspectCommand) {
+      
+      case 'lockcount':
+      case 'lock-count':
+      case 'lock_count':
+        return this.send(ws, {'inspectResult': 5});
+      
+      case 'clientcount':
+      case 'client-count':
+      case 'client_count':
+        return this.send(ws, {'inspectResult': 17});
+      
+      default:
+        return this.send(ws, {'inspectResult': 25});
+    }
+    
+  }
+  
   ensureNewLockHolder(lck: ILockObj, data: any) {
     
     const locks = this.locks;
@@ -545,7 +574,7 @@ export class Broker {
           notifyList.push(obj);
         }
         
-        notifyList.forEach(function (obj: any) {
+        notifyList.forEach((obj: any) => {
           self.send(obj.ws, {
             key: data.key,
             uuid: obj.uuid,

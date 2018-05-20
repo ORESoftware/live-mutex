@@ -121,7 +121,6 @@ import {Client, Broker, lmUtils}  from 'live-mutex';
 
 ```js
 const opts = {port: '<port>' , host: '<host>'};
-
 // check to see if the websocket broker is already running, if not, launch one in this process
 
 lmUtils.conditionallyLaunchSocketServer(opts, function(err){
@@ -223,10 +222,12 @@ to see if the web-socket server is running somewhere. I have had a lot of luck w
   
 ### Usage with Promises:
 
-This library exports `lockp` and `unlockp` methods for the client, which are simply implemented like so:
+This library exports `acquire/acquireLock` and `release/releaseLock` methods for the client,<br>
+which are simply implemented like so:
 
 ```typescript
-  lockp(key: string, opts: Partial<IClientLockOpts>) {
+
+  acquire(key: string, opts: Partial<IClientLockOpts>) {
     return new Promise((resolve, reject) => {
       this.lock(key, opts, function (err, unlock, lockUuid) {
         err ? reject(err) : resolve({key, unlock, lockUuid});
@@ -234,13 +235,30 @@ This library exports `lockp` and `unlockp` methods for the client, which are sim
     });
   }
 
-  unlockp(key: string, opts: Partial<IClientUnlockOpts>) {
+  release(key: string, opts: Partial<IClientUnlockOpts>) {
     return new Promise((resolve, reject) => {
       this.unlock(key, opts, function (err, val) {
         err ? reject(err) : resolve(val);
       });
     });
   }
+  
+  acquireLock(key: string, opts: Partial<IClientLockOpts>) {
+     // same as acquire
+  }
+
+  releaseLock(key: string, opts: Partial<IClientUnlockOpts>) {
+      // same as release
+  }
+ 
+  lockp(key: string, opts: Partial<IClientLockOpts>) {
+     // same as acquire
+  }
+
+  unlockp(key: string, opts: Partial<IClientUnlockOpts>) {
+      // same as release
+  }
+  
 ```
 
 ## To use these methods with async/await, it simply looks like:
