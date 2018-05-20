@@ -8,7 +8,9 @@
   "bin": {
     "lm_acquire_lock": "dist/lm-acquire-lock.js",
     "lm_release_lock": "dist/lm-release-lock.js",
-    "lm_inspect_broker": "dist/inspect.js"
+    "lm_inspect_broker": "dist/inspect.js",
+    "lm_start_broker": "dist/lm-start-server.js",
+    "lm_start_server": "dist/lm-start-server.js"
   },
   "scripts": {
     "test": "./scripts/test.sh"

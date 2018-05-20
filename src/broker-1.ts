@@ -7,18 +7,20 @@ import * as net from 'net';
 import * as util from 'util';
 
 //npm
+import chalk from "chalk";
 import {createParser} from "./json-parser";
 
 //project
 export const log = {
-  info: console.log.bind(console, ' [live-mutex broker]'),
-  error: console.error.bind(console, ' [live-mutex broker]')
+  info: console.log.bind(console, chalk.gray.bold('[live-mutex broker]')),
+  error: console.error.bind(console, chalk.gray.bold('[live-mutex broker]'))
 };
 
 ///////////////////////////////////////////////////////////////////
 
 import {weAreDebugging} from './we-are-debugging';
 import * as fs from "fs";
+
 if (weAreDebugging) {
   log.error('broker is in debug mode. Timeouts are turned off.');
 }
@@ -158,11 +160,11 @@ export class Broker {
   
   ///////////////////////////////////////////////////////////////
   
-  constructor($opts: IBrokerOptsPartial, cb?: IErrorFirstCB) {
+  constructor(o: IBrokerOptsPartial, cb?: IErrorFirstCB) {
     
     this.isOpen = false;
-    const opts = this.opts = $opts || {};
-    assert(typeof opts === 'object', ' => Bad arguments to live-mutex server constructor.');
+    const opts = this.opts = o || {};
+    assert(typeof opts === 'object', 'Options argument must be an object - live-mutex server constructor.');
     
     Object.keys(opts).forEach(function (key) {
       if (validOptions.indexOf(key) < 0) {

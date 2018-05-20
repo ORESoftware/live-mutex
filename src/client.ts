@@ -8,12 +8,13 @@ import * as fs from 'fs';
 
 //npm
 import uuidV4 = require('uuid/v4');
+import chalk from "chalk";
 import {createParser} from "./json-parser";
 
 //project
 export const log = {
-  info: console.log.bind(console, ' [live-mutex client]'),
-  error: console.error.bind(console, ' [live-mutex client]')
+  info: console.log.bind(console, chalk.gray.bold('[live-mutex client]')),
+  error: console.error.bind(console, chalk.gray.bold('[live-mutex client]'))
 };
 
 /////////////////////////////////////////////////////////////////////////

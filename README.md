@@ -16,6 +16,12 @@ fully evented, and Lockfile and Warlock use a polling implementation by nature.<
 
 # Installation
 
+For command line tools:
+
+## ```$ npm install -g live-mutex```
+
+For usage with Node.js libraries:
+
 ## ```$ npm install live-mutex --save```
 
 ### Who needs it
@@ -99,6 +105,25 @@ Do not use more than one broker for the same key, as that will defeat the purpos
 
 
 # Examples
+
+
+### Command line:
+
+The real power of this library comes with usage with Node.js, but we can use <br>
+the functionality at the command line too:
+
+
+```bash
+
+# in shell 1
+lm_start_server 6970
+
+# in shell 2
+lm_acquire_lock foo
+lm_release_lock foo
+
+```
+
 
 ### Importing the library
 

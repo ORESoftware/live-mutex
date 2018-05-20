@@ -2,6 +2,7 @@
 'use strict';
 
 import {Client, log} from "./client";
+import chalk from "chalk";
 const port = parseInt(process.argv[3] || process.env.live_mutex_port || '6970');
 const key = process.argv[2] || process.env.live_mutex_key || '';
 
@@ -41,12 +42,12 @@ new Client({port}).ensure().then(function (c) {
   c.lock(key, {ttl: 6000, isViaShell: true}, function (e: any) {
     
     if (e) {
-      log.error(e && e.message || e);
+      log.error(chalk.magenta.bold(e && e.message || e));
       log.error(`To discover what is going on with the broker, use '$ lm_inspect_broker -p <port> -h <host>'.`);
       return process.exit(1);
     }
     
-    log.info('Acquired lock for key:', key);
+    log.info(chalk.green.bold(`${chalk.italic('Acquired')} lock for key:`), `'${chalk.blueBright.bold(key)}'`);
     process.exit(0);
     
   });
