@@ -22,7 +22,8 @@ Test.create([function (b, inject, describe, before, it, $deps, $core) {
         describe('inject', function (b) {
             var c = b.getInjectedValue('client');
             var lockWriteRelease = function (val, cb) {
-                c.lock('a', function (err, unlock) {
+                c.lock('a', function (err, _a) {
+                    var unlock = _a.unlock;
                     if (err) {
                         return cb(err);
                     }

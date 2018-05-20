@@ -1,25 +1,28 @@
-"use strict";
+'use strict';
 exports.__esModule = true;
 var suman = require("suman");
 var Test = suman.init(module);
+var dist_1 = require("../../dist");
 /////////////////////////////////////////////////////
-Test.create({ mode: 'parallel' }, ['Client', 'lmUtils', function (b, assert, before, it) {
-        var _a = b.ioc, lmUtils = _a.lmUtils, Client = _a.Client;
+Test.create({ mode: 'parallel' }, ['lmUtils', function (b, assert, before, it) {
+        var lmUtils = b.ioc.lmUtils;
         var conf = Object.freeze({ port: 7888 });
         before('promise', function () {
             return lmUtils.conditionallyLaunchSocketServerp(conf);
         });
         it.cb('yes', { timeout: 30000 }, function (t) {
-            var client = new Client(conf, function () {
-                client.lock('z', function (err) {
+            var client = new dist_1.Client(conf, function (err, c) {
+                c.lock('z', function (err) {
                     if (err)
                         return t(err);
-                    client.unlock('z', t);
+                    c.unlock('z', t);
                 });
             });
         });
         it.cb('yes', { timeout: 30000 }, function (t) {
-            new Client(conf, function () {
+            new dist_1.Client(conf, function (err, c) {
+                if (err)
+                    return t(err);
                 this.lock('z', function (err) {
                     if (err)
                         return t(err);
@@ -28,17 +31,19 @@ Test.create({ mode: 'parallel' }, ['Client', 'lmUtils', function (b, assert, bef
             });
         });
         it.cb('yes', { timeout: 30000 }, function (t) {
-            var client = new Client(conf);
-            client.ensure(function () {
-                client.lock('z', function (err) {
+            var client = new dist_1.Client(conf);
+            return client.ensure(function (err, c) {
+                if (err)
+                    return t(err);
+                c.lock('z', function (err) {
                     if (err)
                         return t(err);
-                    client.unlock('z', t);
+                    c.unlock('z', t);
                 });
             });
         });
         it.cb('yes', { timeout: 30000 }, function (t) {
-            var client = new Client(conf);
+            var client = new dist_1.Client(conf);
             client.ensure().then(function (c) {
                 c.lock('z', function (err) {
                     if (err)

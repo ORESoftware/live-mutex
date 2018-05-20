@@ -38,15 +38,16 @@ exports.__esModule = true;
 var suman = require("suman");
 var Test = suman.init(module).Test;
 global.Promise = require('bluebird');
+var dist_1 = require("../../dist");
 ///////////////////////////////////////////////////////////////////////////////////////
-Test.create(['Broker', 'Client', function (b, it, inject, describe, before, $deps) {
+Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
         var _this = this;
-        var _a = b.ioc, Broker = _a.Broker, Client = _a.Client;
+        var Promise = b.ioc.Promise;
         var colors = $deps.chalk;
         var conf = Object.freeze({ port: 7035 });
-        before(function (h) { return new Broker(conf).start(); });
+        before(function (h) { return new dist_1.Broker(conf).start(); });
         before('get client', function (h) {
-            return new Client(conf).ensure().then(function (c) {
+            return new dist_1.Client(conf).ensure().then(function (c) {
                 h.supply.client = c;
             });
         });
@@ -65,13 +66,13 @@ Test.create(['Broker', 'Client', function (b, it, inject, describe, before, $dep
                     return c.unlockp('a');
                 });
             });
-            var promhelper = function (unlock) {
-                return new Promise(function (resolve, reject) {
-                    unlock(function (err) {
-                        err ? reject(err) : resolve();
-                    });
-                });
-            };
+            // const promhelper = function (unlock) {
+            //   return new Promise(function (resolve, reject) {
+            //     unlock(function (err) {
+            //       err ? reject(err) : resolve();
+            //     });
+            //   });
+            // };
             var makePromiseProvider = function (unlock) {
                 return function (input) {
                     return Promise.resolve(input).then(function () {
@@ -87,7 +88,7 @@ Test.create(['Broker', 'Client', function (b, it, inject, describe, before, $dep
                 var c = t.supply.client;
                 return c.lockp('foo').then(function (_a) {
                     var unlock = _a.unlock;
-                    return promhelper(unlock);
+                    return (unlock);
                 });
             });
             it('locks/unlocks super special 2', function (t) { return __awaiter(_this, void 0, void 0, function () {
@@ -96,10 +97,10 @@ Test.create(['Broker', 'Client', function (b, it, inject, describe, before, $dep
                     switch (_a.label) {
                         case 0:
                             c = t.supply.client;
-                            return [4 /*yield*/, c.lockp('foo')];
+                            return [4 /*yield*/, c.acquire('foo')];
                         case 1:
                             unlock = (_a.sent()).unlock;
-                            return [2 /*return*/, promhelper(unlock)];
+                            return [2 /*return*/, c.promisifyUnlock(unlock)];
                     }
                 });
             }); });

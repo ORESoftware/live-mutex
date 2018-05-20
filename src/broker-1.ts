@@ -241,8 +241,6 @@ export class Broker {
         }
       }
       
-      console.log('my data:', data);
-      
       if (data.inspectCommand) {
         self.inspect(data, ws);
       }
@@ -475,7 +473,7 @@ export class Broker {
     return new Broker(opts).ensure(cb);
   }
   
-  inspect(data: object, ws: net.Socket) {
+  inspect(data: any, ws: net.Socket) {
     
     if (typeof data.inspectCommand !== 'string') {
       return this.send(ws, {error: 'inspectCommand was not a string'});

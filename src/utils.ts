@@ -9,7 +9,6 @@ const ping = require('tcp-ping');
 //project
 import {Broker} from './broker-1';
 const p = require.resolve('./launch-broker-child');
-
 const log = {
   info: console.log.bind(console, ' [live-mutex utils]'),
   error: console.error.bind(console, ' [live-mutex utils]')
@@ -125,7 +124,6 @@ export const launchBrokerInChildProcess = function (opts: any, cb: Function) {
         });
       }
     });
-    
   });
   
 };

@@ -33,11 +33,11 @@ process.once('uncaughtException', function (err) {
 
 new Client({port}).ensure().then(function (c) {
   
-  c.unlock(key, {ttl: 6000}, function (e: any) {
+  c.unlock(key, {ttl: 6000, isViaShell: true}, function (e: any) {
     
     if (e) {
       log.error(e && e.message || e);
-      log.error(`To discover what is going on with the broker, use '$ lm_inspect_broker -p <port> -h <host>'.`)
+      log.error(`To discover what is going on with the broker, use '$ lm_inspect_broker -p <port> -h <host>'.`);
       return process.exit(1);
     }
     

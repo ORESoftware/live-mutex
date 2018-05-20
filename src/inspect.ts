@@ -27,7 +27,7 @@ s.once('error', function (e) {
   log.error('socket experienced an error:', e);
 });
 
-s.pipe(createParser()).on('data', function (d) {
+s.pipe(createParser()).on('data', function (d: any) {
   console.log('server response:', String(d.inspectResult));
   process.stdout.write(chalk.blueBright('live mutex > '));
 });

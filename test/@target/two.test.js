@@ -1,10 +1,11 @@
-"use strict";
+'use strict';
 exports.__esModule = true;
 var suman = require("suman");
 var Test = suman.init(module).Test;
+var dist_1 = require("../../dist");
 ///////////////////////////////////////////////////////////
-Test.create(['Broker', 'Client', function (b, assert, describe, inject, it, $deps, $core) {
-        var _a = b.ioc, Client = _a.Client, Broker = _a.Broker;
+Test.create(['Promise', function (b, assert, describe, inject, it, $deps, $core) {
+        var Promise = b.ioc.Promise;
         var _ = $deps.lodash, async = $deps.async, colors = $deps.chalk;
         var arrays = [
             [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
@@ -14,10 +15,10 @@ Test.create(['Broker', 'Client', function (b, assert, describe, inject, it, $dep
         ];
         var conf = Object.freeze({ port: 7037 });
         inject(function (j) {
-            j.register('broker', new Broker(conf).ensure());
+            j.register('broker', new dist_1.Broker(conf).ensure());
         });
         inject(function (j) {
-            j.register('client', new Client(conf).ensure());
+            j.register('client', new dist_1.Client(conf).ensure());
         });
         describe('inject', function (b) {
             var c = b.getInjectedValue('client');
@@ -25,15 +26,16 @@ Test.create(['Broker', 'Client', function (b, assert, describe, inject, it, $dep
                 describe.delay('resumes', function (b) {
                     async.map(a, function (val, cb) {
                         cb(null, function (t) {
-                            c.lock(String(val), function (err, unlock, id) {
+                            c.lock(String(val), function (err, v) {
                                 if (err) {
-                                    t.fail(err);
+                                    return t.fail(err);
                                 }
-                                else {
-                                    setTimeout(function () {
-                                        c.unlock(String(val), { force: false, _uuid: id }, t.done);
-                                    }, 100);
-                                }
+                                setTimeout(function () {
+                                    c.unlock(String(val), {
+                                        force: false,
+                                        _uuid: v.lockUuid
+                                    }, t.done);
+                                }, 100);
                             });
                         });
                     }, function (err, results) {
