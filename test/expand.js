@@ -1,10 +1,8 @@
 
 
 
-const c = function ({a,b}) {
-  
-  console.log(a);
-  
-};
+const {Broker} = require('../broker');
 
-c(null);
+new Broker({}).close(function(err){
+  console.error(err);
+});

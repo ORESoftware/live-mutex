@@ -136,9 +136,7 @@ export interface INotifyObj {
   ttl: number
 }
 
-////////////////////////////////////////////////////////
-
-const SOCKETFILE = '/tmp/unix.sock';
+/////////////////////////////////////////////////////////////////////////////
 
 export class Broker {
   
@@ -157,6 +155,7 @@ export class Broker {
   wsToKeys: Map<net.Socket, Array<string>>;
   bookkeeping: IBookkeepingHash;
   isOpen: boolean;
+  wss: net.Server;
   
   ///////////////////////////////////////////////////////////////
   
@@ -314,7 +313,7 @@ export class Broker {
     const connectedClients = new Map();
     let firstConnection = true;
     
-    const wss = net.createServer((ws) => {
+    const wss = this.wss = net.createServer((ws) => {
       
       connectedClients.set(ws, true);
       
@@ -340,16 +339,6 @@ export class Broker {
         
         ws.removeAllListeners();
         connectedClients.delete(ws);
-        
-        // let keys;
-        // if (keys = this.wsLock.get(ws)) {
-        //   keys.forEach(k => {
-        //     removeWsLockKey(this, ws, k);
-        //     if (this.locks[k]) {
-        //       this.unlock({force: true, key: k}, ws);
-        //     }
-        //   });
-        // }
         
         let keys;
         if (keys = this.wsLock.get(ws)) {
@@ -386,11 +375,13 @@ export class Broker {
     
     let callable = true;
     let sigEvent = function (event: any) {
-      return function () {
+      return function (err: any) {
+        err && log.error('There was an error:', err);
         if (!callable) {
           return;
         }
         callable = false;
+        err && process.emit('warning', err);
         process.emit('warning', new Error(`${event} event has occurred.`));
         connectedClients.forEach(function (v, k, map) {
           // destroy each connected client
@@ -442,20 +433,6 @@ export class Broker {
         
         wss.once('error', reject);
         
-        try {
-          fs.unlinkSync('/tmp/unix.sock');
-          // fs.writeFileSync('/tmp/unix.sock','');
-        }
-        catch (err) {
-          // throw err;
-        }
-        
-        // wss.listen(SOCKETFILE, () => {
-        //   self.isOpen = true;
-        //   clearTimeout(to);
-        //   wss.removeListener('error', reject);
-        //   resolve(self);
-        // });
         
         wss.listen(self.port, () => {
           self.isOpen = true;
@@ -491,6 +468,18 @@ export class Broker {
   
   static create(opts: IBrokerOptsPartial): Broker {
     return new Broker(opts);
+  }
+  
+  close(cb: Function): void {
+    this.wss.close(cb);
+  }
+  
+  getPort() {
+    return this.port;
+  }
+  
+  getHost() {
+    return this.host;
   }
   
   inspect(data: any, ws: net.Socket) {
