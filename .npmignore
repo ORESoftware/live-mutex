@@ -5,6 +5,10 @@ node_modules
 src
 test
 docs
+.tscmultiwatch
+.docker.r2g
+coverage
+
 
 ### matching files
 *.log
@@ -17,6 +21,7 @@ docs
 *.tgz
 
 ### files
+.dockerignore
 suman.conf.js
 .gitignore
 .npmignore
