@@ -35,9 +35,9 @@ s.pipe(createParser()).on('data', function (d: any) {
 
 const acceptableCommands = {
   'lockcount': true,
-  'lock-count': true,
   'clientcount': true,
-  'fff': true
+  'clear': true,
+  'help': true
 };
 
 // readline.emitKeypressEvents(process.stdin);
@@ -65,6 +65,12 @@ s.once('connect', function () {
   //   console.log('readline got data:', String(d));
   // });
   
+  let resetCurrentLine = function () {
+    readline.clearLine(process.stdout, 0);  // clear current text
+    readline.cursorTo(process.stdout, 0);
+    process.stdout.write(prompt);
+  };
+  
   let currentLine = '', previousCmd = '';
   let commands = [];
   process.stdin.setRawMode(true);
@@ -79,9 +85,19 @@ s.once('connect', function () {
     switch (charAsAscii) {
       
       case '9':
-        process.stdout.write('\n');
-        console.log(Object.keys(acceptableCommands).filter(v => String(v).startsWith(currentLine)));
-        process.stdout.write(prompt + currentLine);
+        
+        let matches = Object.keys(acceptableCommands).filter(v => String(v).startsWith(currentLine));
+        
+        if (matches.length !== 1) {
+          process.stdout.write('\n');
+          console.log(matches);
+          process.stdout.write(prompt + currentLine);
+          return;
+        }
+        
+        resetCurrentLine();
+        currentLine = matches[0];
+        process.stdout.write(currentLine);
         break;
       
       case '3':
@@ -104,26 +120,23 @@ s.once('connect', function () {
         currentLine && commands.push(currentLine);
         process.stdin.emit('linex', currentLine || '');
         currentLine = '';
-        process.stdout.write(prompt);
         break;
       
       case '27':
         // process.stdout.write('\n');
         // process.stdout.write(prompt);
-         previousCmd = commands.pop();
+        previousCmd = commands.pop();
         currentLine = previousCmd;
-        readline.clearLine(process.stdout, 21);  // clear current text
-        readline.cursorTo(process.stdout, 21);   // move cursor to beginning of line
+        resetCurrentLine();
         process.stdout.write(previousCmd);
         break;
-  
+      
       case '127':
         // process.stdout.write('\n');
         // process.stdout.write(prompt);
-        readline.clearLine(process.stdout, 0);  // clear current text
-        readline.cursorTo(process.stdout, 0);
+        resetCurrentLine();
         currentLine = '';
-        process.stdout.write(prompt);
+        
         // readline.cursorTo(process.stdout, 21);   // move cursor to beginning of line
         // process.stdout.write(previousCmd);
         break;
@@ -144,17 +157,20 @@ s.once('connect', function () {
     const lc = String(d || '').trim().toLowerCase();
     
     if (!lc) {
+      process.stdout.write(prompt);
       return;
     }
     
     if (lc === 'clear') {
       process.stdout.write('\x1Bc');
+      process.stdout.write(prompt);
       return;
     }
     
     if (lc === 'help') {
       console.log(chalk.bold('Available commands:'));
       console.log(Object.keys(acceptableCommands));
+      process.stdout.write(prompt);
       return;
     }
     
@@ -165,6 +181,7 @@ s.once('connect', function () {
     else {
       console.log('Command not recognized:', lc);
       console.log('Try using "help" to view available commands.');
+      process.stdout.write(prompt);
     }
     
   });
