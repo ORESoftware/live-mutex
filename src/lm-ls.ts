@@ -18,20 +18,6 @@ if (index > 1) {
 }
 else {
   v = {} as any;
-  v.key = process.argv[2] || process.env.live_mutex_key || '';
-  v.port = parseInt(process.argv[3] || process.env.live_mutex_port || '6970');
-}
-
-if (!Number.isInteger(v.port)) {
-  log.error(chalk.magenta('Live-mutex: port could not be parsed to integer from command line input.'));
-  log.error('Usage: lm_acquire_lock <key> <?port>');
-  process.exit(1);
-}
-
-if (!v.key) {
-  log.error(chalk.magenta('Live-mutex: no key passed at command line.'));
-  log.error('Usage: lm_acquire_lock <key> <?port>');
-  process.exit(1);
 }
 
 process.once('warning' as any, function (e: any) {
@@ -61,20 +47,9 @@ const clientOpts = getSelectable(validConstructorOptions, v);
 
 new Client(clientOpts).ensure().then(function (c) {
   
-  const lockOptions = Object.assign(
-    {ttl: 6000}, getSelectable(validLockOptions, v), {isViaShell: true}
-  );
-  
-  c.lock(v.key, lockOptions, function (e: any) {
+  c.ls(function (err, results) {
     
-    if (e) {
-      log.error(chalk.magenta.bold(e && e.message || e));
-      log.error(`To discover what is going on with the broker, use ${chalk.blueBright.bold('$ lm_inspect_broker -p <port> -h <host>')}.`);
-      return process.exit(1);
-    }
-    
-    log.info(chalk.green.bold(`${chalk.italic('Acquired')} lock for key:`), `'${chalk.blueBright.bold(v.key)}'`);
-    process.exit(0);
-    
+    if (err) throw err;
+    console.log(results);
   });
 });

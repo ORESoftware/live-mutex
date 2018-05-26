@@ -2,7 +2,7 @@
 'use strict';
 
 import {Broker, log} from "./broker";
-
+import chalk from "chalk";
 let port = parseInt(process.argv[2] || process.env.live_mutex_port || '6970');
 const index = process.argv.indexOf('--json');
 
@@ -14,8 +14,8 @@ if(index > 0){
      v = JSON.parse(process.argv[index + 1]);
   }
   catch(err){
-    console.error(`Could not parse your --json argument, try --json '{"port":3091}'.`);
-    throw err.message;
+    log.error(chalk.magenta(`Could not parse your --json argument, try --json '{"port":3091}'.`));
+    throw chalk.magentaBright(err.message);
   }
   
   port = v.port = (v.port || port);
@@ -23,7 +23,7 @@ if(index > 0){
 
 
 if (!Number.isInteger(port)) {
-  log.error('Live-mutex: port could not be parsed to integer from command line input.');
+  log.error(chalk.magenta('Live-mutex: port could not be parsed to integer from command line input.'));
   log.error('Usage: lm_acquire_lock <key> <?port>');
   process.exit(1);
 }

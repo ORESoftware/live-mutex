@@ -36,25 +36,31 @@ setTimeout(function () {
   }
 }, 5000);
 
-const totalNoop = function () {
+export const validConstructorOptions = {
+  key: 'string',
+  listener: 'Function',
+  host: 'string',
+  port: 'integer',
+  unlockRequestTimeout: 'integer in millis',
+  lockRequestTimeout: 'integer in millis',
+  unlockRetryMax: 'integer',
+  lockRetryMax: 'integer'
 };
 
-const asyncNoop = function (cb?: Function) {
-  cb && process.nextTick(cb);
+export const validLockOptions = {
+  force: 'boolean',
+  maxRetries: 'integer',
+  maxRetry: 'integer',
+  ttl: 'integer in millis',
+  lockRequestTimeout: 'integer in millis'
 };
 
-const validOptions: Array<string> = [
-  'key',
-  'listener',
-  'host',
-  'port',
-  'unlockRequestTimeout',
-  'lockRequestTimeout',
-  'unlockRetryMax',
-  'lockRetryMax'
-];
+export const validUnlockOptions = {
+  force: 'boolean',
+  unlockRequestTimeout: 'integer'
+};
 
-export interface IClientOptions {
+export interface ClientOpts {
   key: string,
   listener: Function,
   host: string,
@@ -65,8 +71,6 @@ export interface IClientOptions {
   lockRetryMax: number;
   ttl: number
 }
-
-export type TClientOptions = Partial<IClientOptions>
 
 export interface IUuidTimeoutBool {
   [key: string]: boolean
@@ -92,7 +96,7 @@ export interface IBookkeeping {
 export type LMClientCallBack = (err: any, c?: Client) => void;
 export type Ensure = (cb?: LMClientCallBack) => Promise<Client>;
 
-export interface IUuidBooleanHash {
+export interface UuidBooleanHash {
   [key: string]: boolean;
 }
 
@@ -104,10 +108,6 @@ export interface LMClientUnlockOpts {
   
 }
 
-export interface ILockHolderCount {
-  [key: string]: number;
-}
-
 export type LMLockSuccessData = {
   acquired: boolean, key: string, unlock?: LMClientUnlockConvenienceCallback, lockUuid: string, id: string
 };
@@ -116,16 +116,14 @@ export type LMClientUnlockCallBack = (err: any, uuid?: string) => void;
 export type ErrorFirstCallBack = (err: any) => void;
 export type LMClientUnlockConvenienceCallback = (fn: ErrorFirstCallBack) => void;
 
-////////////////////////////////////////////////////////////////
-
-const SOCKETFILE = '/tmp/unix.sock';
+//////////////////////////////////////////////////////////////////////////////////////////
 
 export class Client {
   
   port: number;
   host: string;
   listeners: Object;
-  opts: TClientOptions;
+  opts: Partial<ClientOpts>;
   ttl: number;
   unlockTimeout: number;
   lockTimeout: number;
@@ -137,14 +135,14 @@ export class Client {
   bookkeeping: IBookkeepingHash;
   ensure: Ensure;
   connect: Ensure;
-  giveups: IUuidBooleanHash;
+  giveups: UuidBooleanHash;
   write: Function;
   isOpen: boolean;
   close: Function;
   
   ////////////////////////////////////////////////////////////////
   
-  constructor(o: TClientOptions, cb?: LMClientCallBack) {
+  constructor(o: Partial<ClientOpts>, cb?: LMClientCallBack) {
     
     this.isOpen = false;
     const opts = this.opts = o || {};
@@ -156,55 +154,55 @@ export class Client {
     }
     
     Object.keys(opts).forEach(function (key) {
-      if (validOptions.indexOf(key) < 0) {
-        throw new Error(' => Option passed to Live-Mutex#Client constructor is ' +
-          'not a recognized option => "' + key + '"');
+      if (!validConstructorOptions[key]) {
+        throw new Error('An option passed to Live-Mutex Client constructor is ' +
+          `not a recognized option => "${key}", \n valid options are: ` + util.inspect(validConstructorOptions));
       }
     });
     
-    if ('host' in opts) {
+    if (opts['host']) {
       assert(typeof opts.host === 'string', ' => "host" option needs to be a string.');
     }
     
-    if ('port' in opts) {
+    if (opts['port']) {
       assert(Number.isInteger(opts.port), ' => "port" option needs to be an integer.');
       assert(opts.port > 1024 && opts.port < 49152, ' => "port" integer needs to be in range (1025-49151).');
     }
     
-    if ('listener' in opts) {
+    if (opts['listener']) {
       assert(typeof opts.listener === 'function', ' => Listener should be a function.');
       assert(typeof opts.key === 'string', ' => You must pass in a key to use listener functionality.');
     }
     
-    if ('unlockRetryMax' in opts) {
+    if (opts['unlockRetryMax']) {
       assert(Number.isInteger(opts.unlockRetryMax),
         ' => "unlockRetryMax" option needs to be an integer.');
       assert(this.opts.unlockRetryMax >= 0 && opts.unlockRetryMax <= 100,
         ' => "unlockRetryMax" integer needs to be in range (0-100).');
     }
     
-    if ('lockRetryMax' in opts) {
+    if (opts['lockRetryMax']) {
       assert(Number.isInteger(opts.lockRetryMax),
         ' => "lockRetryMax" option needs to be an integer.');
       assert(opts.lockRetryMax >= 0 && opts.lockRetryMax <= 100,
         ' => "lockRetryMax" integer needs to be in range (0-100).');
     }
     
-    if ('unlockRequestTimeout' in opts) {
+    if (opts['unlockRequestTimeout']) {
       assert(Number.isInteger(opts.unlockRequestTimeout),
         ' => "unlockRequestTimeout" option needs to be an integer (representing milliseconds).');
       assert(opts.unlockRequestTimeout >= 20 && opts.unlockRequestTimeout <= 800000,
         ' => "unlockRequestTimeout" needs to be integer between 20 and 800000 millis.');
     }
     
-    if ('lockRequestTimeout' in opts) {
+    if (opts['lockRequestTimeout']) {
       assert(Number.isInteger(opts.lockRequestTimeout),
         ' => "lockRequestTimeout" option needs to be an integer (representing milliseconds).');
       assert(opts.lockRequestTimeout >= 20 && opts.lockRequestTimeout <= 800000,
         ' => "lockRequestTimeout" needs to be integer between 20 and 800000 millis.');
     }
     
-    if ('ttl' in opts) {
+    if (opts['ttl']) {
       assert(Number.isInteger(opts.ttl),
         ' => "ttl" option needs to be an integer (representing milliseconds).');
       assert(opts.ttl >= 3 && opts.ttl <= 800000,
@@ -296,7 +294,7 @@ export class Client {
         throw new Error('optional argument to ensure/connect must be a function.');
       }
       
-      if (connectPromise && ws.writable) {
+      if (connectPromise && ws.writable && self.isOpen) {
         return connectPromise.then((val) => {
             cb && cb.call(self, null, val);
             return val;
@@ -316,7 +314,7 @@ export class Client {
       
       return connectPromise = new Promise((resolve, reject) => {
         
-        let onFirstErr = function (e: any) {
+        let onFirstErr = (e: any) => {
           let err = new Error('live-mutex client error => ' + (e && e.stack || e));
           process.emit('warning', err);
           reject(err);
@@ -333,29 +331,19 @@ export class Client {
           resolve(this);
         });
         
-        // ws = net.createConnection(SOCKETFILE, () => {
-        //   self.isOpen = true;
-        //   clearTimeout(to);
-        //   ws.removeListener('error', onFirstErr);
-        //   resolve(this);
-        // });
-        
-        ws.once('end', () => {
+        ws.setEncoding('utf8')
+        .once('end', () => {
           process.emit('warning', new Error('client stream "end" event occurred.'));
-        });
-        
-        ws.once('error', onFirstErr);
-        ws.once('close', () => {
+        })
+        .once('error', onFirstErr)
+        .once('close', () => {
           self.isOpen = false;
-        });
-        
-        ws.setEncoding('utf8');
-        
-        ws.on('error', function (e) {
+        })
+        .on('error', function (e) {
+          self.isOpen = false;
           process.emit('warning', new Error('live-mutex client error: ' + e.stack || util.inspect(e)));
-        });
-        
-        ws.pipe(createParser())
+        })
+        .pipe(createParser())
         .on('data', onData)
         .once('error', function (e: any) {
           self.write({error: String(e && e.stack || e)}, function () {
@@ -364,7 +352,7 @@ export class Client {
         });
       })
       // if the user passes a callback, we fire the callback here
-      .then((val) => {
+      .then(val => {
           cb && cb.call(self, null, val);
           return val;
         },
@@ -393,7 +381,7 @@ export class Client {
     
   };
   
-  static create(opts: TClientOptions): Client {
+  static create(opts: Partial<ClientOpts>): Client {
     return new Client(opts);
   }
   
@@ -487,7 +475,29 @@ export class Client {
     err = err instanceof Error ? err : new Error(err);
     process.emit('warning', err);
     cb(err, {acquired: false, key, lockUuid: uuid});
-  };
+  }
+  
+  ls(opts: any, cb?: ErrFirstDataCallback){
+    
+    if(typeof opts === 'function'){
+      cb = opts;
+      opts = {};
+    }
+    
+    if(typeof cb !== 'function'){
+      throw new Error('Callback needs to be a function type.');
+    }
+    
+    const id = uuidV4();
+    
+    this.write({
+      isViaShell: opts.isViaShell,
+      uuid: id,
+      type: 'ls',
+    });
+  
+    this.resolutions[id] = cb;
+  }
   
   lock(key: string, opts: any, cb?: LMClientLockCallBack) {
     
@@ -513,7 +523,7 @@ export class Client {
       opts = {ttl: opts};
     }
     
-    opts = opts || {} as TClientOptions;
+    opts = opts || {} as Partial<ClientOpts>;
     
     assert(typeof cb === 'function', 'callback function must be passed to Client lock() method.');
     cb = cb.bind(this);
@@ -523,31 +533,31 @@ export class Client {
         '"append" option must be a string value.');
     }
     
-    if ('force' in opts) {
+    if (opts['force']) {
       assert.equal(typeof opts.force, 'boolean', ' => Live-Mutex usage error => ' +
         '"force" option must be a boolean value. Coerce it on your side, for safety.');
     }
     
-    if ('maxRetries' in opts) {
+    if (opts['maxRetries']) {
       assert(Number.isInteger(opts.maxRetries), '"retry" option must be an integer.');
       assert(opts.maxRetries >= 0 && opts.maxRetries <= 20,
         '"retry" option must be an integer between 0 and 20 inclusive.');
     }
     
-    if ('maxRetry' in opts) {
+    if (opts['maxRetry']) {
       assert(Number.isInteger(opts.maxRetry), '"retry" option must be an integer.');
       assert(opts.maxRetry >= 0 && opts.maxRetry <= 20,
         '"retry" option must be an integer between 0 and 20 inclusive.');
     }
     
-    if ('ttl' in opts) {
+    if (opts['ttl']) {
       assert(Number.isInteger(opts.ttl),
         ' => Live-Mutex usage error => Please pass an integer representing milliseconds as the value for "ttl".');
       assert(opts.ttl >= 3 && opts.ttl <= 800000,
         ' => Live-Mutex usage error => "ttl" for a lock needs to be integer between 3 and 800000 millis.');
     }
     
-    if ('lockRequestTimeout' in opts) {
+    if (opts['lockRequestTimeout']) {
       assert(Number.isInteger(opts.lockRequestTimeout),
         ' => Please pass an integer representing milliseconds as the value for "ttl".');
       assert(opts.lockRequestTimeout >= 20 && opts.lockRequestTimeout <= 800000,
@@ -587,10 +597,10 @@ export class Client {
       self.write({uuid, key, type: 'lock-client-timeout'});
       ++opts.__retryCount;
       
-      log.error(`retrying lock request for key '${key}', uuid '${uuid}', attempt #`, opts.__retryCount);
+      log.error(`retrying lock request for key '${key}', on host:port '${self.getHost()}:${self.getPort()}', attempt #`, opts.__retryCount);
       
       if (opts.__retryCount >= maxRetries) {
-        return cb(new Error(` => Live-Mutex client lock request timed out after ${lockTimeout * opts.__retryCount} ms, ` +
+        return cb(new Error(`Live-Mutex client lock request timed out after ${lockTimeout * opts.__retryCount} ms, ` +
           `${maxRetries} retries attempted.`),
           {acquired: false, key, lockUuid: uuid, id: uuid});
       }
@@ -684,6 +694,14 @@ export class Client {
   
   }
   
+  getPort() {
+    return this.port;
+  }
+  
+  getHost() {
+    return this.host;
+  }
+  
   unlock(key: string, opts?: any, cb?: LMClientUnlockCallBack) {
     
     assert.equal(typeof key, 'string', 'Key passed to live-mutex #unlock needs to be a string.');
@@ -709,15 +727,15 @@ export class Client {
     }
     
     opts = opts || {};
-    cb && (cb = cb.bind(this));
+    cb && (cb !== this.noop) && (cb = cb.bind(this));
     cb = cb || this.noop;
     
-    if ('force' in opts) {
+    if (opts['force']) {
       assert.equal(typeof opts.force, 'boolean', ' => Live-Mutex usage error => ' +
         '"force" option must be a boolean value. Coerce it on your side, for safety.');
     }
     
-    if ('unlockRequestTimeout' in opts) {
+    if (opts['unlockRequestTimeout']) {
       assert(Number.isInteger(opts.lockRequestTimeout),
         ' => Please pass an integer representing milliseconds as the value for "ttl".');
       assert(opts.lockRequestTimeout >= 20 && opts.lockRequestTimeout <= 800000,

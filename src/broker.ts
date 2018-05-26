@@ -62,12 +62,12 @@ const removeKeyFromWsLock = function (keys: Array<string>, key: string) {
   }
 };
 
-const validOptions = [
-  'lockExpiresAfter',
-  'timeoutToFindNewLockholder',
-  'host',
-  'port'
-];
+export const validConstructorOptions = {
+  'lockExpiresAfter': 'integer in millis',
+  'timeoutToFindNewLockholder': 'integer in millis',
+  'host': 'string',
+  'port': 'integer'
+};
 
 /////////////////// interfaces /////////////////////////////////////
 
@@ -166,31 +166,31 @@ export class Broker {
     assert(typeof opts === 'object', 'Options argument must be an object - live-mutex server constructor.');
     
     Object.keys(opts).forEach(function (key) {
-      if (validOptions.indexOf(key) < 0) {
-        throw new Error(' => Option passed to Live-Mutex#Broker constructor ' +
-          'is not a recognized option => "' + key + '"');
+      if (!validConstructorOptions[key]) {
+        throw new Error('An option passed to Live-Mutex#Broker constructor ' +
+          `is not a recognized option => "${key}", valid options are: ${util.inspect(validConstructorOptions)}.`);
       }
     });
     
-    if ('lockExpiresAfter' in opts) {
+    if (opts['lockExpiresAfter']) {
       assert(Number.isInteger(opts.lockExpiresAfter),
         ' => "expiresAfter" option needs to be an integer (milliseconds)');
       assert(opts.lockExpiresAfter > 20 && opts.lockExpiresAfter < 4000000,
         ' => "expiresAfter" is not in range (20 to 4000000 ms).');
     }
     
-    if ('timeoutToFindNewLockholder' in opts) {
+    if (opts['timeoutToFindNewLockholder']) {
       assert(Number.isInteger(opts.timeoutToFindNewLockholder),
         ' => "timeoutToFindNewLockholder" option needs to be an integer (milliseconds)');
       assert(opts.timeoutToFindNewLockholder > 20 && opts.timeoutToFindNewLockholder < 4000000,
         ' => "timeoutToFindNewLockholder" is not in range (20 to 4000000 ms).');
     }
     
-    if ('host' in opts) {
+    if (opts['host']) {
       assert(typeof opts.host === 'string', ' => "host" option needs to be a string.');
     }
     
-    if ('port' in opts) {
+    if (opts['port']) {
       assert(Number.isInteger(opts.port),
         ' => "port" option needs to be an integer => ' + opts.port);
       assert(opts.port > 1024 && opts.port < 49152,
@@ -432,7 +432,6 @@ export class Broker {
         }, 3000);
         
         wss.once('error', reject);
-        
         
         wss.listen(self.port, () => {
           self.isOpen = true;

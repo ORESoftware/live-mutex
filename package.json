@@ -10,7 +10,13 @@
     "lm_release_lock": "dist/lm-release-lock.js",
     "lm_inspect_broker": "dist/inspect.js",
     "lm_start_broker": "dist/lm-start-server.js",
-    "lm_start_server": "dist/lm-start-server.js"
+    "lm_start_server": "dist/lm-start-server.js",
+    "lmx_acquire_lock": "dist/lm-acquire-lock.js",
+    "lmx_release_lock": "dist/lm-release-lock.js",
+    "lmx_inspect_broker": "dist/inspect.js",
+    "lmx_start_broker": "dist/lm-start-server.js",
+    "lmx_start_server": "dist/lm-start-server.js",
+    "lmx": "assets/lmx.sh"
   },
   "scripts": {
     "test": "./scripts/test.sh"
