@@ -33,9 +33,11 @@ Test.create(['lmUtils', (b, assert, before, describe, it, path, fs, inject) => {
   
   const p = path.resolve(__dirname + '/../fixtures/alphabet.test');
   
-  before.cb('clean up file', h => {
-    fs.writeFile(p, '', h);
-  });
+  // before.cb('clean up file', h => {
+  //   fs.writeFile(p, '', h);
+  // });
+  
+  const strm = fs.createWriteStream(p);
   
   describe('post', function (b) {
     
@@ -47,17 +49,12 @@ Test.create(['lmUtils', (b, assert, before, describe, it, path, fs, inject) => {
         
         client.lock('foo', function (err, v) {
           
-          const strm = fs.createWriteStream(p, {flags: 'a'});
-          
           for (let i = 0; i < num; i++) {
             strm.write(val);
           }
           
-          strm.end();
+          v.unlock(cb);
           
-          strm.once('finish', function () {
-            v.unlock(cb);
-          });
         });
         
       }, h.done);

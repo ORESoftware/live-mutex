@@ -27,7 +27,7 @@ if (weAreDebugging) {
 
 process.setMaxListeners(100);
 process.on('warning', function (e: any) {
-  log.error('warning:', e && e.stack || e);
+  log.error('warning:', e && e.message || e);
 });
 
 ///////////////////////////////////////////////////////////////////
@@ -81,7 +81,7 @@ export interface IBrokerOpts {
 export type IBrokerOptsPartial = Partial<IBrokerOpts>
 export type IErrorFirstCB = (err: Error | null | undefined | string, val?: any) => void;
 
-export interface IBrokerSend {
+export interface BrokerSend {
   (ws: net.Socket, data: any, cb?: IErrorFirstCB): void;
 }
 
@@ -145,7 +145,7 @@ export class Broker {
   timeoutToFindNewLockholder: number;
   host: string;
   port: number;
-  send: IBrokerSend;
+  send: BrokerSend;
   rejected: IUuidBooleanHash;
   timeouts: IUuidTimer;
   locks: LockHash;
@@ -543,19 +543,20 @@ export class Broker {
       let uuid = lck.uuid = obj.uuid;
       lck.pid = obj.pid;
       
-      lck.to = setTimeout(function () {
-        
+      lck.to = setTimeout(() => {
+
         // delete locks[key]; => no, this.unlock will take care of that
-        process.emit('warning', new Error('Live-Mutex Broker warning, lock object timed out for key => "' + key + '"'));
-        
+        process.emit('warning', new Error(`Live-Mutex Broker warning, lock object timed out after ${ttl}ms for key => "${key}".`));
+
         // we set lck.lockholderTimeouts[uuid], so that when an unlock request for uuid comes into the broker
         // we know that it timed out already, and we know not to throw an error when the lock.uuid doesn't match
         lck.lockholderTimeouts[uuid] = true;
+
         self.unlock({
           key: key,
           force: true
         });
-        
+
       }, ttl);
       
       clearTimeout(this.timeouts[key]);
@@ -806,6 +807,8 @@ export class Broker {
     
     if (lck && (same || force)) {
       
+      log.info(chalk.blueBright('unlocking with same/force.'));
+      
       const count = lck.notify.length;
       clearTimeout(lck.to);
       
@@ -836,6 +839,8 @@ export class Broker {
       
     }
     else if (lck) {
+  
+      log.info(chalk.blueBright('unlocking with FUCKKKK.'));
       
       const count = lck.notify.length;
       
@@ -890,6 +895,7 @@ export class Broker {
       process.emit('warning', new Error('Live-Mutex implementation error => no lock with key => "' + key + '"'));
       
       // since the lock no longer exists for this key, remove ownership of this key
+      
       this.wsLock.forEach((v, k) => {
         const keys = self.wsLock.get(k);
         if (keys) {

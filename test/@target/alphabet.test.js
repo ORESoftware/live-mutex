@@ -21,22 +21,25 @@ Test.create(['lmUtils', function (b, assert, before, describe, it, path, fs, inj
             j.register('client', new client_1.Client(conf).ensure());
         });
         var p = path.resolve(__dirname + '/../fixtures/alphabet.test');
-        before.cb('clean up file', function (h) {
-            fs.writeFile(p, '', h);
-        });
+        // before.cb('clean up file', h => {
+        //   fs.writeFile(p, '', h);
+        // });
+        var strm = fs.createWriteStream(p);
         describe('post', function (b) {
             var client = b.getInjectedValue('client');
             before.cb('yo', function (h) {
                 async.each(a2z, function (val, cb) {
                     client.lock('foo', function (err, v) {
-                        var strm = fs.createWriteStream(p, { flags: 'a' });
                         for (var i = 0; i < num; i++) {
                             strm.write(val);
                         }
-                        strm.end();
-                        strm.once('finish', function () {
-                            v.unlock(cb);
-                        });
+                        v.unlock(cb);
+                        console.log('foo');
+                        // strm.end();
+                        //
+                        // strm.once('finish', function () {
+                        //   v.unlock(cb);
+                        // });
                     });
                 }, h.done);
             });
