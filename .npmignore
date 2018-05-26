@@ -8,16 +8,13 @@ docs
 
 ### matching files
 *.log
-*.sh
 *.md
 *.json
 *.txt
-*.ts
 *.yml
 *.html
 *.lock
 *.tgz
-
 
 ### files
 suman.conf.js
@@ -25,6 +22,3 @@ suman.conf.js
 .npmignore
 yarn.lock
 
-
-### negation
-!*.d.ts
