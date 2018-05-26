@@ -9,10 +9,14 @@ import * as util from 'util';
 //npm
 import chalk from "chalk";
 import {createParser} from "./json-parser";
+const localDev = process.env.oresoftware_local_dev === 'yes';
+const noop = function () {
+  // do nothing obviously
+};
 
 //project
 export const log = {
-  info: console.log.bind(console, chalk.gray.bold('[live-mutex broker]')),
+  info: localDev ? console.log.bind(console, chalk.gray.bold('[live-mutex broker]')) : noop,
   error: console.error.bind(console, chalk.gray.bold('[live-mutex broker]'))
 };
 
