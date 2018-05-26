@@ -139,6 +139,7 @@ export class Client {
   write: Function;
   isOpen: boolean;
   close: Function;
+  lockQueues = {}  as { [key: string]: Array<any> };
   
   ////////////////////////////////////////////////////////////////
   
@@ -398,6 +399,7 @@ export class Client {
     const uuid = opts._uuid || uuidV4();
     
     this.resolutions[uuid] = (err, data) => {
+      
       if (String(key) !== String(data.key)) {
         delete this.resolutions[uuid];
         throw new Error('Live-Mutex implementation error => bad key.');
@@ -477,14 +479,14 @@ export class Client {
     cb(err, {acquired: false, key, lockUuid: uuid});
   }
   
-  ls(opts: any, cb?: ErrFirstDataCallback){
+  ls(opts: any, cb?: ErrFirstDataCallback) {
     
-    if(typeof opts === 'function'){
+    if (typeof opts === 'function') {
       cb = opts;
       opts = {};
     }
     
-    if(typeof cb !== 'function'){
+    if (typeof cb !== 'function') {
       throw new Error('Callback needs to be a function type.');
     }
     
@@ -495,13 +497,11 @@ export class Client {
       uuid: id,
       type: 'ls',
     });
-  
+    
     this.resolutions[id] = cb;
   }
   
   lock(key: string, opts: any, cb?: LMClientLockCallBack) {
-    
-    assert.equal(typeof key, 'string', 'Key passed to live-mutex #lock needs to be a string.');
     
     this.bookkeeping[key] = this.bookkeeping[key] || {
       rawLockCount: 0,
@@ -510,7 +510,23 @@ export class Client {
       unlockCount: 0
     };
     
-    this.bookkeeping[key].rawLockCount++;
+    this.lockQueues[key] = this.lockQueues[key] || [];
+    
+    const rawLockCount = ++this.bookkeeping[key].rawLockCount;
+    const unlockCount = this.bookkeeping[key].unlockCount;
+    
+    if (rawLockCount - unlockCount > 5) {
+      this.lockQueues[key].unshift(arguments);
+    }
+    else {
+      this.lockInternal.apply(this, arguments);
+    }
+    
+  }
+  
+  private lockInternal(key: string, opts: any, cb?: LMClientLockCallBack) {
+    
+    assert.equal(typeof key, 'string', 'Key passed to live-mutex #lock needs to be a string.');
     
     if (typeof opts === 'function') {
       cb = opts;
@@ -749,6 +765,9 @@ export class Client {
     
     const to = setTimeout(() => {
       
+      const v = this.lockQueues[key].pop();
+      v && this.lockInternal.apply(this, v);
+      
       timedOut = true;
       delete this.resolutions[uuid];
       this.timeouts[uuid] = true;
@@ -759,6 +778,9 @@ export class Client {
     }, unlockTimeout);
     
     this.resolutions[uuid] = (err, data) => {
+      
+      const v = this.lockQueues[key].pop();
+      v && this.lockInternal.apply(this, v);
       
       if (timedOut) {
         return;

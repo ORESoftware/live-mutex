@@ -2,7 +2,6 @@
 
 import * as suman from 'suman';
 const {Test} = suman.init(module);
-
 import {Broker, Client} from '../../dist';
 
 ///////////////////////////////////////////////////////////////

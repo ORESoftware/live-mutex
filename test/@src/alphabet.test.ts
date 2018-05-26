@@ -3,15 +3,12 @@
 import suman = require('suman');
 const Test = suman.init(module);
 const async = require('async');
-
-// import {Client, Broker} from "../../dist";
-
 import {Client} from "../../client";
 import {Broker} from "../../broker";
 
 ////////////////////////////////////////////////////////
 
-Test.create(['lmUtils', (b, assert, before, describe, it, path, fs, inject) => {
+Test.create(['lmUtils', (b, assert, before, describe, it, path, fs, inject, after) => {
   
   const {lmUtils} = b.ioc;
   
@@ -42,10 +39,15 @@ Test.create(['lmUtils', (b, assert, before, describe, it, path, fs, inject) => {
   describe('post', function (b) {
     
     const client = b.getInjectedValue('client') as Client;
+    const broker = b.getInjectedValue('broker') as Client;
+    
+    after(h => {
+      return broker.close();
+    });
     
     before.cb('yo', h => {
       
-      async.each(a2z, function (val, cb) {
+      async.eachLimit(a2z, 1, function (val, cb) {
         
         client.lock('foo', function (err, v) {
           
@@ -53,7 +55,8 @@ Test.create(['lmUtils', (b, assert, before, describe, it, path, fs, inject) => {
             strm.write(val);
           }
           
-          v.unlock(cb);
+          cb();
+          v.unlock();
           
         });
         

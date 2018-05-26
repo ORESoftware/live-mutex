@@ -1,29 +1,28 @@
 'use strict';
-exports.__esModule = true;
-var suman_1 = require("suman");
-var Test = suman_1["default"].init(module);
+Object.defineProperty(exports, "__esModule", { value: true });
+const suman_1 = require("suman");
+const Test = suman_1.default.init(module);
 // import the other way, just to be sure
-var live_mutex_1 = require("live-mutex");
+const live_mutex_1 = require("live-mutex");
 /////////////////////////////////////////////////////////////////////
 Test.create([function (b, inject, describe, before, it, $deps, $core) {
-        var fs = $core.fs, path = $core.path, assert = $core.assert;
-        var colors = $deps.chalk, async = $deps.async, _ = $deps.lodash;
-        var conf = Object.freeze({ port: 7027 });
-        inject(function (j) {
+        const { fs, path, assert } = $core;
+        const { chalk: colors, async, lodash: _ } = $deps;
+        const conf = Object.freeze({ port: 7027 });
+        inject(j => {
             j.register('broker', new live_mutex_1.Broker(conf).ensure());
         });
-        inject(function (j) {
+        inject(j => {
             j.register('client', new live_mutex_1.Client(conf).ensure());
         });
-        var f = require.resolve('../fixtures/corruptible.txt');
+        const f = require.resolve('../fixtures/corruptible.txt');
         before.cb('remove file', function (t) {
             fs.writeFile(f, '', t);
         });
-        describe('inject', function (b) {
-            var c = b.getInjectedValue('client');
-            var lockWriteRelease = function (val, cb) {
-                c.lock('a', function (err, _a) {
-                    var unlock = _a.unlock;
+        describe('inject', b => {
+            const c = b.getInjectedValue('client');
+            const lockWriteRelease = function (val, cb) {
+                c.lock('a', function (err, { unlock }) {
                     if (err) {
                         return cb(err);
                     }
@@ -32,16 +31,16 @@ Test.create([function (b, inject, describe, before, it, $deps, $core) {
                     });
                 });
             };
-            before.cb('write like crazy', { timeout: 30000 }, function (t) {
-                var a = Array.apply(null, { length: 20 }).map(function (item, index) { return index; });
+            before.cb('write like crazy', { timeout: 30000 }, t => {
+                const a = Array.apply(null, { length: 20 }).map((item, index) => index);
                 async.each(a, lockWriteRelease, t.done);
             });
-            it.cb('ensure that file still has the same stuff in it!', { timeout: 30000 }, function (t) {
+            it.cb('ensure that file still has the same stuff in it!', { timeout: 30000 }, t => {
                 fs.readFile(f, function (err, data) {
                     if (err) {
                         return t.fail(err);
                     }
-                    var arr = String(data).split('\n').filter(function (line) {
+                    const arr = String(data).split('\n').filter(function (line) {
                         return String(line).trim().length > 0;
                     });
                     arr.forEach(function (item, index) {

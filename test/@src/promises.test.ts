@@ -39,13 +39,6 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
       });
     });
     
-    // const promhelper = function (unlock) {
-    //   return new Promise(function (resolve, reject) {
-    //     unlock(function (err) {
-    //       err ? reject(err) : resolve();
-    //     });
-    //   });
-    // };
     
     const makePromiseProvider = function (unlock) {
       return function (input: string) {
@@ -62,7 +55,7 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
     it('locks/unlocks super special 1', t => {
       const c = t.supply.client;
       return c.lockp('foo').then(function ({unlock}) {
-        return (unlock);
+        return c.promisifyUnlock(unlock);
       });
     });
     

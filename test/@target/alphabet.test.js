@@ -1,49 +1,47 @@
 'use strict';
-exports.__esModule = true;
-var suman = require("suman");
-var Test = suman.init(module);
-var async = require('async');
-// import {Client, Broker} from "../../dist";
-var client_1 = require("../../client");
-var broker_1 = require("../../broker");
+Object.defineProperty(exports, "__esModule", { value: true });
+const suman = require("suman");
+const Test = suman.init(module);
+const async = require('async');
+const client_1 = require("../../client");
+const broker_1 = require("../../broker");
 ////////////////////////////////////////////////////////
-Test.create(['lmUtils', function (b, assert, before, describe, it, path, fs, inject) {
-        var lmUtils = b.ioc.lmUtils;
-        var alphabet = 'abcdefghijklmnopqrstuvwxyz';
-        var a2z = alphabet.split('');
+Test.create(['lmUtils', (b, assert, before, describe, it, path, fs, inject, after) => {
+        const { lmUtils } = b.ioc;
+        const alphabet = 'abcdefghijklmnopqrstuvwxyz';
+        const a2z = alphabet.split('');
         assert.equal(a2z.length, 26, ' => Western alphabet is messed up.');
-        var num = 100;
-        var conf = Object.freeze({ port: 7028 });
-        inject(function (j) {
+        const num = 100;
+        const conf = Object.freeze({ port: 7028 });
+        inject(j => {
             j.register('broker', new broker_1.Broker(conf).ensure());
         });
-        inject(function (j) {
+        inject(j => {
             j.register('client', new client_1.Client(conf).ensure());
         });
-        var p = path.resolve(__dirname + '/../fixtures/alphabet.test');
+        const p = path.resolve(__dirname + '/../fixtures/alphabet.test');
         // before.cb('clean up file', h => {
         //   fs.writeFile(p, '', h);
         // });
-        var strm = fs.createWriteStream(p);
+        const strm = fs.createWriteStream(p);
         describe('post', function (b) {
-            var client = b.getInjectedValue('client');
-            before.cb('yo', function (h) {
-                async.each(a2z, function (val, cb) {
+            const client = b.getInjectedValue('client');
+            const broker = b.getInjectedValue('broker');
+            after(h => {
+                return broker.close();
+            });
+            before.cb('yo', h => {
+                async.eachLimit(a2z, 1, function (val, cb) {
                     client.lock('foo', function (err, v) {
-                        for (var i = 0; i < num; i++) {
+                        for (let i = 0; i < num; i++) {
                             strm.write(val);
                         }
-                        v.unlock(cb);
-                        console.log('foo');
-                        // strm.end();
-                        //
-                        // strm.once('finish', function () {
-                        //   v.unlock(cb);
-                        // });
+                        cb();
+                        v.unlock();
                     });
                 }, h.done);
             });
-            it.cb('count characters => expect num*26', { timeout: 300 }, function (t) {
+            it.cb('count characters => expect num*26', { timeout: 300 }, t => {
                 fs.readFile(p, function (err, data) {
                     if (err) {
                         return t.done(err);
@@ -52,15 +50,15 @@ Test.create(['lmUtils', function (b, assert, before, describe, it, path, fs, inj
                     t.done();
                 });
             });
-            it.cb('10 chars of each, in order', { timeout: 300 }, function (t) {
-                var readable = fs.createReadStream(p);
+            it.cb('10 chars of each, in order', { timeout: 300 }, t => {
+                const readable = fs.createReadStream(p);
                 readable.once('error', t.fail);
                 readable.once('end', t.done);
                 readable.on('readable', function () {
-                    var index = 0;
-                    var chunk;
+                    let index = 0;
+                    let chunk;
                     while (null != (chunk = readable.read(1))) {
-                        var temp = (index - (index % num)) / num;
+                        const temp = (index - (index % num)) / num;
                         assert.equal(String(chunk), alphabet[temp]);
                         index++;
                     }

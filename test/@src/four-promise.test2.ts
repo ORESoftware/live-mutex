@@ -2,7 +2,6 @@
 
 import suman = require('suman');
 const Test = suman.init(module);
-
 import {LvMtxClient} from "../../dist";
 import {lmUtils} from "../../dist";
 
