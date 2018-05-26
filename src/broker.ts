@@ -125,7 +125,7 @@ export interface ILockObj {
   to: NodeJS.Timer
 }
 
-export interface ILockHash {
+export interface LockHash {
   [key: string]: ILockObj
 }
 
@@ -148,7 +148,7 @@ export class Broker {
   send: IBrokerSend;
   rejected: IUuidBooleanHash;
   timeouts: IUuidTimer;
-  locks: ILockHash;
+  locks: LockHash;
   ensure: TEnsure;
   start: TEnsure;
   wsLock: Map<net.Socket, Array<string>>;  // Array<uuid> to be exact
@@ -247,6 +247,9 @@ export class Broker {
       
       if (data.inspectCommand) {
         self.inspect(data, ws);
+      }
+      else if (data.type === 'ls') {
+        self.ls(data, ws);
       }
       else if (data.type === 'unlock') {
         self.unlock(data, ws);
@@ -479,6 +482,10 @@ export class Broker {
   
   getHost() {
     return this.host;
+  }
+  
+  ls(data: any, ws: net.Socket) {
+    return this.send(ws, {ls_result: Object.keys(this.locks), uuid: data.uuid});
   }
   
   inspect(data: any, ws: net.Socket) {
@@ -793,7 +800,6 @@ export class Broker {
     // this prevents a function from being called at the wrong time, or more than once, etc.
     
     let same = true;
-    
     if (_uuid && lck && lck.uuid !== undefined) {
       same = (String(lck.uuid) === String(_uuid));
     }
@@ -807,7 +813,6 @@ export class Broker {
         
         // if no uuid is defined, then unlock was called by something other than the client
         // aka this library called unlock when there was a timeout
-        
         this.send(ws, {
           uuid: uuid,
           key: key,
@@ -838,6 +843,16 @@ export class Broker {
         
         delete lck.lockholderTimeouts[_uuid];
         
+        this.wsLock.forEach((v, k) => {
+          const keys = self.wsLock.get(k);
+          if (keys) {
+            const i = keys.indexOf(key);
+            if (i >= 0) {
+              keys.splice(i, 1);
+            }
+          }
+        });
+        
         if (uuid && ws) {
           // if no uuid is defined, then unlock was called by something other than the client
           // aka this library called unlock when there was a timeout
@@ -849,6 +864,7 @@ export class Broker {
             type: 'unlock',
             unlocked: true
           });
+          
         }
       }
       else {

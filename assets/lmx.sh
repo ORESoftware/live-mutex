@@ -24,6 +24,11 @@ elif [ "$cmd" == "inspect" ]; then
   lm_inspect_broker "$@"
    exit $?
 
+elif [ "$cmd" == "ls" ]; then
+
+  lm_ls "$@"
+   exit $?
+
 else
 
   echo "no subcommand was recognized."

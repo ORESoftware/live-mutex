@@ -59,7 +59,7 @@ const clientOpts = getSelectable(validConstructorOptions, v);
 new Client(clientOpts).ensure().then(function (c) {
   
   const unlockOptions = Object.assign(
-    {ttl: 6000}, getSelectable(validUnlockOptions, v), {isViaShell: true}
+    {ttl: 6000}, getSelectable(validUnlockOptions, v), {isViaShell: true, force: true}
   );
   
   c.unlock(v.key, unlockOptions, function (e: any) {

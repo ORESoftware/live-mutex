@@ -50,6 +50,9 @@ new Client(clientOpts).ensure().then(function (c) {
   c.ls(function (err, results) {
     
     if (err) throw err;
-    console.log(results);
+    console.log(chalk.blueBright('Number of locks:'), chalk.bold(results.ls_result.length));
+    console.log(chalk.blueBright('Lock keys list:'), results.ls_result);
+    process.exit(0);
+    
   });
 });
