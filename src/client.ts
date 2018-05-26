@@ -44,7 +44,8 @@ export const validConstructorOptions = {
   unlockRequestTimeout: 'integer in millis',
   lockRequestTimeout: 'integer in millis',
   unlockRetryMax: 'integer',
-  lockRetryMax: 'integer'
+  lockRetryMax: 'integer',
+  isViaShell: 'boolean'
 };
 
 export const validLockOptions = {
@@ -52,12 +53,14 @@ export const validLockOptions = {
   maxRetries: 'integer',
   maxRetry: 'integer',
   ttl: 'integer in millis',
-  lockRequestTimeout: 'integer in millis'
+  lockRequestTimeout: 'integer in millis',
+  isViaShell: 'boolean'
 };
 
 export const validUnlockOptions = {
   force: 'boolean',
-  unlockRequestTimeout: 'integer'
+  unlockRequestTimeout: 'integer',
+  isViaShell: 'boolean'
 };
 
 export interface ClientOpts {
@@ -69,7 +72,8 @@ export interface ClientOpts {
   lockRequestTimeout: number;
   unlockRetryMax: number;
   lockRetryMax: number;
-  ttl: number
+  ttl: number,
+  isViaShell: boolean
 }
 
 export interface IUuidTimeoutBool {
@@ -140,6 +144,7 @@ export class Client {
   isOpen: boolean;
   close: Function;
   lockQueues = {}  as { [key: string]: Array<any> };
+  isViaShell = false;
   
   ////////////////////////////////////////////////////////////////
   
@@ -210,6 +215,7 @@ export class Client {
         ' => "ttl" needs to be integer between 3 and 800000 millis.');
     }
     
+    this.isViaShell = Boolean(opts.isViaShell);
     this.listeners = {};
     this.host = opts.host || 'localhost';
     this.port = opts.port || 6970;
@@ -225,10 +231,14 @@ export class Client {
     const self = this;
     
     this.write = (data: any, cb: Function) => {
+      
       if (!ws) {
         throw new Error('please call ensure()/connect() on this Live-Mutex client, before using the lock/unlock methods.');
       }
+      
       data.pid = process.pid;
+      data.isViaShell = this.isViaShell;
+      
       ws.write(JSON.stringify(data) + '\n', 'utf8', cb);
     };
     
@@ -765,7 +775,7 @@ export class Client {
     
     const to = setTimeout(() => {
       
-      const v = this.lockQueues[key].pop();
+      const v = this.lockQueues[key] && this.lockQueues[key].pop();
       v && this.lockInternal.apply(this, v);
       
       timedOut = true;
@@ -779,7 +789,7 @@ export class Client {
     
     this.resolutions[uuid] = (err, data) => {
       
-      const v = this.lockQueues[key].pop();
+      const v = this.lockQueues[key] && this.lockQueues[key].pop();
       v && this.lockInternal.apply(this, v);
       
       if (timedOut) {

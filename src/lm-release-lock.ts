@@ -54,13 +54,11 @@ const getSelectable = function (selectable, original) {
   return Object.keys(selectable).reduce((a, b) => (a[b] = original[b], a), {})
 };
 
-const clientOpts = getSelectable(validConstructorOptions, v);
+const clientOpts = Object.assign(v, {isViaShell: true});
 
 new Client(clientOpts).ensure().then(function (c) {
   
-  const unlockOptions = Object.assign(
-    {ttl: 6000}, getSelectable(validUnlockOptions, v), {isViaShell: true, force: true}
-  );
+  const unlockOptions = Object.assign({ttl: 6000}, v, {isViaShell: true, force: true});
   
   c.unlock(v.key, unlockOptions, function (e: any) {
     

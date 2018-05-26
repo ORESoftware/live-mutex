@@ -53,17 +53,11 @@ process.once('uncaughtException', function (e: any) {
   process.exit(1);
 });
 
-const getSelectable = function (selectable, original) {
-  return Object.keys(selectable).reduce((a, b) => (a[b] = original[b], a), {})
-};
-
-const clientOpts = getSelectable(validConstructorOptions, v);
+const clientOpts = Object.assign(v, {isViaShell: true});
 
 new Client(clientOpts).ensure().then(function (c) {
   
-  const lockOptions = Object.assign(
-    {ttl: 6000}, getSelectable(validLockOptions, v), {isViaShell: true}
-  );
+  const lockOptions = Object.assign({ttl: 6000}, v, {isViaShell: true});
   
   c.lock(v.key, lockOptions, function (e: any) {
     
