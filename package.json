@@ -1,6 +1,6 @@
 {
   "name": "live-mutex",
-  "version": "0.0.10035",
+  "version": "0.0.10036",
   "description": "Simple mutex that uses a TCP server; useful if you cannot install Redis, etc.",
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
@@ -11,11 +11,13 @@
     "lm_inspect_broker": "dist/inspect.js",
     "lm_start_broker": "dist/lm-start-server.js",
     "lm_start_server": "dist/lm-start-server.js",
+    "lm_ls": "dist/lm-ls.js",
     "lmx_acquire_lock": "dist/lm-acquire-lock.js",
     "lmx_release_lock": "dist/lm-release-lock.js",
     "lmx_inspect_broker": "dist/inspect.js",
     "lmx_start_broker": "dist/lm-start-server.js",
     "lmx_start_server": "dist/lm-start-server.js",
+    "lmx_ls": "dist/lm-ls.js",
     "lmx": "assets/lmx.sh"
   },
   "scripts": {
