@@ -25,7 +25,7 @@ const s = net.createConnection({port, host});
 s.setEncoding('utf8');
 
 s.once('error', function (e) {
-  log.error('socket experienced an error:', e);
+  log.error(chalk.magentaBright('socket experienced an error:'), '\n', util.inspect(e, {breakLength: Infinity}));
 });
 
 s.pipe(createParser()).on('data', function (d: any) {
@@ -40,7 +40,7 @@ const acceptableCommands = {
   'help': true
 };
 
-const prompt = chalk.blueBright.bold(`lmx ${host}:${port} > `);
+const prompt = chalk.blueBright(`(${host}:${port})`) + chalk.blueBright.bold(` lmx > `);
 
 s.once('connect', function () {
   

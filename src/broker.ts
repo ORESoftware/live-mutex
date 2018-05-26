@@ -23,8 +23,6 @@ export const log = {
 ///////////////////////////////////////////////////////////////////
 
 import {weAreDebugging} from './we-are-debugging';
-import * as fs from "fs";
-
 if (weAreDebugging) {
   log.error('broker is in debug mode. Timeouts are turned off.');
 }
