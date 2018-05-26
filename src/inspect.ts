@@ -19,8 +19,9 @@ export const log = {
 };
 
 const port = parseInt(process.argv[2] || process.env.live_mutex_port || '6970');
+const host = process.argv[3] || process.env.live_mutex_host || 'localhost';
 
-const s = net.createConnection({port});
+const s = net.createConnection({port, host});
 s.setEncoding('utf8');
 
 s.once('error', function (e) {
@@ -29,7 +30,7 @@ s.once('error', function (e) {
 
 s.pipe(createParser()).on('data', function (d: any) {
   console.log('server response:', String(d.inspectResult));
-  process.stdout.write(chalk.blueBright('live mutex > '));
+  process.stdout.write(prompt);
 });
 
 const acceptableCommands = {
@@ -44,14 +45,12 @@ const acceptableCommands = {
 //   process.stdin.setRawMode(true);
 // }
 
+const prompt = chalk.blueBright.bold(`lmx ${host}:${port} > `);
+
 s.once('connect', function () {
   
   console.log(chalk.green('client is connected to live-mutex broker at port:'), chalk.greenBright.bold(String(port)));
-  process.stdout.write(chalk.blueBright('live mutex > '));
-  
-  const rl = readline.createInterface({
-    input: process.stdin,
-  });
+  process.stdout.write(prompt);
   
   // process.on('SIGINT', function(){
   //   process.stdout.write('\x1Bc');
@@ -66,7 +65,78 @@ s.once('connect', function () {
   //   console.log('readline got data:', String(d));
   // });
   
-  rl.on('line', function (d) {
+  let currentLine = '', previousCmd = '';
+  let commands = [];
+  process.stdin.setRawMode(true);
+  
+  process.stdin.on('data', (buf) => {
+    
+    const str = String(buf);
+    const charAsAscii = String(buf.toString().charCodeAt(0));
+    
+    // const charAsAscii = buf.readInt16LE();
+    
+    switch (charAsAscii) {
+      
+      case '9':
+        process.stdout.write('\n');
+        console.log(Object.keys(acceptableCommands).filter(v => String(v).startsWith(currentLine)));
+        process.stdout.write(prompt + currentLine);
+        break;
+      
+      case '3':
+        console.log('\nYou pressed Ctrl-C. Sending SIGINT.');
+        process.kill(process.pid, 'SIGINT');
+        break;
+      
+      case '4':
+        console.log('\nYou pressed Ctrl-D. Bye!');
+        process.exit(0);
+        break;
+      
+      case '12':
+        process.stdout.write('\x1Bc');
+        process.stdout.write(prompt);
+        break;
+      
+      case '13':
+        process.stdout.write('\n');
+        currentLine && commands.push(currentLine);
+        process.stdin.emit('linex', currentLine || '');
+        currentLine = '';
+        process.stdout.write(prompt);
+        break;
+      
+      case '27':
+        // process.stdout.write('\n');
+        // process.stdout.write(prompt);
+         previousCmd = commands.pop();
+        currentLine = previousCmd;
+        readline.clearLine(process.stdout, 21);  // clear current text
+        readline.cursorTo(process.stdout, 21);   // move cursor to beginning of line
+        process.stdout.write(previousCmd);
+        break;
+  
+      case '127':
+        // process.stdout.write('\n');
+        // process.stdout.write(prompt);
+        readline.clearLine(process.stdout, 0);  // clear current text
+        readline.cursorTo(process.stdout, 0);
+        currentLine = '';
+        process.stdout.write(prompt);
+        // readline.cursorTo(process.stdout, 21);   // move cursor to beginning of line
+        // process.stdout.write(previousCmd);
+        break;
+      
+      default:
+        // console.log('here is is the char:', charAsAscii);
+        process.stdout.write(str);
+        currentLine += str || '';
+        break;
+    }
+  });
+  
+  process.stdin.on('linex', function (d) {
     
     readline.clearLine(process.stdout, 0);  // clear current text
     readline.cursorTo(process.stdout, 0);   // move cursor to beginning of line
@@ -74,13 +144,17 @@ s.once('connect', function () {
     const lc = String(d || '').trim().toLowerCase();
     
     if (!lc) {
-      process.stdout.write(chalk.blueBright('live mutex > '));
       return;
     }
     
     if (lc === 'clear') {
       process.stdout.write('\x1Bc');
-      process.stdout.write(chalk.blueBright('live mutex > '));
+      return;
+    }
+    
+    if (lc === 'help') {
+      console.log(chalk.bold('Available commands:'));
+      console.log(Object.keys(acceptableCommands));
       return;
     }
     
@@ -91,12 +165,11 @@ s.once('connect', function () {
     else {
       console.log('Command not recognized:', lc);
       console.log('Try using "help" to view available commands.');
-      process.stdout.write(chalk.blueBright('live mutex > '));
     }
     
   });
   
-  rl.on('close', () => {
+  process.stdin.on('close', () => {
     
     console.log('\n Hope you enjoyed your time here!');
     process.exit(0);
