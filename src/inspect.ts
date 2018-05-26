@@ -40,11 +40,6 @@ const acceptableCommands = {
   'help': true
 };
 
-// readline.emitKeypressEvents(process.stdin);
-// if (process.stdin.isTTY) {
-//   process.stdin.setRawMode(true);
-// }
-
 const prompt = chalk.blueBright.bold(`lmx ${host}:${port} > `);
 
 s.once('connect', function () {
