@@ -20,7 +20,7 @@ docker rm "$container" || echo "no container with name $container could be remov
 tag="docker_r2g_image/$name";
 
 
-docker build -f Dockerfile.r2g -t "$tag" .
+docker build -f Dockerfile.r2g -t "$tag" --build-arg CACHEBUST="$(date +%s)" .
 
 docker run \
     -v "$search_root:$shared:ro"  \

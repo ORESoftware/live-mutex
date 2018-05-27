@@ -5,9 +5,14 @@ RUN apt-get -y install sudo
 RUN sudo apt-get -y update
 RUN apt-get install -y netcat
 
+ENV docker_r2g_in_container=yes
 RUN sudo echo "node ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
 USER node
+RUN mkdir -p /home/node/app/node_modules
+RUN mkdir -p /home/node/.docker_r2g_cache
+ENV USER="node"
+ENV HOME="/home/node"
 RUN mkdir -p /home/node/app/node_modules
 WORKDIR /home/node/app
 
@@ -22,19 +27,16 @@ RUN sudo chown -R $(whoami) /usr/local/etc
 RUN npm cache clear -f;
 RUN npm cache clean -f;
 
-RUN  npm install --loglevel=warn -g typescript
-RUN  npm install --loglevel=warn -g "@oresoftware/docker.r2g@latest"
-RUN  npm install --loglevel=warn -g "r2g@latest"
+ARG CACHEBUST=1
 
-COPY package.json .
-COPY assets assets
-RUN npm install --loglevel=warn --production
+RUN npm install --loglevel=warn -g "@oresoftware/docker.r2g@latest"
+RUN npm install --loglevel=warn -g "https://github.com/ORESoftware/r2g"
+
+
 COPY . .
 
 RUN sudo chmod -R 777  /home/node
-
 ENV PATH="./node_modules/.bin:${PATH}"
-RUN tsc
 
 ENTRYPOINT ["docker.r2g", "--run"]
 
