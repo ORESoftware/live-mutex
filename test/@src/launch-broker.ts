@@ -1,6 +1,6 @@
 
 
-const lmUtils = require('../utils');
+import lmUtils = require('../../utils');
 
 lmUtils.launchBrokerInChildProcess({port:7888}, function (err, result) {
   

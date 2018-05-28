@@ -31,9 +31,6 @@ setTimeout(function () {
   if (process.listenerCount('warning') < 1) {
     log.info(`recommends you attach a process.on('warning') event handler.`);
   }
-  if (process.listenerCount('error') < 1) {
-    log.info(`recommends you attach a process.on('error') event handler.`);
-  }
 }, 5000);
 
 export const validConstructorOptions = {
@@ -41,6 +38,7 @@ export const validConstructorOptions = {
   listener: 'Function',
   host: 'string',
   port: 'integer',
+  ttl: 'integer',
   unlockRequestTimeout: 'integer in millis',
   lockRequestTimeout: 'integer in millis',
   unlockRetryMax: 'integer',
@@ -484,6 +482,8 @@ export class Client {
   
   private callbackWithError(err: any, uuid: string, cb: Function, key: string, to: Timer) {
     this.cleanUp(to, uuid);
+    const v = this.lockQueues[key] && this.lockQueues[key].pop();
+    v && this.lockInternal.apply(this, v);
     err = err instanceof Error ? err : new Error(err);
     process.emit('warning', err);
     cb(err, {acquired: false, key, lockUuid: uuid});
@@ -529,7 +529,7 @@ export class Client {
     //   this.lockQueues[key].unshift(arguments);
     // }
     // else {
-      this.lockInternal.apply(this, arguments);
+    this.lockInternal.apply(this, arguments);
     // }
     
   }
@@ -623,7 +623,9 @@ export class Client {
       self.write({uuid, key, type: 'lock-client-timeout'});
       ++opts.__retryCount;
       
-      // log.error(`retrying lock request for key '${key}', on host:port '${self.getHost()}:${self.getPort()}', attempt #`, opts.__retryCount);
+      log.error(
+        `retrying lock request for key '${key}', on host:port '${self.getHost()}:${self.getPort()}', attempt #`, opts.__retryCount
+      );
       
       if (opts.__retryCount >= maxRetries) {
         return cb(new Error(`Live-Mutex client lock request timed out after ${lockTimeout * opts.__retryCount} ms, ` +
@@ -671,11 +673,17 @@ export class Client {
         this.cleanUp(to, uuid);
         self.bookkeeping[key].lockCount++;
         self.write({uuid: uuid, key: key, type: 'lock-received'});
-        const boundUnlock = self.unlock.bind(self, key, {_uuid: uuid});
+        
+        let boundUnlock = self.unlock.bind(self, key, {_uuid: uuid});
         boundUnlock.acquired = true;
         boundUnlock.key = key;
         boundUnlock.unlock = boundUnlock;
         boundUnlock.lockUuid = data.uuid;
+        
+        // if(process.domain){
+        //   boundUnlock = process.domain.bind(boundUnlock);
+        // }
+        
         cb(null, boundUnlock);
         
       }
@@ -690,6 +698,11 @@ export class Client {
         if (opts.wait === false) {
           this.cleanUp(to, uuid);
           self.giveups[uuid] = true;
+          
+          // if(process.domain){
+          //   cb = process.domain.bind(cb);
+          // }
+          
           cb(null, {
             key,
             acquired: false,

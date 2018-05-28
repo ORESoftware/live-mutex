@@ -369,7 +369,7 @@ export class Broker {
         closeSocket();
       });
       
-      ws.on('error', function (err) {
+      ws.once('error', function (err) {
         process.emit('warning', new Error('live-mutex client error ' + (err && err.stack || err)));
         closeSocket();
       });
