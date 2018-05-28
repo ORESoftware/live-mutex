@@ -525,12 +525,12 @@ export class Client {
     const rawLockCount = ++this.bookkeeping[key].rawLockCount;
     const unlockCount = this.bookkeeping[key].unlockCount;
     
-    if (rawLockCount - unlockCount > 5) {
-      this.lockQueues[key].unshift(arguments);
-    }
-    else {
+    // if (rawLockCount - unlockCount > 5) {
+    //   this.lockQueues[key].unshift(arguments);
+    // }
+    // else {
       this.lockInternal.apply(this, arguments);
-    }
+    // }
     
   }
   
@@ -623,7 +623,7 @@ export class Client {
       self.write({uuid, key, type: 'lock-client-timeout'});
       ++opts.__retryCount;
       
-      log.error(`retrying lock request for key '${key}', on host:port '${self.getHost()}:${self.getPort()}', attempt #`, opts.__retryCount);
+      // log.error(`retrying lock request for key '${key}', on host:port '${self.getHost()}:${self.getPort()}', attempt #`, opts.__retryCount);
       
       if (opts.__retryCount >= maxRetries) {
         return cb(new Error(`Live-Mutex client lock request timed out after ${lockTimeout * opts.__retryCount} ms, ` +
