@@ -17,7 +17,11 @@ const noop = function () {
 //project
 export const log = {
   info: localDev ? console.log.bind(console, chalk.gray.bold('[live-mutex broker]')) : noop,
-  error: console.error.bind(console, chalk.gray.bold('[live-mutex broker]'))
+  error: console.error.bind(console, chalk.red.bold('[live-mutex broker]')),
+  warning: console.error.bind(console, chalk.magenta.bold('[live-mutex client]')),
+  debug: function (...args: any[]) {
+    weAreDebugging && console.log('[live-mutex broker debugging]', ...args);
+  }
 };
 
 ///////////////////////////////////////////////////////////////////
@@ -97,7 +101,7 @@ export interface LockObj {
   uuid: string,
   notify: Array<NotifyObj>,
   key: string,
-  isViaShell: boolean
+  keepLocksAfterDeath: boolean
   to: NodeJS.Timer
 }
 
@@ -265,14 +269,8 @@ export class Broker {
         }
         
         self.rejected[data.uuid] = true;
-        
-        if (lck.notify.length > 0) {
-          log.info(chalk.red.bold('lock-received-rejected, now looking for a new lock holder.'));
-          self.ensureNewLockHolder(lck, data);
-        }
-        else {
-          delete self.locks[key];
-        }
+        log.debug(chalk.red.bold('lock-received-rejected, now looking for a new lock holder.'));
+        self.ensureNewLockHolder(lck, data);
         
       }
       else if (data.type === 'lock-info-request') {
@@ -517,7 +515,7 @@ export class Broker {
     const locks = this.locks;
     const notifyList = lck.notify;
     
-    log.info(chalk.yellow.bold('ensuring there is a new lockholder, with this many candidates:'), lck.notify.length);
+    log.debug(chalk.yellow.bold('ensuring there is a new lockholder, with this many candidates:'), lck.notify.length);
     
     // currently there is no lock-holder;
     // before we delete the lock object, let's try to find a new lock-holder
@@ -542,17 +540,18 @@ export class Broker {
     if (!obj) {
       // note: only delete lock if no client is remaining to claim it
       // No other connections waiting for lock with key, so we deleted the lock
-      log.info(chalk.blue.bold('notify list is empty, deleting lock obj for key:'), key);
+      log.debug(chalk.blue.bold('notify list is empty, deleting lock obj for key:'), key);
       delete locks[key];
       return;
     }
     
-    log.info(chalk.magentaBright('new notify object for key:'), key);
+    log.debug(chalk.magentaBright('new notify object for key:'), key);
     
     // Sending ws client the "acquired" message
     // set the timeout for the next ws to acquire lock, if not within alloted time, we simple call unlock
     
     let ws = obj.ws;
+    let originalTTL = obj.ttl;
     let ttl = weAreDebugging ? 50000000 : (obj.ttl || this.lockExpiresAfter);
     
     this.wsToKeys.get(ws)[key] = true;
@@ -560,7 +559,7 @@ export class Broker {
     let uuid = lck.uuid = obj.uuid;
     lck.pid = obj.pid;
     
-    if (!data.isViaShell) {
+    if (originalTTL !== null) {
       lck.to = setTimeout(() => {
         
         // delete locks[key]; => no, this.unlock will take care of that
@@ -569,7 +568,7 @@ export class Broker {
         // we set lck.lockholderTimeouts[uuid], so that when an unlock request for uuid comes into the broker
         // we know that it timed out already, and we know not to throw an error when the lock.uuid doesn't match
         lck.lockholderTimeouts[uuid] = true;
-        self.unlock({key, force: true});
+        self.unlock({key, force: true, from: 'ttl expired for lock (3)'});
         
       }, ttl);
     }
@@ -655,22 +654,23 @@ export class Broker {
   
   lock(data: any, ws: net.Socket) {
     
-    log.info('new lock request:', util.inspect(data, {breakLength: Infinity}));
+    log.debug('new lock request:', util.inspect(data, {breakLength: Infinity}));
     
     const locks = this.locks;
     const key = data.key;
-    const isViaShell = Boolean(data.isViaShell);
+    const keepLocksAfterDeath = Boolean(data.keepLocksAfterDeath);
     const lck = locks[key];
     
     if (lck) {
-      log.info('new lock request, current lck uuid', lck.uuid);
-      log.info('new lock request, current lck notify:',
-        util.inspect(lck.notify.map(({uuid, ttl, pid}) => ({uuid, ttl, pid})), {breakLength: Infinity}));
+      log.debug('new lock request, current lck uuid', lck.uuid);
+      log.debug('new lock request, current lck notify length:', lck.notify.length);
     }
     
     const uuid = data.uuid;
     const pid = data.pid;
+    const originalTTL = data.ttl;
     const ttl = weAreDebugging ? 500000000 : (data.ttl || this.lockExpiresAfter);
+    
     const force = data.force;
     const retryCount = data.retryCount;
     
@@ -685,16 +685,16 @@ export class Broker {
     
     if (lck) {
       
-      log.info('lock object already exists for key:', key);
+      log.debug('lock object already exists for key:', key);
       
       const count = lck.notify.length;
       
       if (lck.uuid) {
         
-        log.info(chalk.magenta('lock already has a uuid:'), {
+        log.debug(chalk.magenta('lock already has a uuid:'), {
           key: lck.key,
           notifyCount: lck.notify.length,
-          isViaShell: lck.isViaShell
+          keepLocksAfterDeath: lck.keepLocksAfterDeath
         });
         
         // Lock exists *and* already has a lockholder; adding ws to list of to be notified
@@ -707,15 +707,15 @@ export class Broker {
         
         if (!alreadyAdded) {
           
-          log.info(chalk.red('uuid is not already in the notify list'));
+          log.debug(chalk.red('uuid is not already in the notify list'));
           
           if (retryCount > 0) {
-            log.info(chalk.red('retry count is greater than 0'));
-            lck.notify.unshift({ws, uuid, pid, ttl});
+            log.debug(chalk.red('retry count is greater than 0'));
+            lck.notify.unshift({ws, uuid, pid, ttl: originalTTL});
           }
           else {
-            log.info(chalk.red('retry count is 0'));
-            lck.notify.push({ws, uuid, pid, ttl});
+            log.debug(chalk.red('retry count is 0'));
+            lck.notify.push({ws, uuid, pid, ttl: originalTTL});
             
           }
         }
@@ -735,7 +735,9 @@ export class Broker {
         
         clearTimeout(lck.to);
         
-        if (isViaShell === false) {
+        if (originalTTL !== null) {
+          
+          // if originalTTL is null, we are using Infinity, so there is no timeout
           
           // if we are locking with the shell, there is not timeout
           // otherwise if we are using the lib programmatically, we use a timeout
@@ -748,7 +750,7 @@ export class Broker {
             // we set lck.lockholderTimeouts[uuid], so that when an unlock request for uuid might come in to broker
             // we know that it timed out already, and we do not throw an error then
             locks[key] && (locks[key].lockholderTimeouts[uuid] = true);
-            this.unlock({key, force: true});
+            this.unlock({key, force: true, from: 'ttl expired for lock (1)'});
             
           }, ttl);
         }
@@ -767,32 +769,35 @@ export class Broker {
     }
     else {
       
-      log.info('creating new lock object for key:', key);
+      log.debug('creating new lock object for key:', key);
       
       this.wsToKeys.get(ws)[key] = true;
       
       locks[key] = {
         pid,
         uuid,
-        isViaShell,
+        keepLocksAfterDeath,
         lockholderTimeouts: {},
         key,
         notify: [],
         to: null
       };
       
-      if (isViaShell === false) {
+      if (originalTTL !== null) {
         locks[key].to = setTimeout(() => {
+          
           // delete locks[key];  => no!, this.unlock will take care of that
+          
           process.emit('warning', new Error('Live-Mutex warning, lock object timed out for key => "' + key + '"'));
+          
           // we set lck.lockholderTimeouts[uuid], so that when an unlock request for uuid comes into the broker
           // we know that it timed out already, and we know not to throw an error when the lock.uuid doesn't match
+          
           locks[key] && (locks[key].lockholderTimeouts[uuid] = true);
-          this.unlock({key, force: true, from: 'new lock object timeout'});
+          this.unlock({key, force: true, from: 'ttl expired for lock (2)'});
+          
         }, ttl);
       }
-      
-      log.info(chalk.red('acquired lock on brand new lock object.'));
       
       this.send(ws, {
         uuid: uuid,
@@ -807,7 +812,7 @@ export class Broker {
   
   unlock(data: any, ws?: net.Socket) {
     
-    log.info('new unlock request:', util.inspect(data, {breakLength: Infinity}));
+    log.debug('new unlock request:', util.inspect(data, {breakLength: Infinity}));
     
     const locks = this.locks;
     const key = data.key;
@@ -815,13 +820,9 @@ export class Broker {
     const _uuid = data._uuid;
     const force = data.force;
     const lck = locks[key];
-    const isViaShell = Boolean(data.isViaShell);
+    const keepLocksAfterDeath = Boolean(data.keepLocksAfterDeath);
     
-    if (!(key && uuid)) {
-      return this.send(ws, {error: 'missing key or uuid in the request', key: key || null, uuid: uuid || null});
-    }
-    
-    if (ws) {
+    if (ws && keepLocksAfterDeath !== true) {
       // we know for a fact that
       // this websocket connection no longer owns this key
       delete this.wsToKeys.get(ws)[key];
@@ -849,7 +850,7 @@ export class Broker {
     
     if (lck && (same || force)) {
       
-      log.info(chalk.blueBright('unlocking with same/force.'));
+      log.debug(chalk.blueBright('unlocking with same/force.'));
       
       const count = lck.notify.length;
       clearTimeout(lck.to);
@@ -868,12 +869,7 @@ export class Broker {
         });
       }
       
-      if (lck && lck.notify.length > 0) {
-        this.ensureNewLockHolder(lck, data);
-      }
-      else {
-        delete this.locks[key];
-      }
+      this.ensureNewLockHolder(lck, data);
       
     }
     else if (lck) {
@@ -933,7 +929,7 @@ export class Broker {
           lockRequestCount: 0,
           type: 'unlock',
           unlocked: true,
-          error: `Live-Mutex warning => [1] no lock with key  => '${key}'.`
+          error: `Live-Mutex warning => [1] no lock with key  => "${key}".`
         });
       }
     }

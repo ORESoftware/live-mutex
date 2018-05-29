@@ -54,11 +54,11 @@ const getSelectable = function (selectable, original) {
   return Object.keys(selectable).reduce((a, b) => (a[b] = original[b], a), {})
 };
 
-const clientOpts = Object.assign(v, {isViaShell: true});
+const clientOpts = Object.assign(v, {keepLocksAfterDeath: true});
 
 new Client(clientOpts).ensure().then(function (c) {
   
-  const unlockOptions = Object.assign({ttl: 6000}, v, {isViaShell: true, force: true});
+  const unlockOptions = Object.assign({ttl: 6000}, v, {keepLocksAfterDeath: true, force: true});
   
   c.unlock(v.key, unlockOptions, function (e: any) {
     

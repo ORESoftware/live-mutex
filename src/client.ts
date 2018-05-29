@@ -14,7 +14,11 @@ import {createParser} from "./json-parser";
 //project
 export const log = {
   info: console.log.bind(console, chalk.gray.bold('[live-mutex client]')),
-  error: console.error.bind(console, chalk.gray.bold('[live-mutex client]'))
+  warning: console.error.bind(console, chalk.magenta.bold('[live-mutex client]')),
+  error: console.error.bind(console, chalk.red.bold('[live-mutex client]')),
+  debug: function (...args: any[]) {
+    weAreDebugging && console.log('[live-mutex debugging]', ...args);
+  }
 };
 
 /////////////////////////////////////////////////////////////////////////
@@ -22,14 +26,14 @@ export const log = {
 import {weAreDebugging} from './we-are-debugging';
 import Timer = NodeJS.Timer;
 if (weAreDebugging) {
-  log.info('Live-Mutex client is in debug mode. Timeouts are turned off.');
+  log.debug('Live-Mutex client is in debug mode. Timeouts are turned off.');
 }
 
 /////////////////////////////////////////////////////////////////////////
 
 setTimeout(function () {
   if (process.listenerCount('warning') < 1) {
-    log.info(`recommends you attach a process.on('warning') event handler.`);
+    log.debug(`recommends you attach a process.on('warning') event handler.`);
   }
 }, 5000);
 
@@ -43,7 +47,7 @@ export const validConstructorOptions = {
   lockRequestTimeout: 'integer in millis',
   unlockRetryMax: 'integer',
   lockRetryMax: 'integer',
-  isViaShell: 'boolean'
+  keepLocksAfterDeath: 'boolean'
 };
 
 export const validLockOptions = {
@@ -52,13 +56,13 @@ export const validLockOptions = {
   maxRetry: 'integer',
   ttl: 'integer in millis',
   lockRequestTimeout: 'integer in millis',
-  isViaShell: 'boolean'
+  keepLocksAfterDeath: 'boolean'
 };
 
 export const validUnlockOptions = {
   force: 'boolean',
   unlockRequestTimeout: 'integer',
-  isViaShell: 'boolean'
+  keepLocksAfterDeath: 'boolean'
 };
 
 export interface ClientOpts {
@@ -71,7 +75,8 @@ export interface ClientOpts {
   unlockRetryMax: number;
   lockRetryMax: number;
   ttl: number,
-  isViaShell: boolean
+  keepLocksAfterDeath: boolean,
+  keepAnyLocksAfterExit: boolean
 }
 
 export interface IUuidTimeoutBool {
@@ -113,7 +118,12 @@ export interface LMClientUnlockOpts {
 export type LMLockSuccessData = {
   acquired: boolean, key: string, unlock?: LMClientUnlockConvenienceCallback, lockUuid: string, id: string
 };
-export type LMClientLockCallBack = (err: any, val: LMLockSuccessData) => void;
+
+export interface LMClientLockCallBack {
+  isLMBound?: boolean;
+  (err: any, val: LMLockSuccessData): void;
+}
+
 export type LMClientUnlockCallBack = (err: any, uuid?: string) => void;
 export type ErrorFirstCallBack = (err: any) => void;
 export type LMClientUnlockConvenienceCallback = (fn: ErrorFirstCallBack) => void;
@@ -138,12 +148,12 @@ export class Client {
   ensure: Ensure;
   connect: Ensure;
   giveups: UuidBooleanHash;
-  timers: { [key: string]: Timer }
+  timers: { [key: string]: Timer };
   write: Function;
   isOpen: boolean;
   close: Function;
   lockQueues = {}  as { [key: string]: Array<any> };
-  isViaShell = false;
+  keepLocksAfterDeath = false;
   
   ////////////////////////////////////////////////////////////////
   
@@ -214,7 +224,12 @@ export class Client {
         ' => "ttl" needs to be integer between 3 and 800000 millis.');
     }
     
-    this.isViaShell = Boolean(opts.isViaShell);
+    if ('keepLocksAfterDeath' in opts) {
+      assert(typeof opts.keepLocksAfterDeath === 'boolean',
+        ' => "keepLocksAfterDeath" option needs to be a boolean.');
+    }
+    
+    this.keepLocksAfterDeath = Boolean(opts.keepLocksAfterDeath);
     this.listeners = {};
     this.host = opts.host || 'localhost';
     this.port = opts.port || 6970;
@@ -236,7 +251,13 @@ export class Client {
       }
       
       data.pid = process.pid;
-      data.isViaShell = this.isViaShell;
+      
+      if ('keepLocksAfterDeath' in data) {
+        data.keepLocksAfterDeath = Boolean(data.keepLocksAfterDeath);
+      }
+      else {
+        data.keepLocksAfterDeath = this.keepLocksAfterDeath;
+      }
       
       ws.write(JSON.stringify(data) + '\n', 'utf8', cb);
     };
@@ -245,7 +266,7 @@ export class Client {
       
       const uuid = data.uuid;
       
-      log.info('client received data:', util.inspect(data, {breakLength: Infinity}));
+      log.debug('client received data:', util.inspect(data, {breakLength: Infinity}));
       
       if (!uuid) {
         return process.emit('warning', new Error(
@@ -254,7 +275,7 @@ export class Client {
       }
       
       if (self.giveups[uuid]) {
-        log.info(chalk.red('we already gave up on this request:', data));
+        log.debug(chalk.red('we already gave up on this request:', data));
         delete self.giveups[uuid];
         return;
       }
@@ -480,13 +501,22 @@ export class Client {
     delete this.resolutions[uuid];
   }
   
-  private callbackWithError(err: any, uuid: string, cb: Function, key: string, to: Timer) {
+  private fireUnlockCallbackWithError(err: any, uuid: string, cb: LMClientUnlockCallBack, key: string, to: Timer) {
     this.cleanUp(to, uuid);
     const v = this.lockQueues[key] && this.lockQueues[key].pop();
     v && this.lockInternal.apply(this, v);
     err = err instanceof Error ? err : new Error(err);
     process.emit('warning', err);
-    cb(err, {acquired: false, key, lockUuid: uuid});
+    cb(err, uuid);
+  }
+  
+  private fireLockCallbackWithError(err: any, uuid: string, cb: LMClientLockCallBack, key: string, to: Timer) {
+    this.cleanUp(to, uuid);
+    const v = this.lockQueues[key] && this.lockQueues[key].pop();
+    v && this.lockInternal.apply(this, v);
+    err = err instanceof Error ? err : new Error(err);
+    process.emit('warning', err);
+    cb(err, {acquired: false, key, lockUuid: uuid, id: uuid});
   }
   
   ls(opts: any, cb?: ErrFirstDataCallback) {
@@ -503,7 +533,7 @@ export class Client {
     const id = uuidV4();
     
     this.write({
-      isViaShell: opts.isViaShell,
+      keepLocksAfterDeath: opts.keepLocksAfterDeath,
       uuid: id,
       type: 'ls',
     });
@@ -529,14 +559,12 @@ export class Client {
     //   this.lockQueues[key].unshift(arguments);
     // }
     // else {
-    this.lockInternal.apply(this, arguments);
+      this.lockInternal.apply(this, arguments);
     // }
     
   }
   
   private lockInternal(key: string, opts: any, cb?: LMClientLockCallBack) {
-    
-    assert.equal(typeof key, 'string', 'Key passed to live-mutex #lock needs to be a string.');
     
     if (typeof opts === 'function') {
       cb = opts;
@@ -551,53 +579,70 @@ export class Client {
     
     opts = opts || {} as Partial<ClientOpts>;
     
-    assert(typeof cb === 'function', 'callback function must be passed to Client lock() method.');
-    cb = cb.bind(this);
-    
-    if ('append' in opts) {
-      assert.equal(typeof opts.append, 'string', ' => Live-Mutex usage error => ' +
-        '"append" option must be a string value.');
-    }
-    
-    if (opts['force']) {
-      assert.equal(typeof opts.force, 'boolean', ' => Live-Mutex usage error => ' +
-        '"force" option must be a boolean value. Coerce it on your side, for safety.');
-    }
-    
-    if (opts['maxRetries']) {
-      assert(Number.isInteger(opts.maxRetries), '"retry" option must be an integer.');
-      assert(opts.maxRetries >= 0 && opts.maxRetries <= 20,
-        '"retry" option must be an integer between 0 and 20 inclusive.');
-    }
-    
-    if (opts['maxRetry']) {
-      assert(Number.isInteger(opts.maxRetry), '"retry" option must be an integer.');
-      assert(opts.maxRetry >= 0 && opts.maxRetry <= 20,
-        '"retry" option must be an integer between 0 and 20 inclusive.');
-    }
-    
-    if (opts['ttl']) {
-      assert(Number.isInteger(opts.ttl),
-        ' => Live-Mutex usage error => Please pass an integer representing milliseconds as the value for "ttl".');
-      assert(opts.ttl >= 3 && opts.ttl <= 800000,
-        ' => Live-Mutex usage error => "ttl" for a lock needs to be integer between 3 and 800000 millis.');
-    }
-    
-    if (opts['lockRequestTimeout']) {
-      assert(Number.isInteger(opts.lockRequestTimeout),
-        ' => Please pass an integer representing milliseconds as the value for "ttl".');
-      assert(opts.lockRequestTimeout >= 20 && opts.lockRequestTimeout <= 800000,
-        ' => "ttl" for a lock needs to be integer between 3 and 800000 millis.');
-    }
-    
-    opts.__retryCount = opts.__retryCount || 0;
-    
-    if (opts.__retryCount > 0) {
-      assert(opts._uuid, 'Live-Mutex internal error: no _uuid past to retry call.');
-    }
-    
     const append = opts.append || '';
-    assert(typeof append === 'string', 'append option to lock() method must be of type "string".');
+    
+    try {
+      
+      assert.equal(typeof key, 'string', 'Key passed to live-mutex #lock needs to be a string.');
+      assert(typeof cb === 'function', 'callback function must be passed to Client lock() method.');
+      
+      if (cb.isLMBound !== true) {
+        cb = cb.bind(this);
+        cb.isLMBound = true;
+      }
+      
+      if ('append' in opts) {
+        assert.equal(typeof opts.append, 'string', ' => Live-Mutex usage error => ' +
+          '"append" option must be a string value.');
+      }
+      
+      if (opts['force']) {
+        assert.equal(typeof opts.force, 'boolean', ' => Live-Mutex usage error => ' +
+          '"force" option must be a boolean value. Coerce it on your side, for safety.');
+      }
+      
+      if (opts['maxRetries']) {
+        assert(Number.isInteger(opts.maxRetries), '"retry" option must be an integer.');
+        assert(opts.maxRetries >= 0 && opts.maxRetries <= 20,
+          '"retry" option must be an integer between 0 and 20 inclusive.');
+      }
+      
+      if (opts['maxRetry']) {
+        assert(Number.isInteger(opts.maxRetry), '"retry" option must be an integer.');
+        assert(opts.maxRetry >= 0 && opts.maxRetry <= 20,
+          '"retry" option must be an integer between 0 and 20 inclusive.');
+      }
+      
+      if (opts['ttl'] === Infinity) {
+        // allow ttl to be stringified, null or Infinity both mean there is no ttl
+        opts['ttl'] = null;
+      }
+      
+      if (opts['ttl']) {
+        assert(Number.isInteger(opts.ttl),
+          ' => Live-Mutex usage error => Please pass an integer representing milliseconds as the value for "ttl".');
+        assert(opts.ttl >= 3 && opts.ttl <= 800000,
+          ' => Live-Mutex usage error => "ttl" for a lock needs to be integer between 3 and 800000 millis.');
+      }
+      
+      if (opts['lockRequestTimeout']) {
+        assert(Number.isInteger(opts.lockRequestTimeout),
+          ' => Please pass an integer representing milliseconds as the value for "ttl".');
+        assert(opts.lockRequestTimeout >= 20 && opts.lockRequestTimeout <= 800000,
+          ' => "ttl" for a lock needs to be integer between 3 and 800000 millis.');
+      }
+      
+      opts.__retryCount = opts.__retryCount || 0;
+      
+      if (opts.__retryCount > 0) {
+        assert(opts._uuid, 'Live-Mutex internal error: no _uuid past to retry call.');
+      }
+      
+      assert(typeof append === 'string', 'append option to lock() method must be of type "string".');
+    }
+    catch (err) {
+      return process.nextTick(cb, err);
+    }
     
     const uuid = opts._uuid = opts._uuid || (append + uuidV4());
     const ttl = opts.ttl || this.ttl;
@@ -624,8 +669,9 @@ export class Client {
       
       ++opts.__retryCount;
       
-      log.error(
-        `retrying lock request for key '${key}', on host:port '${self.getHost()}:${self.getPort()}', attempt #`, opts.__retryCount
+      process.emit('warning',
+        `retrying lock request for key '${key}', on host:port '${self.getHost()}:${self.getPort()}', ` +
+        `attempt # ${opts.__retryCount}` as any,
       );
       
       if (opts.__retryCount >= maxRetries) {
@@ -646,36 +692,36 @@ export class Client {
       }
       
       if (err) {
-        return this.callbackWithError(err, uuid, cb, key, to);
+        return this.fireLockCallbackWithError(err, uuid, cb, key, to);
       }
       
       if (!data) {
-        return this.callbackWithError('no data received from broker.', uuid, cb, key, to);
+        return this.fireLockCallbackWithError('no data received from broker.', uuid, cb, key, to);
       }
       
       if (data.uuid !== uuid) {
-        return this.callbackWithError(
+        return this.fireLockCallbackWithError(
           `Live-Mutex error, mismatch in uuids -> '${data.uuid}', -> '${uuid}'.`,
           uuid, cb, key, to
         );
       }
       
       if (String(key) !== String(data.key)) {
-        return this.callbackWithError(
+        return this.fireLockCallbackWithError(
           `Live-Mutex bad key, [1] => '${key}', [2] -> ${data.key}`,
           uuid, cb, key, to
         );
       }
       
       if (data.error) {
-        return this.callbackWithError(data.error, uuid, cb, key, to);
+        return this.fireLockCallbackWithError(data.error, uuid, cb, key, to);
       }
       
       if (data.acquired === true) {
         
         this.cleanUp(to, uuid);
         self.bookkeeping[key].lockCount++;
-        log.info('lock was received!');
+        log.debug('lock was received!');
         self.write({uuid: uuid, key: key, type: 'lock-received'});
         
         let boundUnlock = self.unlock.bind(self, key, {_uuid: uuid});
@@ -719,7 +765,7 @@ export class Client {
         
       }
       else {
-        this.callbackWithError(
+        this.fireLockCallbackWithError(
           `Implementation error, please report, fallthrough in condition [1]`, uuid, cb, key, to
         );
       }
@@ -727,7 +773,7 @@ export class Client {
     };
     
     this.write({
-      isViaShell: opts.isViaShell,
+      keepLocksAfterDeath: opts.keepLocksAfterDeath,
       retryCount: opts.__retryCount,
       uuid: uuid,
       key: key,
@@ -751,8 +797,6 @@ export class Client {
   
   unlock(key: string, opts?: any, cb?: LMClientUnlockCallBack) {
     
-    assert.equal(typeof key, 'string', 'Key passed to live-mutex #unlock needs to be a string.');
-    
     this.bookkeeping[key] = this.bookkeeping[key] || {
       rawLockCount: 0,
       rawUnlockCount: 0,
@@ -774,19 +818,27 @@ export class Client {
     }
     
     opts = opts || {};
+    
     cb && (cb !== this.noop) && (cb = cb.bind(this));
     cb = cb || this.noop;
     
-    if (opts['force']) {
-      assert.equal(typeof opts.force, 'boolean', ' => Live-Mutex usage error => ' +
-        '"force" option must be a boolean value. Coerce it on your side, for safety.');
+    try {
+      assert.equal(typeof key, 'string', 'Key passed to live-mutex #unlock needs to be a string.');
+      
+      if (opts['force']) {
+        assert.equal(typeof opts.force, 'boolean', ' => Live-Mutex usage error => ' +
+          '"force" option must be a boolean value. Coerce it on your side, for safety.');
+      }
+      
+      if (opts['unlockRequestTimeout']) {
+        assert(Number.isInteger(opts.lockRequestTimeout),
+          ' => Please pass an integer representing milliseconds as the value for "ttl".');
+        assert(opts.lockRequestTimeout >= 20 && opts.lockRequestTimeout <= 800000,
+          ' => "ttl" for a lock needs to be integer between 3 and 800000 millis.');
+      }
     }
-    
-    if (opts['unlockRequestTimeout']) {
-      assert(Number.isInteger(opts.lockRequestTimeout),
-        ' => Please pass an integer representing milliseconds as the value for "ttl".');
-      assert(opts.lockRequestTimeout >= 20 && opts.lockRequestTimeout <= 800000,
-        ' => "ttl" for a lock needs to be integer between 3 and 800000 millis.');
+    catch (err) {
+      return process.nextTick(cb, err);
     }
     
     const uuid = uuidV4();
@@ -821,21 +873,21 @@ export class Client {
       }
       
       if (err) {
-        return this.callbackWithError(err, uuid, cb, key, to);
+        return this.fireUnlockCallbackWithError(err, uuid, cb, key, to);
       }
       
       if (!data) {
-        return this.callbackWithError('Live-Mutex implementation error, bad key.',
+        return this.fireUnlockCallbackWithError('Live-Mutex implementation error, bad key.',
           uuid, cb, key, to);
       }
       
       if (String(key) !== String(data.key)) {
-        return this.callbackWithError('Live-Mutex implementation error, bad key.',
+        return this.fireUnlockCallbackWithError('Live-Mutex implementation error, bad key.',
           uuid, cb, key, to);
       }
       
       if (data.error) {
-        return this.callbackWithError(data.error, uuid, cb, key, to);
+        return this.fireUnlockCallbackWithError(data.error, uuid, cb, key, to);
       }
       
       if (data.unlocked === true) {
@@ -857,13 +909,13 @@ export class Client {
         cb && cb(data);
       }
       else {
-        this.callbackWithError('fallthrough in conditional [2], Live-Mutex failure.',
+        this.fireUnlockCallbackWithError('fallthrough in conditional [2], Live-Mutex failure.',
           uuid, cb, key, to);
       }
       
     };
     
-    let force = (opts.__retryCount > 0) ? true : Boolean(opts.force);
+    let force = (opts.__retryCount > 0) || Boolean(opts.force);
     
     this.write({
       _uuid: opts._uuid,

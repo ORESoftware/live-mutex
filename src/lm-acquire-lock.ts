@@ -53,11 +53,11 @@ process.once('uncaughtException', function (e: any) {
   process.exit(1);
 });
 
-const clientOpts = Object.assign(v, {isViaShell: true});
+const clientOpts = Object.assign(v, {keepLocksAfterDeath: true});
 
 new Client(clientOpts).ensure().then(function (c) {
   
-  const lockOptions = Object.assign({ttl: 6000}, v, {isViaShell: true});
+  const lockOptions = Object.assign({ttl: 6000}, v, {keepLocksAfterDeath: true});
   
   c.lock(v.key, lockOptions, function (e: any) {
     
