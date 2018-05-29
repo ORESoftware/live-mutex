@@ -53,7 +53,7 @@ process.once('uncaughtException', function (e: any) {
   process.exit(1);
 });
 
-const clientOpts = Object.assign(v, {keepLocksAfterDeath: true});
+const clientOpts = Object.assign({keepLocksAfterDeath: true}, v);
 const c = new Client(clientOpts);
 
 c.emitter.on('warning', function () {
@@ -62,7 +62,7 @@ c.emitter.on('warning', function () {
 
 c.ensure().then(function (c) {
   
-  const lockOptions = Object.assign({ttl: 6000}, v, {keepLocksAfterDeath: true});
+  const lockOptions = Object.assign({ttl: null, keepLocksAfterDeath: true}, v);
   
   c.lock(v.key, lockOptions, function (e: any) {
     

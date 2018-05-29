@@ -297,8 +297,6 @@ export class Client {
       }
       
       if (fn) {
-        clearTimeout(self.timers[uuid]);
-        delete self.timeouts[uuid];
         fn.call(this, null, data);
         return;
       }
@@ -431,6 +429,9 @@ export class Client {
     
     this.resolutions[uuid] = (err, data) => {
       
+      clearTimeout(this.timers[uuid]);
+      delete this.timeouts[uuid];
+      
       if (String(key) !== String(data.key)) {
         delete this.resolutions[uuid];
         throw new Error('Live-Mutex implementation error => bad key.');
@@ -498,14 +499,15 @@ export class Client {
     });
   }
   
-  private cleanUp(to: Timer, uuid: string) {
-    clearTimeout(to);
+  private cleanUp(uuid: string) {
+    clearTimeout(this.timers[uuid]);
+    delete this.timeouts[uuid];
     delete this.resolutions[uuid];
   }
   
-  private fireUnlockCallbackWithError(err: any, uuid: string, cb: LMClientUnlockCallBack, key: string, to: Timer) {
+  private fireUnlockCallbackWithError(err: any, uuid: string, cb: LMClientUnlockCallBack, key: string) {
     
-    this.cleanUp(to, uuid);
+    this.cleanUp(uuid);
     
     try {
       const v = this.lockQueues[key] && this.lockQueues[key].pop();
@@ -520,9 +522,9 @@ export class Client {
     cb(err, uuid);
   }
   
-  private fireLockCallbackWithError(err: any, uuid: string, cb: LMClientLockCallBack, key: string, to: Timer) {
+  private fireLockCallbackWithError(err: any, uuid: string, cb: LMClientLockCallBack, key: string) {
     
-    this.cleanUp(to, uuid);
+    this.cleanUp(uuid);
     
     try {
       const v = this.lockQueues[key] && this.lockQueues[key].pop();
@@ -681,7 +683,9 @@ export class Client {
     const self = this;
     let timedOut = false;
     
-    const to = this.timers[uuid] = setTimeout(() => {
+    log.info('the lock timeout is:', lockTimeout);
+    
+    this.timers[uuid] = setTimeout(() => {
       
       timedOut = true;
       delete this.timers[uuid];
@@ -689,12 +693,15 @@ export class Client {
       
       ++opts.__retryCount;
       
+      log.error('timed-out, have to retry?');
+      
       this.emitter.emit('warning',
         `retrying lock request for key '${key}', on host:port '${self.getHost()}:${self.getPort()}', ` +
         `attempt # ${opts.__retryCount}` as any,
       );
       
       if (opts.__retryCount >= maxRetries) {
+        
         this.timeouts[uuid] = true;
         self.write({uuid, key, type: 'lock-client-timeout'});
         return cb(new Error(`Live-Mutex client lock request timed out after ${lockTimeout * opts.__retryCount} ms, ` +
@@ -712,39 +719,37 @@ export class Client {
       }
       
       if (err) {
-        return this.fireLockCallbackWithError(err, uuid, cb, key, to);
+        return this.fireLockCallbackWithError(err, uuid, cb, key);
       }
       
       if (!data) {
-        return this.fireLockCallbackWithError('no data received from broker.', uuid, cb, key, to);
+        return this.fireLockCallbackWithError('no data received from broker.', uuid, cb, key);
       }
       
       if (data.uuid !== uuid) {
         return this.fireLockCallbackWithError(
           `Live-Mutex error, mismatch in uuids -> '${data.uuid}', -> '${uuid}'.`,
-          uuid, cb, key, to
+          uuid, cb, key
         );
       }
       
       if (String(key) !== String(data.key)) {
         return this.fireLockCallbackWithError(
           `Live-Mutex bad key, [1] => '${key}', [2] -> ${data.key}`,
-          uuid, cb, key, to
+          uuid, cb, key
         );
       }
       
       if (data.error) {
-        return this.fireLockCallbackWithError(data.error, uuid, cb, key, to);
+        return this.fireLockCallbackWithError(data.error, uuid, cb, key);
       }
       
       if (data.acquired === true) {
         
-        this.cleanUp(to, uuid);
+        this.cleanUp(uuid);
         self.bookkeeping[key].lockCount++;
-        log.debug('lock was received!');
         self.write({uuid: uuid, key: key, type: 'lock-received'});
-        
-        let boundUnlock = self.unlock.bind(self, key, {_uuid: uuid});
+        const boundUnlock = self.unlock.bind(self, key, {_uuid: uuid});
         boundUnlock.acquired = true;
         boundUnlock.key = key;
         boundUnlock.unlock = boundUnlock;
@@ -754,7 +759,7 @@ export class Client {
       }
       else if (data.reelection === true) {
         
-        this.cleanUp(to, uuid);
+        this.cleanUp(uuid);
         self.lock(key, opts, cb);
         
       }
@@ -762,7 +767,7 @@ export class Client {
         
         if (opts.wait === false) {
           
-          this.cleanUp(to, uuid);
+          this.cleanUp(uuid);
           self.giveups[uuid] = true;
           
           cb(new Error('Could not acquire lock on first attempt and wait===false.'), {
@@ -775,7 +780,7 @@ export class Client {
       }
       else {
         this.fireLockCallbackWithError(
-          `Implementation error, please report, fallthrough in condition [1]`, uuid, cb, key, to
+          `Implementation error, please report, fallthrough in condition [1]`, uuid, cb, key
         );
       }
       
@@ -861,7 +866,7 @@ export class Client {
     
     let timedOut = false;
     
-    const to = this.timers[uuid] = setTimeout(() => {
+    this.timers[uuid] = setTimeout(() => {
       
       timedOut = true;
       delete this.timers[uuid];
@@ -883,6 +888,9 @@ export class Client {
     
     this.resolutions[uuid] = (err, data) => {
       
+      delete this.timeouts[uuid];
+      clearTimeout(this.timers[uuid]);
+      
       const v = this.lockQueues[key] && this.lockQueues[key].pop();
       v && this.lockInternal.apply(this, v);
       
@@ -891,26 +899,26 @@ export class Client {
       }
       
       if (err) {
-        return this.fireUnlockCallbackWithError(err, uuid, cb, key, to);
+        return this.fireUnlockCallbackWithError(err, uuid, cb, key);
       }
       
       if (!data) {
         return this.fireUnlockCallbackWithError('Live-Mutex implementation error, bad key.',
-          uuid, cb, key, to);
+          uuid, cb, key);
       }
       
       if (String(key) !== String(data.key)) {
         return this.fireUnlockCallbackWithError('Live-Mutex implementation error, bad key.',
-          uuid, cb, key, to);
+          uuid, cb, key);
       }
       
       if (data.error) {
-        return this.fireUnlockCallbackWithError(data.error, uuid, cb, key, to);
+        return this.fireUnlockCallbackWithError(data.error, uuid, cb, key);
       }
       
       if (data.unlocked === true) {
         
-        this.cleanUp(to, uuid);
+        this.cleanUp(uuid);
         this.bookkeeping[key].unlockCount++;
         this.write({
           uuid: uuid,
@@ -923,12 +931,12 @@ export class Client {
       else if (data.unlocked === false) {
         // data.error will most likely be defined as well
         // so this may never get hit
-        this.cleanUp(to, uuid);
+        this.cleanUp(uuid);
         cb(data);
       }
       else {
         this.fireUnlockCallbackWithError('fallthrough in conditional [2], Live-Mutex failure.',
-          uuid, cb, key, to);
+          uuid, cb, key);
       }
       
     };
