@@ -13,9 +13,9 @@ import {createParser} from "./json-parser";
 
 //project
 export const log = {
-  info: console.log.bind(console, chalk.gray.bold('[live-mutex client]')),
-  warning: console.error.bind(console, chalk.magenta.bold('[live-mutex client]')),
-  error: console.error.bind(console, chalk.red.bold('[live-mutex client]')),
+  info: console.log.bind(console, chalk.gray.bold('[live-mutex client info]')),
+  warn: console.error.bind(console, chalk.magenta.bold('[live-mutex client warning]')),
+  error: console.error.bind(console, chalk.red.bold('[live-mutex client error]')),
   debug: function (...args: any[]) {
     weAreDebugging && console.log('[live-mutex debugging]', ...args);
   }
@@ -144,7 +144,7 @@ export class Client {
   connect: Ensure;
   giveups: UuidBooleanHash;
   timers: { [key: string]: Timer };
-  write: Function;
+  write: (data: any, cb?: Function) => void;
   isOpen: boolean;
   close: Function;
   lockQueues = {}  as { [key: string]: Array<any> };
@@ -243,7 +243,7 @@ export class Client {
     
     const self = this;
     
-    this.write = (data: any, cb: Function) => {
+    this.write = (data: any, cb?: Function) => {
       
       if (!ws) {
         throw new Error('please call ensure()/connect() on this Live-Mutex client, before using the lock/unlock methods.');
