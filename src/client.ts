@@ -138,6 +138,7 @@ export class Client {
   ensure: Ensure;
   connect: Ensure;
   giveups: UuidBooleanHash;
+  timers: { [key: string]: Timer }
   write: Function;
   isOpen: boolean;
   close: Function;
@@ -244,55 +245,53 @@ export class Client {
       
       const uuid = data.uuid;
       
-      if (uuid) {
-        
-        if (self.giveups[uuid]) {
-          delete self.giveups[uuid];
-          return;
-        }
-        
-        const fn = self.resolutions[uuid];
-        const to = self.timeouts[uuid];
-        
-        if (fn && to) {
-          process.emit('warning', new Error('Function and timeout both exist => Live-Mutex implementation error.'));
-        }
-        
-        if (fn) {
-          fn.call(this, null, data);
-        }
-        else if (to) {
-          
-          process.emit('warning', new Error('Client side lock/unlock request timed-out.'));
-          
-          delete self.timeouts[uuid];
-          
-          if (data.type === 'lock') {
-            self.write({
-              uuid: uuid,
-              key: data.key,
-              type: 'lock-received-rejected'
-            });
-          }
-        }
-        else {
-          
-          process.emit('warning', new Error('Live-mutex implementation warning, ' +
-            'no fn with that uuid in the resolutions hash => ' + util.inspect(data)));
-          
-          if (data.acquired === true && data.type === 'lock') {
-            self.write({
-              uuid: uuid,
-              key: data.key,
-              type: 'lock-received-rejected'
-            });
-          }
-        }
-      }
-      else {
-        process.emit('warning', new Error(
-          'potential Live-Mutex implementation error => message did not contain uuid =>' + util.inspect(data))
+      log.info('client received data:', util.inspect(data, {breakLength: Infinity}));
+      
+      if (!uuid) {
+        return process.emit('warning', new Error(
+          'Potential Live-Mutex implementation error => message did not contain uuid =>' + util.inspect(data))
         );
+      }
+      
+      if (self.giveups[uuid]) {
+        log.info(chalk.red('we already gave up on this request:', data));
+        delete self.giveups[uuid];
+        return;
+      }
+      
+      const fn = self.resolutions[uuid];
+      const to = self.timeouts[uuid];
+      
+      if (fn && to) {
+        process.emit('warning', new Error('Function and timeout both exist => Live-Mutex implementation error.'));
+      }
+      
+      if (to) {
+        
+        process.emit('warning', new Error('Client side lock/unlock request timed-out.'));
+        delete self.timeouts[uuid];
+        if (data.type === 'lock') {
+          self.write({uuid: uuid, key: data.key, type: 'lock-received-rejected'});
+        }
+        return;
+      }
+      
+      if (fn) {
+        clearTimeout(self.timers[uuid]);
+        delete self.timeouts[uuid];
+        fn.call(this, null, data);
+        return;
+      }
+      
+      process.emit('warning', new Error('Live-mutex implementation warning, ' +
+        'no fn with that uuid in the resolutions hash => ' + util.inspect(data)));
+      
+      if (data.acquired === true && data.type === 'lock') {
+        self.write({
+          uuid: uuid,
+          key: data.key,
+          type: 'lock-received-rejected'
+        });
       }
       
     };
@@ -383,6 +382,7 @@ export class Client {
     this.timeouts = {};
     this.resolutions = {};
     this.giveups = {};
+    this.timers = {};
     
     // if the user passes a callback, we call connect here
     // on behalf of the user
@@ -615,12 +615,13 @@ export class Client {
     
     const self = this;
     let timedOut = false;
-    const to = setTimeout(() => {
+    
+    const to = this.timers[uuid] = setTimeout(() => {
       
       timedOut = true;
-      // this.timeouts[uuid] = true;
+      delete this.timers[uuid];
       delete self.resolutions[uuid];
-      self.write({uuid, key, type: 'lock-client-timeout'});
+      
       ++opts.__retryCount;
       
       log.error(
@@ -628,12 +629,14 @@ export class Client {
       );
       
       if (opts.__retryCount >= maxRetries) {
+        this.timeouts[uuid] = true;
+        self.write({uuid, key, type: 'lock-client-timeout'});
         return cb(new Error(`Live-Mutex client lock request timed out after ${lockTimeout * opts.__retryCount} ms, ` +
-          `${maxRetries} retries attempted.`),
-          {acquired: false, key, lockUuid: uuid, id: uuid});
+          `${maxRetries} retries attempted.`), {acquired: false, key, lockUuid: uuid, id: uuid});
       }
       
       self.lock(key, opts, cb);
+      
     }, lockTimeout);
     
     this.resolutions[uuid] = (err, data) => {
@@ -672,6 +675,7 @@ export class Client {
         
         this.cleanUp(to, uuid);
         self.bookkeeping[key].lockCount++;
+        log.info('lock was received!');
         self.write({uuid: uuid, key: key, type: 'lock-received'});
         
         let boundUnlock = self.unlock.bind(self, key, {_uuid: uuid});
@@ -696,6 +700,7 @@ export class Client {
       else if (data.acquired === false) {
         
         if (opts.wait === false) {
+          
           this.cleanUp(to, uuid);
           self.giveups[uuid] = true;
           
@@ -703,17 +708,20 @@ export class Client {
           //   cb = process.domain.bind(cb);
           // }
           
-          cb(null, {
+          cb(new Error('Could not acquire lock on first attempt and wait===false.'), {
             key,
             acquired: false,
             lockUuid: uuid,
             id: uuid
           });
+          
         }
         
       }
       else {
-        this.callbackWithError(`fallthrough in condition [1]`, uuid, cb, key, to);
+        this.callbackWithError(
+          `Implementation error, please report, fallthrough in condition [1]`, uuid, cb, key, to
+        );
       }
       
     };
@@ -786,14 +794,17 @@ export class Client {
     
     let timedOut = false;
     
-    const to = setTimeout(() => {
+    const to = this.timers[uuid] = setTimeout(() => {
+      
+      delete this.timers[uuid];
+      delete this.resolutions[uuid];
+      this.timeouts[uuid] = true;
       
       const v = this.lockQueues[key] && this.lockQueues[key].pop();
       v && this.lockInternal.apply(this, v);
       
       timedOut = true;
-      delete this.resolutions[uuid];
-      this.timeouts[uuid] = true;
+      
       let err = new Error('Unlock request timed out.');
       process.emit('warning', err);
       cb && cb(err);
@@ -828,6 +839,7 @@ export class Client {
       }
       
       if (data.unlocked === true) {
+        
         this.cleanUp(to, uuid);
         this.bookkeeping[key].unlockCount++;
         this.write({

@@ -34,27 +34,6 @@ process.on('warning', function (e: any) {
 
 ///////////////////////////////////////////////////////////////////
 
-const addWsLockKey = function (broker: Broker, ws: net.Socket, key: string): void {
-  
-  if (!broker.wsToKeys.get(ws)) {
-    broker.wsToKeys.set(ws, {});
-  }
-  
-  broker.wsToKeys.get(ws)[key] = true;
-};
-
-const removeWsLockKey = function (broker: Broker, ws: net.Socket, key: string): boolean {
-  
-  const v = broker.wsToKeys.get(ws);
-  
-  if (v && v[key]) {
-    return delete v[key];
-  }
-  
-  return false;
-  
-};
-
 export const validConstructorOptions = {
   'lockExpiresAfter': 'integer in millis',
   'timeoutToFindNewLockholder': 'integer in millis',
@@ -140,6 +119,10 @@ export interface KeyToBool {
   [key: string]: boolean
 }
 
+export interface UUIDToBool {
+  [key: string]: boolean
+}
+
 export class Broker {
   
   opts: IBrokerOptsPartial;
@@ -153,7 +136,7 @@ export class Broker {
   locks: LockHash;
   ensure: TEnsure;
   start: TEnsure;
-  // wsToUUIDs: Map<net.Socket, UUIDToBool>;  // {uuid: true}
+  wsToUUIDs: Map<net.Socket, UUIDToBool>;  // {uuid: true}
   wsToKeys: Map<net.Socket, KeyToBool>; // {key: true}
   bookkeeping: IBookkeepingHash;
   isOpen: boolean;
@@ -208,13 +191,6 @@ export class Broker {
     
     this.send = (ws, data, cb) => {
       
-      let cleanUp = () => {
-        const key = data && data.key;
-        if (key && removeWsLockKey(this, ws, key)) {
-          self.unlock({key, force: true}, ws);
-        }
-      };
-      
       if (!ws.writable) {
         process.emit('warning', new Error('socket is not writable [1].'));
         // cleanUp();
@@ -234,10 +210,6 @@ export class Broker {
     const onData = (ws: net.Socket, data: any) => {
       
       const key = data.key;
-      
-      if (key) {
-        self.wsToKeys.get(ws)[key] = true;
-      }
       
       if (data.inspectCommand) {
         self.inspect(data, ws);
@@ -267,6 +239,7 @@ export class Broker {
         // if the client times out, we don't want to send them any more messages
         const lck = self.locks[key];
         const uuid = data.uuid;
+        
         if (!lck) {
           process.emit('warning', new Error(`Lock for key "${key}" has probably expired.`));
           return;
@@ -283,13 +256,24 @@ export class Broker {
         
       }
       else if (data.type === 'lock-received-rejected') {
+        
         const lck = self.locks[key];
+        
         if (!lck) {
           process.emit('warning', new Error(`Lock for key "${key}" has probably expired.`));
           return;
         }
+        
         self.rejected[data.uuid] = true;
-        self.ensureNewLockHolder(lck, data);
+        
+        if (lck.notify.length > 0) {
+          log.info(chalk.red.bold('lock-received-rejected, now looking for a new lock holder.'));
+          self.ensureNewLockHolder(lck, data);
+        }
+        else {
+          delete self.locks[key];
+        }
+        
       }
       else if (data.type === 'lock-info-request') {
         self.retrieveLockInfo(data, ws);
@@ -341,6 +325,7 @@ export class Broker {
         this.wsToKeys.delete(ws);
         
         v && Object.keys(v).forEach(k => {
+          
           if (this.locks[k]) {
             
             const notify = this.locks[k].notify;
@@ -352,10 +337,13 @@ export class Broker {
               }
             }
             
-            if (this.locks[k].isViaShell === false) {
-              delete v[k];
-              this.unlock({force: true, key: k}, ws);
-            }
+            // if (this.locks[k].isViaShell === false) {
+            //   delete v[k];
+            //   this.unlock({force: true, key: k, from: 'client socket closed/ended/errored'}, ws);
+            // }
+            
+            this.unlock({force: true, key: k, from: 'client socket closed/ended/errored'}, ws);
+            
           }
         });
         
@@ -471,7 +459,7 @@ export class Broker {
     this.rejected = {};
     this.timeouts = {};
     this.locks = {};
-    // this.wsToUUIDs = new Map(); // keys are ws objects, values are lock key maps {uuid: true}
+    this.wsToUUIDs = new Map(); // keys are ws objects, values are lock key maps {uuid: true}
     this.wsToKeys = new Map(); // keys are ws objects, values are key maps {key: true}
     
     // if the user passes a callback then we call
@@ -529,6 +517,8 @@ export class Broker {
     const locks = this.locks;
     const notifyList = lck.notify;
     
+    log.info(chalk.yellow.bold('ensuring there is a new lockholder, with this many candidates:'), lck.notify.length);
+    
     // currently there is no lock-holder;
     // before we delete the lock object, let's try to find a new lock-holder
     
@@ -541,93 +531,99 @@ export class Broker {
     
     const self = this;
     
-    let obj: any;
-    if (obj = notifyList.shift()) {
-      
-      log.info(chalk.magentaBright('new notify object for key:'), key);
-      
-      // Sending ws client the "acquired" message
-      // set the timeout for the next ws to acquire lock, if not within alloted time, we simple call unlock
-      
-      let ws = obj.ws;
-      let ttl = weAreDebugging ? 50000000 : (obj.ttl || this.lockExpiresAfter);
-      
-      addWsLockKey(this, ws, key);
-      
-      let uuid = lck.uuid = obj.uuid;
-      lck.pid = obj.pid;
-      
-      if (!data.isViaShell) {
-        lck.to = setTimeout(() => {
-          
-          // delete locks[key]; => no, this.unlock will take care of that
-          process.emit('warning', new Error(`Live-Mutex Broker warning, lock object timed out after ${ttl}ms for key => "${key}".`));
-          
-          // we set lck.lockholderTimeouts[uuid], so that when an unlock request for uuid comes into the broker
-          // we know that it timed out already, and we know not to throw an error when the lock.uuid doesn't match
-          lck.lockholderTimeouts[uuid] = true;
-          self.unlock({key, force: true});
-          
-        }, ttl);
+    let obj: NotifyObj;
+    
+    while (obj = notifyList.shift()) {
+      if (obj.ws && obj.ws.writable) {
+        break;
       }
-      
-      clearTimeout(this.timeouts[key]);
-      delete this.timeouts[key];
-      
-      this.timeouts[key] = setTimeout(() => {
-        
-        removeWsLockKey(this, ws, key);
-        delete self.timeouts[key];
-        
-        // if this timeout occurs, that is because the first item in the notify list did not receive the
-        // acquire lock message, so we push the object back onto the end of notify list and send a reelection message to all
-        // if a client receives a reelection message, they will all retry to acquire the lock on this key
-        
-        let _lck;
-        let count: number;
-        
-        // if this timeout happens, then we can no longer cross-verify uuid's
-        if (_lck = locks[key]) {
-          _lck.uuid = undefined;
-          _lck.pid = undefined;
-          count = lck.notify.length;
-        }
-        else {
-          count = 0;
-        }
-        
-        if (!self.rejected[obj.uuid]) {
-          notifyList.push(obj);
-        }
-        
-        notifyList.forEach((obj: any) => {
-          self.send(obj.ws, {
-            key: data.key,
-            uuid: obj.uuid,
-            type: 'lock',
-            lockRequestCount: count,
-            reelection: true
-          });
-        });
-        
-      }, self.timeoutToFindNewLockholder);
-      
-      let count = lck.notify.length;
-      
-      this.send(obj.ws, {
-        key: data.key,
-        uuid: obj.uuid,
-        type: 'lock',
-        lockRequestCount: count,
-        acquired: true
-      });
     }
-    else {
+    
+    if (!obj) {
       // note: only delete lock if no client is remaining to claim it
       // No other connections waiting for lock with key, so we deleted the lock
-      log.info('deleting lock obj for key:', key);
+      log.info(chalk.blue.bold('notify list is empty, deleting lock obj for key:'), key);
       delete locks[key];
+      return;
     }
+    
+    log.info(chalk.magentaBright('new notify object for key:'), key);
+    
+    // Sending ws client the "acquired" message
+    // set the timeout for the next ws to acquire lock, if not within alloted time, we simple call unlock
+    
+    let ws = obj.ws;
+    let ttl = weAreDebugging ? 50000000 : (obj.ttl || this.lockExpiresAfter);
+    
+    this.wsToKeys.get(ws)[key] = true;
+    
+    let uuid = lck.uuid = obj.uuid;
+    lck.pid = obj.pid;
+    
+    if (!data.isViaShell) {
+      lck.to = setTimeout(() => {
+        
+        // delete locks[key]; => no, this.unlock will take care of that
+        process.emit('warning', new Error(`Live-Mutex Broker warning, lock object timed out after ${ttl}ms for key => "${key}".`));
+        
+        // we set lck.lockholderTimeouts[uuid], so that when an unlock request for uuid comes into the broker
+        // we know that it timed out already, and we know not to throw an error when the lock.uuid doesn't match
+        lck.lockholderTimeouts[uuid] = true;
+        self.unlock({key, force: true});
+        
+      }, ttl);
+    }
+    
+    clearTimeout(this.timeouts[key]);
+    delete this.timeouts[key];
+    
+    this.timeouts[key] = setTimeout(() => {
+      
+      delete this.wsToKeys.get(ws)[key];
+      delete self.timeouts[key];
+      
+      // if this timeout occurs, that is because the first item in the notify list did not receive the
+      // acquire lock message, so we push the object back onto the end of notify list and send a reelection message to all
+      // if a client receives a reelection message, they will all retry to acquire the lock on this key
+      
+      let _lck;
+      let count: number;
+      
+      // if this timeout happens, then we can no longer cross-verify uuid's
+      if (_lck = locks[key]) {
+        _lck.uuid = undefined;
+        _lck.pid = undefined;
+        count = lck.notify.length;
+      }
+      else {
+        count = 0;
+      }
+      
+      if (!self.rejected[obj.uuid]) {
+        notifyList.push(obj);
+      }
+      
+      notifyList.forEach((obj: any) => {
+        self.send(obj.ws, {
+          key: data.key,
+          uuid: obj.uuid,
+          type: 'lock',
+          lockRequestCount: count,
+          reelection: true
+        });
+      });
+      
+    }, self.timeoutToFindNewLockholder);
+    
+    let count = lck.notify.length;
+    
+    this.send(obj.ws, {
+      key: data.key,
+      uuid: obj.uuid,
+      type: 'lock',
+      lockRequestCount: count,
+      acquired: true
+    });
     
   }
   
@@ -689,11 +685,17 @@ export class Broker {
     
     if (lck) {
       
+      log.info('lock object already exists for key:', key);
+      
       const count = lck.notify.length;
       
       if (lck.uuid) {
         
-        log.info(chalk.magenta('lock already has a uuid:'), util.inspect(lck, {breakLength: Infinity}));
+        log.info(chalk.magenta('lock already has a uuid:'), {
+          key: lck.key,
+          notifyCount: lck.notify.length,
+          isViaShell: lck.isViaShell
+        });
         
         // Lock exists *and* already has a lockholder; adding ws to list of to be notified
         // if we are retrying, we may attempt to call lock() more than once
@@ -704,11 +706,17 @@ export class Broker {
         });
         
         if (!alreadyAdded) {
+          
+          log.info(chalk.red('uuid is not already in the notify list'));
+          
           if (retryCount > 0) {
+            log.info(chalk.red('retry count is greater than 0'));
             lck.notify.unshift({ws, uuid, pid, ttl});
           }
           else {
+            log.info(chalk.red('retry count is 0'));
             lck.notify.push({ws, uuid, pid, ttl});
+            
           }
         }
         
@@ -745,7 +753,7 @@ export class Broker {
           }, ttl);
         }
         
-        addWsLockKey(this, ws, key);
+        this.wsToKeys.get(ws)[key] = true;
         
         this.send(ws, {
           uuid: uuid,
@@ -759,7 +767,9 @@ export class Broker {
     }
     else {
       
-      addWsLockKey(this, ws, key);
+      log.info('creating new lock object for key:', key);
+      
+      this.wsToKeys.get(ws)[key] = true;
       
       locks[key] = {
         pid,
@@ -778,9 +788,11 @@ export class Broker {
           // we set lck.lockholderTimeouts[uuid], so that when an unlock request for uuid comes into the broker
           // we know that it timed out already, and we know not to throw an error when the lock.uuid doesn't match
           locks[key] && (locks[key].lockholderTimeouts[uuid] = true);
-          this.unlock({key, force: true});
+          this.unlock({key, force: true, from: 'new lock object timeout'});
         }, ttl);
       }
+      
+      log.info(chalk.red('acquired lock on brand new lock object.'));
       
       this.send(ws, {
         uuid: uuid,
@@ -795,7 +807,7 @@ export class Broker {
   
   unlock(data: any, ws?: net.Socket) {
     
-    log.info('new UNlock request:', util.inspect(data, {breakLength: Infinity}));
+    log.info('new unlock request:', util.inspect(data, {breakLength: Infinity}));
     
     const locks = this.locks;
     const key = data.key;
@@ -804,6 +816,16 @@ export class Broker {
     const force = data.force;
     const lck = locks[key];
     const isViaShell = Boolean(data.isViaShell);
+    
+    if (!(key && uuid)) {
+      return this.send(ws, {error: 'missing key or uuid in the request', key: key || null, uuid: uuid || null});
+    }
+    
+    if (ws) {
+      // we know for a fact that
+      // this websocket connection no longer owns this key
+      delete this.wsToKeys.get(ws)[key];
+    }
     
     this.bookkeeping[key] = this.bookkeeping[key] || {
       rawLockCount: 0,
@@ -825,13 +847,6 @@ export class Broker {
       same = (String(lck.uuid) === String(_uuid));
     }
     
-    if (lck && isViaShell) {
-      if (lck.notify.length < 1) {
-        log.info(chalk.magentaBright('nobody to notify, so deleting lock for key:'), key);
-        delete locks[key];
-      }
-    }
-    
     if (lck && (same || force)) {
       
       log.info(chalk.blueBright('unlocking with same/force.'));
@@ -843,6 +858,7 @@ export class Broker {
         
         // if no uuid is defined, then unlock was called by something other than the client
         // aka this library called unlock when there was a timeout
+        
         this.send(ws, {
           uuid: uuid,
           key: key,
@@ -852,11 +868,12 @@ export class Broker {
         });
       }
       
-      this.wsToKeys.forEach((v, k) => {
-        delete v[key];
-      });
-      
-      this.ensureNewLockHolder(lck, data);
+      if (lck && lck.notify.length > 0) {
+        this.ensureNewLockHolder(lck, data);
+      }
+      else {
+        delete this.locks[key];
+      }
       
     }
     else if (lck) {
@@ -867,11 +884,8 @@ export class Broker {
         
         delete lck.lockholderTimeouts[_uuid];
         
-        this.wsToKeys.forEach((v, k) => {
-          delete v[key];
-        });
-        
         if (uuid && ws) {
+          
           // if no uuid is defined, then unlock was called by something other than the client
           // aka this library called unlock when there was a timeout
           
@@ -909,10 +923,6 @@ export class Broker {
       
       // since the lock no longer exists for this key, remove ownership of this key
       
-      this.wsToKeys.forEach((v, k) => {
-        delete v[key];
-      });
-      
       if (ws) {
         
         process.emit('warning', new Error(`Live-Mutex warning, [2] no lock with key => '${key}'.`));
@@ -927,7 +937,6 @@ export class Broker {
         });
       }
     }
-    
   }
 }
 

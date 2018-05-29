@@ -45,7 +45,7 @@ process.once('uncaughtException', function (e: any) {
 });
 
 new Broker(v).ensure().then(function (c) {
-  log.info('Started server on port:', c.getPort());
+  log.info(chalk.bold('Started server on port:'), chalk.magenta.bold(String(c.getPort())));
 })
 .catch(function (err) {
   log.error('caught:', err && err.message || err);

@@ -10,8 +10,6 @@ const ping = require('tcp-ping');
 import {Broker} from './broker';
 const p = require.resolve('./launch-broker-child');
 
-console.log('p is:', p);
-
 const log = {
   info: console.log.bind(console, ' [live-mutex utils]'),
   error: console.error.bind(console, ' [live-mutex utils]')
@@ -83,8 +81,6 @@ export const launchBrokerInChildProcess = function (opts: any, cb: Function) {
       return cb(null, {host, port, alreadyRunning: true});
     }
     
-    console.log(44444);
-    
     log.info(`live-mutex is launching new broker at '${host}:${port}'.`);
     
     const n = cp.spawn('node', [p], {
@@ -121,8 +117,6 @@ export const launchBrokerInChildProcess = function (opts: any, cb: Function) {
         if (detached) {
           n.unref();
         }
-        
-        console.log(33333);
         
         cb(null, {
           liveMutexProcess: n,
