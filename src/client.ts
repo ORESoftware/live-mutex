@@ -25,17 +25,12 @@ export const log = {
 
 import {weAreDebugging} from './we-are-debugging';
 import Timer = NodeJS.Timer;
+import {EventEmitter} from 'events';
 if (weAreDebugging) {
   log.debug('Live-Mutex client is in debug mode. Timeouts are turned off.');
 }
 
 /////////////////////////////////////////////////////////////////////////
-
-setTimeout(function () {
-  if (process.listenerCount('warning') < 1) {
-    log.debug(`recommends you attach a process.on('warning') event handler.`);
-  }
-}, 5000);
 
 export const validConstructorOptions = {
   key: 'string',
@@ -154,6 +149,7 @@ export class Client {
   close: Function;
   lockQueues = {}  as { [key: string]: Array<any> };
   keepLocksAfterDeath = false;
+  emitter = new EventEmitter();
   
   ////////////////////////////////////////////////////////////////
   
@@ -165,7 +161,10 @@ export class Client {
     
     if (cb) {
       assert(typeof cb === 'function', 'optional second argument to Live-Mutex Client constructor must be a function.');
-      cb = cb.bind(this)
+      cb = cb.bind(this);
+      if (process.domain) {
+        cb = process.domain.bind(cb);
+      }
     }
     
     Object.keys(opts).forEach(function (key) {
@@ -269,7 +268,7 @@ export class Client {
       log.debug('client received data:', util.inspect(data, {breakLength: Infinity}));
       
       if (!uuid) {
-        return process.emit('warning', new Error(
+        return this.emitter.emit('warning', new Error(
           'Potential Live-Mutex implementation error => message did not contain uuid =>' + util.inspect(data))
         );
       }
@@ -284,12 +283,12 @@ export class Client {
       const to = self.timeouts[uuid];
       
       if (fn && to) {
-        process.emit('warning', new Error('Function and timeout both exist => Live-Mutex implementation error.'));
+        this.emitter.emit('warning', new Error('Function and timeout both exist => Live-Mutex implementation error.'));
       }
       
       if (to) {
         
-        process.emit('warning', new Error('Client side lock/unlock request timed-out.'));
+        this.emitter.emit('warning', new Error('Client side lock/unlock request timed-out.'));
         delete self.timeouts[uuid];
         if (data.type === 'lock') {
           self.write({uuid: uuid, key: data.key, type: 'lock-received-rejected'});
@@ -304,10 +303,13 @@ export class Client {
         return;
       }
       
-      process.emit('warning', new Error('Live-mutex implementation warning, ' +
+      this.emitter.emit('warning', new Error('Live-mutex implementation warning, ' +
         'no fn with that uuid in the resolutions hash => ' + util.inspect(data)));
       
       if (data.acquired === true && data.type === 'lock') {
+        
+        this.emitter.emit('warning', new Error('Rejecting lock acquisition.'));
+        
         self.write({
           uuid: uuid,
           key: data.key,
@@ -345,7 +347,7 @@ export class Client {
         
         let onFirstErr = (e: any) => {
           let err = new Error('live-mutex client error => ' + (e && e.stack || e));
-          process.emit('warning', err);
+          this.emitter.emit('warning', err);
           reject(err);
         };
         
@@ -362,15 +364,15 @@ export class Client {
         
         ws.setEncoding('utf8')
         .once('end', () => {
-          process.emit('warning', new Error('client stream "end" event occurred.'));
+          this.emitter.emit('warning', new Error('client stream "end" event occurred.'));
         })
         .once('error', onFirstErr)
         .once('close', () => {
           self.isOpen = false;
         })
-        .on('error', function (e) {
+        .on('error', (e) => {
           self.isOpen = false;
-          process.emit('warning', new Error('live-mutex client error: ' + e.stack || util.inspect(e)));
+          this.emitter.emit('warning', new Error('live-mutex client error: ' + e.stack || util.inspect(e)));
         })
         .pipe(createParser())
         .on('data', onData)
@@ -435,7 +437,7 @@ export class Client {
       }
       
       if (data.error) {
-        process.emit('warning', data.error);
+        this.emitter.emit('warning', data.error);
       }
       
       if ([data.acquired, data.retry].filter(i => i).length > 1) {
@@ -502,21 +504,39 @@ export class Client {
   }
   
   private fireUnlockCallbackWithError(err: any, uuid: string, cb: LMClientUnlockCallBack, key: string, to: Timer) {
+    
     this.cleanUp(to, uuid);
-    const v = this.lockQueues[key] && this.lockQueues[key].pop();
-    v && this.lockInternal.apply(this, v);
+    
+    try {
+      const v = this.lockQueues[key] && this.lockQueues[key].pop();
+      v && this.lockInternal.apply(this, v);
+    }
+    catch (err) {
+      this.emitter.emit('warning', err);
+    }
+    
     err = err instanceof Error ? err : new Error(err);
-    process.emit('warning', err);
+    this.emitter.emit('warning', err);
     cb(err, uuid);
   }
   
   private fireLockCallbackWithError(err: any, uuid: string, cb: LMClientLockCallBack, key: string, to: Timer) {
+    
     this.cleanUp(to, uuid);
-    const v = this.lockQueues[key] && this.lockQueues[key].pop();
-    v && this.lockInternal.apply(this, v);
+    
+    try {
+      const v = this.lockQueues[key] && this.lockQueues[key].pop();
+      v && this.lockInternal.apply(this, v);
+    }
+    catch (err) {
+      this.emitter.emit('warning', err);
+    }
+    
     err = err instanceof Error ? err : new Error(err);
-    process.emit('warning', err);
+    this.emitter.emit('warning', err);
+    
     cb(err, {acquired: false, key, lockUuid: uuid, id: uuid});
+    
   }
   
   ls(opts: any, cb?: ErrFirstDataCallback) {
@@ -530,7 +550,10 @@ export class Client {
       throw new Error('Callback needs to be a function type.');
     }
     
+    opts = opts || {};
     const id = uuidV4();
+    
+    this.resolutions[id] = cb;
     
     this.write({
       keepLocksAfterDeath: opts.keepLocksAfterDeath,
@@ -538,7 +561,6 @@ export class Client {
       type: 'ls',
     });
     
-    this.resolutions[id] = cb;
   }
   
   lock(key: string, opts: any, cb?: LMClientLockCallBack) {
@@ -555,17 +577,6 @@ export class Client {
     const rawLockCount = ++this.bookkeeping[key].rawLockCount;
     const unlockCount = this.bookkeeping[key].unlockCount;
     
-    // if (rawLockCount - unlockCount > 5) {
-    //   this.lockQueues[key].unshift(arguments);
-    // }
-    // else {
-      this.lockInternal.apply(this, arguments);
-    // }
-    
-  }
-  
-  private lockInternal(key: string, opts: any, cb?: LMClientLockCallBack) {
-    
     if (typeof opts === 'function') {
       cb = opts;
       opts = {};
@@ -579,17 +590,16 @@ export class Client {
     
     opts = opts || {} as Partial<ClientOpts>;
     
-    const append = opts.append || '';
+    cb = cb.bind(this);
+    
+    if (process.domain) {
+      cb = process.domain.bind(cb);
+    }
     
     try {
       
       assert.equal(typeof key, 'string', 'Key passed to live-mutex #lock needs to be a string.');
       assert(typeof cb === 'function', 'callback function must be passed to Client lock() method.');
-      
-      if (cb.isLMBound !== true) {
-        cb = cb.bind(this);
-        cb.isLMBound = true;
-      }
       
       if ('append' in opts) {
         assert.equal(typeof opts.append, 'string', ' => Live-Mutex usage error => ' +
@@ -638,13 +648,23 @@ export class Client {
         assert(opts._uuid, 'Live-Mutex internal error: no _uuid past to retry call.');
       }
       
-      assert(typeof append === 'string', 'append option to lock() method must be of type "string".');
     }
     catch (err) {
       return process.nextTick(cb, err);
     }
     
-    const uuid = opts._uuid = opts._uuid || (append + uuidV4());
+    // if (rawLockCount - unlockCount > 5) {
+    //   this.lockQueues[key].unshift([key, opts, cb]);
+    // }
+    // else {
+    this.lockInternal.call(this, key, opts, cb);
+    // }
+    
+  }
+  
+  private lockInternal(key: string, opts: any, cb: LMClientLockCallBack) {
+    
+    const uuid = opts._uuid = opts._uuid || uuidV4();
     const ttl = opts.ttl || this.ttl;
     const lockTimeout = opts.lockRequestTimeout || this.lockTimeout;
     const maxRetries = opts.maxRetry || opts.maxRetries || this.lockRetryMax;
@@ -669,7 +689,7 @@ export class Client {
       
       ++opts.__retryCount;
       
-      process.emit('warning',
+      this.emitter.emit('warning',
         `retrying lock request for key '${key}', on host:port '${self.getHost()}:${self.getPort()}', ` +
         `attempt # ${opts.__retryCount}` as any,
       );
@@ -729,11 +749,6 @@ export class Client {
         boundUnlock.key = key;
         boundUnlock.unlock = boundUnlock;
         boundUnlock.lockUuid = data.uuid;
-        
-        // if(process.domain){
-        //   boundUnlock = process.domain.bind(boundUnlock);
-        // }
-        
         cb(null, boundUnlock);
         
       }
@@ -750,19 +765,13 @@ export class Client {
           this.cleanUp(to, uuid);
           self.giveups[uuid] = true;
           
-          // if(process.domain){
-          //   cb = process.domain.bind(cb);
-          // }
-          
           cb(new Error('Could not acquire lock on first attempt and wait===false.'), {
             key,
             acquired: false,
             lockUuid: uuid,
             id: uuid
           });
-          
         }
-        
       }
       else {
         this.fireLockCallbackWithError(
@@ -819,7 +828,13 @@ export class Client {
     
     opts = opts || {};
     
-    cb && (cb !== this.noop) && (cb = cb.bind(this));
+    if (cb && cb !== this.noop) {
+      cb = cb.bind(this);
+      if (process.domain) {
+        cb = process.domain.bind(cb);
+      }
+    }
+    
     cb = cb || this.noop;
     
     try {
@@ -848,18 +863,21 @@ export class Client {
     
     const to = this.timers[uuid] = setTimeout(() => {
       
+      timedOut = true;
       delete this.timers[uuid];
       delete this.resolutions[uuid];
       this.timeouts[uuid] = true;
-      
-      const v = this.lockQueues[key] && this.lockQueues[key].pop();
-      v && this.lockInternal.apply(this, v);
-      
-      timedOut = true;
-      
       let err = new Error('Unlock request timed out.');
-      process.emit('warning', err);
-      cb && cb(err);
+      this.emitter.emit('warning', err);
+      cb(err);
+      
+      try {
+        const v = this.lockQueues[key] && this.lockQueues[key].pop();
+        v && this.lockInternal.apply(this, v);
+      }
+      catch (err) {
+        this.emitter.emit('warning', err);
+      }
       
     }, unlockTimeout);
     
@@ -900,13 +918,13 @@ export class Client {
           type: 'unlock-received'
         });
         
-        cb && cb(null, data.uuid);
+        cb(null, data.uuid);
       }
       else if (data.unlocked === false) {
         // data.error will most likely be defined as well
         // so this may never get hit
         this.cleanUp(to, uuid);
-        cb && cb(data);
+        cb(data);
       }
       else {
         this.fireUnlockCallbackWithError('fallthrough in conditional [2], Live-Mutex failure.',
@@ -915,13 +933,12 @@ export class Client {
       
     };
     
-    let force = (opts.__retryCount > 0) || Boolean(opts.force);
+    let force: boolean = (opts.__retryCount > 0) || Boolean(opts.force);
     
     this.write({
       _uuid: opts._uuid,
       uuid: uuid,
       key: key,
-      // we only use force if we have to retry
       force: force,
       type: 'unlock'
     });

@@ -8,19 +8,18 @@ const index = process.argv.indexOf('--json');
 
 let v = {port} as any;
 
-if(index > 0){
+if (index > 0) {
   
-  try{
-     v = JSON.parse(process.argv[index + 1]);
+  try {
+    v = JSON.parse(process.argv[index + 1]);
   }
-  catch(err){
+  catch (err) {
     log.error(chalk.magenta(`Could not parse your --json argument, try --json '{"port":3091}'.`));
     throw chalk.magentaBright(err.message);
   }
   
   port = v.port = (v.port || port);
 }
-
 
 if (!Number.isInteger(port)) {
   log.error(chalk.magenta('Live-mutex: port could not be parsed to integer from command line input.'));
@@ -32,10 +31,6 @@ process.once('warning' as any, function (e: any) {
   log.error('process warning:', e && e.message || e);
 });
 
-process.once('error' as any, function (e: any) {
-  log.error('process error:', e && e.message || e);
-});
-
 process.once('unhandledRejection', function (e: any) {
   log.error('unhandledRejection:', e && e.message || e);
 });
@@ -44,8 +39,14 @@ process.once('uncaughtException', function (e: any) {
   log.error('uncaughtException:', e && e.message || e);
 });
 
-new Broker(v).ensure().then(function (c) {
-  log.info(chalk.bold('Started server on port:'), chalk.magenta.bold(String(c.getPort())));
+const b = new Broker(v);
+
+b.emitter.on('warning', function () {
+  log.warn(...arguments);
+});
+
+b.ensure().then(function (b) {
+  log.info(chalk.bold('Started server on port:'), chalk.magenta.bold(String(b.getPort())));
 })
 .catch(function (err) {
   log.error('caught:', err && err.message || err);
