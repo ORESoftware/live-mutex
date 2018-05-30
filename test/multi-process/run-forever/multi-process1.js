@@ -92,7 +92,7 @@ new Broker({port: multi_process_port}).ensure(function () {
 
     if (result && result.stderr) {
       console.error('\n');
-      console.error('stderr from child:')
+      console.error('stderr from child:');
       console.error(result.stderr);
     }
 

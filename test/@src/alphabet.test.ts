@@ -1,12 +1,16 @@
+'use strict';
+
 import suman = require('suman');
 const Test = suman.init(module);
 const async = require('async');
+import {Client} from "../../client";
+import {Broker} from "../../broker";
 
 ////////////////////////////////////////////////////////
 
-Test.create(['Broker', 'Client', 'lmUtils', (b, assert, before, describe, it, path, fs, inject) => {
+Test.create(['lmUtils', (b, assert, before, describe, it, path, fs, inject, after) => {
   
-  const {Client, Broker, lmUtils} = b.ioc;
+  const {lmUtils} = b.ioc;
   
   const alphabet = 'abcdefghijklmnopqrstuvwxyz';
   const a2z = alphabet.split('');
@@ -26,31 +30,34 @@ Test.create(['Broker', 'Client', 'lmUtils', (b, assert, before, describe, it, pa
   
   const p = path.resolve(__dirname + '/../fixtures/alphabet.test');
   
-  before.cb('clean up file', h => {
-    fs.writeFile(p, '', h);
-  });
+  // before.cb('clean up file', h => {
+  //   fs.writeFile(p, '', h);
+  // });
+  
+  const strm = fs.createWriteStream(p);
   
   describe('post', function (b) {
     
-    const client = b.getInjectedValue('client');
+    const client = b.getInjectedValue('client') as Client;
+    const broker = b.getInjectedValue('broker') as Client;
+    
+    after(h => {
+      return broker.close();
+    });
     
     before.cb('yo', h => {
       
-      async.each(a2z, function (val, cb) {
+      async.eachLimit(a2z, 1, function (val, cb) {
         
-        client.lock('foo', function (err, unlock) {
-          
-          const strm = fs.createWriteStream(p, {flags: 'a'});
+        client.lock('foo', function (err, v) {
           
           for (let i = 0; i < num; i++) {
             strm.write(val);
           }
           
-          strm.end();
+          cb();
+          v.unlock();
           
-          strm.once('finish', function () {
-            unlock(cb);
-          });
         });
         
       }, h.done);
@@ -60,13 +67,14 @@ Test.create(['Broker', 'Client', 'lmUtils', (b, assert, before, describe, it, pa
     it.cb('count characters => expect num*26', {timeout: 300}, t => {
       
       fs.readFile(p, function (err, data) {
+        
         if (err) {
           return t.done(err);
         }
-        else {
-          assert.equal(String(data).trim().length, (26 * num));
-          t.done();
-        }
+        
+        assert.equal(String(data).trim().length, (26 * num));
+        t.done();
+        
       });
     });
     

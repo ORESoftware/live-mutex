@@ -26,33 +26,34 @@ setTimeout(function () {
 
 const q = async.queue(function (task, cb) {
   task(cb);
-}, 50); // max concurrency
+}, 500); // max concurrency
 
 const start = Date.now();
 
 let onRandomInterval = function () {
-
+  
   const randTime = Math.ceil(Math.random() * intervalTimeSeed);
   const randCount = Math.ceil(Math.random() * countSeed);
-
+  
   if (finishedQueueing === false) {
     setTimeout(onRandomInterval, randTime);
   }
-
+  
   for (let i = 0; i < randCount; i++) {
     q.push(function (cb) {
       const w = Math.ceil(Math.random() * 20);
       lf.lock(file, {wait: w, retries: 5000, stale: 500}, function (err) {
+        
         if (err) {
-          cb(err);
+          return cb(err);
         }
-        else {
-          lockCount++;
-          let randTime = Math.ceil(Math.random() * randTimeoutSeed);
-          setTimeout(function () {
-            lf.unlock(file, cb);
-          }, randTime);
-        }
+        
+        lockCount++;
+        let randTime = Math.ceil(Math.random() * randTimeoutSeed);
+        setTimeout(function () {
+          lf.unlock(file, cb);
+        }, randTime);
+        
       });
     });
   }
@@ -61,15 +62,15 @@ let onRandomInterval = function () {
 onRandomInterval();
 
 q.drain = function complete(err) {
-
+  
   if (err) {
     throw err;
   }
-
+  
   if (finishedQueueing === false) {
     return onRandomInterval();
   }
-
+  
   const diff = Date.now() - start;
   console.log(' => Time required for lockfile => ', diff);
   console.log(' => Lock/unlock cycles per millisecond => ', Number(lockCount / diff).toFixed(3));

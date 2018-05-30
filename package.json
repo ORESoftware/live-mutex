@@ -1,13 +1,24 @@
 {
   "name": "live-mutex",
-  "version": "0.0.10029",
+  "version": "0.0.10043",
   "description": "Simple mutex that uses a TCP server; useful if you cannot install Redis, etc.",
-  "main": "index.js",
-  "typings": "index.d.ts",
-  "types": "index.d.ts",
+  "main": "dist/index.js",
+  "typings": "dist/index.d.ts",
+  "types": "dist/index.d.ts",
   "bin": {
-    "lm_acquire_lock": "lib/lm-acquire-lock.js",
-    "lm_release_lock": "lib/lm-release-lock.js"
+    "lm_acquire_lock": "dist/lm-acquire-lock.js",
+    "lm_release_lock": "dist/lm-release-lock.js",
+    "lm_inspect_broker": "dist/inspect.js",
+    "lm_launch_broker": "dist/lm-start-server.js",
+    "lm_start_server": "dist/lm-start-server.js",
+    "lm_ls": "dist/lm-ls.js",
+    "lmx_acquire_lock": "dist/lm-acquire-lock.js",
+    "lmx_release_lock": "dist/lm-release-lock.js",
+    "lmx_inspect_broker": "dist/inspect.js",
+    "lmx_launch_broker": "dist/lm-start-server.js",
+    "lmx_start_server": "dist/lm-start-server.js",
+    "lmx_ls": "dist/lm-ls.js",
+    "lmx": "assets/lmx.sh"
   },
   "scripts": {
     "test": "./scripts/test.sh"
@@ -23,21 +34,19 @@
   },
   "homepage": "https://github.com/ORESoftware/live-mutex#readme",
   "dependencies": {
-    "JSONStream": "^1.3.1",
-    "async": "^2.1.4",
     "chalk": "^2.0.1",
-    "debug": "^2.5.1",
     "siamese": "^2.0.4",
-    "strangeloop": "0.0.10001",
     "tcp-ping": "^0.1.1",
     "uuid": "^3.1.0"
   },
   "devDependencies": {
-    "@types/async": "^2.0.38",
-    "@types/chalk": "^0.4.31",
-    "@types/core-js": "^0.9.42",
+    "@types/async": "^2.0.49",
+    "@types/core-js": "^0.9.46",
     "@types/lodash": "^4.14.50",
-    "@types/node": "^7.0.33",
+    "@types/node": "^10.1.2"
+  },
+  "optionalDependencies": {
+    "async": "^2.6.0",
     "bluebird": "^3.4.7",
     "handlebars": "^4.0.10",
     "lockfile": "^1.0.3",

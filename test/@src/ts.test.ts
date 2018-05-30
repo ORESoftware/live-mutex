@@ -33,7 +33,8 @@ Test.create([function (b, inject, describe, before, it, $deps, $core) {
     
     const lockWriteRelease = function (val, cb) {
       
-      c.lock('a', function (err, unlock) {
+      c.lock('a', function (err, {unlock}) {
+        
         if (err) {
           return cb(err);
         }

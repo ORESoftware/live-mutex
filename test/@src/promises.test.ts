@@ -3,12 +3,13 @@
 import * as suman from 'suman';
 const {Test} = suman.init(module);
 global.Promise = require('bluebird');
+import {Client, Broker} from '../../dist';
 
 ///////////////////////////////////////////////////////////////////////////////////////
 
-Test.create(['Broker', 'Client', function (b, it, inject, describe, before, $deps) {
+Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
   
-  const {Broker, Client} = b.ioc;
+  const {Promise} = b.ioc;
   const {chalk: colors} = $deps;
   const conf = Object.freeze({port: 7035});
   
@@ -24,7 +25,7 @@ Test.create(['Broker', 'Client', function (b, it, inject, describe, before, $dep
     
     describe('injected', function (b) {
       it('locks/unlocks', t => {
-        const c = t.supply.client;
+        const c = t.supply.client as Client;
         return c.lockp('a').then(function (v) {
           return c.unlockp('a');
         });
@@ -32,19 +33,12 @@ Test.create(['Broker', 'Client', function (b, it, inject, describe, before, $dep
     });
     
     it('locks/unlocks', t => {
-      const c = t.supply.client;
+      const c = t.supply.client as Client;
       return c.lockp('a').then(function (v) {
         return c.unlockp('a');
       });
     });
     
-    const promhelper = function (unlock) {
-      return new Promise(function (resolve, reject) {
-        unlock(function (err) {
-          err ? reject(err) : resolve();
-        });
-      });
-    };
     
     const makePromiseProvider = function (unlock) {
       return function (input: string) {
@@ -61,14 +55,14 @@ Test.create(['Broker', 'Client', function (b, it, inject, describe, before, $dep
     it('locks/unlocks super special 1', t => {
       const c = t.supply.client;
       return c.lockp('foo').then(function ({unlock}) {
-        return promhelper(unlock);
+        return c.promisifyUnlock(unlock);
       });
     });
     
     it('locks/unlocks super special 2', async t => {
-      const c = t.supply.client;
-      const {unlock} = await c.lockp('foo');
-      return promhelper(unlock);
+      const c = t.supply.client as Client;
+      const {unlock} = await c.acquire('foo');
+      return c.promisifyUnlock(unlock);
     });
     
     it('locks/unlocks super special 2', async t => {

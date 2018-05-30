@@ -16,6 +16,12 @@ fully evented, and Lockfile and Warlock use a polling implementation by nature.<
 
 # Installation
 
+For command line tools:
+
+## ```$ npm install -g live-mutex```
+
+For usage with Node.js libraries:
+
 ## ```$ npm install live-mutex --save```
 
 ### Who needs it
@@ -100,6 +106,25 @@ Do not use more than one broker for the same key, as that will defeat the purpos
 
 # Examples
 
+
+### Command line:
+
+The real power of this library comes with usage with Node.js, but we can use <br>
+the functionality at the command line too:
+
+
+```bash
+
+# in shell 1
+lm_start_server 6970
+
+# in shell 2
+lm_acquire_lock foo
+lm_release_lock foo
+
+```
+
+
 ### Importing the library
 
 ```js
@@ -108,8 +133,7 @@ const {Broker} = require('live-mutex/broker');
 const {Client} = require('live-mutex/client');
 const lmUtils = require('live-mutex/utils');
 
-// there are also aliases, which are more descriptive:
-
+// there are aliases, which are more descriptive:
 const {LMBroker, LvMtxBroker} = require('live-mutex/broker');  // these are simply aliases of Broker
 const {LMClient, LvMtxClient} = require('live-mutex/client');  // these are simply aliases of Client
 
@@ -121,7 +145,6 @@ import {Client, Broker, lmUtils}  from 'live-mutex';
 
 ```js
 const opts = {port: '<port>' , host: '<host>'};
-
 // check to see if the websocket broker is already running, if not, launch one in this process
 
 lmUtils.conditionallyLaunchSocketServer(opts, function(err){
@@ -137,22 +160,29 @@ lmUtils.conditionallyLaunchSocketServer(opts, function(err){
       // to the right key and internal call-id
 
              
-    const client = new Client(opts, function(err){
-     // you will need to handle err
+     // here is the recommended way with promises
+     
+     const client = new Client(opts);
+     // calling ensure before each critical section means that we ensure we have a connected client
+     return client.ensure().then(c =>  {
+       return client.acquire('<key>').then(({key,id}) => {
+             return client.release('<key>', id);
+         });
+     });
+       
+       
+   // using vanilla callbacks (higher performance + a convenience unlock function)
+    client.ensure(function(err){
+       // handle any err your way
        client.lock('<key>', function(err, unlock){
-          unlock(function(err){ // use the unlock convenience callback
-                              
-          });
+            // handle any err your way
+             unlock(function(err){  // unlock is bound to the right key and request uuid
+                 // handle any err your way, p
+             });
        });
     });
-       
-       
-    // using the "unlock()" convenience callback is basically equivalent to doing this:     
-    client.lock('<key>', function(err, unlock, id){
-       client.unlock('<key>', id, function(err){
-           
-       });
-    });
+    
+   
       
     // note: using this id ensures that the unlock call corresponds with the original corresponding lock call
     // otherwise what could happen in your program is that you could call
@@ -160,7 +190,6 @@ lmUtils.conditionallyLaunchSocketServer(opts, function(err){
         
         
     //  simple usage without the call id (this is less safe):
-      
     const client = new Client(opts);
     
     client.ensure().then(function(c){
@@ -224,24 +253,43 @@ to see if the web-socket server is running somewhere. I have had a lot of luck w
   
 ### Usage with Promises:
 
-This library exports `lockp` and `unlockp` methods for the client, which are simply implemented like so:
+This library exports `acquire/acquireLock` and `release/releaseLock` methods for the client,<br>
+which are simply implemented like so:
 
 ```typescript
-  lockp(key: string, opts: Partial<IClientLockOpts>) {
+
+  acquire(key: string, opts?: Partial<IClientLockOpts>) {
     return new Promise((resolve, reject) => {
-      this.lock(key, opts, function (err, unlock, lockUuid) {
-        err ? reject(err) : resolve({key, unlock, lockUuid});
+      this.lock(key, opts, function (err, v) {
+        err ? reject(err) : resolve(v);
       });
     });
   }
 
-  unlockp(key: string, opts: Partial<IClientUnlockOpts>) {
+  release(key: string, opts?: Partial<IClientUnlockOpts>) {
     return new Promise((resolve, reject) => {
       this.unlock(key, opts, function (err, val) {
         err ? reject(err) : resolve(val);
       });
     });
   }
+  
+  acquireLock(key: string, opts?: Partial<IClientLockOpts>) {
+     // same as acquire
+  }
+
+  releaseLock(key: string, opts?: Partial<IClientUnlockOpts>) {
+      // same as release
+  }
+ 
+  lockp(key: string, opts?: Partial<IClientLockOpts>) {
+     // same as acquire
+  }
+
+  unlockp(key: string, opts?: Partial<IClientUnlockOpts>) {
+      // same as release
+  }
+  
 ```
 
 ## To use these methods with async/await, it simply looks like:
@@ -257,132 +305,22 @@ you can also use the unlock() convenience callback like so:
 ```js
     return c.lockp('foo').then(function ({unlock}) {
       return new Promise(function (resolve, reject) {
-        unlock(function (err) {
-          err ? reject(err) : resolve();
+        unlock(function (err, v) {
+          err ? reject(err) : resolve(v);
         });
       });
     });
-
-```
-   
-
-### If you want, you can just create your own promise wrapper in your app, like so:
-
-```js
-
-exports.acquireLock = function(lockName){
-  
-  return new Promise(function(resolve,reject){
-    
-    client.lock(lockName, function(err, unlock, lockUuid){
-      
-      err ? reject(err) : resolve({
-         unlock,
-         lockUuid
-      });
-      
-    });
-    
-  });
-  
-};
-
-exports.releaseLock = function(lockName, lockUuid){
-  
-   return new Promise(function(resolve,reject){
-      
-      client.unlock(lockName, lockUuid, function(err){
-          err ? reject(err): resolve();
-      });
-      
-    });
-  
-};
-
-// alternatively, if you use the unlock convenience function, 
-// releaseLock can be implemented more simply as:
-
-exports.releaseLock = function(unlock){
-  
-   return new Promise(function(resolve,reject){
-      
-      unlock(function(err){
-          err ? reject(err): resolve();
-      });
-      
-    });
-  
-};
-
 
 ```
 
 
 
 ### Usage with RxJS5 Observables
+ => see docs/examples.md
   
-```js
+### Usage with ES6 Promises
+ => see docs/examples.md
 
-   import {Observable} from 'rxjs/Rx';
-  
-   exports.acquireLock = function (q, name) {
-  
-      const lock = q.lock;
-      const client = q.client;
-  
-      return Observable.create(sub => {
-  
-          client.lock(lock, {append: name},  (err, unlock, id) => {
-          
-              if (err) {
-                  console.error(' => Error acquiring lock => ', (err.stack || err));
-              }
-  
-              sub.next({
-                  unlock,
-                  error: err,
-                  id: id,
-                  name: name
-              });
-  
-              sub.complete();
-  
-          });
-  
-          return function () {
-              console.log('disposing acquireLock()');
-          }
-      });
-  };
-  
-   exports.releaseLock = function (q, lockUuid) {
-  
-      const client = q.client;
-      const lock = q.lock;
-  
-      return Observable.create(sub => {
-  
-          client.unlock(lock, lockUuid,  err => {
-  
-              if (err) {
-                  console.error(' => Release lock error => ', err.stack || err);
-              }
-            
-              sub.next({
-                  error: err
-              });
-  
-              sub.complete();
-  
-          });
-  
-          return function () {
-               console.log('disposing releaseLock()');
-          }
-      });
-  };
-
-```
 
 ## Creating a simple client pool
 

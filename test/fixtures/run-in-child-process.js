@@ -1,7 +1,5 @@
 const {Client} = require('live-mutex/client');
-
 const async = require('async');
-const uuidv4 = require('uuid/v4');
 
 let times = 10;
 let keys = [];
@@ -11,7 +9,7 @@ for (let i = 0; i < times; i++) {
 }
 
 let min = 5;
-let max = 4000;
+let max = 1000;
 
 process.on('warning', function (e) {
   console.error(e.stack || e);
@@ -25,17 +23,18 @@ const client = new Client({port}, function (err) {
     throw err;
   }
 
-  async.timesLimit(100000, 200, function (n, cb) {
+  async.timesLimit(100, 40, function (n, cb) {
 
     let randomKey = keys[Math.floor(Math.random() * keys.length)];
     console.log('count', n, 'randomKey', randomKey);
 
     client.lock(randomKey, function (err, unlock) {
 
-      if (err && String(err.message || err).match(/lock request timed out/)) {
+      if (err && String(err.stack || err.message || err).match(/lock request timed out/ig)) {
         return cb(null);
       }
       else if(err){
+        console.error('this is bad news fml.');
         return cb(err);
       }
 

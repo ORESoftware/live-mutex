@@ -2,25 +2,28 @@
 ### folders
 node_modules
 .idea
+src
 test
+docs
+.tscmultiwatch
+.docker.r2g
+coverage
+
 
 ### matching files
 *.log
-*.sh
 *.md
 *.json
 *.txt
-*.ts
 *.yml
 *.html
 *.lock
+*.tgz
 
 ### files
+.dockerignore
 suman.conf.js
 .gitignore
 .npmignore
 yarn.lock
 
-
-### negation
-!*.d.ts
