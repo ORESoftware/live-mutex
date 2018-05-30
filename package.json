@@ -34,7 +34,7 @@
   },
   "homepage": "https://github.com/ORESoftware/live-mutex#readme",
   "dependencies": {
-    "chalk": "^2.0.1",
+    "chalk": "^2.4.1",
     "siamese": "^2.0.4",
     "tcp-ping": "^0.1.1",
     "uuid": "^3.1.0"
