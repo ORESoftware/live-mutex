@@ -241,6 +241,19 @@ export class Client {
     let ws: net.Socket = null;
     let connectPromise: Promise<any> = null;
     
+    process.nextTick(() => {
+      if (this.emitter.listenerCount('warning') < 2) {
+        process.emit.call(process, 'warning',
+          new Error('Add a "warning" event listener to the Live-Mutex client to get rid of this message.'));
+      }
+    });
+    
+    this.emitter.on('warning', () => {
+      if (this.emitter.listenerCount('warning') < 2) {
+        process.emit.call(process, 'warning', ...arguments);
+      }
+    });
+    
     const self = this;
     
     this.write = (data: any, cb?: Function) => {

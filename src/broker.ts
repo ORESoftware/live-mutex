@@ -192,6 +192,19 @@ export class Broker {
     this.host = opts.host || '127.0.0.1';
     this.port = opts.port || 6970;
     
+    process.nextTick(() => {
+      if (this.emitter.listenerCount('warning') < 2) {
+        process.emit.call(process, 'warning',
+          new Error('Add a "warning" event listener to the Live-Mutex broker to get rid of this message.'));
+      }
+    });
+    
+    this.emitter.on('warning', () => {
+      if (this.emitter.listenerCount('warning') < 2) {
+        process.emit.call(process, 'warning', ...arguments);
+      }
+    });
+    
     const self = this;
     
     this.send = (ws, data, cb) => {
@@ -465,11 +478,11 @@ export class Broker {
         });
         
       })
-      .then(function (val) {
+      .then(val => {
           cb && cb.call(self, null, val);
           return val;
         },
-        function (err) {
+        (err) => {
           cb && cb.call(self, err);
           return Promise.reject(err);
         });
