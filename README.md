@@ -134,7 +134,8 @@ lmUtils.conditionallyLaunchSocketServer(opts, function(err){
       
       // * the following is our recommended usage* =>
       // for convenience and safety, you can use the unlock callback, which is bound
-      // to the right key and internal call-id 
+      // to the right key and internal call-id
+
              
     const client = new Client(opts, function(err){
      // you will need to handle err
@@ -248,7 +249,7 @@ This library exports `lockp` and `unlockp` methods for the client, which are sim
 ```js
     await client.lockp('a');
     await Promise.delay(100);
-    return client.unlockp('a');
+    await client.unlockp('a');
 ```
 
 you can also use the unlock() convenience callback like so:
