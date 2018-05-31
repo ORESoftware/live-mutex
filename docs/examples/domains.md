@@ -26,8 +26,10 @@ app.use(function(req,res,next){
 
       client.ensure(function(err, c){
 
-         c.lock(function(err, unlock){
+         c.lock('foo', function(err, unlock){
+         
              throw 'whoops';  // this will get caught by the domain
+             
              unlock(next);
          });
       });
