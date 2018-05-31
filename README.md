@@ -32,7 +32,7 @@ For usage with Node.js libraries:
 one machine, Live-Mutex can work on a network.)
 
 In more detail:<br>
-See: docs/detailed-explanation.md
+See: `docs/detailed-explanation.md`
 
 
 ## Alternatives to Live-Mutex
@@ -147,9 +147,9 @@ const opts = {port: '<port>' , host: '<host>'};
  const client = new Client(opts);
 
  // calling ensure before each critical section means that we ensure we have a connected client
- return client.ensure().then(c =>  {
-   return client.acquire('<key>').then(({key,id}) => {
-         return client.release('<key>', id);
+ return client.ensure().then(c =>  {   // (c is the same object as client)
+   return c.acquire('<key>').then(({key,id}) => {
+         return c.release('<key>', id);
      });
  });
 ```
@@ -158,16 +158,31 @@ const opts = {port: '<port>' , host: '<host>'};
 
 ```js
 client.ensure(function(err){
-
    client.lock('<key>', function(err, unlock){
 
-         unlock(function(err){  // unlock is a convenience function, bound to the right key + request uuid
+       // unlock is a convenience function, bound to the right key + request uuid
 
-         });
+       unlock(function(err){
+
+       });
    });
 });
 ```
 
+## If you want the key and request id, use:
+
+```js
+client.ensure(function(err){
+   client.lock('<key>', function(err, {id, key}){
+
+       // unlock is a convenience function, bound to the right key + request uuid
+
+       client.unlock(key, id, function(err){
+
+       });
+   });
+});
+```
 
 // note: using this id ensures that the unlock call corresponds with the original corresponding lock call
 // otherwise what could happen in your program is that you could call
