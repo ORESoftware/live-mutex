@@ -74,17 +74,17 @@ to use multiple brokers for the same key, that is the one thing you should not d
 
 ## Do's and Don'ts
 <br>
-Do use a different key for each different resource that you need to control access to. <br>
-Do use more than one broker, if you have multiple keys, and need maximum performance. <br>
-Do put each broker in a separate process, if you want to. <br>
-Do *not* use more than one broker for the same key, as that will defeat the purpose of locking altogether. Lol. <br>
-Do call `client.ensure()` immediately before every client.lock() call, this will allow the client to reconnect if it has
+* Do use a different key for each different resource that you need to control access to.
+* Do use more than one broker, if you have multiple keys, and need maximum performance.
+* Do put each broker in a separate process, if you want to.
+* Do *not* use more than one broker for the same key, as that will defeat the purpose of locking altogether. Lol.
+* Do call `client.ensure()` immediately before every client.lock() call, this will allow the client to reconnect if it has
 a bad state.
 
+<br>
 # Examples
 
-
-### Command line:
+## Command line:
 
 The real power of this library comes with usage with Node.js, but we can use <br>
 the functionality at the command line too:
@@ -93,11 +93,11 @@ the functionality at the command line too:
 ```bash
 
 # in shell 1
-$ lm_start_server 6970
+$ lm_start_server 6970  # 6970 is the default port, so you can omit that
 
 # in shell 2
-$ lm_acquire_lock foo
-$ lm_release_lock foo
+$ lm_acquire_lock foo 6970  # 6970 is the default port, so you can omit that
+$ lm_release_lock foo 6970  # 6970 is the default port, so you can omit that
 
 ```
 
@@ -110,7 +110,7 @@ lm_start_server # defaults to port 6970
 And then write some node.js code that uses that broker.
 
 
-### Importing the library using Node.js
+## Importing the library using Node.js
 
 ```js
 
@@ -141,7 +141,7 @@ use `opts.force = true`. Otherwise, implement your own retry mechanism for unloc
 to implement automatic retries for unlocking, please file an ticket.
 
 
-## Using the library with Promises (recommended usage)
+### Using the library with Promises (recommended usage)
 
 ```js
 const opts = {port: '<port>' , host: '<host>'};
@@ -157,12 +157,11 @@ const opts = {port: '<port>' , host: '<host>'};
  });
 ```
 
-### Using vanilla callbacks (higher performance + a convenience unlock function)
+#### Using vanilla callbacks (higher performance + a convenience unlock function)
 
 ```js
 client.ensure(function(err){
    client.lock('<key>', function(err, unlock){
-
        // unlock is a convenience function, bound to the right key + request uuid
        unlock(function(err){
 
@@ -171,12 +170,11 @@ client.ensure(function(err){
 });
 ```
 
-### If you want the key and request id, use:
+#### If you want the key and request id, use:
 
 ```js
 client.ensure(function(err){
    client.lock('<key>', function(err, {id, key}){
-
        // unlock is a convenience function, bound to the right key + request uuid
        client.unlock(key, id, function(err){
 
