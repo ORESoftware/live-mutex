@@ -74,14 +74,19 @@ to use multiple brokers for the same key, that is the one thing you should not d
 
 ## Do's and Don'ts
 <br>
+
 * Do use a different key for each different resource that you need to control access to.
+
 * Do use more than one broker, if you have multiple keys, and need maximum performance.
+
 * Do put each broker in a separate process, if you want to.
+
 * Do *not* use more than one broker for the same key, as that will defeat the purpose of locking altogether. Lol.
-* Do call `client.ensure()` immediately before every client.lock() call, this will allow the client to reconnect if it has
-a bad state.
+
+* Do call `client.ensure()` immediately before every `client.lock()` call, this will allow the client to reconnect if it has a bad state.
 
 <br>
+
 # Examples
 
 ## Command line:
@@ -218,10 +223,10 @@ or is overwhelmed. You can simply log unlocking errors, and otherwise ignore the
 There are some important options. All options can be passed to the client constructor instead of the client lock method, which is more convenient and performant:
 
 ```js
-const c = new Client({port: 3999, ttl: 11000, lockRequestTimeout: 1000, maxRetries: 5});
+const c = new Client({port: 3999, ttl: 11000, lockRequestTimeout: 2000, maxRetries: 5});
 
 c.ensure().then(c => {
-    // lock will retry a maximum of 5 times, with 1 second between each retry
+    // lock will retry a maximum of 5 times, with 2 seconds between each retry
    return c.lock(key);
 })
 .then(function({key, id, unlock}){
@@ -231,7 +236,7 @@ c.ensure().then(c => {
 
    // note that if we want to use the unlock convenience function, it's available here
 
-   return c.runUnlock(unlock);  // runUnlock will return a promise, and execute the unlock convenience function for us
+   return c.execUnlock(unlock);  // runUnlock/execUnlock will return a promise, and execute the unlock convenience function for us
 });
 ```
 
