@@ -17,10 +17,7 @@ exports.default = {
   
   packages: {
   
-    'example1': true,
-    'example2': true,
-    // if it's falsy it will be ignored
-    '@org/example3': 0
+    'siamese': true
     
   }
   
