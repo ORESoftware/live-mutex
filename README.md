@@ -218,12 +218,12 @@ c.ensure().then(c => {
 
 ## The current default values:
 
-* ttl => 4000ms. If 4000ms elapses, if the lock still exists, the lock will be automatically released by the broker.
-* maxRetries => 3. A lock request will be sent to the broker 3 times before an error is called back.
-* lockTimeout => 3000ms. For each lock request, it will timeout after 3 seconds. Upon timeout, it will retry until maxRetries is reached.
-
-
-* keepLocksOnExit => false. If true, locks will *not* be deleted if a connection is closed.
+* port => `6970`
+* host => `localhost`
+* ttl => `4000`ms. If 4000ms elapses, if the lock still exists, the lock will be automatically released by the broker.
+* maxRetries => `3`. A lock request will be sent to the broker 3 times before an error is called back.
+* lockRequestTimeout => `3000`ms. For each lock request, it will timeout after 3 seconds. Upon timeout, it will retry until maxRetries is reached.
+* keepLocksOnExit => `false`. If true, locks will *not* be deleted if a connection is closed.
 
 
   

@@ -58,15 +58,15 @@ const clientOpts = Object.assign(v, {keepLocksAfterDeath: true});
 
 const c = new Client(clientOpts);
 
-c.on('info', function () {
+c.emitter.on('info', function () {
   log.info(...arguments);
 });
 
-c.on('warning', function () {
+c.emitter.on('warning', function () {
   log.warn(...arguments);
 });
 
-c.on('error', function () {
+c.emitter.on('error', function () {
   log.error(...arguments);
 });
 

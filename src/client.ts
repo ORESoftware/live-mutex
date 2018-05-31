@@ -132,8 +132,8 @@ export class Client {
   listeners: Object;
   opts: Partial<ClientOpts>;
   ttl: number;
-  unlockTimeout: number;
-  lockTimeout: number;
+  unlockRequestTimeout: number;
+  lockRequestTimeout: number;
   lockRetryMax: number;
   ws: net.Socket;
   timeouts: IUuidTimeoutBool;
@@ -242,8 +242,8 @@ export class Client {
     this.host = opts.host || 'localhost';
     this.port = opts.port || 6970;
     this.ttl = weAreDebugging ? 5000000 : (opts.ttl || 4000);
-    this.unlockTimeout = weAreDebugging ? 5000000 : (opts.unlockRequestTimeout || 4000);
-    this.lockTimeout = weAreDebugging ? 5000000 : (opts.lockRequestTimeout || 3000);
+    this.unlockRequestTimeout = weAreDebugging ? 5000000 : (opts.unlockRequestTimeout || 4000);
+    this.lockRequestTimeout = weAreDebugging ? 5000000 : (opts.lockRequestTimeout || 3000);
     this.lockRetryMax = opts.lockRetryMax || opts.maxRetries || opts.retryMax || 3;
 
     let ws: net.Socket = null;
@@ -280,7 +280,7 @@ export class Client {
         data.keepLocksAfterDeath = Boolean(data.keepLocksAfterDeath);
       }
       else {
-        data.keepLocksAfterDeath = this.keepLocksAfterDeath;
+        data.keepLocksAfterDeath = this.keepLocksAfterDeath || false;
       }
 
       ws.write(JSON.stringify(data) + '\n', 'utf8', cb);
@@ -312,7 +312,7 @@ export class Client {
 
         this.emitter.emit('warning', new Error('Client side lock/unlock request timed-out.'));
         delete self.timeouts[uuid];
-        if (data.type === 'lock') {
+        if (data.acquired === true && data.type === 'lock') {
           self.write({uuid: uuid, key: data.key, type: 'lock-received-rejected'});
         }
         return;
@@ -323,8 +323,8 @@ export class Client {
         return;
       }
 
-      this.emitter.emit('warning', new Error('Live-mutex implementation warning, ' +
-        'no fn with that uuid in the resolutions hash => ' + util.inspect(data)));
+      this.emitter.emit('warning', 'Live-mutex implementation warning, ' +
+        'no fn with that uuid in the resolutions hash => ' + util.inspect(data, {breakLength: Infinity}));
 
       if (data.acquired === true && data.type === 'lock') {
 
@@ -701,7 +701,7 @@ export class Client {
 
     const uuid = opts._uuid = opts._uuid || uuidV4();
     const ttl = opts.ttl || this.ttl;
-    const lockTimeout = opts.lockRequestTimeout || this.lockTimeout;
+    const lockRequestTimeout = opts.lockRequestTimeout || this.lockRequestTimeout;
     const maxRetries = opts.maxRetry || opts.maxRetries || this.lockRetryMax;
 
     if (opts.__retryCount > maxRetries) {
@@ -716,7 +716,7 @@ export class Client {
     const self = this;
     let timedOut = false;
 
-    this.emitter.emit('info', 'timeout to acquire the lock is:' + lockTimeout);
+    this.emitter.emit('info', 'timeout to acquire the lock is:' + lockRequestTimeout);
     this.emitter.emit('info', 'ttl of lock when acquired is:', ttl);
 
     this.timers[uuid] = setTimeout(() => {
@@ -744,13 +744,15 @@ export class Client {
 
         this.timeouts[uuid] = true;
         self.write({uuid, key, type: 'lock-client-timeout'});
-        return cb(new Error(`Live-Mutex client lock request timed out after ${lockTimeout * opts.__retryCount} ms, ` +
+
+        return cb(
+          new Error(`Live-Mutex client lock request timed out after ${lockRequestTimeout * opts.__retryCount} ms, ` +
           `${maxRetries} retries attempted.`), {acquired: false, key, lockUuid: uuid, id: uuid});
       }
 
       self.lockInternal(key, opts, cb);
 
-    }, lockTimeout);
+    }, lockRequestTimeout);
 
     this.resolutions[uuid] = (err, data) => {
 
@@ -835,7 +837,7 @@ export class Client {
     };
 
     this.write({
-      keepLocksAfterDeath: opts.keepLocksAfterDeath,
+      keepLocksAfterDeath: Boolean(opts.keepLocksAfterDeath || opts.keepLocksOnExit),
       retryCount: opts.__retryCount,
       uuid: uuid,
       key: key,
@@ -910,7 +912,7 @@ export class Client {
     }
 
     const uuid = uuidV4();
-    const unlockTimeout = opts.unlockRequestTimeout || this.unlockTimeout;
+    const unlockRequestTimeout = opts.unlockRequestTimeout || this.unlockRequestTimeout;
 
     let timedOut = false;
 
@@ -932,7 +934,7 @@ export class Client {
         this.emitter.emit('warning', err);
       }
 
-    }, unlockTimeout);
+    }, unlockRequestTimeout);
 
     this.resolutions[uuid] = (err, data) => {
 
@@ -991,7 +993,6 @@ export class Client {
         this.fireUnlockCallbackWithError('fallthrough in conditional [2], Live-Mutex failure.',
           uuid, cb, key);
       }
-
     };
 
     let force: boolean = (opts.__retryCount > 0) || Boolean(opts.force);
