@@ -8,7 +8,7 @@ const index = process.argv.indexOf('--json');
 let v = null as any;
 
 if (index > 0) {
-  
+
   try {
     v = JSON.parse(process.argv[index + 1]);
   }
@@ -56,21 +56,35 @@ const getSelectable = function (selectable, original) {
 
 const clientOpts = Object.assign(v, {keepLocksAfterDeath: true});
 
-new Client(clientOpts).ensure().then(function (c) {
-  
+const c = new Client(clientOpts);
+
+c.on('info', function () {
+  log.info(...arguments);
+});
+
+c.on('warning', function () {
+  log.warn(...arguments);
+});
+
+c.on('error', function () {
+  log.error(...arguments);
+});
+
+c.ensure().then(function (c) {
+
   const unlockOptions = Object.assign({ttl: 6000}, v, {keepLocksAfterDeath: true, force: true});
-  
+
   c.unlock(v.key, unlockOptions, function (e: any) {
-    
+
     if (e) {
       log.error(chalk.magenta.bold(e && e.message || e));
       log.error(`To discover what is going on with the broker, use ${chalk.bold.blueBright('$ lm_inspect_broker -p <port> -h <host>')}.`);
       return process.exit(1);
     }
-    
+
     log.info(chalk.green.bold(`${chalk.italic('Unlocked/released')} lock for key:`), `'${chalk.blueBright.bold(v.key)}'`);
     process.exit(0);
-    
+
   });
-  
+
 });

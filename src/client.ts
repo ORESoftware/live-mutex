@@ -228,6 +228,10 @@ export class Client {
         ' => "keepLocksAfterDeath" option needs to be a boolean.');
     }
 
+    if (opts.ttl === null) {
+      opts.ttl = Infinity;
+    }
+
     this.keepLocksAfterDeath = Boolean(opts.keepLocksAfterDeath);
     this.listeners = {};
     this.host = opts.host || 'localhost';
@@ -264,6 +268,10 @@ export class Client {
 
       data.pid = process.pid;
 
+      if (data.ttl === Infinity) {
+        data.ttl = null;
+      }
+
       if ('keepLocksAfterDeath' in data) {
         data.keepLocksAfterDeath = Boolean(data.keepLocksAfterDeath);
       }
@@ -278,8 +286,6 @@ export class Client {
 
       const uuid = data.uuid;
 
-      log.debug('client received data:', util.inspect(data, {breakLength: Infinity}));
-
       if (!uuid) {
         return this.emitter.emit('warning', new Error(
           'Potential Live-Mutex implementation error => message did not contain uuid =>' + util.inspect(data))
@@ -287,7 +293,6 @@ export class Client {
       }
 
       if (self.giveups[uuid]) {
-        log.debug(chalk.red('we already gave up on this request:', data));
         delete self.giveups[uuid];
         return;
       }
@@ -530,7 +535,7 @@ export class Client {
       this.emitter.emit('warning', err);
     }
 
-    err = err instanceof Error ? err : new Error(err);
+    // err = err instanceof Error ? err : new Error(err);
     this.emitter.emit('warning', err);
     cb(err, uuid);
   }
@@ -638,16 +643,16 @@ export class Client {
           '"retry" option must be an integer between 0 and 20 inclusive.');
       }
 
-      if (opts['ttl'] === Infinity) {
-        // allow ttl to be stringified, null or Infinity both mean there is no ttl
-        opts['ttl'] = null;
-      }
-
       if (opts['ttl']) {
         assert(Number.isInteger(opts.ttl),
           ' => Live-Mutex usage error => Please pass an integer representing milliseconds as the value for "ttl".');
         assert(opts.ttl >= 3 && opts.ttl <= 800000,
           ' => Live-Mutex usage error => "ttl" for a lock needs to be integer between 3 and 800000 millis.');
+      }
+
+      if (opts['ttl'] === null) {
+        // allow ttl to be stringified, null or Infinity both mean there is no ttl
+        opts['ttl'] = Infinity;
       }
 
       if (opts['lockRequestTimeout']) {
@@ -677,12 +682,20 @@ export class Client {
 
   }
 
+  on() {
+    log.warn('warning:', 'use c.emitter.on() instead of c.on()');
+    return this.emitter.on.apply(this.emitter, arguments);
+  }
+
+  once() {
+    log.warn('warning:', 'use c.emitter.once() instead of c.once()');
+    return this.emitter.once.apply(this.emitter, arguments);
+  }
+
   private lockInternal(key: string, opts: any, cb: LMClientLockCallBack) {
 
-    console.log('raw internal opts:', opts);
-
     const uuid = opts._uuid = opts._uuid || uuidV4();
-    const ttl = opts.ttl === null ? null : this.ttl;
+    const ttl = opts.ttl || this.ttl;
     const lockTimeout = opts.lockRequestTimeout || this.lockTimeout;
     const maxRetries = opts.maxRetry || opts.maxRetries || this.lockRetryMax;
 
@@ -698,8 +711,8 @@ export class Client {
     const self = this;
     let timedOut = false;
 
-    log.info('timeout to acquire the lock is:', lockTimeout);
-    log.info('ttl of lock when acquired is:', ttl || Infinity);
+    this.emitter.emit('info', 'timeout to acquire the lock is:' + lockTimeout);
+    this.emitter.emit('info', 'ttl of lock when acquired is:', ttl);
 
     this.timers[uuid] = setTimeout(() => {
 
@@ -709,8 +722,6 @@ export class Client {
 
       ++opts.__retryCount;
 
-      log.error('timed-out, have to retry?');
-
       this.emitter.emit('warning',
         `retrying lock request for key '${key}', on host:port '${self.getHost()}:${self.getPort()}', ` +
         `attempt # ${opts.__retryCount}` as any,
@@ -718,17 +729,33 @@ export class Client {
 
       if (opts.__retryCount >= maxRetries) {
 
+        try {
+          const v = this.lockQueues[key] && this.lockQueues[key].pop();
+          v && this.lockInternal.apply(this, v);
+        }
+        catch (err) {
+          this.emitter.emit('warning', err);
+        }
+
         this.timeouts[uuid] = true;
         self.write({uuid, key, type: 'lock-client-timeout'});
         return cb(new Error(`Live-Mutex client lock request timed out after ${lockTimeout * opts.__retryCount} ms, ` +
           `${maxRetries} retries attempted.`), {acquired: false, key, lockUuid: uuid, id: uuid});
       }
 
-      self.lock(key, opts, cb);
+      self.lockInternal(key, opts, cb);
 
     }, lockTimeout);
 
     this.resolutions[uuid] = (err, data) => {
+
+      try {
+        const v = this.lockQueues[key] && this.lockQueues[key].pop();
+        v && this.lockInternal.apply(this, v);
+      }
+      catch (err) {
+        this.emitter.emit('warning', err);
+      }
 
       if (timedOut) {
         return;
@@ -776,7 +803,7 @@ export class Client {
       else if (data.reelection === true) {
 
         this.cleanUp(uuid);
-        self.lock(key, opts, cb);
+        self.lockInternal(key, opts, cb);
 
       }
       else if (data.acquired === false) {

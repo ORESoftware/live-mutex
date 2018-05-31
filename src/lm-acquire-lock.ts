@@ -56,24 +56,32 @@ process.once('uncaughtException', function (e: any) {
 const clientOpts = Object.assign({keepLocksAfterDeath: true}, v);
 const c = new Client(clientOpts);
 
+c.emitter.on('info', function () {
+  log.info(...arguments);
+});
+
 c.emitter.on('warning', function () {
   log.warn(...arguments);
 });
 
+c.emitter.on('error', function () {
+  log.error(...arguments);
+});
+
 c.ensure().then(function (c) {
-  
+
   const lockOptions = Object.assign({ttl: null, keepLocksAfterDeath: true}, v);
-  
+
   c.lock(v.key, lockOptions, function (e: any) {
-    
+
     if (e) {
       log.error(chalk.magenta.bold(e && e.message || e));
       log.error(`To discover what is going on with the broker, use ${chalk.blueBright.bold('$ lm_inspect_broker -p <port> -h <host>')}.`);
       return process.exit(1);
     }
-    
+
     log.info(chalk.green.bold(`${chalk.italic('Acquired')} lock for key:`), `'${chalk.blueBright.bold(v.key)}'`);
     process.exit(0);
-    
+
   });
 });

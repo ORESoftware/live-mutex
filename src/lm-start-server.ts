@@ -9,7 +9,7 @@ const index = process.argv.indexOf('--json');
 let v = {port} as any;
 
 if (index > 0) {
-  
+
   try {
     v = JSON.parse(process.argv[index + 1]);
   }
@@ -17,7 +17,7 @@ if (index > 0) {
     log.error(chalk.magenta(`Could not parse your --json argument, try --json '{"port":3091}'.`));
     throw chalk.magentaBright(err.message);
   }
-  
+
   port = v.port = (v.port || port);
 }
 
@@ -40,6 +40,12 @@ process.once('uncaughtException', function (e: any) {
 });
 
 const b = new Broker(v);
+
+process.once('exit', function () {
+  b.close(function () {
+    log.info('broker closed.');
+  });
+});
 
 b.emitter.on('warning', function () {
   log.warn(...arguments);

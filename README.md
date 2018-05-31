@@ -5,7 +5,7 @@
 ### Disclaimer
 
 Tested on *nix and MacOS - (probably will work on Windows, but not tested on Windows). <br>
-Tested and proven on Node.js versions > 4.0.0.
+Tested and proven on Node.js versions >= 6.0.0.
 
 ## About
 
@@ -32,29 +32,7 @@ For usage with Node.js libraries:
 one machine, Live-Mutex can work on a network.)
 
 In more detail:<br>
-This library is useful for developers who need a multi-process locking mechanism, but may find it
-inconvenient or impossible to use Redis, or similar proven mutex brokers. In other words, this library is designed to support other 
-libraries more so than applications. 
-
-Live-Mutex offers lightweight (non-polling), safe (prevents you from unlocking a lock by accident),
-and high-performance (faster than anything else) locking.
-
-It offers the same locking features that Redis-related libraries would offer, but should be more developer friendly. 
-
-Ideally, use Live-Mutex for shorter lived locking needs (less than an hour), for two reasons:
-
-1. I haven't proved that there are no memory leaks over time (although things look good).
-2. This library does not currently have a backup/secondary system - if the broker goes down for whatever reason, that's it.
-
-For application development, there is no reason not to use Redis or similar,
-but for libraries that need a locking mechanism, and for which installing Redis would be too much to ask, then this
-will be a good solution. In most cases, this library should outperform other libraries doing concurrent access, this
-is because this library uses events instead of polling for its implementation.
-
-This library uses a broker and client model. For any key there should be at most 1 broker. There can be as many
-clients as you like. For more than one key, you can use just 1 broker, or a separate broker per key,
-depending on how much performance you really need.
-
+See: docs/detailed-explanation.md
 
 
 ## Alternatives to Live-Mutex
@@ -69,19 +47,17 @@ The NPM lockfile library works OK for the same purpose, but Live-Mutex is:
 ## Usage and Best Practices
 
 The Live-Mutex API is completely asynchronous and requires usage of async initialization for both
-the client and broker instances. You can initialize a client or broker in a few different ways.
-
-This library requires a Node.js process to run a TCP server. This can be within one of your existing Node.js
+the client and broker instances. This library requires a Node.js process to run a TCP server. This can be within one of your existing Node.js
 processes, or more likely launched separately. In other words, a live-mutex client could also be the broker,
 there is nothing wrong with that. For any given key there should be one broker. For absolute speed, you could use separate
 brokers (in separate Node.js processes)for separate keys, but that's not really very necessary.
 
 Three things to remember:
 
-1. You need to initialize a broker before initializing any clients, otherwise your clients will pass back an error upon connect().
-2. You need to call `ensure()` on a client or use the asynchronous callback passed to the constructor, before
+1. You need to initialize a broker before connecting any clients, otherwise your clients will pass back an error upon connect().
+2. You need to call `ensure()/connect()` on a client or use the asynchronous callback passed to the constructor, before
 calling client.lock() or client.unlock().
-3. Live-Mutex clients and brokers are not (currently) event emitters. <br> The two classes wrap Node.js sockets, but the sockets
+3. Live-Mutex clients and brokers are *not* event emitters. <br> The two classes wrap Node.js sockets, but the sockets connections
 are not exposed to the user of the library.
 
 
@@ -101,8 +77,9 @@ to use multiple brokers for the same key, that is the one thing you should not d
 Do use a different key for each different resource that you need to control access to. <br>
 Do use more than one broker, if you have multiple keys, and need maximum performance. <br>
 Do put each broker in a separate process, if you want to. <br>
-Do not use more than one broker for the same key, as that will defeat the purpose of locking altogether. <br>
-
+Do *not* use more than one broker for the same key, as that will defeat the purpose of locking altogether. Lol. <br>
+Do call `client.ensure()` immediately before every client.lock() call, this will allow the client to reconnect if it has
+a bad state.
 
 # Examples
 
@@ -116,16 +93,24 @@ the functionality at the command line too:
 ```bash
 
 # in shell 1
-lm_start_server 6970
+$ lm_start_server 6970
 
 # in shell 2
-lm_acquire_lock foo
-lm_release_lock foo
+$ lm_acquire_lock foo
+$ lm_release_lock foo
 
 ```
 
+Note to get started with the library, you should simply start a live-mutex broker with:
 
-### Importing the library
+```bash
+lm_start_server # defaults to port 6970
+```
+
+And then write some node.js code that uses that broker.
+
+
+### Importing the library using Node.js
 
 ```js
 
@@ -141,67 +126,58 @@ const {LMClient, LvMtxClient} = require('live-mutex/client');  // these are simp
 import {Client, Broker, lmUtils}  from 'live-mutex';
 
 ```
-## Using the library with vanilla callbacks
+
+As you can see, before any `client.lock()` call, we call `client.ensure()`...this is not imperative, but it is a best practice. <br>
+`client.ensure()` only needs to be called once before any subsequent `client.lock()` call. However, the benefit of calling it before every time, <br>
+is that it will allow a new connection to be made if the existing one has a bad state.
+
+## Using the library with Promises (recommended usage)
 
 ```js
 const opts = {port: '<port>' , host: '<host>'};
 // check to see if the websocket broker is already running, if not, launch one in this process
 
-lmUtils.conditionallyLaunchSocketServer(opts, function(err){
-    
-    if(err) throw err;
-           
-      // either this process now owns the broker, or it's already running in a different process
-      // either way, we are good to go
-      // you don't need to use this utility method, you can easily write your own
-      
-      // * the following is our recommended usage* =>
-      // for convenience and safety, you can use the unlock callback, which is bound
-      // to the right key and internal call-id
+ const client = new Client(opts);
 
-             
-     // here is the recommended way with promises
-     
-     const client = new Client(opts);
-     // calling ensure before each critical section means that we ensure we have a connected client
-     return client.ensure().then(c =>  {
-       return client.acquire('<key>').then(({key,id}) => {
-             return client.release('<key>', id);
-         });
+ // calling ensure before each critical section means that we ensure we have a connected client
+ return client.ensure().then(c =>  {
+   return client.acquire('<key>').then(({key,id}) => {
+         return client.release('<key>', id);
      });
-       
-       
-   // using vanilla callbacks (higher performance + a convenience unlock function)
-    client.ensure(function(err){
-       // handle any err your way
-       client.lock('<key>', function(err, unlock){
-            // handle any err your way
-             unlock(function(err){  // unlock is bound to the right key and request uuid
-                 // handle any err your way, p
-             });
-       });
-    });
-    
-   
-      
-    // note: using this id ensures that the unlock call corresponds with the original corresponding lock call
-    // otherwise what could happen in your program is that you could call
-    // unlock() for a key that was not supposed to be unlocked by your current call
-        
-        
-    //  simple usage without the call id (this is less safe):
-    const client = new Client(opts);
-    
-    client.ensure().then(function(c){
-      c.lock('<key>', function(err){       // c and client are same object
-          c.unlock('<key>',function(err){
-                     
-          });
-      });      
-    });
-      
-});
+ });
+```
 
+## Using vanilla callbacks (higher performance + a convenience unlock function)
+
+```js
+client.ensure(function(err){
+
+   client.lock('<key>', function(err, unlock){
+
+         unlock(function(err){  // unlock is a convenience function, bound to the right key + request uuid
+
+         });
+   });
+});
+```
+
+
+// note: using this id ensures that the unlock call corresponds with the original corresponding lock call
+// otherwise what could happen in your program is that you could call
+// unlock() for a key that was not supposed to be unlocked by your current call
+
+
+## Usage without the call id (this is less safe):
+
+```js
+const client = new Client(opts);
+client.ensure(function(err, c){
+  c.lock('<key>', function(err){       // c and client are same object
+      c.unlock('<key>',function(err){
+
+      });
+  });
+});
 
 ```
 
@@ -238,88 +214,53 @@ to see if the web-socket server is running somewhere. I have had a lot of luck w
   
 ## Usage with Promises and RxJS5 Observables:
   
-  This library conciously uses a CPS interface as this is the most primitive async interface.
+  This library conciously uses a CPS interface as this is the most primitive and performant async interface.
   You can always wrap client.lock and client.unlock to use Promises or Observables etc.
-  Below I have demonstrated making live-mutex usable with ES6 Promises and RxJS5 Observables. 
+  In the docs directory, I've demonstrated how to use live-mutex with ES6 Promises and RxJS5 Observables.
   Releasing the lock can be implemented with (1) the unlock() convenience callback or with (2) both
   the lockName and the uuid of the lock request.
   
-  With regard the Observables implementation, notice that we just pass errors to sub.next() instead of sub.error(), 
+  With regard to the Observables implementation, notice that we just pass errors to sub.next() instead of sub.error(),
   but that's just a design decision.
-  
-  Below, we assume you have created a connected client. It's best to avoid having to call `client.ensure()` for every
-  request. Simply call `client.ensure()` once, when your application starts up.
-  
-  
+
+
 ### Usage with Promises:
-
-This library exports `acquire/acquireLock` and `release/releaseLock` methods for the client,<br>
-which are simply implemented like so:
-
-```typescript
-
-  acquire(key: string, opts?: Partial<IClientLockOpts>) {
-    return new Promise((resolve, reject) => {
-      this.lock(key, opts, function (err, v) {
-        err ? reject(err) : resolve(v);
-      });
-    });
-  }
-
-  release(key: string, opts?: Partial<IClientUnlockOpts>) {
-    return new Promise((resolve, reject) => {
-      this.unlock(key, opts, function (err, val) {
-        err ? reject(err) : resolve(val);
-      });
-    });
-  }
-  
-  acquireLock(key: string, opts?: Partial<IClientLockOpts>) {
-     // same as acquire
-  }
-
-  releaseLock(key: string, opts?: Partial<IClientUnlockOpts>) {
-      // same as release
-  }
- 
-  lockp(key: string, opts?: Partial<IClientLockOpts>) {
-     // same as acquire
-  }
-
-  unlockp(key: string, opts?: Partial<IClientUnlockOpts>) {
-      // same as release
-  }
-  
-```
-
-## To use these methods with async/await, it simply looks like:
-
-```js
-    await client.lockp('a');
-    await Promise.delay(100);
-    await client.unlockp('a');
-```
-
-you can also use the unlock() convenience callback like so:
-
-```js
-    return c.lockp('foo').then(function ({unlock}) {
-      return new Promise(function (resolve, reject) {
-        unlock(function (err, v) {
-          err ? reject(err) : resolve(v);
-        });
-      });
-    });
-
-```
-
+ => see docs/examples/promises.md
 
 
 ### Usage with RxJS5 Observables
- => see docs/examples.md
-  
-### Usage with ES6 Promises
- => see docs/examples.md
+ => see docs/examples/observables.md
+
+
+### Live-Mutex utils
+
+To launch a broker process using Node.js:
+
+```js
+
+const lmUtils = require('live-mutex/utils');
+
+lmUtils.conditionallyLaunchSocketServer(opts, function(err){
+
+    if(err) throw err;
+
+      // either this process now owns the broker, or it's already running in a different process
+      // either way, we are good to go
+      // you don't need to use this utility method, you can easily write your own
+
+      // * the following is our recommended usage* =>
+      // for convenience and safety, you can use the unlock callback, which is bound
+      // to the right key and internal call-id
+
+  });
+
+```
+
+To see examples of launching a broker using Node.js code, see:
+
+```src/lm-start-server.ts```
+
+
 
 
 ## Creating a simple client pool
