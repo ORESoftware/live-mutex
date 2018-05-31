@@ -55,14 +55,14 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
     it('locks/unlocks super special 1', t => {
       const c = t.supply.client;
       return c.lockp('foo').then(function ({unlock}) {
-        return c.promisifyUnlock(unlock);
+        return c.runUnlock(unlock);
       });
     });
     
     it('locks/unlocks super special 2', async t => {
       const c = t.supply.client as Client;
       const {unlock} = await c.acquire('foo');
-      return c.promisifyUnlock(unlock);
+      return c.execUnlock(unlock);
     });
     
     it('locks/unlocks super special 2', async t => {

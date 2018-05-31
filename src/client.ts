@@ -69,6 +69,8 @@ export interface ClientOpts {
   unlockRequestTimeout: number;
   lockRequestTimeout: number;
   lockRetryMax: number;
+  retryMax: number;
+  maxRetries: number;
   ttl: number,
   keepLocksAfterDeath: boolean,
   keepLocksOnExit: boolean
@@ -513,7 +515,7 @@ export class Client {
     return this.unlockp.apply(this, arguments);
   }
 
-  promisifyUnlock(fn: LMClientUnlockConvenienceCallback) {
+  runUnlock(fn: LMClientUnlockConvenienceCallback): Promise<any> {
     return new Promise((resolve, reject) => {
       fn(function (err, val) {
         err ? reject(err) : resolve(val);
@@ -521,12 +523,8 @@ export class Client {
     });
   }
 
-  runUnlock(fn: LMClientUnlockConvenienceCallback) {
-    return new Promise((resolve, reject) => {
-      fn(function (err, val) {
-        err ? reject(err) : resolve(val);
-      });
-    });
+  execUnlock(fn: LMClientUnlockConvenienceCallback): Promise<any> {
+    return this.runUnlock.apply(this, arguments);
   }
 
   private cleanUp(uuid: string) {
@@ -755,7 +753,7 @@ export class Client {
 
         return cb(
           new Error(`Live-Mutex client lock request timed out after ${lockRequestTimeout * opts.__retryCount} ms, ` +
-          `${maxRetries} retries attempted.`), {acquired: false, key, lockUuid: uuid, id: uuid});
+            `${maxRetries} retries attempted.`), {acquired: false, key, lockUuid: uuid, id: uuid});
       }
 
       self.lockInternal(key, opts, cb);
@@ -1006,7 +1004,7 @@ export class Client {
     let force: boolean = (opts.__retryCount > 0) || Boolean(opts.force);
 
     this.write({
-      _uuid: opts._uuid || opts.id || opts.lockUuid ,
+      _uuid: opts._uuid || opts.id || opts.lockUuid,
       uuid: uuid,
       key: key,
       force: force,

@@ -231,7 +231,7 @@ c.ensure().then(c => {
 
    // note that if we want to use the unlock convenience function, it's available here
 
-   return c.promisifyUnlock(unlock);
+   return c.runUnlock(unlock);  // runUnlock will return a promise, and execute the unlock convenience function for us
 });
 ```
 
