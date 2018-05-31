@@ -133,6 +133,9 @@ import {Client, Broker, lmUtils}  from 'live-mutex';
 By default, a lock request will retry 3 times, on an interval defined by `opts.lockRequestTimeout`, which defaults to 3 seconds.
 That would mean that the a lock request might fail with a timeout error after 9 seconds.
 
+If there is an error or Promise rejection, the lock was not acquired, otherwise the lock was acquired.
+This is nice than other libraries that necessitate that you check to see if 'unlock' is a function, etc etc.
+
 Unlock requests - there are no builtin retries for unlock requests - if you absolutely need an unlock request to succeed,
 use `opts.force = true`. Otherwise, implement your own retry mechanism for unlocking. If you want the library
 to implement automatic retries for unlocking, please file an ticket.
@@ -154,14 +157,13 @@ const opts = {port: '<port>' , host: '<host>'};
  });
 ```
 
-## Using vanilla callbacks (higher performance + a convenience unlock function)
+### Using vanilla callbacks (higher performance + a convenience unlock function)
 
 ```js
 client.ensure(function(err){
    client.lock('<key>', function(err, unlock){
 
        // unlock is a convenience function, bound to the right key + request uuid
-
        unlock(function(err){
 
        });
@@ -169,14 +171,13 @@ client.ensure(function(err){
 });
 ```
 
-## If you want the key and request id, use:
+### If you want the key and request id, use:
 
 ```js
 client.ensure(function(err){
    client.lock('<key>', function(err, {id, key}){
 
        // unlock is a convenience function, bound to the right key + request uuid
-
        client.unlock(key, id, function(err){
 
        });
@@ -189,7 +190,7 @@ client.ensure(function(err){
 // unlock() for a key that was not supposed to be unlocked by your current call
 
 
-## Usage without the call id (this is less safe):
+### Usage without the call id (this is less safe):
 
 ```js
 const client = new Client(opts);
