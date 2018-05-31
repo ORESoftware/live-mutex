@@ -40,9 +40,9 @@ export const validConstructorOptions = {
   ttl: 'integer',
   unlockRequestTimeout: 'integer in millis',
   lockRequestTimeout: 'integer in millis',
-  unlockRetryMax: 'integer',
   lockRetryMax: 'integer',
-  keepLocksAfterDeath: 'boolean'
+  keepLocksAfterDeath: 'boolean',
+  keepLocksOnExit: 'boolean'
 };
 
 export const validLockOptions = {
@@ -51,7 +51,8 @@ export const validLockOptions = {
   maxRetry: 'integer',
   ttl: 'integer in millis',
   lockRequestTimeout: 'integer in millis',
-  keepLocksAfterDeath: 'boolean'
+  keepLocksAfterDeath: 'boolean',
+  keepLocksOnExit: 'boolean'
 };
 
 export const validUnlockOptions = {
@@ -67,11 +68,10 @@ export interface ClientOpts {
   port: number
   unlockRequestTimeout: number;
   lockRequestTimeout: number;
-  unlockRetryMax: number;
   lockRetryMax: number;
   ttl: number,
   keepLocksAfterDeath: boolean,
-  keepAnyLocksAfterExit: boolean
+  keepLocksOnExit: boolean
 }
 
 export interface IUuidTimeoutBool {
@@ -135,7 +135,6 @@ export class Client {
   unlockTimeout: number;
   lockTimeout: number;
   lockRetryMax: number;
-  unlockRetryMax: number;
   ws: net.Socket;
   timeouts: IUuidTimeoutBool;
   resolutions: IClientResolution;
@@ -149,6 +148,7 @@ export class Client {
   close: Function;
   lockQueues = {}  as { [key: string]: Array<any> };
   keepLocksAfterDeath = false;
+  keepLocksOnExit = false;
   emitter = new EventEmitter();
 
   ////////////////////////////////////////////////////////////////
@@ -188,18 +188,18 @@ export class Client {
       assert(typeof opts.key === 'string', ' => You must pass in a key to use listener functionality.');
     }
 
-    if (opts['unlockRetryMax']) {
-      assert(Number.isInteger(opts.unlockRetryMax),
-        ' => "unlockRetryMax" option needs to be an integer.');
-      assert(this.opts.unlockRetryMax >= 0 && opts.unlockRetryMax <= 100,
-        ' => "unlockRetryMax" integer needs to be in range (0-100).');
-    }
-
     if (opts['lockRetryMax']) {
       assert(Number.isInteger(opts.lockRetryMax),
         ' => "lockRetryMax" option needs to be an integer.');
       assert(opts.lockRetryMax >= 0 && opts.lockRetryMax <= 100,
         ' => "lockRetryMax" integer needs to be in range (0-100).');
+    }
+
+    if (opts['retryMax']) {
+      assert(Number.isInteger(opts.retryMax),
+        ' => "retryMax" option needs to be an integer.');
+      assert(opts.retryMax >= 0 && opts.retryMax <= 100,
+        ' => "retryMax" integer needs to be in range (0-100).');
     }
 
     if (opts['unlockRequestTimeout']) {
@@ -228,19 +228,23 @@ export class Client {
         ' => "keepLocksAfterDeath" option needs to be a boolean.');
     }
 
+    if ('keepLocksOnExit' in opts) {
+      assert(typeof opts.keepLocksOnExit === 'boolean',
+        ' => "keepLocksOnExit" option needs to be a boolean.');
+    }
+
     if (opts.ttl === null) {
       opts.ttl = Infinity;
     }
 
-    this.keepLocksAfterDeath = Boolean(opts.keepLocksAfterDeath);
+    this.keepLocksAfterDeath = Boolean(opts.keepLocksAfterDeath || opts.keepLocksOnExit);
     this.listeners = {};
     this.host = opts.host || 'localhost';
     this.port = opts.port || 6970;
-    this.ttl = weAreDebugging ? 5000000 : (opts.ttl || 3000);
+    this.ttl = weAreDebugging ? 5000000 : (opts.ttl || 4000);
     this.unlockTimeout = weAreDebugging ? 5000000 : (opts.unlockRequestTimeout || 4000);
     this.lockTimeout = weAreDebugging ? 5000000 : (opts.lockRequestTimeout || 3000);
-    this.lockRetryMax = opts.lockRetryMax || 3;
-    this.unlockRetryMax = opts.unlockRetryMax || 3;
+    this.lockRetryMax = opts.lockRetryMax || opts.maxRetries || opts.retryMax || 3;
 
     let ws: net.Socket = null;
     let connectPromise: Promise<any> = null;
@@ -621,11 +625,6 @@ export class Client {
       assert.equal(typeof key, 'string', 'Key passed to live-mutex #lock needs to be a string.');
       assert(typeof cb === 'function', 'callback function must be passed to Client lock() method.');
 
-      if ('append' in opts) {
-        assert.equal(typeof opts.append, 'string', ' => Live-Mutex usage error => ' +
-          '"append" option must be a string value.');
-      }
-
       if (opts['force']) {
         assert.equal(typeof opts.force, 'boolean', ' => Live-Mutex usage error => ' +
           '"force" option must be a boolean value. Coerce it on your side, for safety.');
@@ -640,6 +639,12 @@ export class Client {
       if (opts['maxRetry']) {
         assert(Number.isInteger(opts.maxRetry), '"retry" option must be an integer.');
         assert(opts.maxRetry >= 0 && opts.maxRetry <= 20,
+          '"retry" option must be an integer between 0 and 20 inclusive.');
+      }
+
+      if (opts['retryMax']) {
+        assert(Number.isInteger(opts.retryMax), '"retry" option must be an integer.');
+        assert(opts.retryMax >= 0 && opts.retryMax <= 20,
           '"retry" option must be an integer between 0 and 20 inclusive.');
       }
 
@@ -934,8 +939,13 @@ export class Client {
       delete this.timeouts[uuid];
       clearTimeout(this.timers[uuid]);
 
-      const v = this.lockQueues[key] && this.lockQueues[key].pop();
-      v && this.lockInternal.apply(this, v);
+      try {
+        const v = this.lockQueues[key] && this.lockQueues[key].pop();
+        v && this.lockInternal.apply(this, v);
+      }
+      catch (err) {
+        this.emitter.emit('warning', err);
+      }
 
       if (timedOut) {
         return;

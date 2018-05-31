@@ -127,9 +127,16 @@ import {Client, Broker, lmUtils}  from 'live-mutex';
 
 ```
 
-As you can see, before any `client.lock()` call, we call `client.ensure()`...this is not imperative, but it is a best practice. <br>
-`client.ensure()` only needs to be called once before any subsequent `client.lock()` call. However, the benefit of calling it before every time, <br>
-is that it will allow a new connection to be made if the existing one has a bad state.
+
+### A note on default behavior
+
+By default, a lock request will retry 3 times, on an interval defined by `opts.lockRequestTimeout`, which defaults to 3 seconds.
+That would mean that the a lock request might fail with a timeout error after 9 seconds.
+
+Unlock requests - there are no builtin retries for unlock requests - if you absolutely need an unlock request to succeed,
+use `opts.force = true`. Otherwise, implement your own retry mechanism for unlocking. If you want the library
+to implement automatic retries for unlocking, please file an ticket.
+
 
 ## Using the library with Promises (recommended usage)
 
@@ -181,35 +188,43 @@ client.ensure(function(err, c){
 
 ```
 
+As you can see, before any `client.lock()` call, we call `client.ensure()`...this is not imperative, but it is a best practice. <br>
+`client.ensure()` only needs to be called once before any subsequent `client.lock()` call. However, the benefit of calling it before every time, <br>
+is that it will allow a new connection to be made if the existing one has a bad state.
+
 Any *locking* errors will mostly be due to the failure to acquire a lock before timing out, and should
  very rarely happen if you understand your system and provide good settings/options to live-mutex.
 
 *Unlocking* errors should be very rare, and most likely will happen if the process running the broker goes down
-or is overwhelmed.
+or is overwhelmed. You can simply log unlocking errors, and otherwise ignore them.
 
-To check if there is already a broker running in your system on the desired port, you can use a tcp ping utility
-to see if the web-socket server is running somewhere. I have had a lot of luck with tcp-ping, like so:
 
-```js
+## Client constructor and client.lock() method options
 
-  const ping = require('tcp-ping');
-
-  ping.probe(host, port, function (err, available) {
-
-        if (err) {
-            // handle it
-        }
-        else if (available) {
-            // tcp server is already listening on the given host/port
-        }
-        else {
-           // nothing is listening so you should launch a new server/broker, as stated above
-           // the broker can run in the same process as a client, or a separate process, either way
-        }
-    });
-
+There are some important options. All options can be passed to the client constructor instead of the client lock method, which is more convenient and performant:
 
 ```
+const c = new Client({port: 3999, ttl: 11000, lockRequestTimeout: 1000, maxRetries: 5});
+
+c.ensure().then(c => {
+    // lock will retry a maximum of 5 times, with 1 second between each retry
+   return c.lock(key);
+})
+.then(function(){
+   // we have acquired a lock on the key, if we don't release the lock after 11 seconds
+   // it will be unlocked for us.
+});
+```
+
+## The current default values:
+
+* ttl => 4000ms. If 4000ms elapses, if the lock still exists, the lock will be automatically released by the broker.
+* maxRetries => 3. A lock request will be sent to the broker 3 times before an error is called back.
+* lockTimeout => 3000ms. For each lock request, it will timeout after 3 seconds. Upon timeout, it will retry until maxRetries is reached.
+
+
+* keepLocksOnExit => false. If true, locks will *not* be deleted if a connection is closed.
+
 
   
 ## Usage with Promises and RxJS5 Observables:
@@ -232,7 +247,7 @@ to see if the web-socket server is running somewhere. I have had a lot of luck w
  => see docs/examples/observables.md
 
 
-### Live-Mutex utils
+## Live-Mutex utils
 
 To launch a broker process using Node.js:
 
@@ -261,7 +276,34 @@ To see examples of launching a broker using Node.js code, see:
 ```src/lm-start-server.ts```
 
 
+To check if there is already a broker running in your system on the desired port, you can use a tcp ping utility
+to see if the web-socket server is running somewhere. I have had a lot of luck with tcp-ping, like so:
 
+```js
+
+  const ping = require('tcp-ping');
+
+  ping.probe(host, port, function (err, available) {
+
+        if (err) {
+            // handle it
+        }
+        else if (available) {
+            // tcp server is already listening on the given host/port
+        }
+        else {
+           // nothing is listening so you should launch a new server/broker, as stated above
+           // the broker can run in the same process as a client, or a separate process, either way
+        }
+    });
+
+
+```
+
+
+
+### Live-Mutex supports Node.js core domains
+To see more, see: docs/examples/domains.md
 
 ## Creating a simple client pool
 
