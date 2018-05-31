@@ -217,29 +217,36 @@ or is overwhelmed. You can simply log unlocking errors, and otherwise ignore the
 
 There are some important options. All options can be passed to the client constructor instead of the client lock method, which is more convenient and performant:
 
-```
+```js
 const c = new Client({port: 3999, ttl: 11000, lockRequestTimeout: 1000, maxRetries: 5});
 
 c.ensure().then(c => {
     // lock will retry a maximum of 5 times, with 1 second between each retry
    return c.lock(key);
 })
-.then(function(){
+.then(function({key, id, unlock}){
+
    // we have acquired a lock on the key, if we don't release the lock after 11 seconds
    // it will be unlocked for us.
+
+   // note that if we want to use the unlock convenience function, it's available here
+
+   return c.promisifyUnlock(unlock);
 });
 ```
 
-## The current default values:
+## The current default values for constructor options:
 
-* port => `6970`
-* host => `localhost`
-* ttl => `4000`ms. If 4000ms elapses, if the lock still exists, the lock will be automatically released by the broker.
-* maxRetries => `3`. A lock request will be sent to the broker 3 times before an error is called back.
-* lockRequestTimeout => `3000`ms. For each lock request, it will timeout after 3 seconds. Upon timeout, it will retry until maxRetries is reached.
-* keepLocksOnExit => `false`. If true, locks will *not* be deleted if a connection is closed.
+* `port` => `6970`
+* `host` => `localhost`
+* `ttl` => `4000`ms. If 4000ms elapses, if the lock still exists, the lock will be automatically released by the broker.
+* `maxRetries` => `3`. A lock request will be sent to the broker 3 times before an error is called back.
+* `lockRequestTimeout` => `3000`ms. For each lock request, it will timeout after 3 seconds. Upon timeout, it will retry until maxRetries is reached.
+* `keepLocksOnExit` => `false`. If true, locks will *not* be deleted if a connection is closed.
 
-
+As already stated, unless you are using different options for different lock requests for the same client, <br>
+simply pass these options to the client constructor which allows you to avoid passing an options object for each <br>
+client.lock/unlock call.
   
 ## Usage with Promises and RxJS5 Observables:
   
@@ -254,11 +261,11 @@ c.ensure().then(c => {
 
 
 ### Usage with Promises:
- => see docs/examples/promises.md
+ => see `docs/examples/promises.md`
 
 
 ### Usage with RxJS5 Observables
- => see docs/examples/observables.md
+ => see `docs/examples/observables.md`
 
 
 ## Live-Mutex utils
@@ -315,9 +322,12 @@ to see if the web-socket server is running somewhere. I have had a lot of luck w
 ```
 
 
+<br>
 
 ### Live-Mutex supports Node.js core domains
-To see more, see: docs/examples/domains.md
+To see more, see: `docs/examples/domains.md`
+
+<br>
 
 ## Creating a simple client pool
 

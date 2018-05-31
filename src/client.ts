@@ -120,7 +120,7 @@ export interface LMClientLockCallBack {
 }
 
 export type LMClientUnlockCallBack = (err: any, uuid?: string) => void;
-export type ErrorFirstCallBack = (err: any) => void;
+export type ErrorFirstCallBack = (err: any, val?: any) => void;
 export type LMClientUnlockConvenienceCallback = (fn: ErrorFirstCallBack) => void;
 
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -513,7 +513,15 @@ export class Client {
     return this.unlockp.apply(this, arguments);
   }
 
-  promisifyUnlock(fn: Function) {
+  promisifyUnlock(fn: LMClientUnlockConvenienceCallback) {
+    return new Promise((resolve, reject) => {
+      fn(function (err, val) {
+        err ? reject(err) : resolve(val);
+      });
+    });
+  }
+
+  runUnlock(fn: LMClientUnlockConvenienceCallback) {
     return new Promise((resolve, reject) => {
       fn(function (err, val) {
         err ? reject(err) : resolve(val);
@@ -998,7 +1006,7 @@ export class Client {
     let force: boolean = (opts.__retryCount > 0) || Boolean(opts.force);
 
     this.write({
-      _uuid: opts._uuid,
+      _uuid: opts._uuid || opts.id || opts.lockUuid ,
       uuid: uuid,
       key: key,
       force: force,
