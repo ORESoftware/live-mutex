@@ -14,6 +14,17 @@ Tested and proven on Node.js versions >= 6.0.0.
 <i>Live-Mutex should also be much less memory and CPU intensive than Lockfile and Warlock, because Live-Mutex is
 fully evented, and Lockfile and Warlock use a polling implementation by nature.</i>
 
+### Why
+
+I used a couple of other libraries and they required manual retry logic and they used<br>
+polling under the hood to acquire locks.  It was difficult to fine tune those libraries and <br>
+they were extremely slow for high lock request concurrency. <br>
+Other libraries are stuck with polling for simple reasons - the filesystem is dumb, and so is Redis (unless you write some <br>
+Lua scripts that can run on there - I don't know of any libraries that do that).
+If we create an intelligent broker that can queue locking requests, <br>
+then we can create some that's both more performant and more developer friendly. Enter live-mutex. <br>
+
+
 # Installation
 
 For command line tools:
