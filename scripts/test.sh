@@ -6,36 +6,33 @@ if [[ ! -d "node_modules" ]]; then
     exit 1;
 fi
 
-LIB_NAME="live-mutex";
+lib_name="live-mutex";
 
-WHICH_SUMAN_TOOLS="$(which suman-tools)";
+which_suman_tools="$(which suman-tools)";
 
 # with the PATH set, we can pick up local NPM executables
 export PATH=${PATH}:"$(pwd)/node_modules/.bin"
 
-if [[ -z ${WHICH_SUMAN_TOOLS} ]]; then
+if [[ -z ${which_suman_tools} ]]; then
     npm install -g suman-tools;
 fi
 
-IS_GLOBALLY_SYMLINKED=`suman-tools --is-symlinked-globally="${LIB_NAME}"`
-IS_LOCALLY_SYMLINKED=`suman-tools --is-symlinked-locally="${LIB_NAME}"`
+IS_GLOBALLY_SYMLINKED=`suman-tools --is-symlinked-globally="${lib_name}"`
+IS_LOCALLY_SYMLINKED=`suman-tools --is-symlinked-locally="${lib_name}"`
 
 if [[ ${IS_GLOBALLY_SYMLINKED} != *"affirmative"* ]]; then
     npm link # create a global symlink for this library, so that we can create a local symlink
 fi
 
 if [[ ${IS_LOCALLY_SYMLINKED} != *"affirmative"* || ${IS_GLOBALLY_SYMLINKED} != *"affirmative"* ]]; then
-    npm link "${LIB_NAME}" # create a global symlink for this library, so that we can create a local symlink
+    npm link "${lib_name}" # create a global symlink for this library, so that we can create a local symlink
 fi
 
 
-WHICH_SUMAN="$(which suman)";
-if [[ -z ${WHICH_SUMAN} || "${NODE_ENV}" != "local" ]]; then
-    echo "installing suman globally...";
-    npm install -g suman@latest --silent
-fi
+npm install -g suman@1.1.51243:
+
 
 echo "linking global suman to local node_modules...";
 npm link suman
 
-suman --coverage test/@src/*.ts # --inherit-all-stdio #--inherit-stdio
+suman -- #coverage test/@src/*.ts # --inherit-all-stdio #--inherit-stdio
