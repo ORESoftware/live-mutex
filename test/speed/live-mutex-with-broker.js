@@ -3,7 +3,7 @@
 const async = require('async');
 const lmUtils = require('live-mutex/utils');
 const {Broker, Client} = require('live-mutex');
-const conf = Object.freeze({port: 7003});
+const conf = Object.freeze({port: 6970});
 const util = require('util');
 
 process.on('unhandledRejection', function (e) {
@@ -14,6 +14,7 @@ process.on('unhandledRejection', function (e) {
 
 Promise.all([
   new Broker(conf).ensure(),
+  // console.log(''),
   new Client(conf).ensure()
 ])
 .then(function ([b, c]) {
