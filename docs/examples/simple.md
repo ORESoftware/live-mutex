@@ -41,8 +41,10 @@ here is the same example as above but more condensed and with comments:
 ```js
 
 Promise.all([
-  new Broker().ensure(),   // if we omit options objects to both constructors, then the default host:port is localhost:6970
-  new Client().connect()   // new Client().connect() is just an alias to new Client().ensure()
+  // if we omit options objects to either constructor, then the default host:port is localhost:6970
+  new Broker().ensure(),
+  // `new Client().connect()` is just an alias for `new Client().ensure()`
+  new Client().connect()
 ])
 .then(function ([b, c]) {
 
