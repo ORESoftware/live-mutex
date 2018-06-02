@@ -19,7 +19,7 @@ Test.create(['lmUtils', (b, assert, before, describe, it, path, inject, after) =
   const key = 'foo';
   const original = 'abcdefghijklmnopqrstuvwxyz';
 
-  const conf = Object.freeze({port: 7035});
+  const conf = Object.freeze({port: 7037});
 
   inject(j => {
     j.register('broker', new Broker(conf).ensure());

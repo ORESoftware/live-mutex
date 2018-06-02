@@ -13,9 +13,9 @@ import {createParser} from "./json-parser";
 
 //project
 export const log = {
-  info: console.log.bind(console, chalk.gray.bold('[live-mutex client info]')),
-  warn: console.error.bind(console, chalk.magenta.bold('[live-mutex client warning]')),
-  error: console.error.bind(console, chalk.red.bold('[live-mutex client error]')),
+  info: console.log.bind(console, chalk.gray.bold('[live-mutex info]')),
+  warn: console.error.bind(console, chalk.magenta.bold('[live-mutex warning]')),
+  error: console.error.bind(console, chalk.red.bold('[live-mutex error]')),
   debug: function (...args: any[]) {
     weAreDebugging && console.log('[live-mutex debugging]', ...args);
   }
@@ -251,16 +251,11 @@ export class Client {
     let ws: net.Socket = null;
     let connectPromise: Promise<any> = null;
 
-    process.nextTick(() => {
-      if (this.emitter.listenerCount('warning') < 2) {
-        process.emit.call(process, 'warning',
-          new Error('Add a "warning" event listener to the Live-Mutex client to get rid of this message.'));
-      }
-    });
-
     this.emitter.on('warning', () => {
       if (this.emitter.listenerCount('warning') < 2) {
         process.emit.call(process, 'warning', ...arguments);
+        process.emit.call(process, 'warning',
+          'Add a "warning" event listener to the Live-Mutex client to get rid of this message.');
       }
     });
 
@@ -491,7 +486,7 @@ export class Client {
     });
   }
 
-  unlockp(key: string, opts?: Partial<LMClientUnlockOpts>) : Promise<string> {
+  unlockp(key: string, opts?: Partial<LMClientUnlockOpts>): Promise<string> {
     return new Promise((resolve, reject) => {
       this.unlock(key, opts, function (err, val) {
         err ? reject(err) : resolve(val);
@@ -620,16 +615,10 @@ export class Client {
 
     opts = opts || {} as Partial<ClientOpts>;
 
-    cb = cb.bind(this);
-
-    if (process.domain) {
-      cb = process.domain.bind(cb);
-    }
-
     try {
 
       assert.equal(typeof key, 'string', 'Key passed to live-mutex #lock needs to be a string.');
-      assert(typeof cb === 'function', 'callback function must be passed to Client lock() method.');
+      assert(typeof cb === 'function', 'callback function must be passed to Client lock() method; use lockp() or acquire() for promise API.');
 
       if (opts['force']) {
         assert.equal(typeof opts.force, 'boolean', ' => Live-Mutex usage error => ' +
@@ -681,7 +670,19 @@ export class Client {
 
     }
     catch (err) {
-      return process.nextTick(cb, err);
+
+      if (typeof cb === 'function') {
+        cb = cb.bind(this);
+        return process.nextTick(cb, err);
+      }
+
+      throw err;
+    }
+
+    cb = cb.bind(this);
+
+    if (process.domain) {
+      cb = process.domain.bind(cb);
     }
 
     // if (rawLockCount - unlockCount > 5) {

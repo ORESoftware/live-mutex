@@ -11,7 +11,7 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
   
   const {Promise} = b.ioc;
   const {chalk: colors} = $deps;
-  const conf = Object.freeze({port: 7035});
+  const conf = Object.freeze({port: 7036});
   
   before(h => new Broker(conf).start());
   

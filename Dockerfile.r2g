@@ -28,10 +28,6 @@ RUN sudo chown -R $(whoami) /usr/local/etc
 
 ARG CACHEBUST=1
 
-#RUN npm install --loglevel=warn -g "@oresoftware/docker.r2g@latest"
-#RUN npm install --loglevel=warn -g "https://github.com/ORESoftware/r2g"
-
-
 RUN npm install --loglevel=warn -g \
  "https://raw.githubusercontent.com/oresoftware/tarballs/master/tgz/oresoftware/docker.r2g.tgz?$(date +%s)"
 
@@ -42,5 +38,5 @@ COPY . .
 
 RUN sudo chmod -R 777  /home/node
 
-ENTRYPOINT ["docker.r2g", "--run"]
+ENTRYPOINT ["docker.r2g", "run"]
 

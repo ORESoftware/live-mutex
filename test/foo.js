@@ -10,6 +10,8 @@
 //
 // });
 
-console.log(typeof Infinity);
+// console.log(typeof Infinity);
+//
+// console.log(Number.isInteger(Infinity))
 
-console.log(Number.isInteger(Infinity))
+console.log(Number(undefined));

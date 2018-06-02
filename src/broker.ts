@@ -15,9 +15,9 @@ const noop = function () {
 
 //project
 export const log = {
-  info: console.log.bind(console, chalk.gray.bold('[live-mutex broker]')),
-  error: console.error.bind(console, chalk.red.bold('[live-mutex broker]')),
-  warn: console.error.bind(console, chalk.magenta.bold('[live-mutex broker]')),
+  info: console.log.bind(console, chalk.gray.bold('[live-mutex info]')),
+  error: console.error.bind(console, chalk.red.bold('[live-mutex error]')),
+  warn: console.error.bind(console, chalk.yellow.bold('[live-mutex warning]')),
   debug: function (...args: any[]) {
     weAreDebugging && console.log('[live-mutex broker debugging]', ...args);
   }
@@ -192,16 +192,11 @@ export class Broker {
     this.host = opts.host || '127.0.0.1';
     this.port = opts.port || 6970;
 
-    process.nextTick(() => {
-      if (this.emitter.listenerCount('warning') < 2) {
-        process.emit.call(process, 'warning',
-          new Error('Add a "warning" event listener to the Live-Mutex broker to get rid of this message.'));
-      }
-    });
-
     this.emitter.on('warning', () => {
       if (this.emitter.listenerCount('warning') < 2) {
         process.emit.call(process, 'warning', ...arguments);
+        process.emit.call(process, 'warning',
+          'Add a "warning" event listener to the Live-Mutex broker to get rid of this message.');
       }
     });
 
@@ -417,7 +412,7 @@ export class Broker {
         }
 
         callable = false;
-        this.emitter.emit('warning', new Error(`${event} event has occurred.`));
+        this.emitter.emit('warning', chalk.yellow.bold(`${event} event has occurred.`));
         connectedClients.forEach(function (v, k) {
           // destroy each connected client
           k.destroy();

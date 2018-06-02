@@ -18,7 +18,7 @@ Test.create(['Promise', function (b, assert, describe, inject, it, $deps, $core)
     [1, 2, 3, 4, 5, 6, 7, 8, 9]
   ];
   
-  const conf = Object.freeze({port: 7037});
+  const conf = Object.freeze({port: 7038});
   
   inject(j => {
     j.register('broker', new Broker(conf).ensure());

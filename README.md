@@ -217,7 +217,7 @@ client.ensure(function(err, c){
 ```
 
 As you can see, before any `client.lock()` call, we call `client.ensure()`...this is not imperative, but it is a best practice. <br>
-`client.ensure()` only needs to be called once before any subsequent `client.lock()` call. However, the benefit of calling it before every time, <br>
+`client.ensure()` only needs to be called once before any subsequent `client.lock()` call. However, the benefit of calling it before every time,
 is that it will allow a new connection to be made if the existing one has a bad state.
 
 Any *locking* errors will mostly be due to the failure to acquire a lock before timing out, and should
