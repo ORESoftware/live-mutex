@@ -19,10 +19,18 @@ Promise.all([
 ])
 .then(function ([b, c]) {
 
+  b.emitter.on('warning', function () {
+    console.log(...arguments);
+  });
+
+  c.emitter.on('warning', function () {
+    console.log(...arguments);
+  });
+
   const a = Array.apply(null, {length: 10000});
   const start = Date.now();
 
-  var counts = {
+  let counts = {
     z: 0
   };
 
