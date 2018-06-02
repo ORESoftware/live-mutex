@@ -21,7 +21,8 @@ It was difficult to fine tune those libraries and they were extremely slow for h
 Other libraries are stuck with polling for simple reasons - the filesystem is dumb, and so is Redis (unless you write some <br>
 Lua scripts that can run on there - I don't know of any libraries that do that).<br>
 <br>
-If we create an intelligent broker that can queue locking requests, then we can create some that's both more performant and more developer friendly. Enter live-mutex. <br>
+If we create an intelligent broker that can queue locking requests, <br>
+then we can create something that's both more performant and more developer friendly. Enter live-mutex. <br>
 
 
 # Installation
@@ -81,9 +82,7 @@ You probably only need one broker for any given host, and probably only need one
 but you can always use more than one broker per host, and use different ports. Obviously, it would not work
 to use multiple brokers for the same key, that is the one thing you should not do.
 
-
 ## Do's and Don'ts
-<br>
 
 * Do use a different key for each different resource that you need to control access to.
 
@@ -116,13 +115,11 @@ $ lm_release_lock foo 6970  # 6970 is the default port, so you can omit that
 
 ```
 
-Note to get started with the library, you should simply start a live-mutex broker with:
+Note to get started with the library, you can simply start a live-mutex broker with:
 
 ```bash
 lm_start_server # defaults to port 6970
 ```
-
-And then write some node.js code that uses that broker.
 
 
 ## Importing the library using Node.js
@@ -167,7 +164,7 @@ const opts = {port: '<port>' , host: '<host>'};
  // calling ensure before each critical section means that we ensure we have a connected client
  return client.ensure().then(c =>  {   // (c is the same object as client)
    return c.acquire('<key>').then(({key,id}) => {
-         return c.release('<key>', id);
+        return c.release('<key>', id);
      });
  });
 ```
@@ -190,9 +187,11 @@ client.ensure(function(err){
 ```js
 client.ensure(function(err){
    client.lock('<key>', function(err, {id, key}){
-       // unlock is a convenience function, bound to the right key + request uuid
        client.unlock(key, id, function(err){
-
+           // note that if we don't use the unlock convenience callback,
+           // that we should definitely pass the id of the original request.
+           // this is for safety - we only want to unlock the corresponding lock,
+           // which is defined not just by the right key, but also the right request id.
        });
    });
 });
