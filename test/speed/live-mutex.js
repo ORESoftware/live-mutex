@@ -18,14 +18,14 @@ lmUtils.launchBrokerInChildProcess(conf, function () {
   
   client.ensure().then(function () {
     
-    const a = Array.apply(null, {length: 1000});
+    const a = Array.apply(null, {length: 10000});
     const start = Date.now();
     
-    var counts = {
+    let counts = {
       z: 0
     };
     
-    async.eachLimit(a, 50, function (val, cb) {
+    async.eachLimit(a, 20, function (val, cb) {
       
       client.lock('foo', function (err, unlock) {
         
