@@ -34,7 +34,7 @@ lmUtils.launchBrokerInChildProcess(conf, function () {
         }
         
         try {
-          // console.log('unlocking...' + counts.z++);
+          console.log('unlocking...' + counts.z++);
           // console.log(util.inspect(unlock));
           
           // client.unlock('foo',cb);
