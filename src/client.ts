@@ -491,7 +491,7 @@ export class Client {
     });
   }
 
-  unlockp(key: string, opts?: Partial<LMClientUnlockOpts>) {
+  unlockp(key: string, opts?: Partial<LMClientUnlockOpts>) : Promise<string> {
     return new Promise((resolve, reject) => {
       this.unlock(key, opts, function (err, val) {
         err ? reject(err) : resolve(val);

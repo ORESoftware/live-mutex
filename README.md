@@ -163,7 +163,7 @@ const opts = {port: '<port>' , host: '<host>'};
 
  // calling ensure before each critical section means that we ensure we have a connected client
  return client.ensure().then(c =>  {   // (c is the same object as client)
-   return c.acquire('<key>').then(({key,id}) => {
+    return c.acquire('<key>').then(({key,id}) => {
         return c.release('<key>', id);
      });
  });
