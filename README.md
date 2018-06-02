@@ -251,7 +251,9 @@ c.ensure().then(c => {
 
    // note that if we want to use the unlock convenience function, it's available here
 
-   return c.execUnlock(unlock);  // runUnlock/execUnlock will return a promise, and execute the unlock convenience function for us
+   // runUnlock/execUnlock will return a promise, and execute the unlock convenience function for us
+   return c.execUnlock(unlock)
+     .catch(e => ({errror:e}));  // we ignore any unlocking errors, which is usually fine
 });
 ```
 

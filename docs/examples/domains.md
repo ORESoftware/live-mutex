@@ -15,7 +15,7 @@ if(process.domain){
 
 ```js
 const Domain = require('domain');
-const client = new Client({port:3999})
+const client = new Client()
 
 app.use(function(req,res,next){
 

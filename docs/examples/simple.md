@@ -41,14 +41,14 @@ here is the same example as above but more condensed and with comments:
 ```js
 
 Promise.all([
-  new Broker().ensure(),
-  new Client().connect()   // new Client().connect() is just an alias to new Client().ensure() 
+  new Broker().ensure(),   // if we omit options objects to both constructors, then the default host:port is localhost:6970
+  new Client().connect()   // new Client().connect() is just an alias to new Client().ensure()
 ])
 .then(function ([b, c]) {
 
    // warnings won't really help with application logic, but will help you debug problems
    // if you do not attach listeners to b and c, then process.emit('warning') will be used by the lib
-   
+
   b.emitter.on('warning', function () {
     console.error(...arguments);
   });
