@@ -36,17 +36,19 @@ Promise.all([
 });
 ```
 
-here is the same example as above but more condensed:
+here is the same example as above but more condensed and with comments:
 
 ```js
-const {Client, Broker} = require('live-mutex');
 
 Promise.all([
   new Broker().ensure(),
-  new Client().connect()
+  new Client().connect()   // new Client().connect() is just an alias to new Client().ensure() 
 ])
 .then(function ([b, c]) {
 
+   // warnings won't really help with application logic, but will help you debug problems
+   // if you do not attach listeners to b and c, then process.emit('warning') will be used by the lib
+   
   b.emitter.on('warning', function () {
     console.error(...arguments);
   });
