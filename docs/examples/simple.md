@@ -19,7 +19,7 @@ Promise.all([
     console.error(...arguments);
   });
 
-  return c.lockp('foo', {}).then(({id, key}) => {
+  return c.lockp('foo').then(({id, key}) => {
 
     return c.unlockp(key, id).then(v => {
 
@@ -55,13 +55,13 @@ Promise.all([
     console.error(...arguments);
   });
 
-  return c.lockp('foo');
+  return c.lockp('foo');   // c.acquire and c.acquireLock are aliases to c.lockp
 
 })
 .then(({id, key}) => {
-   
-   return c.unlockp(key, id);
-   
+
+  return c.unlockp(key, id);   // c.release and c.releaseLock are aliases to c.unlockp
+
 });
 .catch(e => {
   console.error(e);

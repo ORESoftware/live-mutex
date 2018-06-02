@@ -139,14 +139,20 @@ import {Client, Broker, lmUtils}  from 'live-mutex';
 
 ```
 
+## Simple example
+
+To see a complete simple example of using a broker and client in the same process, see:
+```=> docs/examples/simple.md```
+
 
 ### A note on default behavior
 
 By default, a lock request will retry 3 times, on an interval defined by `opts.lockRequestTimeout`, which defaults to 3 seconds.
-That would mean that the a lock request might fail with a timeout error after 9 seconds.
+That would mean that the a lock request may fail with a timeout error after 9 seconds.
 
 If there is an error or Promise rejection, the lock was not acquired, otherwise the lock was acquired.
-This is nice than other libraries that necessitate that you check to see if 'unlock' is a function, etc etc.
+This is nicer than other libraries that ask that you check the type of the second argument, instead of just checking
+for the presence of an error.
 
 Unlock requests - there are no builtin retries for unlock requests - if you absolutely need an unlock request to succeed,
 use `opts.force = true`. Otherwise, implement your own retry mechanism for unlocking. If you want the library
