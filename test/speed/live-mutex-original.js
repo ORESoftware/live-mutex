@@ -3,7 +3,7 @@
 const async = require('async');
 const lmUtils = require('live-mutex/utils');
 const {Client} = require('live-mutex/client');
-const conf = Object.freeze({port: 7003});
+const conf = Object.freeze({port: 6970});
 const util = require('util');
 
 process.on('unhandledRejection', function (e) {
@@ -14,17 +14,18 @@ process.on('unhandledRejection', function (e) {
 
 const client = new Client(conf);
 
-
 client.ensure().then(function () {
+
+  console.log('client is ensured:');
   
-  const a = Array.apply(null, {length: 1000});
+  const a = Array.apply(null, {length: 100});
   const start = Date.now();
   
   var counts = {
     z: 0
   };
   
-  async.eachLimit(a, 50, function (val, cb) {
+  async.eachLimit(a, 5, function (val, cb) {
     
     client.lock('foo', function (err, unlock) {
       
@@ -33,7 +34,7 @@ client.ensure().then(function () {
       }
       
       try {
-        // console.log('unlocking...' + counts.z++);
+        console.log('unlocking...' + counts.z++);
         // console.log(util.inspect(unlock));
         
         // client.unlock('foo',cb);
