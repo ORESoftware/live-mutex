@@ -155,7 +155,7 @@ export class Client {
 
   ////////////////////////////////////////////////////////////////
 
-  constructor(o: Partial<ClientOpts>, cb?: LMClientCallBack) {
+  constructor(o?: Partial<ClientOpts>, cb?: LMClientCallBack) {
 
     this.isOpen = false;
     const opts = this.opts = o || {};

@@ -12,7 +12,7 @@ const numOfCPUs = os.cpus().length || 1;
 module.exports = Object.freeze({
 
   //regex
-  matchAny: [/\.ts$/],                              //recommended regex for "matchAny" => [/\.test\.js$/],
+  matchAny: [/\.test\.ts$/],                 //recommended regex for "matchAny" => [/\.test\.js$/],
   matchNone: [/fixture/, /.*target/],        //recommended regex for "matchNone" => [/fixture/],
   matchAll: [],                 //recommended regex for "matchAll" => [],
 

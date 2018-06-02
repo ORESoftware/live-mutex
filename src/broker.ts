@@ -149,7 +149,7 @@ export class Broker {
 
   ///////////////////////////////////////////////////////////////
 
-  constructor(o: IBrokerOptsPartial, cb?: IErrorFirstCB) {
+  constructor(o?: IBrokerOptsPartial, cb?: IErrorFirstCB) {
 
     this.isOpen = false;
     const opts = this.opts = o || {};
