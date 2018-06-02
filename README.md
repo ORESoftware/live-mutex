@@ -139,9 +139,9 @@ import {Client, Broker, lmUtils}  from 'live-mutex';
 
 ```
 
-## Simple example
+# Simple example
 
-To see a complete simple example of using a broker and client in the same process, see:
+To see a *complete* and *simple* example of using a broker and client in the same process, see: <br>
 ```=> docs/examples/simple.md```
 
 
