@@ -39,10 +39,11 @@ process.on('warning', function (e: any) {
 ///////////////////////////////////////////////////////////////////
 
 export const validConstructorOptions = {
-  'lockExpiresAfter': 'integer in millis',
-  'timeoutToFindNewLockholder': 'integer in millis',
-  'host': 'string',
-  'port': 'integer'
+  lockExpiresAfter: 'integer in millis',
+  timeoutToFindNewLockholder: 'integer in millis',
+  host: 'string',
+  port: 'integer',
+  noDelay: 'boolean'
 };
 
 /////////////////// interfaces /////////////////////////////////////
@@ -120,7 +121,6 @@ export interface NotifyObj {
 
 /////////////////////////////////////////////////////////////////////////////
 
-
 export interface KeyToBool {
   [key: string]: boolean
 }
@@ -148,6 +148,7 @@ export class Broker {
   isOpen: boolean;
   wss: net.Server;
   emitter = new EventEmitter();
+  noDelay = true;
 
   ///////////////////////////////////////////////////////////////
 
@@ -189,6 +190,12 @@ export class Broker {
         ' => "port" integer needs to be in range (1025-49151).');
     }
 
+    if ('noDelay' in opts) {
+      assert(typeof opts.noDelay === 'boolean',
+        ' => "noDelay" option needs to be an integer => ' + opts.noDelay);
+      this.noDelay = opts.noDelay;
+    }
+
     this.lockExpiresAfter = weAreDebugging ? 5000000 : (opts.lockExpiresAfter || 5000);
     this.timeoutToFindNewLockholder = weAreDebugging ? 5000000 : (opts.timeoutToFindNewLockholder || 4500);
     this.host = opts.host || '127.0.0.1';
@@ -196,10 +203,8 @@ export class Broker {
 
     this.emitter.on('warning', () => {
       if (this.emitter.listenerCount('warning') < 2) {
-        process.emit.call(process, 'warning', ...Array.from(arguments)
-        .map(v => (typeof v === 'string' ? v : util.inspect(v))));
-        process.emit.call(process, 'warning',
-          'Add a "warning" event listener to the Live-Mutex broker to get rid of this message.');
+        process.emit.call(process, 'warning', ...Array.from(arguments).map(v => (typeof v === 'string' ? v : util.inspect(v))));
+        process.emit.call(process, 'warning', 'Add a "warning" event listener to the Live-Mutex broker to get rid of this message.');
       }
     });
 
@@ -213,7 +218,7 @@ export class Broker {
         return cb && process.nextTick(cb);
       }
 
-      if(ws._handle.fd){
+      if (ws._handle.fd) {
         // console.log('ws._handle.fd:',ws._handle.fd);
         // try{
         //   modSocket.run(ws._handle.fd);
@@ -345,7 +350,9 @@ export class Broker {
 
       connectedClients.set(ws, true);
 
-      ws.setNoDelay(true);
+      if (self.noDelay) {
+        ws.setNoDelay(true);
+      }
 
       if (!self.wsToKeys.get(ws)) {
         self.wsToKeys.set(ws, {});
@@ -509,6 +516,12 @@ export class Broker {
         wss.once('error', reject);
 
         wss.listen(self.port, () => {
+
+          // if(wss._handle.fd){
+          //   console.log('server wss._handle.fd:',wss._handle.fd);
+          //   console.log(modSocket.run(wss._handle.fd));
+          // }
+
           self.isOpen = true;
           clearTimeout(to);
           wss.removeListener('error', reject);

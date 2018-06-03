@@ -44,7 +44,8 @@ export const validConstructorOptions = {
   lockRequestTimeout: 'integer in millis',
   lockRetryMax: 'integer',
   keepLocksAfterDeath: 'boolean',
-  keepLocksOnExit: 'boolean'
+  keepLocksOnExit: 'boolean',
+  noDelay: 'boolean'
 };
 
 export const validLockOptions = {
@@ -75,7 +76,8 @@ export interface ClientOpts {
   maxRetries: number;
   ttl: number,
   keepLocksAfterDeath: boolean,
-  keepLocksOnExit: boolean
+  keepLocksOnExit: boolean,
+  noDelay: boolean
 }
 
 export interface IUuidTimeoutBool {
@@ -154,6 +156,7 @@ export class Client {
   keepLocksAfterDeath = false;
   keepLocksOnExit = false;
   emitter = new EventEmitter();
+  noDelay = true;
 
   ////////////////////////////////////////////////////////////////
 
@@ -239,6 +242,12 @@ export class Client {
 
     if (opts.ttl === null) {
       opts.ttl = Infinity;
+    }
+
+    if ('noDelay' in opts) {
+      assert(typeof opts.noDelay === 'boolean',
+        ' => "noDelay" option needs to be an integer => ' + opts.noDelay);
+      this.noDelay = opts.noDelay;
     }
 
     this.keepLocksAfterDeath = Boolean(opts.keepLocksAfterDeath || opts.keepLocksOnExit);
@@ -392,16 +401,17 @@ export class Client {
           clearTimeout(to);
           ws.removeListener('error', onFirstErr);
 
-          if(ws._handle.fd){
-            // console.log('ws._handle.fd:',ws._handle.fd);
-            modSocket.run(ws._handle.fd);
-          }
+          // if(ws._handle.fd){
+          //   // console.log('ws._handle.fd:',ws._handle.fd);
+          //   modSocket.run(ws._handle.fd);
+          // }
 
           resolve(this);
         });
 
-
-        ws.setNoDelay(true);
+        if(self.noDelay){
+          ws.setNoDelay(true);
+        }
 
         ws.setEncoding('utf8')
         .once('end', () => {

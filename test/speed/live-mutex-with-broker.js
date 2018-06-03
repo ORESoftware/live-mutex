@@ -19,6 +19,9 @@ Promise.all([
 ])
 .then(function ([b, c]) {
 
+  console.log(b.noDelay);
+  console.log(c.noDelay);
+
   b.emitter.on('warning', function () {
     console.log(...arguments);
   });
