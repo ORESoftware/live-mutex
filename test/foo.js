@@ -1,17 +1,26 @@
+const suman = require('suman');
 
+const Test = suman.init(module);
 
-// const lmUtils = require('../utils');
-//
-// lmUtils.launchBrokerInChildProcess({port:7888}, function (err, result) {
-//
-//   if(err) throw err;
-//
-//   console.log(result);
-//
-// });
+Test.create(b => {
 
-// console.log(typeof Infinity);
-//
-// console.log(Number.isInteger(Infinity))
+  const {describe, before} = b.getHooks();
 
-console.log(Number(undefined));
+  before(h => {
+    h.supply.foo = 5;
+    h.set('my foo', 6);
+  });
+
+  describe('inner', b => {
+
+    const {it} = b.getHooks();
+
+    it('foo', t => {
+
+      console.log('more foo:', t.supply.foo);
+      console.log('even more', t.get('my foo'));
+    });
+
+  });
+
+});

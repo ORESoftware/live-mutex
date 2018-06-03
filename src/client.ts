@@ -11,7 +11,6 @@ import uuidV4 = require('uuid/v4');
 import chalk from "chalk";
 import {createParser} from "./json-parser";
 
-
 //project
 export const log = {
   info: console.log.bind(console, chalk.gray.bold('[live-mutex info]')),
@@ -32,10 +31,6 @@ if (weAreDebugging) {
   log.debug('Live-Mutex client is in debug mode. Timeouts are turned off.');
 }
 
-const getUnixDomainSocketFile = function (id: string): string {
-  return path.resolve(process.env.HOME + `/${id}.unix.sock`);
-};
-
 /////////////////////////////////////////////////////////////////////////
 
 export const validConstructorOptions = {
@@ -43,13 +38,14 @@ export const validConstructorOptions = {
   listener: 'Function',
   host: 'string',
   port: 'integer',
-  ttl: 'integer',
+  ttl: 'integer in millis',
   unlockRequestTimeout: 'integer in millis',
   lockRequestTimeout: 'integer in millis',
   lockRetryMax: 'integer',
   keepLocksAfterDeath: 'boolean',
   keepLocksOnExit: 'boolean',
-  noDelay: 'boolean'
+  noDelay: 'boolean',
+  udsPath: 'string (absolute file path)'
 };
 
 export const validLockOptions = {
@@ -81,7 +77,8 @@ export interface ClientOpts {
   ttl: number,
   keepLocksAfterDeath: boolean,
   keepLocksOnExit: boolean,
-  noDelay: boolean
+  noDelay: boolean;
+  udsPath: string
 }
 
 export interface IUuidTimeoutBool {
@@ -132,9 +129,6 @@ export interface LMClientLockCallBack {
 export type LMClientUnlockCallBack = (err: any, uuid?: string) => void;
 export type ErrorFirstCallBack = (err: any, val?: any) => void;
 export type LMClientUnlockConvenienceCallback = (fn: ErrorFirstCallBack) => void;
-
-const SOCKETFILE = path.resolve(process.env.HOME + '/unix.sock');
-
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
@@ -252,19 +246,22 @@ export class Client {
       opts.ttl = Infinity;
     }
 
-    if ('noDelay' in opts) {
+    if ('noDelay' in opts && opts['noDelay'] !== undefined) {
       assert(typeof opts.noDelay === 'boolean',
         ' => "noDelay" option needs to be an integer => ' + opts.noDelay);
       this.noDelay = opts.noDelay;
+    }
+
+    if ('udsPath' in opts && opts['udsPath'] !== undefined) {
+      assert(typeof opts.udsPath === 'string', '"udsPath" option must be a string.');
+      assert(path.isAbsolute(opts.udsPath), '"udsPath" option must be an absolute path.');
+      this.socketFile = path.resolve(opts.udsPath);
     }
 
     this.keepLocksAfterDeath = Boolean(opts.keepLocksAfterDeath || opts.keepLocksOnExit);
     this.listeners = {};
     this.host = opts.host || 'localhost';
     this.port = opts.port || 6970;
-
-    this.socketFile = getUnixDomainSocketFile(String(this.port));
-
     this.ttl = weAreDebugging ? 5000000 : (opts.ttl || 4000);
     this.unlockRequestTimeout = weAreDebugging ? 5000000 : (opts.unlockRequestTimeout || 4000);
     this.lockRequestTimeout = weAreDebugging ? 5000000 : (opts.lockRequestTimeout || 3000);
@@ -286,7 +283,6 @@ export class Client {
 
     this.write = (data: any, cb?: Function) => {
 
-
       if (!ws) {
         throw new Error('please call ensure()/connect() on this Live-Mutex client, before using the lock/unlock methods.');
       }
@@ -300,7 +296,6 @@ export class Client {
       //   // console.log('ws._handle.fd:',ws._handle.fd);
       //   modSocket.run(ws._handle.fd);
       // }
-
 
       data.pid = process.pid;
 
@@ -341,7 +336,6 @@ export class Client {
       }
 
       if (to) {
-
         this.emitter.emit('warning', new Error('Client side lock/unlock request timed-out.'));
         delete self.timeouts[uuid];
         if (data.acquired === true && data.type === 'lock') {
@@ -407,8 +401,9 @@ export class Client {
           reject('live-mutex err: client connection timeout after 2000ms.');
         }, 3000);
 
-        ws = net.createConnection(self.socketFile, () => {
-        // ws = net.createConnection({port: self.port}, () => {
+        let cnkt: any = self.socketFile || {port: self.port};
+
+        ws = net.createConnection(cnkt, () => {
           self.isOpen = true;
           clearTimeout(to);
           ws.removeListener('error', onFirstErr);
@@ -421,7 +416,7 @@ export class Client {
           resolve(this);
         });
 
-        if(self.noDelay){
+        if (self.noDelay) {
           ws.setNoDelay(true);
         }
 

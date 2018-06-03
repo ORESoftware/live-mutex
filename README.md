@@ -9,17 +9,18 @@ Tested and proven on Node.js versions >= 6.0.0.
 
 ## About
 
-<b>Live-Mutex is minimum 5x faster than Lockfile and Warlock for concurrent locking requests.</b>
-<i>When Warlock and Lockfile are not finely/expertly tuned, 5x becomes more like 30x or 40x.</i>
+<b>Live-Mutex uses TCP/Unix Domain Sockets (UDS) to create an evented (non-polling) networked mutex API.</b>
+<b>Live-Mutex is significantly (orders of magnitude) more performant than Lockfile and Warlock for high-concurrency locking requests.</b>
+<i>When Warlock and Lockfile are not finely/expertly tuned, 5x more performant becomes more like 30x or 40x.</i>
 <i>Live-Mutex should also be much less memory and CPU intensive than Lockfile and Warlock, because Live-Mutex is
 fully evented, and Lockfile and Warlock use a polling implementation by nature.</i>
 
 ### Basic Metrics
 
 On Linux, if we feed live-mutex 10,000 lock requests, 20 concurrently, live-mutex can go through all 10,000 lock/unlock cycles
-in 2 seconds, which means 5 lock/unlock cycles per millisecond.
+in less than 2 seconds, which means at least 5 lock/unlock cycles per millisecond.
 
-### Why
+### Rationale
 
 I used a couple of other libraries and they required manual retry logic and they used polling under the hood to acquire locks.
 It was difficult to fine tune those libraries and they were extremely slow for high lock request concurrency. <br>
@@ -75,6 +76,7 @@ Three things to remember:
 calling client.lock() or client.unlock().
 3. Live-Mutex clients and brokers are *not* event emitters. <br> The two classes wrap Node.js sockets, but the sockets connections
 are not exposed to the user of the library.
+4. To use TCP and host/port use `{port: <number>, host: <string>}`, to use Unix Domain Sockets, use `{udsPath: <absoluteFilePath>}`.
 
 
 ## You may not need this library:

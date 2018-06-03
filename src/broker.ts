@@ -45,7 +45,8 @@ export const validConstructorOptions = {
   timeoutToFindNewLockholder: 'integer in millis',
   host: 'string',
   port: 'integer',
-  noDelay: 'boolean'
+  noDelay: 'boolean',
+  udsPath: 'string'
 };
 
 /////////////////// interfaces /////////////////////////////////////
@@ -56,6 +57,7 @@ export interface IBrokerOpts {
   host: string;
   port: number;
   noDelay: boolean;
+  udsPath: string;
 }
 
 export type IBrokerOptsPartial = Partial<IBrokerOpts>
@@ -132,19 +134,6 @@ export interface UUIDToBool {
   [key: string]: boolean
 }
 
-const getUnixDomainSocketFile = function (id: string): string {
-  const SOCKETFILE = path.resolve(process.env.HOME + `/${id}.unix.sock`);
-
-  try {
-    fs.unlinkSync(SOCKETFILE);
-  }
-  catch (err) {
-    console.error(err);
-  }
-
-  return SOCKETFILE;
-};
-
 export class Broker {
 
   opts: IBrokerOptsPartial;
@@ -207,7 +196,7 @@ export class Broker {
         ' => "port" integer needs to be in range (1025-49151).');
     }
 
-    if ('noDelay' in opts) {
+    if ('noDelay' in opts && opts['noDelay'] !== undefined) {
       assert(typeof opts.noDelay === 'boolean',
         ' => "noDelay" option needs to be an integer => ' + opts.noDelay);
       this.noDelay = opts.noDelay;
@@ -218,8 +207,11 @@ export class Broker {
     this.host = opts.host || '127.0.0.1';
     this.port = opts.port || 6970;
 
-    this.socketFile = getUnixDomainSocketFile(String(this.port));
-
+    if ('udsPath' in opts && opts['udsPath'] !== undefined) {
+      assert(typeof opts.udsPath === 'string', '"udsPath" option must be a string.');
+      assert(path.isAbsolute(opts.udsPath), '"udsPath" option must be an absolute path.');
+      this.socketFile = path.resolve(opts.udsPath);
+    }
 
     this.emitter.on('warning', () => {
       if (this.emitter.listenerCount('warning') < 2) {
@@ -535,8 +527,8 @@ export class Broker {
 
         wss.once('error', reject);
 
-        // wss.listen(self.port, () => {
-        wss.listen(self.socketFile, () => {
+        let cnkt: any = self.socketFile || self.port;
+        wss.listen(cnkt, () => {
 
           // if(wss._handle.fd){
           //   console.log('server wss._handle.fd:',wss._handle.fd);

@@ -28,39 +28,43 @@ async.whilst(
         return cb(err);
       }
 
-      c.lock(lockName, function (err, unlock) {
+      setTimeout(function () {
 
-        if (err) {
-          return cb(null);
-        }
-
-        fs.readFile(lmAlphaFrom, function (err, res) {
+        c.lock(lockName, function (err, unlock) {
 
           if (err) {
-            return cb(err);
-          }
-
-          const v = String(res || '').split('');
-          const myChar = v.shift();
-
-          if (!myChar) {
-            search = false;
             return cb(null);
           }
 
-          fs.writeFile(lmAlphaFrom, v.join(''), function (err) {
+          fs.readFile(lmAlphaFrom, function (err, res) {
 
             if (err) {
               return cb(err);
             }
 
-            fs.appendFile(lmAlphaTo, myChar, function (err) {
+            const v = String(res || '').split('');
+            const myChar = v.shift();
+
+            if (!myChar) {
+              search = false;
+              return cb(null);
+            }
+
+            fs.writeFile(lmAlphaFrom, v.join(''), function (err) {
 
               if (err) {
                 return cb(err);
               }
 
-              unlock(cb);
+              fs.appendFile(lmAlphaTo, myChar, function (err) {
+
+                if (err) {
+                  return cb(err);
+                }
+
+                unlock(cb);
+
+              });
 
             });
 
@@ -68,7 +72,7 @@ async.whilst(
 
         });
 
-      });
+      }, Math.random() * 100);
 
     });
 
