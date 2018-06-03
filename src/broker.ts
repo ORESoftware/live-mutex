@@ -4,6 +4,7 @@
 import * as assert from 'assert';
 import * as net from 'net';
 import * as util from 'util';
+import * as fs from 'fs';
 
 //npm
 import chalk from "chalk";
@@ -27,6 +28,8 @@ export const log = {
 
 import {weAreDebugging} from './we-are-debugging';
 import {EventEmitter} from 'events';
+import * as path from "path";
+import * as fs from "fs";
 if (weAreDebugging) {
   log.error('broker is in debug mode. Timeouts are turned off.');
 }
@@ -129,6 +132,19 @@ export interface UUIDToBool {
   [key: string]: boolean
 }
 
+const getUnixDomainSocketFile = function (id: string): string {
+  const SOCKETFILE = path.resolve(process.env.HOME + `/${id}.unix.sock`);
+
+  try {
+    fs.unlinkSync(SOCKETFILE);
+  }
+  catch (err) {
+    console.error(err);
+  }
+
+  return SOCKETFILE;
+};
+
 export class Broker {
 
   opts: IBrokerOptsPartial;
@@ -149,6 +165,7 @@ export class Broker {
   wss: net.Server;
   emitter = new EventEmitter();
   noDelay = true;
+  socketFile = '';
 
   ///////////////////////////////////////////////////////////////
 
@@ -200,6 +217,9 @@ export class Broker {
     this.timeoutToFindNewLockholder = weAreDebugging ? 5000000 : (opts.timeoutToFindNewLockholder || 4500);
     this.host = opts.host || '127.0.0.1';
     this.port = opts.port || 6970;
+
+    this.socketFile = getUnixDomainSocketFile(String(this.port));
+
 
     this.emitter.on('warning', () => {
       if (this.emitter.listenerCount('warning') < 2) {
@@ -515,7 +535,8 @@ export class Broker {
 
         wss.once('error', reject);
 
-        wss.listen(self.port, () => {
+        // wss.listen(self.port, () => {
+        wss.listen(self.socketFile, () => {
 
           // if(wss._handle.fd){
           //   console.log('server wss._handle.fd:',wss._handle.fd);

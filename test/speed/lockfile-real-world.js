@@ -26,7 +26,11 @@ setTimeout(function () {
 
 const q = async.queue(function (task, cb) {
   task(cb);
-}, 500); // max concurrency
+}, 50); // max concurrency
+
+q.error = function (err) {
+  if(err) throw err;
+};
 
 const start = Date.now();
 

@@ -25,7 +25,7 @@ lmUtils.launchBrokerInChildProcess(conf, function () {
       z: 0
     };
     
-    async.eachLimit(a, 20, function (val, cb) {
+    async.eachLimit(a, 30, function (val, cb) {
       
       client.lock('foo', function (err, unlock) {
         

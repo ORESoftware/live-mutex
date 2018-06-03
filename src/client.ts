@@ -27,9 +27,14 @@ export const log = {
 import {weAreDebugging} from './we-are-debugging';
 import Timer = NodeJS.Timer;
 import {EventEmitter} from 'events';
+import * as path from "path";
 if (weAreDebugging) {
   log.debug('Live-Mutex client is in debug mode. Timeouts are turned off.');
 }
+
+const getUnixDomainSocketFile = function (id: string): string {
+  return path.resolve(process.env.HOME + `/${id}.unix.sock`);
+};
 
 /////////////////////////////////////////////////////////////////////////
 
@@ -128,6 +133,9 @@ export type LMClientUnlockCallBack = (err: any, uuid?: string) => void;
 export type ErrorFirstCallBack = (err: any, val?: any) => void;
 export type LMClientUnlockConvenienceCallback = (fn: ErrorFirstCallBack) => void;
 
+const SOCKETFILE = path.resolve(process.env.HOME + '/unix.sock');
+
+
 //////////////////////////////////////////////////////////////////////////////////////////
 
 export class Client {
@@ -156,6 +164,7 @@ export class Client {
   keepLocksOnExit = false;
   emitter = new EventEmitter();
   noDelay = true;
+  socketFile = '';
 
   ////////////////////////////////////////////////////////////////
 
@@ -253,6 +262,9 @@ export class Client {
     this.listeners = {};
     this.host = opts.host || 'localhost';
     this.port = opts.port || 6970;
+
+    this.socketFile = getUnixDomainSocketFile(String(this.port));
+
     this.ttl = weAreDebugging ? 5000000 : (opts.ttl || 4000);
     this.unlockRequestTimeout = weAreDebugging ? 5000000 : (opts.unlockRequestTimeout || 4000);
     this.lockRequestTimeout = weAreDebugging ? 5000000 : (opts.lockRequestTimeout || 3000);
@@ -395,7 +407,8 @@ export class Client {
           reject('live-mutex err: client connection timeout after 2000ms.');
         }, 3000);
 
-        ws = net.createConnection({port: self.port}, () => {
+        ws = net.createConnection(self.socketFile, () => {
+        // ws = net.createConnection({port: self.port}, () => {
           self.isOpen = true;
           clearTimeout(to);
           ws.removeListener('error', onFirstErr);

@@ -25,7 +25,7 @@ client.ensure().then(function () {
     z: 0
   };
   
-  async.eachLimit(a, 20, function (val, cb) {
+  async.eachLimit(a, 15, function (val, cb) {
     
     client.lock('foo', function (err, unlock) {
       

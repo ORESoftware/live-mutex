@@ -25,14 +25,23 @@ setTimeout(function () {
 ///////////////////////////////////////////////////////////////////////////////////////
 
 lmUtils.launchBrokerInChildProcess(conf, function () {
+
+  console.log(
+    'this should only happen once.'
+  );
   
   const client = new Client(conf);
   client.ensure().then(function () {
     
     const q = async.queue(function (task, cb) {
       task(cb);
-    }, 5000);  // max concurrency
-    
+    }, 50);  // max concurrency
+
+    q.error = function (err) {
+      if(err) throw err;
+    };
+
+
     const start = Date.now();
     
     let onRandomInterval = function () {
