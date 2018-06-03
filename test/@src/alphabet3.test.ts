@@ -52,7 +52,7 @@ Test.create(['lmUtils', (b, assert, before, describe, it, path, inject, after) =
     it.cb('check destination file', t => {
       fs.readFile(alphabetFixtureResult, function (err, result) {
         t.final(function () {
-          t.assert(String(result || '') === '')
+          t.assert(String(result || '') === '');
         });
       });
     });

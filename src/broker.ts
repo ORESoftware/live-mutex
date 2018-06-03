@@ -119,6 +119,7 @@ export interface NotifyObj {
 
 /////////////////////////////////////////////////////////////////////////////
 
+
 export interface KeyToBool {
   [key: string]: boolean
 }

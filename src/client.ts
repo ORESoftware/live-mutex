@@ -261,11 +261,15 @@ export class Client {
 
     const self = this;
 
+
+
     this.write = (data: any, cb?: Function) => {
+
 
       if (!ws) {
         throw new Error('please call ensure()/connect() on this Live-Mutex client, before using the lock/unlock methods.');
       }
+
 
       data.pid = process.pid;
 
@@ -378,6 +382,8 @@ export class Client {
           ws.removeListener('error', onFirstErr);
           resolve(this);
         });
+
+        ws.setNoDelay(false);
 
         ws.setEncoding('utf8')
         .once('end', () => {
