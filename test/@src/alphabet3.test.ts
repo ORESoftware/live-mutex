@@ -37,8 +37,8 @@ Test.create(['lmUtils', (b, assert, before, describe, it, path, inject, after) =
 
     const broker = b.getInjectedValue('broker') as Broker;
 
-    after(h => {
-      return broker.close();
+    after.cb(h => {
+      return broker.close(h);
     });
 
     it.cb('check original file', t => {

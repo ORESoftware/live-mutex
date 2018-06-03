@@ -18,14 +18,14 @@ client.ensure().then(function () {
 
   console.log('client is ensured:');
   
-  const a = Array.apply(null, {length: 100});
+  const a = Array.apply(null, {length: 10000});
   const start = Date.now();
   
   var counts = {
     z: 0
   };
   
-  async.eachLimit(a, 5, function (val, cb) {
+  async.eachLimit(a, 20, function (val, cb) {
     
     client.lock('foo', function (err, unlock) {
       

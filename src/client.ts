@@ -10,6 +10,8 @@ import * as fs from 'fs';
 import uuidV4 = require('uuid/v4');
 import chalk from "chalk";
 import {createParser} from "./json-parser";
+import * as modSocket from '@oresoftware/modify-socket';
+
 
 //project
 export const log = {
@@ -253,7 +255,8 @@ export class Client {
 
     this.emitter.on('warning', () => {
       if (this.emitter.listenerCount('warning') < 2) {
-        process.emit.call(process, 'warning', ...arguments);
+        process.emit.call(process, 'warning', ...Array.from(arguments)
+        .map(v => (typeof v === 'string' ? v : util.inspect(v))));
         process.emit.call(process, 'warning',
           'Add a "warning" event listener to the Live-Mutex client to get rid of this message.');
       }
@@ -261,14 +264,22 @@ export class Client {
 
     const self = this;
 
-
-
     this.write = (data: any, cb?: Function) => {
 
 
       if (!ws) {
         throw new Error('please call ensure()/connect() on this Live-Mutex client, before using the lock/unlock methods.');
       }
+
+      // if(ws._handle.fd){
+      //   console.log('ws._handle.fd:',ws._handle.fd);
+      //   modSocket.run(ws._handle.fd);
+      // }
+
+      // if(ws._handle.fd){
+      //   // console.log('ws._handle.fd:',ws._handle.fd);
+      //   modSocket.run(ws._handle.fd);
+      // }
 
 
       data.pid = process.pid;
@@ -380,10 +391,17 @@ export class Client {
           self.isOpen = true;
           clearTimeout(to);
           ws.removeListener('error', onFirstErr);
+
+          if(ws._handle.fd){
+            // console.log('ws._handle.fd:',ws._handle.fd);
+            modSocket.run(ws._handle.fd);
+          }
+
           resolve(this);
         });
 
-        ws.setNoDelay(false);
+
+        ws.setNoDelay(true);
 
         ws.setEncoding('utf8')
         .once('end', () => {

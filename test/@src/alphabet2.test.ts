@@ -27,8 +27,8 @@ Test.create(['lmUtils', (b, assert, before, describe, it, path, fs, inject, afte
 
     const broker = b.getInjectedValue('broker') as Client;
 
-    after(h => {
-      return broker.close();
+    after.cb(h => {
+      return broker.close(h);
     });
 
     const hasMoreLetters = function () {

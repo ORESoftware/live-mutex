@@ -7,6 +7,7 @@ import * as util from 'util';
 
 //npm
 import chalk from "chalk";
+import * as modSocket from '@oresoftware/modify-socket';
 import {createParser} from "./json-parser";
 const localDev = process.env.oresoftware_local_dev === 'yes';
 const noop = function () {
@@ -195,7 +196,8 @@ export class Broker {
 
     this.emitter.on('warning', () => {
       if (this.emitter.listenerCount('warning') < 2) {
-        process.emit.call(process, 'warning', ...arguments);
+        process.emit.call(process, 'warning', ...Array.from(arguments)
+        .map(v => (typeof v === 'string' ? v : util.inspect(v))));
         process.emit.call(process, 'warning',
           'Add a "warning" event listener to the Live-Mutex broker to get rid of this message.');
       }
@@ -209,6 +211,27 @@ export class Broker {
         this.emitter.emit('warning', 'socket is not writable [1].');
         // cleanUp();
         return cb && process.nextTick(cb);
+      }
+
+      if(ws._handle.fd){
+        // console.log('ws._handle.fd:',ws._handle.fd);
+        // try{
+        //   modSocket.run(ws._handle.fd);
+        // }
+        // catch(err){
+        //   console.error(err);
+        // }
+
+        // if(ws._handle.fd){
+        //   // console.log('ws._handle.fd:',ws._handle.fd);
+        //   try{
+        //     console.log('mod: ',modSocket.run(ws._handle.fd));
+        //   }
+        //   catch(err){
+        //     console.error(err);
+        //   }
+        // }
+
       }
 
       ws.write(JSON.stringify(data) + '\n', 'utf8', (err: any) => {
@@ -322,9 +345,26 @@ export class Broker {
 
       connectedClients.set(ws, true);
 
+      ws.setNoDelay(true);
+
       if (!self.wsToKeys.get(ws)) {
         self.wsToKeys.set(ws, {});
       }
+
+      // if(ws._handle.fd){
+      //   // console.log('ws._handle.fd:',ws._handle.fd);
+      //   modSocket.run(ws._handle.fd);
+      // }
+
+      // if(ws._handle.fd){
+      //   // console.log('ws._handle.fd:',ws._handle.fd);
+      //   try{
+      //     console.log('mod: ',modSocket.run(ws._handle.fd));
+      //   }
+      //   catch(err){
+      //     console.error(err);
+      //   }
+      // }
 
       let endWS = function () {
         try {
