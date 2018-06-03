@@ -265,6 +265,7 @@ c.ensure().then(c => {
 * `maxRetries` => `3`. A lock request will be sent to the broker 3 times before an error is called back.
 * `lockRequestTimeout` => `3000`ms. For each lock request, it will timeout after 3 seconds. Upon timeout, it will retry until maxRetries is reached.
 * `keepLocksOnExit` => `false`. If true, locks will *not* be deleted if a connection is closed.
+* `noDelay` => true. By default true, if true, will use the TCP_NODELAY setting (this option is for both broker constructor and client constructor).
 
 As already stated, unless you are using different options for different lock requests for the same client, <br>
 simply pass these options to the client constructor which allows you to avoid passing an options object for each <br>
