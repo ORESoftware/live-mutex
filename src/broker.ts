@@ -7,7 +7,6 @@ import * as util from 'util';
 
 //npm
 import chalk from "chalk";
-import * as modSocket from '@oresoftware/modify-socket';
 import {createParser} from "./json-parser";
 const localDev = process.env.oresoftware_local_dev === 'yes';
 const noop = function () {
@@ -52,7 +51,8 @@ export interface IBrokerOpts {
   lockExpiresAfter: number;
   timeoutToFindNewLockholder: number;
   host: string;
-  port: number
+  port: number;
+  noDelay: boolean;
 }
 
 export type IBrokerOptsPartial = Partial<IBrokerOpts>

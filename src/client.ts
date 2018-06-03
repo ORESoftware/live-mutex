@@ -10,7 +10,6 @@ import * as fs from 'fs';
 import uuidV4 = require('uuid/v4');
 import chalk from "chalk";
 import {createParser} from "./json-parser";
-import * as modSocket from '@oresoftware/modify-socket';
 
 
 //project
