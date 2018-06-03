@@ -68,6 +68,7 @@ the client and broker instances. This library requires a Node.js process to run 
 processes, or more likely launched separately. In other words, a live-mutex client could also be the broker,
 there is nothing wrong with that. For any given key there should be one broker. For absolute speed, you could use separate
 brokers (in separate Node.js processes)for separate keys, but that's not really very necessary.
+Unix Domain Sockets are about 10-20% faster than TCP, depending on how well tuned TCP is on your system.
 
 Three things to remember:
 
