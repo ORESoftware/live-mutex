@@ -732,7 +732,10 @@ export class Broker {
         notifyList.push(obj.uuid, obj);
       }
 
-      notifyList.forEach((obj: any) => {
+      notifyList.forEach((lqv: LinkedQueueValue) => {
+
+        const obj = lqv.value;
+
         self.send(obj.ws, {
           key: data.key,
           uuid: obj.uuid,
