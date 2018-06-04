@@ -271,7 +271,7 @@ export class Broker {
       }
 
       if (data.inspectCommand) {
-        console.log('here we are inspecting!');
+
         self.inspect(data, ws);
 
       }
@@ -411,35 +411,38 @@ export class Broker {
         const v = this.wsToKeys.get(ws);
         this.wsToKeys.delete(ws);
 
-        v && Object.keys(v).forEach(k => {
+        const uuids = Object.keys(this.wsToUUIDs.get(ws) || {});
+        this.wsToUUIDs.delete(ws);
 
-          if (this.locks[k]) {
+        Object.keys(this.locks).forEach((k) => {
 
-            const notify = this.locks[k].notify;
-            const uuids = Object.keys(this.wsToUUIDs.get(ws) || {});
-
-            // let i = notify.length;
-            //
-            // while (i--) {
-            //   if (notify[i] && notify[i].ws === ws) {
-            //     notify.splice(i, 1);
-            //   }
-            // }
-
-            Object.keys(uuids).forEach(function (uuid) {
-              notify.remove(uuid);
-            });
-
-            // if (this.locks[k].isViaShell === false) {
-            //   delete v[k];
-            //   this.unlock({force: true, key: k, from: 'client socket closed/ended/errored'}, ws);
-            // }
-
-            if (!this.locks[k].keepLocksAfterDeath) {
-              this.unlock({force: true, key: k, from: 'client socket closed/ended/errored'}, ws);
-            }
-
+          if (!this.locks[k]) {
+            return;
           }
+
+          const notify = this.locks[k].notify;
+
+          // let i = notify.length;
+          //
+          // while (i--) {
+          //   if (notify[i] && notify[i].ws === ws) {
+          //     notify.splice(i, 1);
+          //   }
+          // }
+
+          Object.keys(uuids).forEach(function (uuid) {
+            notify.remove(uuid);
+          });
+
+          // if (this.locks[k].isViaShell === false) {
+          //   delete v[k];
+          //   this.unlock({force: true, key: k, from: 'client socket closed/ended/errored'}, ws);
+          // }
+
+          if (!this.locks[k].keepLocksAfterDeath) {
+            this.unlock({force: true, key: k, from: 'client socket closed/ended/errored'}, ws);
+          }
+
         });
 
       };

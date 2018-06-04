@@ -3,7 +3,10 @@
 const async = require('async');
 const lmUtils = require('live-mutex/utils');
 const {Broker, Client} = require('live-mutex');
-const conf = Object.freeze({port: 6970});
+// const conf = Object.freeze({port: 6970});
+
+const path = require('path');
+const conf = Object.freeze({udsPath: path.resolve(process.env.HOME + '/simple.unix.sock')});
 const util = require('util');
 
 process.on('unhandledRejection', function (e) {
