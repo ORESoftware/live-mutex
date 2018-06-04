@@ -786,6 +786,10 @@ export class Broker {
       ttl = weAreDebugging ? 500000000 : (data.ttl || this.lockExpiresAfter);
     }
 
+    if (ws && !this.wsToKeys.get(ws)) {
+      this.wsToKeys.set(ws, {});
+    }
+
     const force = data.force;
     const retryCount = data.retryCount;
 
@@ -808,17 +812,34 @@ export class Broker {
         // if we are retrying, we may attempt to call lock() more than once
         // we don't want to push the same ws object / same uuid combo to array
 
-        const alreadyAdded = lck.notify.some((item) => {
-          return String(item.uuid) === String(uuid);
-        });
+        if (force) {
 
-        if (!alreadyAdded) {
-
-          if (retryCount > 0) {
-            lck.notify.unshift({ws, uuid, pid, ttl, keepLocksAfterDeath});
+          for (let i = 0; i < count; i++) {
+            if (lck.notify[i].uuid === uuid) {
+              // remove item from notify
+              lck.notify.splice(i, 1);
+              break;
+            }
           }
-          else {
-            lck.notify.push({ws, uuid, pid, ttl, keepLocksAfterDeath});
+
+          // because we use force we put it to the front of the line
+          lck.notify.unshift({ws, uuid, pid, ttl, keepLocksAfterDeath});
+
+        }
+        else {
+
+          const alreadyAdded = lck.notify.some((item) => {
+            return String(item.uuid) === String(uuid);
+          });
+
+          if (!alreadyAdded) {
+
+            if (retryCount > 0) {
+              lck.notify.unshift({ws, uuid, pid, ttl, keepLocksAfterDeath});
+            }
+            else {
+              lck.notify.push({ws, uuid, pid, ttl, keepLocksAfterDeath});
+            }
           }
         }
 
@@ -855,10 +876,6 @@ export class Broker {
             this.unlock({key, force: true, from: 'ttl expired for lock (1)'});
 
           }, ttl);
-        }
-
-        if (!this.wsToKeys.get(ws)) {
-          this.wsToKeys.set(ws, {});
         }
 
         this.wsToKeys.get(ws)[key] = true;

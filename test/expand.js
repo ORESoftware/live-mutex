@@ -1,8 +1,9 @@
 
 
+const m = new Map();
 
-const {Broker} = require('../broker');
+m.set('foo', {});
+m.set('zoo', 'start');
 
-new Broker({}).close(function(err){
-  console.error(err);
-});
+
+console.log(m.keys());
