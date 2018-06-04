@@ -40,7 +40,7 @@ Promise.all([
     z: 0
   };
 
-  async.eachLimit(a, 25, function (val, cb) {
+  async.eachLimit(a, 35, function (val, cb) {
 
     c.lock('foo', function (err, unlock) {
 
