@@ -9,6 +9,7 @@ import * as fs from 'fs';
 //npm
 import chalk from "chalk";
 import {createParser} from "./json-parser";
+import {LinkedQueue, LinkedQueueValue} from '@oresoftware/linked-queue';
 const localDev = process.env.oresoftware_local_dev === 'yes';
 const noop = function () {
   // do nothing obviously
@@ -105,7 +106,7 @@ export interface LockObj {
   pid: number,
   lockholderTimeouts: UuidHash,
   uuid: string,
-  notify: Array<NotifyObj>,
+  notify: LinkedQueue, //Array<NotifyObj>,
   key: string,
   keepLocksAfterDeath: boolean
   to: NodeJS.Timer
@@ -315,14 +316,16 @@ export class Broker {
           return;
         }
 
-        let ln = lck.notify.length;
-        for (let i = 0; i < ln; i++) {
-          if (lck.notify[i].uuid === uuid) {
-            // remove item from notify
-            lck.notify.splice(i, 1);
-            break;
-          }
-        }
+        lck.notify.remove(uuid);
+
+        // let ln = lck.notify.length;
+        // for (let i = 0; i < ln; i++) {
+        //   if (lck.notify[i].uuid === uuid) {
+        //     // remove item from notify
+        //     lck.notify.splice(i, 1);
+        //     break;
+        //   }
+        // }
 
       }
       else if (data.type === 'lock-received-rejected') {
@@ -413,13 +416,19 @@ export class Broker {
           if (this.locks[k]) {
 
             const notify = this.locks[k].notify;
-            let i = notify.length;
+            const uuids = Object.keys(this.wsToUUIDs.get(ws) || {});
 
-            while (i--) {
-              if (notify[i] && notify[i].ws === ws) {
-                notify.splice(i, 1);
-              }
-            }
+            // let i = notify.length;
+            //
+            // while (i--) {
+            //   if (notify[i] && notify[i].ws === ws) {
+            //     notify.splice(i, 1);
+            //   }
+            // }
+
+            Object.keys(uuids).forEach(function (uuid) {
+              notify.remove(uuid);
+            });
 
             // if (this.locks[k].isViaShell === false) {
             //   delete v[k];
@@ -638,9 +647,11 @@ export class Broker {
 
     const self = this;
 
+    let lqValue: LinkedQueueValue;
     let obj: NotifyObj;
 
-    while (obj = notifyList.shift()) {
+    while (lqValue = notifyList.shift()) {
+      obj = lqValue.value;
       if (obj.ws && obj.ws.writable) {
         break;
       }
@@ -718,7 +729,7 @@ export class Broker {
       }
 
       if (!self.rejected[obj.uuid]) {
-        notifyList.push(obj);
+        notifyList.push(obj.uuid, obj);
       }
 
       notifyList.forEach((obj: any) => {
@@ -786,6 +797,13 @@ export class Broker {
       ttl = weAreDebugging ? 500000000 : (data.ttl || this.lockExpiresAfter);
     }
 
+    if (ws && uuid) {
+      if (!this.wsToUUIDs.get(ws)) {
+        this.wsToUUIDs.set(ws, {});
+      }
+      this.wsToUUIDs.get(ws)[uuid] = true;
+    }
+
     if (ws && !this.wsToKeys.get(ws)) {
       this.wsToKeys.set(ws, {});
     }
@@ -814,31 +832,35 @@ export class Broker {
 
         if (force) {
 
-          for (let i = 0; i < count; i++) {
-            if (lck.notify[i].uuid === uuid) {
-              // remove item from notify
-              lck.notify.splice(i, 1);
-              break;
-            }
-          }
+          // for (let i = 0; i < count; i++) {
+          //   if (lck.notify[i].uuid === uuid) {
+          //     // remove item from notify
+          //     lck.notify.splice(i, 1);
+          //     break;
+          //   }
+          // }
+
+          lck.notify.remove(uuid);
 
           // because we use force we put it to the front of the line
-          lck.notify.unshift({ws, uuid, pid, ttl, keepLocksAfterDeath});
+          lck.notify.unshift(uuid, {ws, uuid, pid, ttl, keepLocksAfterDeath});
 
         }
         else {
 
-          const alreadyAdded = lck.notify.some((item) => {
-            return String(item.uuid) === String(uuid);
-          });
+          // const alreadyAdded = lck.notify.some((item) => {
+          //   return String(item.uuid) === String(uuid);
+          // });
+
+          const alreadyAdded = lck.notify.get(uuid);
 
           if (!alreadyAdded) {
 
             if (retryCount > 0) {
-              lck.notify.unshift({ws, uuid, pid, ttl, keepLocksAfterDeath});
+              lck.notify.unshift(uuid, {ws, uuid, pid, ttl, keepLocksAfterDeath});
             }
             else {
-              lck.notify.push({ws, uuid, pid, ttl, keepLocksAfterDeath});
+              lck.notify.push(uuid, {ws, uuid, pid, ttl, keepLocksAfterDeath});
             }
           }
         }
@@ -904,7 +926,7 @@ export class Broker {
         keepLocksAfterDeath,
         lockholderTimeouts: {},
         key,
-        notify: [],
+        notify: new LinkedQueue(),
         to: null
       };
 
