@@ -22,9 +22,6 @@ Promise.all([
 ])
 .then(function ([b, c]) {
 
-  console.log(b.noDelay);
-  console.log(c.noDelay);
-
   b.emitter.on('warning', function () {
     console.log(...arguments);
   });
@@ -33,14 +30,14 @@ Promise.all([
     console.log(...arguments);
   });
 
-  const a = Array.apply(null, {length: 10000});
+  const a = Array.apply(null, {length: 1000});
   const start = Date.now();
 
   let counts = {
     z: 0
   };
 
-  async.eachLimit(a, 35, function (val, cb) {
+  async.eachLimit(a, 100, function (val, cb) {
 
     c.lock('foo', function (err, unlock) {
 
@@ -49,7 +46,7 @@ Promise.all([
       }
 
       try {
-        console.log('unlocking...' + counts.z++);
+        // console.log('unlocking...' + counts.z++);
         // console.log(util.inspect(unlock));
 
         // client.unlock('foo',cb);

@@ -484,7 +484,7 @@ export class Broker {
         }
 
         callable = false;
-        this.emitter.emit('warning', chalk.yellow.bold(`${event} event has occurred.`));
+        this.emitter.emit('warning', chalk.yellow.bold(`[live-mutex broker] "${event}" event has occurred.`));
         connectedClients.forEach(function (v, k) {
           // destroy each connected client
           k.destroy();
