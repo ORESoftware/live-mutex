@@ -6,32 +6,36 @@ shift 1;
 
 if [ "$cmd" == "start" ]; then
 
-  lm_start_server "$@"
-  exit $?
+  lmx_start_server "$@"
+
+elif [ "$cmd" == "launch" ]; then
+
+  lmx_start_server "$@"
+
 
 elif [ "$cmd" == "acquire" ]; then
 
-  lm_acquire_lock "$@"
-  exit $?
+  lmx_acquire_lock "$@"
+
 
 elif [ "$cmd" == "release" ]; then
 
-  lm_release_lock "$@"
-   exit $?
+  lmx_release_lock "$@"
+
 
 elif [ "$cmd" == "inspect" ]; then
 
-  lm_inspect_broker "$@"
-   exit $?
+  lmx_inspect_broker "$@"
+
 
 elif [ "$cmd" == "ls" ]; then
 
-  lm_ls "$@"
-   exit $?
+  lmx_ls "$@"
+
 
 else
 
-  echo "no subcommand was recognized."
+  echo "lmx: no subcommand was recognized. Possible subcommands: acquire, release, inspect, launch, start"
   exit 1;
 
 fi

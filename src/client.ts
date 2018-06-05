@@ -318,8 +318,8 @@ export class Client {
       const uuid = data.uuid;
 
       if (!uuid) {
-        return this.emitter.emit('warning', new Error(
-          'Potential Live-Mutex implementation error => message did not contain uuid =>' + util.inspect(data))
+        return this.emitter.emit('warning',
+          'Potential Live-Mutex implementation error => message did not contain uuid =>' + util.inspect(data)
         );
       }
 
@@ -332,11 +332,11 @@ export class Client {
       const to = self.timeouts[uuid];
 
       if (fn && to) {
-        this.emitter.emit('warning', new Error('Function and timeout both exist => Live-Mutex implementation error.'));
+        this.emitter.emit('warning', 'Function and timeout both exist => Live-Mutex implementation error.');
       }
 
       if (to) {
-        this.emitter.emit('warning', new Error('Client side lock/unlock request timed-out.'));
+        this.emitter.emit('warning', 'Client side lock/unlock request timed-out.');
         delete self.timeouts[uuid];
         if (data.acquired === true && data.type === 'lock') {
           self.write({uuid: uuid, key: data.key, type: 'lock-received-rejected'});
@@ -354,7 +354,7 @@ export class Client {
 
       if (data.acquired === true && data.type === 'lock') {
 
-        this.emitter.emit('warning', new Error('Rejecting lock acquisition.'));
+        this.emitter.emit('warning', `Rejecting lock acquisition for key => "${data.key}".`);
 
         self.write({
           uuid: uuid,
@@ -392,13 +392,13 @@ export class Client {
       return connectPromise = new Promise((resolve, reject) => {
 
         let onFirstErr = (e: any) => {
-          let err = new Error('live-mutex client error => ' + (e && e.stack || e));
+          let err = '[lmx] client error => ' + (e && e.message || e);
           this.emitter.emit('warning', err);
           reject(err);
         };
 
         let to = setTimeout(function () {
-          reject('live-mutex err: client connection timeout after 2000ms.');
+          reject('[lmx] err: client connection timeout after 2000ms.');
         }, 3000);
 
         let cnkt: any = self.socketFile || {port: self.port};
@@ -422,7 +422,7 @@ export class Client {
 
         ws.setEncoding('utf8')
         .once('end', () => {
-          this.emitter.emit('warning', new Error('client stream "end" event occurred.'));
+          this.emitter.emit('warning', '[lmx] => client stream "end" event occurred.');
         })
         .once('error', onFirstErr)
         .once('close', () => {
@@ -430,7 +430,7 @@ export class Client {
         })
         .on('error', (e) => {
           self.isOpen = false;
-          this.emitter.emit('warning', new Error('live-mutex client error: ' + e.stack || util.inspect(e)));
+          this.emitter.emit('warning', '[lmx] client error => ' + e.message || util.inspect(e));
         })
         .pipe(createParser())
         .on('data', onData)
@@ -477,7 +477,7 @@ export class Client {
 
   requestLockInfo(key: string, opts?: any, cb?: Function) {
 
-    assert.equal(typeof key, 'string', ' => Key passed to live-mutex#lock needs to be a string.');
+    assert.equal(typeof key, 'string', 'Key passed to lmx#lock needs to be a string.');
 
     if (typeof opts === 'function') {
       cb = opts;
@@ -581,7 +581,6 @@ export class Client {
       this.emitter.emit('warning', err);
     }
 
-    // err = err instanceof Error ? err : new Error(err);
     this.emitter.emit('warning', err);
     cb(err, uuid);
   }
@@ -598,9 +597,7 @@ export class Client {
       this.emitter.emit('warning', err);
     }
 
-    err = err instanceof Error ? err : new Error(err);
     this.emitter.emit('warning', err);
-
     cb(err, {acquired: false, key, lockUuid: uuid, id: uuid});
 
   }
@@ -753,7 +750,7 @@ export class Client {
     const maxRetries = opts.maxRetry || opts.maxRetries || this.lockRetryMax;
 
     if (opts.__retryCount > maxRetries) {
-      return cb(new Error(`Maximum retries (${maxRetries}) attempted.`), {
+      return cb(`Maximum retries (${maxRetries}) attempted to acquire lock for key "${key}".`, {
         acquired: false,
         key,
         lockUuid: uuid,
@@ -794,8 +791,9 @@ export class Client {
         self.write({uuid, key, type: 'lock-client-timeout'});
 
         return cb(
-          new Error(`Live-Mutex client lock request timed out after ${lockRequestTimeout * opts.__retryCount} ms, ` +
-            `${maxRetries} retries attempted.`), {acquired: false, key, lockUuid: uuid, id: uuid});
+         `Live-Mutex client lock request timed out after ${lockRequestTimeout * opts.__retryCount} ms, ` +
+            `${maxRetries} retries attempted to acquire lock for key ${key}.`,
+          {acquired: false, key, lockUuid: uuid, id: uuid});
       }
 
       self.lockInternal(key, opts, cb);
@@ -865,10 +863,15 @@ export class Client {
 
         if (opts.wait === false) {
 
+          // when wait is false, user only wants to try once,
+          // and doesn't even want to wait until the timeout elapses.
+          // such that even if wait === false and maxRetries === 1,
+          // we still wouldn't wait for the timeout to elapse
+
           this.cleanUp(uuid);
           self.giveups[uuid] = true;
 
-          cb(new Error('Could not acquire lock on first attempt and wait===false.'), {
+          cb('Could not acquire lock on first attempt and wait===false.', {
             key,
             acquired: false,
             lockUuid: uuid,
@@ -896,7 +899,7 @@ export class Client {
   }
 
   noop() {
-
+   // this is a no-operation, obviously
   }
 
   getPort() {
@@ -970,7 +973,7 @@ export class Client {
       delete this.timers[uuid];
       delete this.resolutions[uuid];
       this.timeouts[uuid] = true;
-      let err = new Error('Unlock request timed out.');
+      let err = `Unlock request to unlock key => "${key}" timed out.`;
       this.emitter.emit('warning', err);
       cb(err);
 

@@ -534,7 +534,7 @@ export class Broker {
       return brokerPromise = new Promise((resolve, reject) => {
 
         let to = setTimeout(function () {
-          reject(new Error('Live-Mutex broker error: listening action timed out.'))
+          reject('Live-Mutex broker error: listening action timed out.')
         }, 3000);
 
         wss.once('error', reject);
