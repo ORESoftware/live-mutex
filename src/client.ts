@@ -973,7 +973,7 @@ export class Client {
       delete this.timers[uuid];
       delete this.resolutions[uuid];
       this.timeouts[uuid] = true;
-      let err = `Unlock request to unlock key => "${key}" timed out.`;
+      let err = ` [lmx] Unlock request to unlock key => "${key}" timed out.`;
       this.emitter.emit('warning', err);
       cb(err);
 

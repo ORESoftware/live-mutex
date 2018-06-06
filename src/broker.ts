@@ -1075,7 +1075,7 @@ export class Broker {
     }
     else {
 
-      this.emitter.emit('warning', 'Live-Mutex implementation error => no lock with key => "' + key + '"');
+      this.emitter.emit('warning', 'Live-Mutex implementation warning => no lock with key => "' + key + '"');
 
       // since the lock no longer exists for this key, remove ownership of this key
 
