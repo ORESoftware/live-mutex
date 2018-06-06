@@ -114,19 +114,22 @@ the functionality at the command line too:
 
 ```bash
 
-# in shell 1
-$ lm_start_server 6970  # 6970 is the default port, so you can omit that
+###  in shell 1, we launch a server/broker
 
-# in shell 2
-$ lm_acquire_lock foo 6970  # 6970 is the default port, so you can omit that
-$ lm_release_lock foo 6970  # 6970 is the default port, so you can omit that
+$ lmx start 6970  # 6970 is the default port, so you can omit that
+
+
+###  in shell 2, we acquire/release locks
+
+$ lmx acquire foo 6970  # 6970 is the default port, so you can omit that
+$ lmx release foo 6970  # 6970 is the default port, so you can omit that
 
 ```
 
 Note to get started with the library, you can simply start a live-mutex broker with:
 
 ```bash
-lm_start_server # defaults to port 6970
+lmx_start_server # defaults to port 6970
 ```
 
 
