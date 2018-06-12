@@ -1,3 +1,5 @@
+'use strict';
+
 const path = require('path');
 
 if (!path.isAbsolute(process.env.MY_DOCKER_R2G_SEARCH_ROOT || '')) {
