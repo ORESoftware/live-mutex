@@ -30,7 +30,6 @@ export const log = {
 import {weAreDebugging} from './we-are-debugging';
 import {EventEmitter} from 'events';
 import * as path from "path";
-import * as fs from "fs";
 if (weAreDebugging) {
   log.error('broker is in debug mode. Timeouts are turned off.');
 }
@@ -231,7 +230,7 @@ export class Broker {
         return cb && process.nextTick(cb);
       }
 
-      if (ws._handle.fd) {
+      if (ws._handle && ws._handle.fd) {
         // console.log('ws._handle.fd:',ws._handle.fd);
         // try{
         //   modSocket.run(ws._handle.fd);
@@ -430,18 +429,18 @@ export class Broker {
           //   }
           // }
 
-          Object.keys(uuids).forEach(function (uuid) {
-            notify.remove(uuid);
-          });
+          // Object.keys(uuids).forEach(function (uuid) {
+          //   notify.remove(uuid);
+          // });
 
           // if (this.locks[k].isViaShell === false) {
           //   delete v[k];
           //   this.unlock({force: true, key: k, from: 'client socket closed/ended/errored'}, ws);
           // }
 
-          if (!this.locks[k].keepLocksAfterDeath) {
-            this.unlock({force: true, key: k, from: 'client socket closed/ended/errored'}, ws);
-          }
+          // if (!this.locks[k].keepLocksAfterDeath) {
+          //   this.unlock({force: true, key: k, from: 'client socket closed/ended/errored'}, ws);
+          // }
 
         });
 

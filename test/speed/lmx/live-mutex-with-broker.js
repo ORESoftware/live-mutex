@@ -30,14 +30,14 @@ Promise.all([
     console.log(...arguments);
   });
 
-  const a = Array.apply(null, {length: 1000});
+  const a = Array.apply(null, {length: 10000});
   const start = Date.now();
 
   let counts = {
     z: 0
   };
 
-  async.eachLimit(a, 100, function (val, cb) {
+  async.eachLimit(a, 8, function (val, cb) {
 
     c.lock('foo', function (err, unlock) {
 
@@ -45,17 +45,9 @@ Promise.all([
         return cb(err);
       }
 
-      try {
-        // console.log('unlocking...' + counts.z++);
-        // console.log(util.inspect(unlock));
-
-        // client.unlock('foo',cb);
-
+      setTimeout(function(){
         unlock(cb);
-      }
-      catch (err) {
-        return cb(err);
-      }
+      }, Math.ceil(Math.random()*5));
 
     });
 
