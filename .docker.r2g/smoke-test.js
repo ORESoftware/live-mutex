@@ -1,3 +1,6 @@
+#!/usr/bin/env node
+'use strict';
+
 const {Client, Broker} = require('live-mutex');
 
 Promise.all([
