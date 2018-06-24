@@ -15,7 +15,8 @@
     "lmx": "assets/lmx.sh"
   },
   "scripts": {
-    "test": "./scripts/test.sh"
+    "test": "./scripts/test.sh",
+    "postinstall": "./assets/postinstall.sh"
   },
   "repository": {
     "type": "git",
