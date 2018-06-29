@@ -102,6 +102,8 @@ export interface UuidHash {
 }
 
 export interface LockObj {
+  max: number, // max number of lockholders
+  count: number, // current number of lockholders
   pid: number,
   lockholderTimeouts: UuidHash,
   uuid: string,
@@ -230,27 +232,6 @@ export class Broker {
         return cb && process.nextTick(cb);
       }
 
-      if (ws._handle && ws._handle.fd) {
-        // console.log('ws._handle.fd:',ws._handle.fd);
-        // try{
-        //   modSocket.run(ws._handle.fd);
-        // }
-        // catch(err){
-        //   console.error(err);
-        // }
-
-        // if(ws._handle.fd){
-        //   // console.log('ws._handle.fd:',ws._handle.fd);
-        //   try{
-        //     console.log('mod: ',modSocket.run(ws._handle.fd));
-        //   }
-        //   catch(err){
-        //     console.error(err);
-        //   }
-        // }
-
-      }
-
       ws.write(JSON.stringify(data) + '\n', 'utf8', (err: any) => {
         if (err) {
           this.emitter.emit('warning', 'socket is not writable [2].');
@@ -317,15 +298,6 @@ export class Broker {
 
         lck.notify.remove(uuid);
 
-        // let ln = lck.notify.length;
-        // for (let i = 0; i < ln; i++) {
-        //   if (lck.notify[i].uuid === uuid) {
-        //     // remove item from notify
-        //     lck.notify.splice(i, 1);
-        //     break;
-        //   }
-        // }
-
       }
       else if (data.type === 'lock-received-rejected') {
 
@@ -372,20 +344,6 @@ export class Broker {
         self.wsToKeys.set(ws, {});
       }
 
-      // if(ws._handle.fd){
-      //   // console.log('ws._handle.fd:',ws._handle.fd);
-      //   modSocket.run(ws._handle.fd);
-      // }
-
-      // if(ws._handle.fd){
-      //   // console.log('ws._handle.fd:',ws._handle.fd);
-      //   try{
-      //     console.log('mod: ',modSocket.run(ws._handle.fd));
-      //   }
-      //   catch(err){
-      //     console.error(err);
-      //   }
-      // }
 
       let endWS = function () {
         try {
@@ -438,9 +396,9 @@ export class Broker {
           //   this.unlock({force: true, key: k, from: 'client socket closed/ended/errored'}, ws);
           // }
 
-          // if (!this.locks[k].keepLocksAfterDeath) {
-          //   this.unlock({force: true, key: k, from: 'client socket closed/ended/errored'}, ws);
-          // }
+          if (!this.locks[k].keepLocksAfterDeath) {
+            this.unlock({force: true, key: k, from: 'client socket closed/ended/errored'}, ws);
+          }
 
         });
 
@@ -540,11 +498,6 @@ export class Broker {
 
         let cnkt: any = self.socketFile || self.port;
         wss.listen(cnkt, () => {
-
-          // if(wss._handle.fd){
-          //   console.log('server wss._handle.fd:',wss._handle.fd);
-          //   console.log(modSocket.run(wss._handle.fd));
-          // }
 
           self.isOpen = true;
           clearTimeout(to);
@@ -718,16 +671,16 @@ export class Broker {
       // acquire lock message, so we push the object back onto the end of notify list and send a reelection message to all
       // if a client receives a reelection message, they will all retry to acquire the lock on this key
 
-      let _lck: LockObj, count: number;
+      let _lck: LockObj, ln: number;
 
       // if this timeout happens, then we can no longer cross-verify uuid's
       if (_lck = locks[key]) {
         _lck.uuid = undefined;
         _lck.pid = undefined;
-        count = lck.notify.length;
+        ln = lck.notify.length;
       }
       else {
-        count = 0;
+        ln = 0;
       }
 
       if (!self.rejected[obj.uuid]) {
@@ -735,14 +688,12 @@ export class Broker {
       }
 
       notifyList.forEach((lqv: LinkedQueueValue) => {
-
         const obj = lqv.value;
-
         self.send(obj.ws, {
           key: data.key,
           uuid: obj.uuid,
           type: 'lock',
-          lockRequestCount: count,
+          lockRequestCount: ln,
           reelection: true
         });
       });
@@ -795,6 +746,8 @@ export class Broker {
     const lck = locks[key];
     const uuid = data.uuid;
     const pid = data.pid;
+    const max = data.max;  // max lockholders
+
 
     let ttl = data.ttl;
 
@@ -827,9 +780,13 @@ export class Broker {
 
     if (lck) {
 
-      const count = lck.notify.length;
+      if(Number.isInteger(max)){
+        lck.max = max;
+      }
 
-      if (lck.uuid) {
+      const ln = lck.notify.length;
+
+      if (lck.count >= lck.max) {
 
         // Lock exists *and* already has a lockholder; adding ws to list of to be notified
         // if we are retrying, we may attempt to call lock() more than once
@@ -837,25 +794,12 @@ export class Broker {
 
         if (force) {
 
-          // for (let i = 0; i < count; i++) {
-          //   if (lck.notify[i].uuid === uuid) {
-          //     // remove item from notify
-          //     lck.notify.splice(i, 1);
-          //     break;
-          //   }
-          // }
-
-          lck.notify.remove(uuid);
-
           // because we use force we put it to the front of the line
+          lck.notify.remove(uuid);
           lck.notify.unshift(uuid, {ws, uuid, pid, ttl, keepLocksAfterDeath});
 
         }
         else {
-
-          // const alreadyAdded = lck.notify.some((item) => {
-          //   return String(item.uuid) === String(uuid);
-          // });
 
           const alreadyAdded = lck.notify.get(uuid);
 
@@ -873,7 +817,7 @@ export class Broker {
         this.send(ws, {
           key: key,
           uuid: uuid,
-          lockRequestCount: count,
+          lockRequestCount: ln,
           type: 'lock',
           acquired: false
         });
@@ -882,13 +826,13 @@ export class Broker {
 
         lck.pid = pid;
         lck.uuid = uuid;
+        lck.count++;
 
         clearTimeout(lck.to);
 
         if (ttl !== Infinity) {
 
-          // if originalTTL is null, we are using Infinity, so there is no timeout
-
+          // if are using Infinity, there is no timeout
           // if we are locking with the shell, there is not timeout
           // otherwise if we are using the lib programmatically, we use a timeout
 
@@ -910,7 +854,7 @@ export class Broker {
         this.send(ws, {
           uuid: uuid,
           key: key,
-          lockRequestCount: count,
+          lockRequestCount: ln,
           type: 'lock',
           acquired: true
         });
@@ -926,6 +870,8 @@ export class Broker {
       this.wsToKeys.get(ws)[key] = true;
 
       locks[key] = {
+        max: max || 1,
+        count: 1,
         pid,
         uuid,
         keepLocksAfterDeath,
@@ -1005,7 +951,7 @@ export class Broker {
 
     if (lck && (same || force)) {
 
-      const count = lck.notify.length;
+      const ln = lck.notify.length;
       clearTimeout(lck.to);
 
       if (uuid && ws) {
@@ -1016,7 +962,7 @@ export class Broker {
         this.send(ws, {
           uuid: uuid,
           key: key,
-          lockRequestCount: count,
+          lockRequestCount: ln,
           type: 'unlock',
           unlocked: true
         });
@@ -1027,7 +973,7 @@ export class Broker {
     }
     else if (lck) {
 
-      const count = lck.notify.length;
+      const ln = lck.notify.length;
 
       if (lck.lockholderTimeouts[_uuid]) {
 
@@ -1041,7 +987,7 @@ export class Broker {
           this.send(ws, {
             uuid: uuid,
             key: key,
-            lockRequestCount: count,
+            lockRequestCount: ln,
             type: 'unlock',
             unlocked: true
           });
@@ -1058,7 +1004,7 @@ export class Broker {
           this.send(ws, {
             uuid: uuid,
             key: key,
-            lockRequestCount: count,
+            lockRequestCount: ln,
             type: 'unlock',
             error: 'You need to pass the correct uuid, or use force.',
             unlocked: false
@@ -1077,7 +1023,6 @@ export class Broker {
       this.emitter.emit('warning', 'Live-Mutex implementation warning => no lock with key => "' + key + '"');
 
       // since the lock no longer exists for this key, remove ownership of this key
-
       if (ws && uuid) {
 
         this.emitter.emit('warning', `Live-Mutex warning, no lock with key => '${key}'.`);

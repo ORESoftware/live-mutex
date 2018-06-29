@@ -297,6 +297,8 @@ export class Client {
       //   modSocket.run(ws._handle.fd);
       // }
 
+      data.max = data.max || null;
+
       data.pid = process.pid;
 
       if (data.ttl === Infinity) {

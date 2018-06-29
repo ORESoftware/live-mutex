@@ -16,10 +16,7 @@ exports.default = {
   tests: '',
 
   packages: {
-
-    'siamese': true,
     '@oresoftware/linked-queue': true
-
   }
 
 };

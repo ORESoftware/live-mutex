@@ -20,7 +20,7 @@ mkdir -p "$HOME/.oresoftware/bash" || {
 }
 
 cat assets/shell.sh > "$HOME/.oresoftware/bash/lmx.sh" || {
-  echo "could not create oresoftware/bash/lmx.sh file."
+  echo "Could not create oresoftware/bash/lmx.sh file."
   exit 1;
 }
 
