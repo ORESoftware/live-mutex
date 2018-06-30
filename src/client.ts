@@ -119,23 +119,28 @@ export interface LMClientUnlockOpts {
 
 }
 
-export type LMLockSuccessData = {
+export interface LMLockSuccessData  {
   acquired: boolean,
   key: string,
-  unlock?: LMClientUnlockConvenienceCallback,
+  unlock?: LMCallableLockSuccessData,
   lockUuid: string,
   readersCount: number,
   id: string
-};
+}
+
+export interface LMCallableLockSuccessData  extends LMLockSuccessData {
+  (fn: EVCallback): void  // unlock convenience callback
+}
+
+export type EVCallback = (err?: any, val?: any) => void;
 
 export interface LMClientLockCallBack {
   isLMBound?: boolean;
-  (err: any, val: LMLockSuccessData): void;
+  (err: any, val:  LMCallableLockSuccessData): void;
 }
 
 export type LMClientUnlockCallBack = (err: any, uuid?: string) => void;
-export type ErrorFirstCallBack = (err: any, val?: any) => void;
-export type LMClientUnlockConvenienceCallback = (fn: ErrorFirstCallBack) => void;
+
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
@@ -551,15 +556,15 @@ export class Client {
     return this.unlockp.apply(this, arguments);
   }
 
-  runUnlock(fn: LMClientUnlockConvenienceCallback): Promise<any> {
+  runUnlock(fn: LMCallableLockSuccessData): Promise<any> {
     return new Promise((resolve, reject) => {
-      fn(function (err, val) {
+      fn( (err, val) => {
         err ? reject(err) : resolve(val);
       });
     });
   }
 
-  execUnlock(fn: LMClientUnlockConvenienceCallback): Promise<any> {
+  execUnlock(fn: LMCallableLockSuccessData): Promise<any> {
     return this.runUnlock.apply(this, arguments);
   }
 
@@ -598,7 +603,7 @@ export class Client {
     }
 
     this.emitter.emit('warning', err);
-    cb(err, {acquired: false, key, lockUuid: uuid, id: uuid, readersCount: null});
+    cb(err, {acquired: false, key, lockUuid: uuid, id: uuid, readersCount: null} as any);
 
   }
 
@@ -937,24 +942,23 @@ export class Client {
       return process.nextTick(cb, err);
     }
 
-    this.lock(key, opts, (err, val) => {
+    this.lock(key, opts, (err, unlock) => {
 
       if (err) {
-        return cb(err, val);
+        return cb(err, unlock);
       }
 
-      const id = val.lockUuid;
-      const readers = val.readersCount;
+      const readers = unlock.readersCount;
 
       if (!Number.isInteger(readers)) {
-        return this.fireLockCallbackWithError('Implementation error, missing "readersCount".', val.id, cb, key);
+        return this.fireLockCallbackWithError('Implementation error, missing "readersCount".', unlock.id, cb, key);
       }
 
       // console.error('readers:', readers);
 
       const boundEndRead = this.endRead.bind(this, key, {writeKey});
       boundEndRead.endRead = boundEndRead.release = boundEndRead;
-      boundEndRead.lockResult = val;
+      boundEndRead.lockResult = unlock;
 
       if (readers <= 1) {
         return this.lock(writeKey, {force: true}, (err, val) => {
@@ -965,7 +969,7 @@ export class Client {
             return cb(err, boundEndRead);
           }
 
-          this.unlock(key, id, (err, val) => {
+          unlock((err, val) => {
             boundEndRead.unlockResult = val || null;
             cb(err, boundEndRead);
           });
@@ -973,7 +977,7 @@ export class Client {
         });
       }
 
-      this.unlock(key, id, (err, val) => {
+      unlock((err, val) => {
         boundEndRead.unlockResult = val || null;
         cb(err, boundEndRead);
       });
@@ -1213,7 +1217,7 @@ export class Client {
         return cb(
           `Live-Mutex client lock request timed out after ${lockRequestTimeout * opts.__retryCount} ms, ` +
           `${maxRetries} retries attempted to acquire lock for key ${key}.`,
-          {acquired: false, key, lockUuid: uuid, id: uuid, readersCount: null});
+          {acquired: false, key, lockUuid: uuid, id: uuid, readersCount: null} as any);
       }
 
       self.lockInternal(key, opts, cb);
