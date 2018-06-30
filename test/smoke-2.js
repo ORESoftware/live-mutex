@@ -42,7 +42,7 @@ Promise.all([
 
           if (err) throw err;
 
-          console.log('all done:', err, Object.assign({}, val));
+          console.log('all done');
           console.log('all done after:', Date.now() - start);
 
         });

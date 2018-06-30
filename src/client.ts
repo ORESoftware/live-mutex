@@ -275,7 +275,7 @@ export class Client {
     this.listeners = {};
     this.host = opts.host || 'localhost';
     this.port = opts.port || 6970;
-    this.ttl = weAreDebugging ? 5000000 : (opts.ttl || 4000);
+    this.ttl = weAreDebugging ? 5000000 : (opts.ttl || 4050);
     this.unlockRequestTimeout = weAreDebugging ? 5000000 : (opts.unlockRequestTimeout || 4000);
     this.lockRequestTimeout = weAreDebugging ? 5000000 : (opts.lockRequestTimeout || 3000);
     this.lockRetryMax = opts.lockRetryMax || opts.maxRetries || opts.retryMax || 3;
@@ -320,6 +320,7 @@ export class Client {
     const onData = (data: any) => {
 
       const uuid = data.uuid;
+      const _uuid = data._uuid;
 
       if (!uuid) {
 
@@ -348,7 +349,7 @@ export class Client {
         this.emitter.emit('warning', 'Client side lock/unlock request timed-out.');
         delete self.timeouts[uuid];
         if (data.acquired === true && data.type === 'lock') {
-          self.write({uuid: uuid, key: data.key, type: 'lock-received-rejected'});
+          self.write({uuid: uuid, _uuid, key: data.key, type: 'lock-received-rejected'});
         }
         return;
       }
@@ -742,6 +743,7 @@ export class Client {
       return process.nextTick(cb, err);
     }
 
+    opts.max = 1;
     const boundRelease = this.releaseWriteLock.bind(this, key, {});
 
     this.lock(key, opts, (err, unlock) => {
@@ -750,6 +752,9 @@ export class Client {
         return cb(err, boundRelease);
       }
 
+      console.log(chalk.blue('acquireWriteLock got lock on:'), key);
+
+
       this.registerWriteFlagAndReadersCheck(key, {}, (err, val) => {
 
         if (err) {
@@ -757,6 +762,7 @@ export class Client {
         }
 
         unlock((err, val) => {
+          console.log(chalk.blue('acquireWriteLock released lock on:'), key);
           cb(err, boundRelease);
         });
 
@@ -777,11 +783,16 @@ export class Client {
 
     // const boundRelease = this.releaseWriteLock.bind(this, key, {});
 
+    opts.max = 1;
+
     this.lock(key, opts, (err, unlock) => {
 
       if (err) {
         return cb(err, unlock);
       }
+
+      console.log(chalk.blue('releaseWriteLock got lock on:'), key);
+
 
       this.setWriteFlagToFalse(key, (err, val) => {
 
@@ -789,7 +800,10 @@ export class Client {
           return cb(err, unlock);
         }
 
-        unlock(cb);
+        unlock((err,val) => {
+          console.log(chalk.blue('releaseWriteLock released lock on:'), key);
+           cb(err,val);
+        });
 
       });
 
@@ -808,11 +822,15 @@ export class Client {
 
     const boundRelease = this.releaseReadLock.bind(this, key, {});
 
+    opts.max = 1;
+
     this.lock(key, opts, (err, unlock) => {
 
       if (err) {
         return cb(err, boundRelease);
       }
+
+      console.log(chalk.blue('acquireReadLock got lock on key:'), key);
 
       this.registerWriteFlagCheck(key, {}, (err, val) => {
 
@@ -821,6 +839,7 @@ export class Client {
         }
 
         unlock((err, val) => {
+          console.log(chalk.blue('acquireReadLock released lock on key:'), key);
           cb(err, boundRelease);
         });
 
@@ -839,6 +858,8 @@ export class Client {
       return process.nextTick(cb, err);
     }
 
+    opts.max = 1;
+
     // const boundRelease = this.releaseWriteLock.bind(this, key, {});
 
     this.lock(key, opts, (err, unlock) => {
@@ -847,13 +868,18 @@ export class Client {
         return cb(err, unlock);
       }
 
+      console.log(chalk.blue('releaseReadLock got lock on key:'), key);
+
       this.decrementReaders(key, (err, val) => {
 
         if (err) {
           return cb(err, unlock);
         }
 
-        unlock(cb);
+        unlock((err,val) => {
+          console.log(chalk.blue('releaseReadLock released lock on key:'), key);
+             cb(err,val);
+        });
 
       });
 
@@ -865,7 +891,7 @@ export class Client {
     return new Promise((resolve, reject) => {
       this.acquireWriteLock(key, opts, (err, val) => {
         err ? reject(err) : resolve(val);
-      })
+      });
     });
   }
 
@@ -873,7 +899,7 @@ export class Client {
     return new Promise((resolve, reject) => {
       this.acquireReadLock(key, opts, (err, val) => {
         err ? reject(err) : resolve(val);
-      })
+      });
     });
   }
 
@@ -1196,6 +1222,7 @@ export class Client {
     const beginRead = opts.beginRead || null;
     const endRead = opts.endRead || null;
     const isRWLockWrite = opts.isRWLockWrite || null;
+    const max = opts.max;
 
     const self = this;
     let timedOut = false;
@@ -1339,7 +1366,8 @@ export class Client {
       type: 'lock',
       ttl: ttl,
       beginRead,
-      endRead
+      endRead,
+      max
     });
 
   }

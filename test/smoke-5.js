@@ -27,27 +27,34 @@ Promise.all([
 
   const start = Date.now();
 
+  const max = 22;
+
   const firstRead = function (cb) {
-    c.lock('foo', (err, release) => {
+    c.lock('foo', {max},(err, release) => {
       err ? cb(err) : release(cb);
     });
   };
 
   const firstWrite = function (cb) {
-    c.lock('foo', (err, release) => {
+    c.lock('foo', {max},(err, release) => {
        err ? cb(err) : release(cb);
     });
   };
 
-  async.timesLimit(1000, 30, function (n, cb) {
+  async.timesLimit(1000, 20, function (n, cb) {
 
     // console.log('doing it:', n);
+    
+    const done = function () {
+       // console.log('all done with:',n);
+       cb.apply(null,arguments);
+    };
 
     if (Math.random() > .5) {
-      firstRead(cb);
+      firstRead(done);
     }
     else {
-      firstWrite(cb);
+      firstWrite(done);
     }
 
   }, function (err) {

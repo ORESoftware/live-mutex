@@ -105,9 +105,8 @@ export interface LockObj {
   readers?: number;
   max: number, // max number of lockholders
   count: number, // current number of lockholders
-  pid: number,
   lockholderTimeouts: UuidHash,
-  uuid: string,
+  lockholders: { [key: string]: {pid: number, ws:net.Socket, uuid: string} },  // uuid(s) that hold the lock
   notify: LinkedQueue, //Array<NotifyObj>,
   key: string,
   keepLocksAfterDeath: boolean
@@ -292,7 +291,7 @@ export class Broker {
         return self.registerWriteFlagAndReadersCheck(data, ws);
       }
 
-      if(data.type === 'set-write-flag-false-and-broadcast'){
+      if (data.type === 'set-write-flag-false-and-broadcast') {
         return self.setWriteFlagToFalseAndBroadcast(data, ws);
       }
 
@@ -587,6 +586,8 @@ export class Broker {
     const uuid = data.uuid;
     const v = this.registeredListeners[key] = this.registeredListeners[key] || [];
 
+    console.log('broadcasting for key:', key);
+
     while (v.length > 0) {
       let p = v.pop();
       p.fn();
@@ -631,7 +632,9 @@ export class Broker {
     const uuid = data.uuid;
     let lck = this.locks[key] = this.locks[key] || this.getDefaultLockObject(key, null, false, null);
 
+    console.log('setting writer flag to false.');
     lck.writerFlag = false;
+    console.log('broadcasting after setting writer flag to false.');
     this.broadcast({key}, null);
 
     this.send(ws, {uuid, key, type: 'write-flag-false-and-broadcast-success'});
@@ -645,9 +648,11 @@ export class Broker {
 
     let lck = this.locks[key] = this.locks[key] || this.getDefaultLockObject(key, null, false, null);
 
+    console.log('decrementing readers.');
     const r = lck.readers = Math.max(0, --lck.readers);
 
     if (r < 1) {
+      console.log('broadcasting because readers are zero.');
       this.broadcast({key}, null);
     }
 
@@ -672,11 +677,13 @@ export class Broker {
     if (writerFlag || readersCount > 1) {
       return v.push({
         ws, key, uuid, fn: () => {
+          console.log('delayed setting writer flag to true.');
           lck.writerFlag = true;
         }
       });
     }
 
+    console.log('setting writer flag to true.');
     lck.writerFlag = true;
 
     this.send(ws, {
@@ -691,20 +698,25 @@ export class Broker {
 
   getDefaultLockObject(key: string, uuid: string, keepLocksAfterDeath: boolean, pid: number) {
 
-    return {
+    const v = {
       readers: 0,
       max: 1,
       count: 1,
       pid,
-      uuid,
+      lockholders: {},
       keepLocksAfterDeath,
       lockholderTimeouts: {},
       key,
       notify: new LinkedQueue(),
       to: null,
       writerFlag: false
+    };
+
+    if (uuid) {
+      v.lockholders[uuid] = true;
     }
 
+    return v;
   }
 
   registerWriteFlagCheck(data: any, ws: net.Socket) {
@@ -720,11 +732,13 @@ export class Broker {
     if (writerFlag) {
       return v.push({
         ws, key, uuid, fn: () => {
+          console.log('incrementing readers in delayed fashion.');
           lck.readers++;
         }
       });
     }
 
+    console.log('incrementing readers right after write flag check.');
     lck.readers++;
 
     this.send(ws, {
@@ -769,8 +783,11 @@ export class Broker {
     // currently there is no lock-holder;
     // before we delete the lock object, let's try to find a new lock-holder
 
-    lck.uuid = null;
-    lck.pid = null;
+    if(data._uuid){
+       delete lck.lockholders[data._uuid];
+    }
+
+
     lck.keepLocksAfterDeath = null;
 
     const key = data.key;
@@ -812,9 +829,24 @@ export class Broker {
 
     this.wsToKeys.get(ws)[key] = true;
 
-    let uuid = lck.uuid = obj.uuid;
-    lck.pid = obj.pid;
+    let uuid = obj.uuid;
+    lck.lockholders[uuid] = {pid:obj.pid, uuid, ws};
     lck.keepLocksAfterDeath = obj.keepLocksAfterDeath || false;
+
+    let ln = lck.notify.length;
+    lck.lockholders[obj.uuid] = {ws: obj.ws, uuid: obj.uuid, pid: obj.pid};
+
+    this.send(obj.ws, {
+      readersCount: lck.readers,
+      key: data.key,
+      uuid: obj.uuid,
+      type: 'lock',
+      lockRequestCount: ln,
+      acquired: true
+    });
+
+    clearTimeout(this.timeouts[key]);
+    delete this.timeouts[key];
 
     if (ttl !== Infinity) {
       lck.to = setTimeout(() => {
@@ -830,8 +862,6 @@ export class Broker {
       }, ttl);
     }
 
-    clearTimeout(this.timeouts[key]);
-    delete this.timeouts[key];
 
     this.timeouts[key] = setTimeout(() => {
 
@@ -852,8 +882,7 @@ export class Broker {
 
       // if this timeout happens, then we can no longer cross-verify uuid's
       if (_lck = locks[key]) {
-        _lck.uuid = undefined;
-        _lck.pid = undefined;
+        delete _lck.lockholders[uuid];
         ln = lck.notify.length;
       }
       else {
@@ -877,17 +906,7 @@ export class Broker {
 
     }, self.timeoutToFindNewLockholder);
 
-    let ln = lck.notify.length;
-
-    this.send(obj.ws, {
-      readersCount: lck.readers,
-      key: data.key,
-      uuid: obj.uuid,
-      type: 'lock',
-      lockRequestCount: ln,
-      acquired: true
-    });
-
+    // done with this don't add anything here
   }
 
   retrieveLockInfo(data: any, ws: net.Socket) {
@@ -897,8 +916,8 @@ export class Broker {
     const lck = locks[key];
     const uuid = data.uuid;
 
-    const isLocked = lck && lck.uuid && true;
-    const lockholderUUID = isLocked ? lck.uuid : null;
+    const lockholderUUIDs = Object.keys(lck || {});
+    const isLocked = lockholderUUIDs.length > 0;
     const lockRequestCount = lck ? lck.notify.length : -1;
 
     if (isLocked && lockRequestCount > 0) {
@@ -907,7 +926,7 @@ export class Broker {
     }
 
     this.send(ws, {
-      key, uuid, lockholderUUID,
+      key, uuid, lockholderUUIDs,
       lockRequestCount,
       isLocked: Boolean(isLocked),
       lockInfo: true,
@@ -925,8 +944,6 @@ export class Broker {
     const uuid = data.uuid;
     const pid = data.pid;
     const max = data.max;  // max lockholders
-
-    const isRWLockWrite = data.isRWLockWrite;
     const beginRead = data.beginRead;
     const endRead = data.endRead;
 
@@ -982,6 +999,8 @@ export class Broker {
 
       if (lck.count >= lck.max) {
 
+        console.log('count is too high:', lck.count, 'max:', lck.max);
+
         // Lock exists *and* already has a lockholder; adding ws to list of to be notified
         // if we are retrying, we may attempt to call lock() more than once
         // we don't want to push the same ws object / same uuid combo to array
@@ -1019,8 +1038,10 @@ export class Broker {
       }
       else {
 
-        lck.pid = pid;
-        lck.uuid = uuid;
+        // lck exists and we are below the max amount of lockholders
+        // so we can acquire the lock
+
+        lck.lockholders[uuid] = {ws, uuid, pid};
         lck.count++;
 
         clearTimeout(lck.to);
@@ -1059,6 +1080,8 @@ export class Broker {
     }
     else {
 
+      // there is no existing lck, so we create a new lck object
+
       if (!this.wsToKeys.get(ws)) {
         this.wsToKeys.set(ws, {});
       }
@@ -1071,8 +1094,7 @@ export class Broker {
         readers: readersLocal,
         max: max || 1,
         count: 1,
-        pid,
-        uuid,
+        lockholders: {},
         keepLocksAfterDeath,
         lockholderTimeouts: {},
         key,
@@ -1080,6 +1102,8 @@ export class Broker {
         to: null,
         writerFlag: false
       };
+
+      lckTemp.lockholders[uuid] = {ws,uuid,pid};
 
       if (ttl !== Infinity) {
         lckTemp.to = setTimeout(() => {
@@ -1145,14 +1169,16 @@ export class Broker {
     // this prevents a function from being called at the wrong time, or more than once, etc.
 
     let same = true;
-    if (_uuid && lck && lck.uuid !== undefined) {
-      same = (String(lck.uuid) === String(_uuid));
+    if (_uuid && lck) {
+      same = Boolean(lck.lockholders[_uuid]);
     }
 
     if (lck && (same || force)) {
 
       const ln = lck.notify.length;
       clearTimeout(lck.to);
+      delete lck.lockholders[_uuid];
+      lck.count--;
 
       if (uuid && ws) {
 
@@ -1178,6 +1204,9 @@ export class Broker {
       if (lck.lockholderTimeouts[_uuid]) {
 
         delete lck.lockholderTimeouts[_uuid];
+        delete lck.lockholders[_uuid];
+        lck.count--;
+
 
         if (uuid && ws) {
 
@@ -1209,6 +1238,7 @@ export class Broker {
             error: 'You need to pass the correct uuid, or use force.',
             unlocked: false
           });
+
         }
         else if (ws) {
 
@@ -1219,6 +1249,8 @@ export class Broker {
 
     }
     else {
+
+      // lck is not defined
 
       this.emitter.emit('warning', 'Live-Mutex implementation warning => no lock with key => "' + key + '"');
 
