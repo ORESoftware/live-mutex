@@ -98,7 +98,7 @@ Promise.all([
   let i = 0;
   const x = function(){
 
-    return Promise.all(new Array(1).fill(null).map(v => {
+    return Promise.all(new Array(10).fill(null).map(v => {
 
       // console.log('running:',i++);
       if (Math.random() > .2) {
@@ -111,10 +111,10 @@ Promise.all([
   };
 
 
-  const p = Promise.resolve(null);
+  let p = Promise.resolve(null);
 
   for(let i = 0; i < 1000; i++){
-     p.then(x);
+     p = p.then(x);
   }
 
   return p;

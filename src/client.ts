@@ -119,7 +119,7 @@ export interface LMClientUnlockOpts {
 
 }
 
-export interface LMLockSuccessData  {
+export interface LMLockSuccessData {
   acquired: boolean,
   key: string,
   unlock?: LMCallableLockSuccessData,
@@ -128,7 +128,7 @@ export interface LMLockSuccessData  {
   id: string
 }
 
-export interface LMCallableLockSuccessData  extends LMLockSuccessData {
+export interface LMCallableLockSuccessData extends LMLockSuccessData {
   (fn: EVCallback): void  // unlock convenience callback
 }
 
@@ -136,11 +136,10 @@ export type EVCallback = (err?: any, val?: any) => void;
 
 export interface LMClientLockCallBack {
   isLMBound?: boolean;
-  (err: any, val:  LMCallableLockSuccessData): void;
+  (err: any, val: LMCallableLockSuccessData): void;
 }
 
 export type LMClientUnlockCallBack = (err: any, uuid?: string) => void;
-
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
@@ -556,16 +555,20 @@ export class Client {
     return this.unlockp.apply(this, arguments);
   }
 
-  runUnlock(fn: LMCallableLockSuccessData): Promise<any> {
+  run(fn: EVCallback){
     return new Promise((resolve, reject) => {
-      fn( (err, val) => {
+      fn((err, val) => {
         err ? reject(err) : resolve(val);
       });
     });
   }
 
+  runUnlock(fn: LMCallableLockSuccessData): Promise<any> {
+    return this.run.apply(this, arguments);
+  }
+
   execUnlock(fn: LMCallableLockSuccessData): Promise<any> {
-    return this.runUnlock.apply(this, arguments);
+    return this.run.apply(this, arguments);
   }
 
   private cleanUp(uuid: string) {
@@ -741,7 +744,7 @@ export class Client {
 
     const boundRelease = this.releaseWriteLock.bind(this, key, {});
 
-    this.lock(key, opts, (err, {unlock}) => {
+    this.lock(key, opts, (err, unlock) => {
 
       if (err) {
         return cb(err, boundRelease);
@@ -774,7 +777,7 @@ export class Client {
 
     const boundRelease = this.releaseWriteLock.bind(this, key, {});
 
-    this.lock(key, opts, (err, {unlock}) => {
+    this.lock(key, opts, (err, unlock) => {
 
       if (err) {
         return cb(err, boundRelease);
@@ -807,7 +810,7 @@ export class Client {
 
     const boundRelease = this.releaseWriteLock.bind(this, key, {});
 
-    this.lock(key, opts, (err, {unlock}) => {
+    this.lock(key, opts, (err, unlock) => {
 
       if (err) {
         return cb(err, boundRelease);
@@ -829,6 +832,22 @@ export class Client {
 
   }
 
+  acquireWriteLockp(key: string, opts?: any): Promise<any> {
+    return new Promise((resolve, reject) => {
+      this.acquireWriteLock(key, opts, (err, val) => {
+        err ? reject(err) : resolve(val);
+      })
+    });
+  }
+
+  acquireReadLockp(key: string, opts?: any): Promise<any> {
+    return new Promise((resolve, reject) => {
+      this.acquireReadLock(key, opts, (err, val) => {
+        err ? reject(err) : resolve(val);
+      })
+    });
+  }
+
   acquireReadLock(key: string, opts: any, cb?: LMClientUnlockCallBack) {
 
     try {
@@ -840,7 +859,7 @@ export class Client {
 
     const boundRelease = this.releaseReadLock.bind(this, key, {});
 
-    this.lock(key, opts, (err, {unlock}) => {
+    this.lock(key, opts, (err, unlock) => {
 
       if (err) {
         return cb(err, boundRelease);
@@ -914,7 +933,7 @@ export class Client {
     });
   }
 
-  setWriteFlagToFalse(key: string, cb: any){
+  setWriteFlagToFalse(key: string, cb: any) {
     const uuid = uuidV4();
     this.resolutions[uuid] = cb;
     this.write({

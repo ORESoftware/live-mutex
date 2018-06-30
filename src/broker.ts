@@ -963,17 +963,16 @@ export class Broker {
 
       if (beginRead) {
         // lck.readers = Math.max(20, lck.readers++);
+        console.log('begin read hit.');
         lck.readers++
       }
 
       if (endRead) {
         // in case something weird happens, never let it go below 0
+        console.log('end read hit..');
         lck.readers = Math.max(0, --lck.readers);
       }
 
-      if (!isRWLockWrite && !endRead && !beginRead) {
-        console.log('no end read or begin read')
-      }
 
       if (Number.isInteger(max)) {
         lck.max = max;

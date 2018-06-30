@@ -10,57 +10,48 @@ Promise.all([
 .then(function ([b, c]) {
 
   b.emitter.on('warning', function (v) {
-    if(!String(v).match(/no lock with key/)){
+    if (!String(v).match(/no lock with key/)) {
       console.error(...arguments);
     }
   });
 
   c.emitter.on('warning', function (v) {
-    if(!String(v).match(/no lock with key/)){
+    if (!String(v).match(/no lock with key/)) {
       console.error(...arguments);
     }
   });
 
-
   let readers = 0;
   let writers = 0;
-
-
 
   const start = Date.now();
 
   c.acquireReadLock('foo', (err, release) => {
 
-    if(err) throw err;
+    if (err) throw err;
 
     release((err, val) => {
 
-      if(err) throw err;
+      if (err) throw err;
 
       c.acquireWriteLock('foo', (err, release) => {
 
-        if(err) throw err;
+        if (err) throw err;
 
+        release((err, val) => {
 
-        release((err,val) => {
+          if (err) throw err;
 
-          if(err) throw err;
-
-          console.log('all done:', err, Object.assign({},val));
-
+          console.log('all done:', err, Object.assign({}, val));
+          console.log('all done after:', Date.now() - start);
 
         });
 
-
-
       });
-
 
     });
 
   });
-
-
 
 })
 .catch(e => {
