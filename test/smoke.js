@@ -95,8 +95,12 @@ Promise.all([
     }));
   };
 
+  let i = 0;
   const x = function(){
+
     return Promise.all(new Array(1).fill(null).map(v => {
+
+      // console.log('running:',i++);
       if (Math.random() > .2) {
         console.log('doing a reader.');
         return readFile();

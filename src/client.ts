@@ -81,6 +81,8 @@ export interface ClientOpts {
   udsPath: string
 }
 
+export type EndReadCallback = (err?: any, val?: any) => void;
+
 export interface IUuidTimeoutBool {
   [key: string]: boolean
 }
@@ -164,7 +166,7 @@ export class Client {
   emitter = new EventEmitter();
   noDelay = true;
   socketFile = '';
-  readerCounts =  <{ [key: string]: number }>{};
+  readerCounts = <{ [key: string]: number }>{};
   writeKeys = <{ [key: string]: true }>{}; // keeps track of whether a key has been registered as a write key
 
   ////////////////////////////////////////////////////////////////
@@ -316,6 +318,11 @@ export class Client {
       const uuid = data.uuid;
 
       if (!uuid) {
+
+        if (data.error) {
+          this.emitter.emit('error', data.error);
+        }
+
         return this.emitter.emit('warning',
           'Potential Live-Mutex implementation error => message did not contain uuid =>' + util.inspect(data)
         );
@@ -343,7 +350,8 @@ export class Client {
       }
 
       if (fn) {
-        fn.call(this, null, data);
+        // fn.call(this, null, data);
+        fn.call(this, data.error, data);
         return;
       }
 
@@ -717,6 +725,103 @@ export class Client {
     return this.unlock(key, opts, cb);
   }
 
+  releaseWritePrefReadLock(key: string, opts: any, cb: any){
+
+  }
+
+  acquireWritePrefReadLock(key: string, opts: any, cb?: LMClientUnlockCallBack) {
+
+    try {
+      [key, opts, cb] = this.parseUnlockOpts(key, opts, cb);
+    }
+    catch (err) {
+      return process.nextTick(cb, err);
+    }
+
+    const boundRelease = this.releaseWritePrefReadLock.bind(this,key,{});
+
+    this.lock(key, opts, (err, {unlock}) => {
+
+      if (err) {
+        return cb(err, boundRelease);
+      }
+
+      this.registerWriteFlagCheck(key, {}, (err, val) => {
+
+        if (err) {
+          return cb(err, boundRelease);
+        }
+
+        this.incrementReaders(key, (err,val) => {
+
+          if (err) {
+            return cb(err, boundRelease);
+          }
+
+          unlock((err, val) => {
+             cb(err, boundRelease);
+          });
+
+        });
+
+      });
+
+    });
+
+  }
+
+  registerWriteFlagCheck(key: string, opts: any, cb: any) {
+
+    const uuid = uuidV4();
+    this.resolutions[uuid] = (err, val) => {
+        delete this.resolutions[uuid];
+        return cb(err, val);
+    };
+
+    this.write({
+      key,
+      uuid,
+      type: 'register-write-flag-check'
+    });
+
+  }
+
+  registerWriteFlagAndReadersCheck(key: string, opts: any, cb: any) {
+
+    const uuid = uuidV4();
+    this.resolutions[uuid] = (err, val) => {
+      delete this.resolutions[uuid];
+      return cb(err, val);
+    };
+
+    this.write({
+      key,
+      uuid,
+      type: 'register-write-flag-and-readers-check'
+    });
+
+  }
+
+  incrementReaders(key: any, cb: any) {
+    const uuid = uuidV4();
+    this.resolutions[uuid] = cb;
+    this.write({
+      uuid,
+      type: 'increment-readers',
+      key
+    });
+  }
+
+  decrementReaders(key: any, cb: any) {
+    const uuid = uuidV4();
+    this.resolutions[uuid] = cb;
+    this.write({
+      uuid,
+      type: 'decrement-readers',
+      key
+    });
+  }
+
   beginRead(key: string, opts: any, cb: LMClientLockCallBack) {
 
     [key, opts, cb] = this.parseLockOpts(key, opts, cb);
@@ -750,25 +855,37 @@ export class Client {
 
       // console.error('readers:', readers);
 
+      const boundEndRead = this.endRead.bind(this, key, {writeKey});
+      boundEndRead.endRead = boundEndRead.release = boundEndRead;
+      boundEndRead.lockResult = val;
+
       if (readers <= 1) {
         return this.lock(writeKey, {force: true}, (err, val) => {
 
+          boundEndRead.writeKeyLockResult = val || null;
+
           if (err) {
-            return cb(err, val);
+            return cb(err, boundEndRead);
           }
 
-          this.unlock(key, id, cb);
+          this.unlock(key, id, (err, val) => {
+            boundEndRead.unlockResult = val || null;
+            cb(err, boundEndRead);
+          });
 
         });
       }
 
-      this.unlock(key, id, cb);
+      this.unlock(key, id, (err, val) => {
+        boundEndRead.unlockResult = val || null;
+        cb(err, boundEndRead);
+      });
 
     });
 
   }
 
-  endRead(key: string, opts: any, cb: LMClientLockCallBack) {
+  endRead(key: string, opts: any, cb: EndReadCallback) {
 
     try {
       [key, opts, cb] = this.parseLockOpts(key, opts, cb);
@@ -781,25 +898,29 @@ export class Client {
     opts.max = 1;
     const writeKey = opts.writeKey;
 
+    const endReadCb = (err, val) => {
+      cb && cb(err, val);
+    };
+
     try {
       assert(writeKey && typeof writeKey === 'string', '"writeKey" must be a string.');
       assert(key !== writeKey, 'writeKey and readKey cannot be the same string.');
     }
     catch (err) {
-      return process.nextTick(cb, err);
+      return process.nextTick(endReadCb, err);
     }
 
     this.lock(key, opts, (err, val) => {
 
       if (err) {
-        return cb(err, val);
+        return endReadCb(err, val);
       }
 
       const uuid = val.lockUuid;
       const readers = val.readersCount;
 
       if (!Number.isInteger(readers)) {
-        return this.fireLockCallbackWithError('Implementation error, missing "readersCount".', val.id, cb, key);
+        return this.fireLockCallbackWithError('Implementation error, missing "readersCount".', val.id, endReadCb, key);
       }
 
       if (readers < 1) {
@@ -807,15 +928,15 @@ export class Client {
         return this.unlock(writeKey, {force: true}, (err, val) => {
 
           if (err) {
-            return cb(err, val);
+            return endReadCb(err, val);
           }
 
-          this.unlock(key, uuid, cb);
+          this.unlock(key, uuid, endReadCb);
 
         });
       }
 
-      this.unlock(key, uuid, cb);
+      this.unlock(key, uuid, endReadCb);
 
     });
 

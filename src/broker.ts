@@ -140,7 +140,7 @@ export interface UUIDToBool {
 export interface RegisteredListener {
   ws: net.Socket,
   uuid: string,
-  key:string
+  key: string
 }
 
 export class Broker {
@@ -164,7 +164,8 @@ export class Broker {
   emitter = new EventEmitter();
   noDelay = true;
   socketFile = '';
-  registeredListeners = <{[key:string]: Array<RegisteredListener>}>{};
+  registeredListeners = <{ [key: string]: Array<RegisteredListener> }>{};
+  writerFlags = <{ [key: string]: boolean }>{};
 
   ///////////////////////////////////////////////////////////////
 
@@ -259,46 +260,53 @@ export class Broker {
       }
 
       if (data.inspectCommand) {
-
-        self.inspect(data, ws);
-
+        return self.inspect(data, ws);
       }
-      else if (data.type === 'ls') {
 
-        self.ls(data, ws);
-
+      if (data.type === 'ls') {
+        return self.ls(data, ws);
       }
-      else if (data.type === 'unlock') {
 
-        self.unlock(data, ws);
-
+      if (data.type === 'unlock') {
+        return self.unlock(data, ws);
       }
-      else if (data.type === 'lock') {
 
-        self.lock(data, ws);
-
+      if (data.type === 'lock') {
+        return self.lock(data, ws);
       }
-      else if (data.type === 'register-listener') {
 
-        self.register(data, ws);
-
+      if (data.type === 'increment-readers') {
+        return self.incrementReaders(data, ws);
       }
-      else if (data.type === 'lock-received') {
+
+      if (data.type === 'decrement-readers') {
+        return self.decrementReaders(data, ws);
+      }
+
+      if (data.type === 'register-write-flag-check') {
+        return self.registerWriteFlagCheck(data, ws);
+      }
+
+      if (data.type === 'register-write-flag-and-readers-check') {
+        return self.registerWriteFlagAndReadersCheck(data, ws);
+      }
+
+      if (data.type === 'lock-received') {
 
         self.bookkeeping[data.key].lockCount++;
         clearTimeout(self.timeouts[data.key]);
-        delete self.timeouts[data.key];
-
+        return delete self.timeouts[data.key];
       }
-      else if (data.type === 'unlock-received') {
+
+      if (data.type === 'unlock-received') {
 
         const key = data.key;
         clearTimeout(self.timeouts[key]);
         delete self.timeouts[key];
-        self.bookkeeping[key].unlockCount++;
-
+        return self.bookkeeping[key].unlockCount++;
       }
-      else if (data.type === 'lock-client-timeout') {
+
+      if (data.type === 'lock-client-timeout') {
 
         // if the client times out, we don't want to send them any more messages
         const lck = self.locks[key];
@@ -309,10 +317,10 @@ export class Broker {
           return;
         }
 
-        lck.notify.remove(uuid);
-
+        return lck.notify.remove(uuid);
       }
-      else if (data.type === 'lock-received-rejected') {
+
+      if (data.type === 'lock-received-rejected') {
 
         const lck = self.locks[key];
 
@@ -322,24 +330,20 @@ export class Broker {
         }
 
         self.rejected[data.uuid] = true;
-        self.ensureNewLockHolder(lck, data);
-
+        return self.ensureNewLockHolder(lck, data);
       }
-      else if (data.type === 'lock-info-request') {
 
-        self.retrieveLockInfo(data, ws);
-
+      if (data.type === 'lock-info-request') {
+        return self.retrieveLockInfo(data, ws);
       }
-      else {
 
-        this.emitter.emit('warning', `implementation error, bad data sent to broker => ${util.inspect(data)}`);
+      this.emitter.emit('warning', `implementation error, bad data sent to broker => ${util.inspect(data)}`);
 
-        self.send(ws, {
-          key: data.key,
-          uuid: data.uuid,
-          error: 'Malformed data sent to Live-Mutex broker.'
-        });
-      }
+      self.send(ws, {
+        key: data.key,
+        uuid: data.uuid,
+        error: 'Malformed data sent to Live-Mutex broker.'
+      });
 
     };
 
@@ -572,14 +576,13 @@ export class Broker {
     return this.send(ws, {ls_result: Object.keys(this.locks), uuid: data.uuid});
   }
 
-
-  broadcast(data: any, ws: net.Socket){
+  broadcast(data: any, ws: net.Socket) {
 
     const key = data.key;
     const uuid = data.uuid;
-    const v = this.registeredListeners[key] =  this.registeredListeners[key] || [];
+    const v = this.registeredListeners[key] = this.registeredListeners[key] || [];
 
-    while(v.length){
+    while (v.length) {
       let p = v.pop();
       this.send(p.ws, {
         key: data.key,
@@ -588,26 +591,121 @@ export class Broker {
       });
     }
 
-    this.send(ws, {
-      key: data.key,
-      uuid: uuid,
-      type: 'broadcast-success'
-    });
+    if (ws) {
+      // if we call broadcast via broker, ws is null
+      this.send(ws, {
+        key: data.key,
+        uuid: uuid,
+        type: 'broadcast-success'
+      });
+    }
 
   }
 
-
-  register(data: any, ws: net.Socket){
+  incrementReaders(data: any, ws: net.Socket) {
 
     const key = data.key;
     const uuid = data.uuid;
-    const v= this.registeredListeners[key] =  this.registeredListeners[key] || [];
-    v.push({ws, key, uuid});
+
+    let lck = this.locks[key] = this.locks[key] || {
+      readers: 0,
+      max: 1,
+      count: 1,
+      pid: data.pid,
+      uuid: null,
+      keepLocksAfterDeath: false,
+      lockholderTimeouts: {},
+      key,
+      notify: new LinkedQueue(),
+      to: null
+    };
+
+    lck.readers++;
 
     this.send(ws, {
       key,
       uuid,
-      type: 'register-listener-success'
+      type: 'increment-readers-success'
+    });
+
+  }
+
+  decrementReaders(data: any, ws: net.Socket) {
+
+    const key = data.key;
+    const uuid = data.uuid;
+
+    let lck = this.locks[key] = this.locks[key] || {
+      readers: 0,
+      max: 1,
+      count: 1,
+      pid: data.pid,
+      uuid: null,
+      keepLocksAfterDeath: false,
+      lockholderTimeouts: {},
+      key,
+      notify: new LinkedQueue(),
+      to: null
+    };
+
+    const r = lck.readers = Math.max(0, --lck.readers);
+
+    if (r < 1) {
+      this.broadcast({key}, null);
+    }
+
+    this.send(ws, {
+      key,
+      uuid,
+      type: 'decrement-readers-success'
+    });
+
+  }
+
+  registerWriteFlagAndReadersCheck(data: any, ws: net.Socket) {
+
+    const key = data.key;
+    const uuid = data.uuid;
+    const v = this.registeredListeners[key] = this.registeredListeners[key] || [];
+
+    const lck = this.locks[key];
+    const readersCount = lck && lck.readers || 0;
+    const writerFlag = this.writerFlags[key] || false;
+
+    if (writerFlag || readersCount > 1) {
+      return v.push({ws, key, uuid});
+    }
+
+    this.send(ws, {
+      readersCount,
+      writerFlag,
+      key,
+      uuid,
+      type: 'register-write-flag-and-readers-check-success'
+    });
+
+  }
+
+  registerWriteFlagCheck(data: any, ws: net.Socket) {
+
+    const key = data.key;
+    const uuid = data.uuid;
+    const v = this.registeredListeners[key] = this.registeredListeners[key] || [];
+
+    const lck = this.locks[key];
+    const readersCount = lck && lck.readers || 0;
+    const writerFlag = this.writerFlags[key] || false;
+
+    if (writerFlag) {
+      return v.push({ws, key, uuid});
+    }
+
+    this.send(ws, {
+      writerFlag,
+      readersCount,
+      key,
+      uuid,
+      type: 'register-write-flag-success'
     });
 
   }
@@ -841,12 +939,12 @@ export class Broker {
         lck.readers++
       }
 
-      if(endRead){
+      if (endRead) {
         // in case something weird happens, never let it go below 0
         lck.readers = Math.max(0, --lck.readers);
       }
 
-      if(!isRWLockWrite && !endRead && !beginRead){
+      if (!isRWLockWrite && !endRead && !beginRead) {
         console.log('no end read or begin read')
       }
 
