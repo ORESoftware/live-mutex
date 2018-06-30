@@ -703,6 +703,7 @@ export class Broker {
     let ln = lck.notify.length;
 
     this.send(obj.ws, {
+      readersCount: lck.readers,
       key: data.key,
       uuid: obj.uuid,
       type: 'lock',
@@ -748,6 +749,7 @@ export class Broker {
     const pid = data.pid;
     const max = data.max;  // max lockholders
 
+    const isRWLockWrite = data.isRWLockWrite;
     const beginRead = data.beginRead;
     const endRead = data.endRead;
 
@@ -789,7 +791,11 @@ export class Broker {
 
       if(endRead){
         // in case something weird happens, never let it go below 0
-        lck.readers = Math.max(0, lck.readers--);
+        lck.readers = Math.max(0, --lck.readers);
+      }
+
+      if(!isRWLockWrite && !endRead && !beginRead){
+        console.log('no end read or begin read')
       }
 
       if (Number.isInteger(max)) {
@@ -881,10 +887,13 @@ export class Broker {
         this.wsToKeys.set(ws, {});
       }
 
+      const readersLocal = beginRead ? 1 : 0;
+      console.log('readers local =>', readersLocal);
+
       this.wsToKeys.get(ws)[key] = true;
 
       const lckTemp = locks[key] = {
-        readers: beginRead ? 1 : 0,
+        readers: readersLocal,
         max: max || 1,
         count: 1,
         pid,
@@ -1049,12 +1058,11 @@ export class Broker {
           lockRequestCount: 0,
           type: 'unlock',
           unlocked: true,
-          error: `Live-Mutex warning => no lock with key  => "${key}".`
+          warning: `no lock with key => "${key}".`
         });
       }
       else if (ws) {
-        this.emitter.emit('warning',
-          chalk.red('Implemenation warning - Missing uuid (we have socket connection but no uuid).'));
+        this.emitter.emit('warning', chalk.red('Implemenation warning - Missing uuid (we have socket connection but no uuid).'));
       }
     }
   }
