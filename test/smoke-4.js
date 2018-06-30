@@ -42,12 +42,10 @@ Promise.all([
 
           release((err, val) => {
 
-            if (err) return cb(err);
-
-            console.log('all done:', err, Object.assign({}, val));
+            // console.log('all done:', err, Object.assign({}, val));
             console.log('all done after:', Date.now() - start);
 
-            cb(null);
+            cb(err);
 
           });
 
@@ -73,12 +71,12 @@ Promise.all([
 
           release((err, val) => {
 
-            if (err) return cb(err);
+            // if (err) return cb(err);
 
-            console.log('all done:', err, Object.assign({}, val));
+            // console.log('all done:', err, Object.assign({}, val));
             console.log('all done after:', Date.now() - start);
 
-            cb(null);
+            cb(err);
 
           });
 

@@ -511,7 +511,7 @@ export class Client {
 
       if (data.lockInfo === true) {
         delete this.resolutions[uuid];
-        cb(null, {data: data});
+        cb(null, {data});
       }
     };
 
@@ -555,7 +555,7 @@ export class Client {
     return this.unlockp.apply(this, arguments);
   }
 
-  run(fn: EVCallback){
+  run(fn: EVCallback) {
     return new Promise((resolve, reject) => {
       fn((err, val) => {
         err ? reject(err) : resolve(val);
@@ -775,77 +775,26 @@ export class Client {
       return process.nextTick(cb, err);
     }
 
-    const boundRelease = this.releaseWriteLock.bind(this, key, {});
+    // const boundRelease = this.releaseWriteLock.bind(this, key, {});
 
     this.lock(key, opts, (err, unlock) => {
 
       if (err) {
-        return cb(err, boundRelease);
+        return cb(err, unlock);
       }
 
       this.setWriteFlagToFalse(key, (err, val) => {
 
         if (err) {
-          return cb(err, boundRelease);
+          return cb(err, unlock);
         }
 
-        unlock((err, val) => {
-          cb(err, boundRelease);
-        });
+        unlock(cb);
 
       });
 
     });
 
-  }
-
-  releaseReadLock(key: string, opts: any, cb: any) {
-
-    try {
-      [key, opts, cb] = this.parseUnlockOpts(key, opts, cb);
-    }
-    catch (err) {
-      return process.nextTick(cb, err);
-    }
-
-    const boundRelease = this.releaseWriteLock.bind(this, key, {});
-
-    this.lock(key, opts, (err, unlock) => {
-
-      if (err) {
-        return cb(err, boundRelease);
-      }
-
-      this.decrementReaders(key, (err, val) => {
-
-        if (err) {
-          return cb(err, boundRelease);
-        }
-
-        unlock((err, val) => {
-          cb(err, boundRelease);
-        });
-
-      });
-
-    });
-
-  }
-
-  acquireWriteLockp(key: string, opts?: any): Promise<any> {
-    return new Promise((resolve, reject) => {
-      this.acquireWriteLock(key, opts, (err, val) => {
-        err ? reject(err) : resolve(val);
-      })
-    });
-  }
-
-  acquireReadLockp(key: string, opts?: any): Promise<any> {
-    return new Promise((resolve, reject) => {
-      this.acquireReadLock(key, opts, (err, val) => {
-        err ? reject(err) : resolve(val);
-      })
-    });
   }
 
   acquireReadLock(key: string, opts: any, cb?: LMClientUnlockCallBack) {
@@ -879,6 +828,53 @@ export class Client {
 
     });
 
+  }
+
+  releaseReadLock(key: string, opts: any, cb: any) {
+
+    try {
+      [key, opts, cb] = this.parseUnlockOpts(key, opts, cb);
+    }
+    catch (err) {
+      return process.nextTick(cb, err);
+    }
+
+    // const boundRelease = this.releaseWriteLock.bind(this, key, {});
+
+    this.lock(key, opts, (err, unlock) => {
+
+      if (err) {
+        return cb(err, unlock);
+      }
+
+      this.decrementReaders(key, (err, val) => {
+
+        if (err) {
+          return cb(err, unlock);
+        }
+
+        unlock(cb);
+
+      });
+
+    });
+
+  }
+
+  acquireWriteLockp(key: string, opts?: any): Promise<any> {
+    return new Promise((resolve, reject) => {
+      this.acquireWriteLock(key, opts, (err, val) => {
+        err ? reject(err) : resolve(val);
+      })
+    });
+  }
+
+  acquireReadLockp(key: string, opts?: any): Promise<any> {
+    return new Promise((resolve, reject) => {
+      this.acquireReadLock(key, opts, (err, val) => {
+        err ? reject(err) : resolve(val);
+      })
+    });
   }
 
   registerWriteFlagCheck(key: string, opts: any, cb: any) {
