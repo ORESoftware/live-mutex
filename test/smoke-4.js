@@ -43,7 +43,7 @@ Promise.all([
           release((err, val) => {
 
             // console.log('all done:', err, Object.assign({}, val));
-            console.log('all done after:', Date.now() - start);
+            // console.log('all done after:', Date.now() - start);
 
             cb(err);
 
@@ -74,7 +74,7 @@ Promise.all([
             // if (err) return cb(err);
 
             // console.log('all done:', err, Object.assign({}, val));
-            console.log('all done after:', Date.now() - start);
+            // console.log('all done after:', Date.now() - start);
 
             cb(err);
 
@@ -87,9 +87,9 @@ Promise.all([
     });
   };
 
-  async.timesLimit(100, 3, function (n, cb) {
+  async.timesLimit(100, 1, function (n, cb) {
 
-    console.log('doing it:', n);
+    // console.log('doing it:', n);
 
     if (Math.random() > .5) {
       firstRead(cb);
@@ -102,7 +102,7 @@ Promise.all([
 
     if (err) throw err;
 
-    console.log('all done I guess.');
+    console.log('all done I guess:', Date.now() - start);
 
   });
 
