@@ -725,11 +725,7 @@ export class Client {
     return this.unlock(key, opts, cb);
   }
 
-  releaseWritePrefReadLock(key: string, opts: any, cb: any){
-
-  }
-
-  acquireWritePrefReadLock(key: string, opts: any, cb?: LMClientUnlockCallBack) {
+  acquireWriteLock(key: string, opts: any, cb: any) {
 
     try {
       [key, opts, cb] = this.parseUnlockOpts(key, opts, cb);
@@ -738,7 +734,106 @@ export class Client {
       return process.nextTick(cb, err);
     }
 
-    const boundRelease = this.releaseWritePrefReadLock.bind(this,key,{});
+    const boundRelease = this.releaseWriteLock.bind(this, key, {});
+
+    this.lock(key, opts, (err, {unlock}) => {
+
+      if (err) {
+        return cb(err, boundRelease);
+      }
+
+      this.registerWriteFlagAndReadersCheck(key, {}, (err, val) => {
+
+        if (err) {
+          return cb(err, boundRelease);
+        }
+
+        unlock((err, val) => {
+          cb(err, boundRelease);
+        });
+
+      });
+
+    });
+
+  }
+
+  releaseWriteLock(key: string, opts: any, cb: any) {
+
+    try {
+      [key, opts, cb] = this.parseUnlockOpts(key, opts, cb);
+    }
+    catch (err) {
+      return process.nextTick(cb, err);
+    }
+
+    const boundRelease = this.releaseWriteLock.bind(this, key, {});
+
+    this.lock(key, opts, (err, {unlock}) => {
+
+      if (err) {
+        return cb(err, boundRelease);
+      }
+
+      this.setWriteFlagToFalse(key, (err, val) => {
+
+        if (err) {
+          return cb(err, boundRelease);
+        }
+
+        unlock((err, val) => {
+          cb(err, boundRelease);
+        });
+
+      });
+
+    });
+
+  }
+
+  releaseReadLock(key: string, opts: any, cb: any) {
+
+    try {
+      [key, opts, cb] = this.parseUnlockOpts(key, opts, cb);
+    }
+    catch (err) {
+      return process.nextTick(cb, err);
+    }
+
+    const boundRelease = this.releaseWriteLock.bind(this, key, {});
+
+    this.lock(key, opts, (err, {unlock}) => {
+
+      if (err) {
+        return cb(err, boundRelease);
+      }
+
+      this.decrementReaders(key, (err, val) => {
+
+        if (err) {
+          return cb(err, boundRelease);
+        }
+
+        unlock((err, val) => {
+          cb(err, boundRelease);
+        });
+
+      });
+
+    });
+
+  }
+
+  acquireReadLock(key: string, opts: any, cb?: LMClientUnlockCallBack) {
+
+    try {
+      [key, opts, cb] = this.parseUnlockOpts(key, opts, cb);
+    }
+    catch (err) {
+      return process.nextTick(cb, err);
+    }
+
+    const boundRelease = this.releaseReadLock.bind(this, key, {});
 
     this.lock(key, opts, (err, {unlock}) => {
 
@@ -752,16 +847,8 @@ export class Client {
           return cb(err, boundRelease);
         }
 
-        this.incrementReaders(key, (err,val) => {
-
-          if (err) {
-            return cb(err, boundRelease);
-          }
-
-          unlock((err, val) => {
-             cb(err, boundRelease);
-          });
-
+        unlock((err, val) => {
+          cb(err, boundRelease);
         });
 
       });
@@ -774,8 +861,8 @@ export class Client {
 
     const uuid = uuidV4();
     this.resolutions[uuid] = (err, val) => {
-        delete this.resolutions[uuid];
-        return cb(err, val);
+      delete this.resolutions[uuid];
+      return cb(err, val);
     };
 
     this.write({
@@ -812,12 +899,22 @@ export class Client {
     });
   }
 
-  decrementReaders(key: any, cb: any) {
+  decrementReaders(key: string, cb: any) {
     const uuid = uuidV4();
     this.resolutions[uuid] = cb;
     this.write({
       uuid,
       type: 'decrement-readers',
+      key
+    });
+  }
+
+  setWriteFlagToFalse(key: string, cb: any){
+    const uuid = uuidV4();
+    this.resolutions[uuid] = cb;
+    this.write({
+      uuid,
+      type: 'set-write-flag-false-and-broadcast',
       key
     });
   }

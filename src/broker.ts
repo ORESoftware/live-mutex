@@ -111,7 +111,8 @@ export interface LockObj {
   notify: LinkedQueue, //Array<NotifyObj>,
   key: string,
   keepLocksAfterDeath: boolean
-  to: NodeJS.Timer
+  to: NodeJS.Timer,
+  writerFlag: boolean
 }
 
 export interface LockHash {
@@ -140,7 +141,8 @@ export interface UUIDToBool {
 export interface RegisteredListener {
   ws: net.Socket,
   uuid: string,
-  key: string
+  key: string,
+  fn: Function
 }
 
 export class Broker {
@@ -165,7 +167,6 @@ export class Broker {
   noDelay = true;
   socketFile = '';
   registeredListeners = <{ [key: string]: Array<RegisteredListener> }>{};
-  writerFlags = <{ [key: string]: boolean }>{};
 
   ///////////////////////////////////////////////////////////////
 
@@ -289,6 +290,10 @@ export class Broker {
 
       if (data.type === 'register-write-flag-and-readers-check') {
         return self.registerWriteFlagAndReadersCheck(data, ws);
+      }
+
+      if(data.type === 'set-write-flag-false-and-broadcast'){
+        return self.setWriteFlagToFalseAndBroadcast(data, ws);
       }
 
       if (data.type === 'lock-received') {
@@ -582,8 +587,9 @@ export class Broker {
     const uuid = data.uuid;
     const v = this.registeredListeners[key] = this.registeredListeners[key] || [];
 
-    while (v.length) {
+    while (v.length > 0) {
       let p = v.pop();
+      p.fn();
       this.send(p.ws, {
         key: data.key,
         uuid: p.uuid,
@@ -607,18 +613,7 @@ export class Broker {
     const key = data.key;
     const uuid = data.uuid;
 
-    let lck = this.locks[key] = this.locks[key] || {
-      readers: 0,
-      max: 1,
-      count: 1,
-      pid: data.pid,
-      uuid: null,
-      keepLocksAfterDeath: false,
-      lockholderTimeouts: {},
-      key,
-      notify: new LinkedQueue(),
-      to: null
-    };
+    let lck = this.locks[key] = this.locks[key] || this.getDefaultLockObject(key, null, false, data.pid);
 
     lck.readers++;
 
@@ -630,23 +625,25 @@ export class Broker {
 
   }
 
+  setWriteFlagToFalseAndBroadcast(data: any, ws: net.Socket) {
+
+    const key = data.key;
+    const uuid = data.uuid;
+    let lck = this.locks[key] = this.locks[key] || this.getDefaultLockObject(key, null, false, null);
+
+    lck.writerFlag = false;
+    this.broadcast({key}, null);
+
+    this.send(ws, {uuid, key, type: 'write-flag-false-and-broadcast-success'});
+
+  }
+
   decrementReaders(data: any, ws: net.Socket) {
 
     const key = data.key;
     const uuid = data.uuid;
 
-    let lck = this.locks[key] = this.locks[key] || {
-      readers: 0,
-      max: 1,
-      count: 1,
-      pid: data.pid,
-      uuid: null,
-      keepLocksAfterDeath: false,
-      lockholderTimeouts: {},
-      key,
-      notify: new LinkedQueue(),
-      to: null
-    };
+    let lck = this.locks[key] = this.locks[key] || this.getDefaultLockObject(key, null, false, null);
 
     const r = lck.readers = Math.max(0, --lck.readers);
 
@@ -668,13 +665,19 @@ export class Broker {
     const uuid = data.uuid;
     const v = this.registeredListeners[key] = this.registeredListeners[key] || [];
 
-    const lck = this.locks[key];
+    const lck = this.locks[key] = this.locks[key] || this.getDefaultLockObject(key, null, false, data.pid);
     const readersCount = lck && lck.readers || 0;
-    const writerFlag = this.writerFlags[key] || false;
+    const writerFlag = lck.writerFlag || false;
 
     if (writerFlag || readersCount > 1) {
-      return v.push({ws, key, uuid});
+      return v.push({
+        ws, key, uuid, fn: () => {
+          lck.writerFlag = true;
+        }
+      });
     }
+
+    lck.writerFlag = true;
 
     this.send(ws, {
       readersCount,
@@ -686,19 +689,43 @@ export class Broker {
 
   }
 
+  getDefaultLockObject(key: string, uuid: string, keepLocksAfterDeath: boolean, pid: number) {
+
+    return {
+      readers: 0,
+      max: 1,
+      count: 1,
+      pid,
+      uuid,
+      keepLocksAfterDeath,
+      lockholderTimeouts: {},
+      key,
+      notify: new LinkedQueue(),
+      to: null,
+      writerFlag: false
+    }
+
+  }
+
   registerWriteFlagCheck(data: any, ws: net.Socket) {
 
     const key = data.key;
     const uuid = data.uuid;
     const v = this.registeredListeners[key] = this.registeredListeners[key] || [];
 
-    const lck = this.locks[key];
+    const lck = this.locks[key] = this.locks[key] || this.getDefaultLockObject(key, null, false, data.pid);
     const readersCount = lck && lck.readers || 0;
-    const writerFlag = this.writerFlags[key] || false;
+    const writerFlag = lck.writerFlag || false;
 
     if (writerFlag) {
-      return v.push({ws, key, uuid});
+      return v.push({
+        ws, key, uuid, fn: () => {
+          lck.readers++;
+        }
+      });
     }
+
+    lck.readers++;
 
     this.send(ws, {
       writerFlag,
@@ -1052,14 +1079,14 @@ export class Broker {
         lockholderTimeouts: {},
         key,
         notify: new LinkedQueue(),
-        to: null
+        to: null,
+        writerFlag: false
       };
 
       if (ttl !== Infinity) {
         lckTemp.to = setTimeout(() => {
 
           // delete locks[key];  => no!, this.unlock will take care of that
-
           this.emitter.emit('warning', 'Live-Mutex warning, [2] lock object timed out for key => "' + key + '"');
 
           // we set lck.lockholderTimeouts[uuid], so that when an unlock request for uuid comes into the broker
