@@ -137,6 +137,12 @@ export interface UUIDToBool {
   [key: string]: boolean
 }
 
+export interface RegisteredListener {
+  ws: net.Socket,
+  uuid: string,
+  key:string
+}
+
 export class Broker {
 
   opts: IBrokerOptsPartial;
@@ -158,6 +164,7 @@ export class Broker {
   emitter = new EventEmitter();
   noDelay = true;
   socketFile = '';
+  registeredListeners = <{[key:string]: Array<RegisteredListener>}>{};
 
   ///////////////////////////////////////////////////////////////
 
@@ -269,6 +276,11 @@ export class Broker {
       else if (data.type === 'lock') {
 
         self.lock(data, ws);
+
+      }
+      else if (data.type === 'register-listener') {
+
+        self.register(data, ws);
 
       }
       else if (data.type === 'lock-received') {
@@ -558,6 +570,46 @@ export class Broker {
 
   ls(data: any, ws: net.Socket) {
     return this.send(ws, {ls_result: Object.keys(this.locks), uuid: data.uuid});
+  }
+
+
+  broadcast(data: any, ws: net.Socket){
+
+    const key = data.key;
+    const uuid = data.uuid;
+    const v = this.registeredListeners[key] =  this.registeredListeners[key] || [];
+
+    while(v.length){
+      let p = v.pop();
+      this.send(p.ws, {
+        key: data.key,
+        uuid: p.uuid,
+        type: 'broadcast-result'
+      });
+    }
+
+    this.send(ws, {
+      key: data.key,
+      uuid: uuid,
+      type: 'broadcast-success'
+    });
+
+  }
+
+
+  register(data: any, ws: net.Socket){
+
+    const key = data.key;
+    const uuid = data.uuid;
+    const v= this.registeredListeners[key] =  this.registeredListeners[key] || [];
+    v.push({ws, key, uuid});
+
+    this.send(ws, {
+      key,
+      uuid,
+      type: 'register-listener-success'
+    });
+
   }
 
   inspect(data: any, ws: net.Socket) {

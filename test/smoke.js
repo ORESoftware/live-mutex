@@ -15,11 +15,15 @@ Promise.all([
     }
   });
 
-  c.emitter.on('warning', function () {
+  c.emitter.on('warning', function (v) {
     if(!String(v).match(/no lock with key/)){
       console.error(...arguments);
     }
   });
+
+  const delay = function(v){
+    return new Promise((resolve) => setTimeout(resolve,v));
+  };
 
   const start = Date.now();
 
@@ -30,7 +34,10 @@ Promise.all([
   let writers = 0;
 
   const readFile = () => {
-    return c.beginReadp(readKey, {writeKey}).then(v => {
+
+    const d = Math.ceil(Math.random()*20);
+
+    return delay(d).then(v => c.beginReadp(readKey, {writeKey}).then(v => {
 
       readers++;
 
@@ -47,14 +54,16 @@ Promise.all([
         }
 
       });
-    });
+    }));
   };
 
   const writeToFile = () => {
 
     console.log('writing to file');
 
-    return c.beginWritep(writeKey).then(v => {
+    const d = Math.ceil(Math.random()*20);
+
+    return delay(d).then(v => c.beginWritep(writeKey).then(v => {
 
       console.log('done with begin write.');
 
@@ -83,15 +92,28 @@ Promise.all([
         }
 
       });
-    });
+    }));
   };
 
-  return Promise.all(new Array(1000).fill(null).map(v => {
-    if (Math.random() > .2) {
-      return readFile();
-    }
-    return writeToFile();
-  }));
+  const x = function(){
+    return Promise.all(new Array(1).fill(null).map(v => {
+      if (Math.random() > .2) {
+        console.log('doing a reader.');
+        return readFile();
+      }
+      console.log('doing a writer.');
+      return writeToFile();
+    }));
+  };
+
+
+  const p = Promise.resolve(null);
+
+  for(let i = 0; i < 1000; i++){
+     p.then(x);
+  }
+
+  return p;
 
 })
 .catch(e => {

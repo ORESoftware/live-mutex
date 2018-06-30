@@ -748,7 +748,7 @@ export class Client {
         return this.fireLockCallbackWithError('Implementation error, missing "readersCount".', val.id, cb, key);
       }
 
-      console.error('readers:', readers);
+      // console.error('readers:', readers);
 
       if (readers <= 1) {
         return this.lock(writeKey, {force: true}, (err, val) => {
