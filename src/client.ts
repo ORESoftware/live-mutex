@@ -730,7 +730,7 @@ export class Client {
     return this.unlock(key, opts, cb);
   }
 
-  acquireWriteLock(key: string, opts: any, cb: any) {
+  acquireWriteLock(key: string, opts: any, cb?: any) {
 
     try {
       [key, opts, cb] = this.parseUnlockOpts(key, opts, cb);

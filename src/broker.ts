@@ -1065,7 +1065,6 @@ export class Broker {
       }
 
       const readersLocal = beginRead ? 1 : 0;
-      console.log('readers local =>', readersLocal);
 
       this.wsToKeys.get(ws)[key] = true;
 
