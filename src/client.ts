@@ -159,6 +159,7 @@ export class Client {
   emitter = new EventEmitter();
   noDelay = true;
   socketFile = '';
+  writeKeys = <{ [key: string]: true }>{}; // keeps track of whether a key has been registered as a write key
 
   ////////////////////////////////////////////////////////////////
 
@@ -287,18 +288,7 @@ export class Client {
         throw new Error('please call ensure()/connect() on this Live-Mutex client, before using the lock/unlock methods.');
       }
 
-      // if(ws._handle.fd){
-      //   console.log('ws._handle.fd:',ws._handle.fd);
-      //   modSocket.run(ws._handle.fd);
-      // }
-
-      // if(ws._handle.fd){
-      //   // console.log('ws._handle.fd:',ws._handle.fd);
-      //   modSocket.run(ws._handle.fd);
-      // }
-
       data.max = data.max || null;
-
       data.pid = process.pid;
 
       if (data.ttl === Infinity) {
@@ -409,12 +399,6 @@ export class Client {
           self.isOpen = true;
           clearTimeout(to);
           ws.removeListener('error', onFirstErr);
-
-          // if(ws._handle.fd){
-          //   // console.log('ws._handle.fd:',ws._handle.fd);
-          //   modSocket.run(ws._handle.fd);
-          // }
-
           resolve(this);
         });
 
@@ -628,6 +612,187 @@ export class Client {
 
   }
 
+
+  beginWritep(key: string, opts?: any) : Promise<any> {
+    return this.lockp.apply(this, arguments);
+  }
+
+  endWritep(key: string, opts?: any) : Promise<any> {
+    return this.unlockp.apply(this, arguments);
+  }
+
+  parseLockOpts(key: string, opts: any, cb: any){
+
+    if (typeof opts === 'function') {
+      cb = opts;
+      opts = {};
+    }
+    else if (typeof opts === 'boolean') {
+      opts = {force: opts};
+    }
+    else if (typeof opts === 'number') {
+      opts = {ttl: opts};
+    }
+
+    opts = opts || {} as Partial<ClientOpts>;
+
+    return [key, opts, cb];
+
+  }
+
+  parseUnlockOpts(key: string, opts: any, cb: any){
+
+    if (typeof opts === 'function') {
+      cb = opts;
+      opts = {};
+    }
+    else if (typeof opts === 'boolean') {
+      opts = {force: opts};
+    }
+    else if (typeof opts === 'string') {
+      opts = {_uuid: opts};
+    }
+
+
+    opts = opts || {} as Partial<ClientOpts>;
+
+    return [key, opts, cb];
+
+  }
+
+  beginWrite(key: string, opts: any, cb?: LMClientLockCallBack) {
+
+    [key, opts, cb] = this.parseLockOpts(key, opts, cb);
+
+    // we prioritize write locks, over read locks
+    opts.force = true;
+
+    return this.lock.call(this, key, opts, cb);
+  }
+
+  endWrite(key: string, opts: any, cb?: LMClientUnlockCallBack) {
+    return this.unlock.apply(this, arguments);
+  }
+
+  beginRead(key: string, opts: any, cb?: LMClientLockCallBack) {
+
+    if (typeof opts === 'function') {
+      cb = opts;
+      opts = {};
+    }
+    else if (typeof opts === 'boolean') {
+      opts = {force: opts};
+    }
+    else if (typeof opts === 'number') {
+      opts = {ttl: opts};
+    }
+
+    opts = opts || {} as Partial<ClientOpts>;
+
+    opts.beginRead = true;
+    opts.max = 1;
+
+    const writeKey = opts.writeKey;
+
+    try {
+      assert(typeof cb === 'function', 'Must include a callback to the readLock method.');
+      assert(writeKey && typeof writeKey === 'string', '"writeKey" must be a string.');
+    }
+    catch (err) {
+      return process.nextTick(cb, err);
+    }
+
+    this.lockInternal.call(this, key, opts, (err, val) => {
+
+      if (err) {
+        return cb(err, val);
+      }
+
+      const id = val.lockUuid;
+      const readers = val.readersCount;
+
+      if (!Number.isInteger(readers)) {
+        return this.fireLockCallbackWithError('Implementation error, missing "readersCount".', val.uuid, cb, key);
+      }
+
+      if (readers === 1) {
+        return this.lock(writeKey, {force:false}, (err, val) => {
+
+          if (err) {
+            return cb(err, val);
+          }
+
+          this.unlock(key, id, cb);
+
+        });
+      }
+
+      this.unlock(key, id, cb);
+
+    });
+
+  }
+
+  endRead(key: string, opts: any, cb?: LMClientLockCallBack) {
+
+    if (typeof opts === 'function') {
+      cb = opts;
+      opts = {};
+    }
+    else if (typeof opts === 'boolean') {
+      opts = {force: opts};
+    }
+    else if (typeof opts === 'number') {
+      opts = {ttl: opts};
+    }
+
+    opts = opts || {} as Partial<ClientOpts>;
+
+    opts.endRead = true;
+    opts.max = 1;
+
+    const writeKey = opts.writeKey;
+
+    try {
+      assert(typeof cb === 'function', 'Must include a callback to the readLock method.');
+      assert(writeKey && typeof writeKey === 'string', '"writeKey" must be a string.');
+    }
+    catch (err) {
+      return process.nextTick(cb, err);
+    }
+
+    this.lockInternal.call(this, key, opts, (err, val) => {
+
+      if (err) {
+        return cb(err, val);
+      }
+
+      const uuid = val.lockUuid;
+      const readers = val.readersCount;
+
+      if (!Number.isInteger(readers)) {
+        return this.fireLockCallbackWithError('Implementation error, missing "readersCount".', val.uuid, cb, key);
+      }
+
+      if (readers === 0) {
+        // we use force, because this process might not own the writeKey lock
+        return this.unlock(writeKey, {force: true}, (err, val) => {
+
+          if (err) {
+            return cb(err, val);
+          }
+
+          this.unlock(key, uuid, cb);
+
+        });
+      }
+
+      this.unlock(key, uuid, cb);
+
+    });
+
+  }
+
   lock(key: string, opts: any, cb?: LMClientLockCallBack) {
 
     this.bookkeeping[key] = this.bookkeeping[key] || {
@@ -793,8 +958,8 @@ export class Client {
         self.write({uuid, key, type: 'lock-client-timeout'});
 
         return cb(
-         `Live-Mutex client lock request timed out after ${lockRequestTimeout * opts.__retryCount} ms, ` +
-            `${maxRetries} retries attempted to acquire lock for key ${key}.`,
+          `Live-Mutex client lock request timed out after ${lockRequestTimeout * opts.__retryCount} ms, ` +
+          `${maxRetries} retries attempted to acquire lock for key ${key}.`,
           {acquired: false, key, lockUuid: uuid, id: uuid});
       }
 
@@ -901,7 +1066,7 @@ export class Client {
   }
 
   noop() {
-   // this is a no-operation, obviously
+    // this is a no-operation, obviously
   }
 
   getPort() {

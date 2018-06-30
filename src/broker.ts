@@ -102,6 +102,7 @@ export interface UuidHash {
 }
 
 export interface LockObj {
+  readers?: number;
   max: number, // max number of lockholders
   count: number, // current number of lockholders
   pid: number,
@@ -343,7 +344,6 @@ export class Broker {
       if (!self.wsToKeys.get(ws)) {
         self.wsToKeys.set(ws, {});
       }
-
 
       let endWS = function () {
         try {
@@ -700,13 +700,13 @@ export class Broker {
 
     }, self.timeoutToFindNewLockholder);
 
-    let count = lck.notify.length;
+    let ln = lck.notify.length;
 
     this.send(obj.ws, {
       key: data.key,
       uuid: obj.uuid,
       type: 'lock',
-      lockRequestCount: count,
+      lockRequestCount: ln,
       acquired: true
     });
 
@@ -748,6 +748,8 @@ export class Broker {
     const pid = data.pid;
     const max = data.max;  // max lockholders
 
+    const beginRead = data.beginRead;
+    const endRead = data.endRead;
 
     let ttl = data.ttl;
 
@@ -780,7 +782,17 @@ export class Broker {
 
     if (lck) {
 
-      if(Number.isInteger(max)){
+      if (beginRead) {
+        // lck.readers = Math.max(20, lck.readers++);
+        lck.readers++
+      }
+
+      if(endRead){
+        // in case something weird happens, never let it go below 0
+        lck.readers = Math.max(0, lck.readers--);
+      }
+
+      if (Number.isInteger(max)) {
         lck.max = max;
       }
 
@@ -815,6 +827,7 @@ export class Broker {
         }
 
         this.send(ws, {
+          readersCount: lck.readers,
           key: key,
           uuid: uuid,
           lockRequestCount: ln,
@@ -852,6 +865,7 @@ export class Broker {
         this.wsToKeys.get(ws)[key] = true;
 
         this.send(ws, {
+          readersCount: lck.readers,
           uuid: uuid,
           key: key,
           lockRequestCount: ln,
@@ -869,7 +883,8 @@ export class Broker {
 
       this.wsToKeys.get(ws)[key] = true;
 
-      locks[key] = {
+      const lckTemp = locks[key] = {
+        readers: beginRead ? 1 : 0,
         max: max || 1,
         count: 1,
         pid,
@@ -882,7 +897,7 @@ export class Broker {
       };
 
       if (ttl !== Infinity) {
-        locks[key].to = setTimeout(() => {
+        lckTemp.to = setTimeout(() => {
 
           // delete locks[key];  => no!, this.unlock will take care of that
 
@@ -890,7 +905,7 @@ export class Broker {
 
           // we set lck.lockholderTimeouts[uuid], so that when an unlock request for uuid comes into the broker
           // we know that it timed out already, and we know not to throw an error when the lock.uuid doesn't match
-
+          // have to read the key, not use local lckTemp var
           locks[key] && (locks[key].lockholderTimeouts[uuid] = true);
           this.unlock({key, force: true, from: 'ttl expired for lock (2)'});
 
@@ -898,6 +913,7 @@ export class Broker {
       }
 
       this.send(ws, {
+        readersCount: lckTemp.readers,
         uuid: uuid,
         lockRequestCount: 0,
         key: key,

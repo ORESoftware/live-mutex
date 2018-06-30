@@ -1,6 +1,6 @@
 
 
-Using a condition variable and a mutex
+## Using a condition variable and a mutex
 
 A write-preferring R/W lock can be implemented in terms of a condition variable and an ordinary (mutex) lock, in addition to an integer counter and a boolean flag.
 
