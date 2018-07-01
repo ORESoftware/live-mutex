@@ -702,8 +702,6 @@ export class Client {
     return [key, opts, cb];
   }
 
-
-
   acquireWriteLock(key: string, opts: any, cb?: any) {
 
     try {
@@ -1098,23 +1096,30 @@ export class Client {
     const rawLockCount = ++this.bookkeeping[key].rawLockCount;
     const unlockCount = this.bookkeeping[key].unlockCount;
 
-    if (typeof opts === 'function') {
-      cb = opts;
-      opts = {};
+    try {
+      [key, opts, cb] = this.parseLockOpts(key, opts, cb);
     }
-    else if (typeof opts === 'boolean') {
-      opts = {force: opts};
+    catch (err) {
+      if (typeof cb === 'function') {
+        return process.nextTick(cb, err);
+      }
+      throw err;
     }
-    else if (typeof opts === 'number') {
-      opts = {ttl: opts};
-    }
-
-    opts = opts || {} as Partial<ClientOpts>;
 
     try {
 
       assert.equal(typeof key, 'string', 'Key passed to live-mutex #lock needs to be a string.');
       assert(typeof cb === 'function', 'callback function must be passed to Client lock() method; use lockp() or acquire() for promise API.');
+
+      if('max' in opts){
+        assert(Number.isInteger(opts['max']), '"max" options property must be a positive integer.');
+        assert(opts['max'] > 0, '"max" options property must be a positive integer.');
+      }
+
+      if('semaphore' in opts){
+        assert(Number.isInteger(opts['semaphore']), '"semaphore" options property must be a positive integer.');
+        assert(opts['semaphore'] > 0, '"semaphore" options property must be a positive integer.');
+      }
 
       if (opts['force']) {
         assert.equal(typeof opts.force, 'boolean', ' => Live-Mutex usage error => ' +
@@ -1413,7 +1418,7 @@ export class Client {
 
     opts = opts || {};
 
-    if(opts.id){
+    if (opts.id) {
       opts._uuid = opts.id;
     }
 

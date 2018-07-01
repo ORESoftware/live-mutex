@@ -102,11 +102,11 @@ export interface UuidHash {
 }
 
 export interface LockObj {
-   // current number of lockholders for this lock/key is Object.keys(lockholders).length
+  // current number of lockholders for this lock/key is Object.keys(lockholders).length
   readers?: number;
   max: number, // max number of lockholders
   lockholderTimeouts: UuidHash,
-  lockholders: { [key: string]: {pid: number, ws:net.Socket, uuid: string} },  // uuid(s) that hold the lock
+  lockholders: { [key: string]: { pid: number, ws: net.Socket, uuid: string } },  // uuid(s) that hold the lock
   notify: LinkedQueue, //Array<NotifyObj>,
   key: string,
   keepLocksAfterDeath: boolean
@@ -175,10 +175,10 @@ export class Broker {
     const opts = this.opts = o || {};
     assert(typeof opts === 'object', 'Options argument must be an object - live-mutex server constructor.');
 
-    Object.keys(opts).forEach(function (key) {
-      if (!validConstructorOptions[key]) {
+    Object.keys(opts).forEach((k) => {
+      if (!validConstructorOptions[k]) {
         throw new Error('An option passed to Live-Mutex#Broker constructor ' +
-          `is not a recognized option => "${key}", valid options are: ${util.inspect(validConstructorOptions)}.`);
+          `is not a recognized option => "${k}", valid options are: ${util.inspect(validConstructorOptions)}.`);
       }
     });
 
@@ -696,7 +696,7 @@ export class Broker {
 
   }
 
-  getDefaultLockObject(key: string, keepLocksAfterDeath?: boolean, max?: number) : LockObj {
+  getDefaultLockObject(key: string, keepLocksAfterDeath?: boolean, max?: number): LockObj {
 
     return {
       readers: 0,
@@ -776,10 +776,9 @@ export class Broker {
     // currently there is no lock-holder;
     // before we delete the lock object, let's try to find a new lock-holder
 
-    if(data._uuid){
-       delete lck.lockholders[data._uuid];
+    if (data._uuid) {
+      delete lck.lockholders[data._uuid];
     }
-
 
     lck.keepLocksAfterDeath = null;
 
@@ -825,8 +824,7 @@ export class Broker {
 
     this.wsToKeys.get(ws)[key] = true;
 
-
-    lck.lockholders[uuid] = {pid:obj.pid, uuid, ws};
+    lck.lockholders[uuid] = {pid: obj.pid, uuid, ws};
     lck.keepLocksAfterDeath = obj.keepLocksAfterDeath || false;
     let ln = lck.notify.length;
 
@@ -855,7 +853,6 @@ export class Broker {
 
       }, ttl);
     }
-
 
     this.timeouts[key] = setTimeout(() => {
 
@@ -982,7 +979,6 @@ export class Broker {
         lck.readers = Math.max(0, --lck.readers);
       }
 
-
       if (Number.isInteger(max)) {
         lck.max = max;
       }
@@ -1094,7 +1090,7 @@ export class Broker {
         writerFlag: false
       };
 
-      lckTemp.lockholders[uuid] = {ws,uuid,pid};
+      lckTemp.lockholders[uuid] = {ws, uuid, pid};
 
       if (ttl !== Infinity) {
         lckTemp.to = setTimeout(() => {
@@ -1164,7 +1160,6 @@ export class Broker {
       same = Boolean(lck.lockholders[_uuid]);
     }
 
-
     if (lck && (same || force)) {
 
       const ln = lck.notify.length;
@@ -1198,7 +1193,6 @@ export class Broker {
         delete lck.lockholderTimeouts[_uuid];
         delete lck.lockholders[_uuid];
 
-
         if (uuid && ws) {
 
           // if no uuid is defined, then unlock was called by something other than the client
@@ -1214,12 +1208,10 @@ export class Broker {
 
         }
 
-
         this.ensureNewLockHolder(lck, data);
 
       }
       else {
-
 
         if (uuid && ws) {
 

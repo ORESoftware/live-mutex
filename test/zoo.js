@@ -31,14 +31,14 @@ Promise.all([
   });
 
   const start = Date.now();
-  const max = 17;
+  const max = 1;
 
   let count = 0;
   let i = 0;
 
   async.timesLimit(10000, 30, function (n, cb) {
 
-    const r = Math.ceil(Math.random() * 25);
+    const r = Math.ceil(Math.random() * 5);
 
     c.lock('a', {max}, (err, v) => {
 
