@@ -1204,13 +1204,12 @@ export class Client {
 
     const uuid = opts._uuid = opts._uuid || uuidV4();
     const ttl = opts.ttl || this.ttl;
-    const lockRequestTimeout = opts.lockRequestTimeout || this.lockRequestTimeout;
+    const lrt = opts.lockRequestTimeout || this.lockRequestTimeout;
     const maxRetries = opts.maxRetry || opts.maxRetries || this.lockRetryMax;
+    const retryCount  = opts.__retryCount;
 
-    // console.log('begin read?', opts.beginRead, 'end read?', opts.endRead);
-
-    if (opts.__retryCount > maxRetries) {
-      return cb(`Maximum retries (${maxRetries}) attempted to acquire lock for key "${key}".`, {
+    if (retryCount > maxRetries) {
+      return cb(`Maximum retries (${maxRetries}) attempted to acquire lock for key "${key}".`, <any> {
         readersCount: null,
         acquired: false,
         key,
@@ -1227,7 +1226,7 @@ export class Client {
     const self = this;
     let timedOut = false;
 
-    this.emitter.emit('info', 'timeout to acquire the lock is:' + lockRequestTimeout);
+    this.emitter.emit('info', 'timeout to acquire the lock is:' + lrt);
     this.emitter.emit('info', 'ttl of lock when acquired is:', ttl);
 
     this.timers[uuid] = setTimeout(() => {
@@ -1257,14 +1256,14 @@ export class Client {
         self.write({uuid, key, type: 'lock-client-timeout'});
 
         return cb(
-          `Live-Mutex client lock request timed out after ${lockRequestTimeout * opts.__retryCount} ms, ` +
+          `Live-Mutex client lock request timed out after ${lrt * opts.__retryCount} ms, ` +
           `${maxRetries} retries attempted to acquire lock for key ${key}.`,
           {acquired: false, key, lockUuid: uuid, id: uuid, readersCount: null} as any);
       }
 
       self.lockInternal(key, opts, cb);
 
-    }, lockRequestTimeout);
+    }, lrt);
 
     this.resolutions[uuid] = (err, data) => {
 
@@ -1344,7 +1343,7 @@ export class Client {
           this.cleanUp(uuid);
           self.giveups[uuid] = true;
 
-          cb('Could not acquire lock on first attempt, and "wait" is false.', {
+          cb('Could not acquire lock on first attempt, and "wait" is false.', <any> {
             key,
             acquired: false,
             lockUuid: uuid,
@@ -1361,18 +1360,23 @@ export class Client {
 
     };
 
-    this.write({
-      keepLocksAfterDeath: Boolean(opts.keepLocksAfterDeath || opts.keepLocksOnExit),
-      retryCount: opts.__retryCount,
-      uuid: uuid,
-      key: key,
-      isRWLockWrite,
-      type: 'lock',
-      ttl: ttl,
-      beginRead,
-      endRead,
-      max
-    });
+    {
+
+      let keepLocksAfterDeath = Boolean(opts.keepLocksAfterDeath || opts.keepLocksOnExit);
+
+      this.write({
+        keepLocksAfterDeath,
+        retryCount,
+        uuid: uuid,
+        key: key,
+        isRWLockWrite,
+        type: 'lock',
+        ttl: ttl,
+        beginRead,
+        endRead,
+        max
+      });
+    }
 
   }
 
@@ -1388,7 +1392,7 @@ export class Client {
     return this.host;
   }
 
-  unlock(key: string, opts?: any, cb?: LMClientUnlockCallBack) {
+  unlock(key: string, opts: any, cb?: LMClientUnlockCallBack) {
 
     this.bookkeeping[key] = this.bookkeeping[key] || {
       rawLockCount: 0,
