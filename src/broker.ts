@@ -972,13 +972,11 @@ export class Broker {
 
       if (beginRead) {
         // lck.readers = Math.max(20, lck.readers++);
-        console.log('begin read hit.');
         lck.readers++
       }
 
       if (endRead) {
-        // in case something weird happens, never let it go below 0@thnkr/my-name-is-patrick-mcconlogue-i-need-help-c98baf464291
-        console.log('end read hit..');
+        // in case something weird happens, never let it go below 0.
         lck.readers = Math.max(0, --lck.readers);
       }
 
@@ -992,7 +990,7 @@ export class Broker {
 
       if (count >= lck.max) {
 
-        console.log('count is too high:', count, 'max:', lck.max);
+        // console.log('count is too high:', count, 'max:', lck.max);
 
         // Lock exists *and* already has a lockholder; adding ws to list of to be notified
         // if we are retrying, we may attempt to call lock() more than once

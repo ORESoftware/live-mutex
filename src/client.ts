@@ -275,7 +275,7 @@ export class Client {
     this.listeners = {};
     this.host = opts.host || 'localhost';
     this.port = opts.port || 6970;
-    this.ttl = weAreDebugging ? 5000000 : (opts.ttl || 4050);
+    this.ttl = weAreDebugging ? 5000000 : (opts.ttl || 7050);
     this.unlockRequestTimeout = weAreDebugging ? 5000000 : (opts.unlockRequestTimeout || 4000);
     this.lockRequestTimeout = weAreDebugging ? 5000000 : (opts.lockRequestTimeout || 3000);
     this.lockRetryMax = opts.lockRetryMax || opts.maxRetries || opts.retryMax || 3;
@@ -702,37 +702,7 @@ export class Client {
     return [key, opts, cb];
   }
 
-  beginWrite(key: string, opts: any, cb?: LMClientLockCallBack) {
 
-    try {
-      [key, opts, cb] = this.parseLockOpts(key, opts, cb);
-    }
-    catch (err) {
-      return process.nextTick(cb, err);
-    }
-
-    // we prioritize write locks, over read locks
-    opts.isRWLockWrite = true;
-    opts.force = false;
-
-    return this.lock(key, opts, cb);
-  }
-
-  endWrite(key: string, opts: any, cb?: LMClientUnlockCallBack) {
-
-    try {
-      [key, opts, cb] = this.parseUnlockOpts(key, opts, cb);
-    }
-    catch (err) {
-      return process.nextTick(cb, err);
-    }
-
-    // force unlock
-    opts.isRWLockWrite = true;
-    opts.force = false;
-
-    return this.unlock(key, opts, cb);
-  }
 
   acquireWriteLock(key: string, opts: any, cb?: any) {
 
@@ -753,7 +723,6 @@ export class Client {
       }
 
       console.log(chalk.blue('acquireWriteLock got lock on:'), key);
-
 
       this.registerWriteFlagAndReadersCheck(key, {}, (err, val) => {
 
@@ -793,16 +762,15 @@ export class Client {
 
       console.log(chalk.blue('releaseWriteLock got lock on:'), key);
 
-
       this.setWriteFlagToFalse(key, (err, val) => {
 
         if (err) {
           return cb(err, unlock);
         }
 
-        unlock((err,val) => {
+        unlock((err, val) => {
           console.log(chalk.blue('releaseWriteLock released lock on:'), key);
-           cb(err,val);
+          cb(err, val);
         });
 
       });
@@ -876,9 +844,9 @@ export class Client {
           return cb(err, unlock);
         }
 
-        unlock((err,val) => {
+        unlock((err, val) => {
           console.log(chalk.blue('releaseReadLock released lock on key:'), key);
-             cb(err,val);
+          cb(err, val);
         });
 
       });
@@ -965,17 +933,54 @@ export class Client {
     });
   }
 
+  beginWrite(key: string, opts: any, cb?: LMClientLockCallBack) {
+
+    try {
+      [key, opts, cb] = this.parseLockOpts(key, opts, cb);
+    }
+    catch (err) {
+      return process.nextTick(cb, err);
+    }
+
+    // we prioritize write locks, over read locks, by using force = true
+    opts.isRWLockWrite = true;
+    opts.force = true;
+
+    return this.lock(key, opts, cb);
+  }
+
+  endWrite(key: string, opts: any, cb?: LMClientUnlockCallBack) {
+
+    try {
+      [key, opts, cb] = this.parseUnlockOpts(key, opts, cb);
+    }
+    catch (err) {
+      return process.nextTick(cb, err);
+    }
+
+    // force unlock
+    opts.isRWLockWrite = true;
+    opts.force = true;
+
+    return this.unlock(key, opts, cb);
+  }
+
   beginRead(key: string, opts: any, cb: LMClientLockCallBack) {
 
-    [key, opts, cb] = this.parseLockOpts(key, opts, cb);
+    try {
+      [key, opts, cb] = this.parseLockOpts(key, opts, cb);
+    }
+    catch (err) {
+      assert(typeof cb === 'function', 'Must include a callback to the beginRead method.');
+      return process.nextTick(cb, err);
+    }
 
     opts.beginRead = true;
     opts.max = 1;
-    opts.force = true;
+    opts.force = false; // we want writers to have some chance to swoop in
     const writeKey = opts.writeKey;
 
     try {
-      assert(typeof cb === 'function', 'Must include a callback to the readLock method.');
       assert(writeKey && typeof writeKey === 'string', '"writeKey" must be a string.');
       assert(key !== writeKey, 'writeKey and readKey cannot be the same string.');
     }
@@ -1040,45 +1045,40 @@ export class Client {
     opts.max = 1;
     const writeKey = opts.writeKey;
 
-    const endReadCb = (err, val) => {
-      cb && cb(err, val);
-    };
-
     try {
       assert(writeKey && typeof writeKey === 'string', '"writeKey" must be a string.');
       assert(key !== writeKey, 'writeKey and readKey cannot be the same string.');
     }
     catch (err) {
-      return process.nextTick(endReadCb, err);
+      return process.nextTick(cb, err);
     }
 
-    this.lock(key, opts, (err, val) => {
+    this.lock(key, opts, (err, v) => {
 
       if (err) {
-        return endReadCb(err, val);
+        return cb(err, v);
       }
 
-      const uuid = val.lockUuid;
-      const readers = val.readersCount;
+      const readers = v.readersCount;
 
       if (!Number.isInteger(readers)) {
-        return this.fireLockCallbackWithError('Implementation error, missing "readersCount".', val.id, endReadCb, key);
+        return cb('Implementation error, missing "readersCount".');
       }
 
-      if (readers < 1) {
-        // we use force, because this process might not own the writeKey lock
-        return this.unlock(writeKey, {force: true}, (err, val) => {
-
-          if (err) {
-            return endReadCb(err, val);
-          }
-
-          this.unlock(key, uuid, endReadCb);
-
-        });
+      if (readers > 0) {
+        return v.unlock(cb);
       }
 
-      this.unlock(key, uuid, endReadCb);
+      // we use force, because this process might not own the writeKey lock
+      this.unlock(writeKey, {force: true}, (err, val) => {
+
+        if (err) {
+          return cb(err, val);
+        }
+
+        v.unlock(cb);
+
+      });
 
     });
 
@@ -1206,7 +1206,7 @@ export class Client {
     const ttl = opts.ttl || this.ttl;
     const lrt = opts.lockRequestTimeout || this.lockRequestTimeout;
     const maxRetries = opts.maxRetry || opts.maxRetries || this.lockRetryMax;
-    const retryCount  = opts.__retryCount;
+    const retryCount = opts.__retryCount;
 
     if (retryCount > maxRetries) {
       return cb(`Maximum retries (${maxRetries}) attempted to acquire lock for key "${key}".`, <any> {
@@ -1317,7 +1317,6 @@ export class Client {
         boundUnlock.key = key;
         boundUnlock.unlock = boundUnlock;
         boundUnlock.lockUuid = data.uuid;
-
         cb(null, boundUnlock);
 
       }
@@ -1328,8 +1327,6 @@ export class Client {
 
       }
       else if (data.acquired === false) {
-
-        console.log('acquired was false');
 
         if (opts.wait === false) {
 
