@@ -10,34 +10,57 @@ Promise.all([
 ])
 .then(function ([b, c]) {
 
+  b.emitter.on('error', function (v) {
+    if (!String(v).match(/no lock with key/)) {
+      console.error('broker error:',...arguments);
+    }
+  });
+
+  c.emitter.on('error', function (v) {
+    if (!String(v).match(/no lock with key/)) {
+      console.error('client error',...arguments);
+    }
+  });
+
   b.emitter.on('warning', function (v) {
     if (!String(v).match(/no lock with key/)) {
-      console.error(...arguments);
+      console.error('broker warning:',...arguments);
     }
   });
 
   c.emitter.on('warning', function (v) {
     if (!String(v).match(/no lock with key/)) {
-      console.error(...arguments);
+      console.error('client warning',...arguments);
     }
   });
 
-  let readers = 0;
-  let writers = 0;
 
   const start = Date.now();
-
   const max = 22;
 
   const firstRead = function (cb) {
     c.lock('foo', {max},(err, release) => {
-      err ? cb(err) : release(cb);
+      if(err){
+        return cb(err);
+      }
+      if(release.acquired !== true){
+        throw release;
+      }
+
+      release(cb);
     });
   };
 
   const firstWrite = function (cb) {
     c.lock('foo', {max},(err, release) => {
-       err ? cb(err) : release(cb);
+      if(err){
+        return cb(err);
+      }
+      if(release.acquired !== true){
+        throw release;
+      }
+
+      release(cb);
     });
   };
 

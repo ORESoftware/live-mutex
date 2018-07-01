@@ -1330,7 +1330,11 @@ export class Client {
       }
       else if (data.acquired === false) {
 
+        console.log('acquired was false');
+
         if (opts.wait === false) {
+
+          console.log('wait is false.');
 
           // when wait is false, user only wants to try once,
           // and doesn't even want to wait until the timeout elapses.
@@ -1340,7 +1344,7 @@ export class Client {
           this.cleanUp(uuid);
           self.giveups[uuid] = true;
 
-          cb('Could not acquire lock on first attempt and wait===false.', {
+          cb('Could not acquire lock on first attempt, and "wait" is false.', {
             key,
             acquired: false,
             lockUuid: uuid,
