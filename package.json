@@ -18,6 +18,9 @@
     "test": "./scripts/test.sh",
     "postinstall": "./assets/postinstall.sh"
   },
+  "r2g":{
+    "test":"npm link suman && suman --"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ORESoftware/live-mutex.git"

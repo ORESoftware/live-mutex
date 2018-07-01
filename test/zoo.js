@@ -27,12 +27,13 @@ Promise.all([
   });
 
   const start = Date.now();
+  const max = 35;
 
-  async.timesLimit(10000, 20, function (n, cb) {
+  async.timesLimit(10000, 30, function (n, cb) {
 
     const r = Math.ceil(Math.random() * 2);
 
-    c.lock('a', (err, v) => {
+    c.lock('a', {max}, (err, v) => {
 
       if (err) {
         return cb(err);
