@@ -1309,14 +1309,14 @@ export class Client {
 
         this.cleanUp(uuid);
         self.bookkeeping[key].lockCount++;
-        self.write({uuid: uuid, key: key, type: 'lock-received'});
+        self.write({uuid, key, type: 'lock-received'});
 
         const boundUnlock = self.unlock.bind(self, key, {_uuid: uuid});
         boundUnlock.acquired = true;
         boundUnlock.readersCount = Number.isInteger(data.readersCount) ? data.readersCount : null;
         boundUnlock.key = key;
-        boundUnlock.unlock = boundUnlock;
-        boundUnlock.lockUuid = data.uuid;
+        boundUnlock.unlock = boundUnlock.release = boundUnlock;
+        boundUnlock.lockUuid = uuid;
         cb(null, boundUnlock);
 
       }
@@ -1412,6 +1412,10 @@ export class Client {
     }
 
     opts = opts || {};
+
+    if(opts.id){
+      opts._uuid = opts.id;
+    }
 
     if (cb && cb !== this.noop) {
       cb = cb.bind(this);

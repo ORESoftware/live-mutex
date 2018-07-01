@@ -15,23 +15,30 @@ Promise.all([
 .then(function ([b, c]) {
 
   b.emitter.on('warning', function (v) {
-    if (!String(v).match(/no lock with key/)) {
-      console.error(...arguments);
-    }
+      console.error('broker warning:',...arguments);
   });
 
   c.emitter.on('warning', function (v) {
-    if (!String(v).match(/no lock with key/)) {
-      console.error(...arguments);
-    }
+      console.error('client warning',...arguments);
+  });
+
+  b.emitter.on('error', function (v) {
+    console.error('broker error:',...arguments);
+  });
+
+  c.emitter.on('error', function (v) {
+    console.error('client error',...arguments);
   });
 
   const start = Date.now();
-  const max = 35;
+  const max = 17;
+
+  let count = 0;
+  let i = 0;
 
   async.timesLimit(10000, 30, function (n, cb) {
 
-    const r = Math.ceil(Math.random() * 2);
+    const r = Math.ceil(Math.random() * 5);
 
     c.lock('a', {max}, (err, v) => {
 
@@ -39,10 +46,29 @@ Promise.all([
         return cb(err);
       }
 
-      v.unlock(cb);
-      // setTimeout(function () {
-      //
-      // }, r);
+      count++;
+
+      console.log(i++, 'count:', count, 'max:', max);
+
+      if (count > max) {
+        throw 'count greater than max.';
+      }
+
+      // console.log('count:', ++count);
+
+      setTimeout(function () {
+        // v.unlock(cb);
+
+        if (count > max) {
+          throw 'count greater than max.';
+        }
+
+        count--;
+
+        // console.log('v.id:', v.lockUuid);
+        c.unlock('a', {id: v.lockUuid, force: true}, cb);
+
+      }, r);
 
     });
 

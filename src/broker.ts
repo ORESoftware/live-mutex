@@ -799,7 +799,9 @@ export class Broker {
       }
     }
 
-    if (!obj) {
+    const count = Object.keys(lck.lockholders).length;
+
+    if (!obj && count < 1) {
       // note: only delete lock if no client is remaining to claim it
       // No other connections waiting for lock with key, so we deleted the lock
       delete locks[key];
@@ -1196,8 +1198,6 @@ export class Broker {
 
       const ln = lck.notify.length;
 
-      console.log('count before:', count);
-
       if (lck.lockholderTimeouts[_uuid]) {
 
         delete lck.lockholderTimeouts[_uuid];
@@ -1225,7 +1225,6 @@ export class Broker {
       }
       else {
 
-        console.log('count after:', count);
 
         if (uuid && ws) {
 
@@ -1241,6 +1240,11 @@ export class Broker {
             unlocked: false
           });
 
+        }
+        else if (uuid) {
+
+          this.emitter.emit('warning',
+            chalk.red('Implemenation warning - Missing ws (we have a uuid but no ws connection).'));
         }
         else if (ws) {
 
