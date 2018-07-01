@@ -1164,11 +1164,6 @@ export class Broker {
       same = Boolean(lck.lockholders[_uuid]);
     }
 
-    let count = null;
-
-    if(lck){
-      count = Object.keys(lck.lockholders).length;
-    }
 
     if (lck && (same || force)) {
 
@@ -1219,7 +1214,7 @@ export class Broker {
 
         }
 
-        // do we need this call?
+
         this.ensureNewLockHolder(lck, data);
 
       }

@@ -64,7 +64,7 @@ Promise.all([
     });
   };
 
-  async.timesLimit(1000, 20, function (n, cb) {
+  async.timesLimit(1000, 25, function (n, cb) {
 
     // console.log('doing it:', n);
     

@@ -38,7 +38,7 @@ Promise.all([
 
   async.timesLimit(10000, 30, function (n, cb) {
 
-    const r = Math.ceil(Math.random() * 5);
+    const r = Math.ceil(Math.random() * 25);
 
     c.lock('a', {max}, (err, v) => {
 
