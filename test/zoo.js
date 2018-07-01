@@ -66,7 +66,7 @@ Promise.all([
         count--;
 
         // console.log('v.id:', v.lockUuid);
-        c.unlock('a', {id: v.lockUuid, force: true}, cb);
+        v.unlock(cb);
 
       }, r);
 
