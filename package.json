@@ -1,6 +1,6 @@
 {
   "name": "live-mutex",
-  "version": "0.0.10050",
+  "version": "0.0.10051",
   "description": "Simple mutex that uses a TCP server; useful if you cannot install Redis, etc.",
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
@@ -18,8 +18,8 @@
     "test": "./scripts/test.sh",
     "postinstall": "./assets/postinstall.sh"
   },
-  "r2g":{
-    "test":"npm link suman && suman --"
+  "r2g": {
+    "test": "npm link suman && suman --"
   },
   "repository": {
     "type": "git",
