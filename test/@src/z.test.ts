@@ -15,7 +15,7 @@ Test.create({mode: 'parallel'}, ['lmUtils', function (b, assert, before, it) {
     return lmUtils.conditionallyLaunchSocketServerp(conf);
   });
   
-  it.cb('yes', {timeout: 30000}, t => {
+  it.cb('yes 1', {timeout: 30000}, t => {
     const client = new Client(conf, (err, c) => {
       c.lock('z', function (err) {
         if (err) return t(err);
@@ -24,17 +24,17 @@ Test.create({mode: 'parallel'}, ['lmUtils', function (b, assert, before, it) {
     });
   });
   
-  it.cb('yes', {timeout: 30000}, t => {
+  it.cb('yes 2', {timeout: 30000}, t => {
     new Client(conf, function (err, c) {
       if (err) return t(err);
-      this.lock('z', function (err) {
+      this.lock('z', function (err,unlock) {
         if (err) return t(err);
-        this.unlock('z', t.done);
+        unlock(t.done);
       });
     });
   });
   
-  it.cb('yes', {timeout: 30000}, t => {
+  it.cb('yes 3', {timeout: 30000}, t => {
     const client = new Client(conf);
     return client.ensure(function (err, c) {
       if (err) return t(err);
@@ -45,12 +45,21 @@ Test.create({mode: 'parallel'}, ['lmUtils', function (b, assert, before, it) {
     });
   });
   
-  it.cb('yes', {timeout: 30000}, t => {
+  it.cb('yes 4', {timeout: 30000}, t => {
     const client = new Client(conf);
-    client.ensure().then(function (c) {
+    return client.ensure().then(function (c) {
       c.lock('z', function (err) {
         if (err) return t(err);
         c.unlock('z', t.done);
+      });
+    });
+  });
+
+  it('yes 5', {timeout: 30000}, t => {
+    const client = new Client(conf);
+    return client.ensure().then(function (c) {
+      return c.lockp('z').then(function ({unlock}) {
+        return c.run(unlock);
       });
     });
   });

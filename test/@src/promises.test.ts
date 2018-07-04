@@ -8,21 +8,21 @@ import {Client, Broker} from '../../dist';
 ///////////////////////////////////////////////////////////////////////////////////////
 
 Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
-  
+
   const {Promise} = b.ioc;
   const {chalk: colors} = $deps;
   const conf = Object.freeze({port: 7036});
-  
+
   before(h => new Broker(conf).start());
-  
+
   before('get client', h => {
     return new Client(conf).ensure().then(function (c) {
       h.supply.client = c;
     });
   });
-  
+
   describe('do all in parallel', {parallel: true}, b => {
-    
+
     describe('injected', function (b) {
       it('locks/unlocks', t => {
         const c = t.supply.client as Client;
@@ -31,40 +31,37 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
         });
       });
     });
-    
+
     it('locks/unlocks', t => {
       const c = t.supply.client as Client;
       return c.lockp('a').then(function (v) {
         return c.unlockp('a');
       });
     });
-    
-    
+
     const makePromiseProvider = function (unlock) {
       return function (input: string) {
-        return Promise.resolve(input).then(function () {
-          return new Promise(function (resolve, reject) {
-            unlock(function (err) {
-              err ? reject(err) : resolve();
-            });
+        return new Promise(function (resolve, reject) {
+          unlock(function (err) {
+            err ? reject(err) : resolve();
           });
         });
       }
     };
-    
+
     it('locks/unlocks super special 1', t => {
       const c = t.supply.client;
       return c.lockp('foo').then(function ({unlock}) {
         return c.runUnlock(unlock);
       });
     });
-    
+
     it('locks/unlocks super special 2', async t => {
       const c = t.supply.client as Client;
       const {unlock} = await c.acquire('foo');
       return c.execUnlock(unlock);
     });
-    
+
     it('locks/unlocks super special 2', async t => {
       const c = t.supply.client;
       const {unlock} = await c.lockp('foo');
@@ -73,25 +70,22 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
       const v = await Promise.resolve(123);
       return provider(String(v));
     });
-    
+
     it('locks/unlocks super special 3', t => {
       const c = t.supply.client;
       return c.lockp('foo').then(function ({unlock}) {
-        return new Promise(function (resolve, reject) {
-          unlock(function (err) {
-            err ? reject(err) : resolve();
-          });
-        });
+        return new Promise((resolve, reject) =>
+          unlock((e, v) => e ? reject(e) : resolve(v)));
       });
     });
-    
+
     it('locks/unlocks', async t => {
       const c = t.supply.client;
       await c.lockp('a');
       await Promise.delay(100);
       return c.unlockp('a');
     });
-    
+
   });
-  
+
 }]);

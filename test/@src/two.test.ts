@@ -41,15 +41,13 @@ Test.create(['Promise', function (b, assert, describe, inject, it, $deps, $core)
           cb(null, t => {
             
             c.lock(String(val), function (err, v) {
+
               if (err) {
                 return t.fail(err);
               }
               
               setTimeout(function () {
-                c.unlock(String(val), {
-                  force: false,
-                  _uuid: v.lockUuid
-                }, t.done);
+                c.unlock(String(val), {force: false, _uuid: v.lockUuid}, t.done);
               }, 100);
               
             });

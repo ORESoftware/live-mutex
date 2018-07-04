@@ -36,7 +36,7 @@ Promise.all([
   let count = 0;
   let i = 0;
 
-  async.timesLimit(10000, 30, function (n, cb) {
+  async.timesLimit(10000, 4, function (n, cb) {
 
     const r = Math.ceil(Math.random() * 5);
 

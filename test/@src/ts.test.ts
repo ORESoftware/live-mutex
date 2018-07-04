@@ -29,7 +29,7 @@ Test.create([function (b, inject, describe, before, it, $deps, $core) {
   
   describe('inject', b => {
     
-    const c = b.getInjectedValue('client');
+    const c = <Client> b.getInjectedValue('client');
     
     const lockWriteRelease = function (val, cb) {
       

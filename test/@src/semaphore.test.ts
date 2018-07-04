@@ -38,6 +38,7 @@ Test.create(['lmUtils', (b, assert, before, describe, it, path, fs, inject, afte
     let count = {
       val: 0
     };
+
     let max = 4;
 
     before.cb(h => {
@@ -51,8 +52,11 @@ Test.create(['lmUtils', (b, assert, before, describe, it, path, fs, inject, afte
           }
 
           count.val++;
+          console.log('here is the count:', count.val, 'max:', max);
 
-          console.log('here is the count:', count.val);
+          if (count.val > max) {
+            return cb(new Error('count is greather than max.'));
+          }
 
           setTimeout(function () {
 
@@ -62,7 +66,7 @@ Test.create(['lmUtils', (b, assert, before, describe, it, path, fs, inject, afte
 
             count.val--;
 
-            c.unlock('foo', {force: true}, cb);
+            c.unlock('foo', cb);
 
           }, Math.ceil(Math.random() * 10));
 

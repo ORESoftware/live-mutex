@@ -804,6 +804,9 @@ export class Broker {
       // note: only delete lock if no client is remaining to claim it
       // No other connections waiting for lock with key, so we deleted the lock
       delete locks[key];
+    }
+
+    if(!obj){
       return;
     }
 
