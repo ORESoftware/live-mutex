@@ -4,7 +4,6 @@
 import * as util from 'util';
 import * as assert from 'assert';
 import * as net from 'net';
-import * as fs from 'fs';
 
 //npm
 import uuidV4 = require('uuid/v4');
@@ -826,8 +825,6 @@ export class Client {
 
     opts.max = 1;
 
-    // const boundRelease = this.releaseWriteLock.bind(this, key, {});
-
     this.lock(key, opts, (err, unlock) => {
 
       if (err) {
@@ -997,8 +994,6 @@ export class Client {
       if (!Number.isInteger(readers)) {
         return this.fireLockCallbackWithError('Implementation error, missing "readersCount".', unlock.id, cb, key);
       }
-
-      // console.error('readers:', readers);
 
       const boundEndRead = this.endRead.bind(this, key, {writeKey});
       boundEndRead.endRead = boundEndRead.release = boundEndRead;

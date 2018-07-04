@@ -4,13 +4,12 @@
 import * as assert from 'assert';
 import * as net from 'net';
 import * as util from 'util';
-import * as fs from 'fs';
 
 //npm
 import chalk from "chalk";
 import {createParser} from "./json-parser";
 import {LinkedQueue, LinkedQueueValue} from '@oresoftware/linked-queue';
-const localDev = process.env.oresoftware_local_dev === 'yes';
+const isLocalDev = process.env.oresoftware_local_dev === 'yes';
 const noop = function () {
   // do nothing obviously
 };
