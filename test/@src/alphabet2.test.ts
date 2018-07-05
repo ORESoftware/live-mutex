@@ -3,8 +3,8 @@
 import suman = require('suman');
 const Test = suman.init(module);
 const async = require('async');
-import {Client} from "../../client";
-import {Broker} from "../../broker";
+import {Client} from "../../dist/client";
+import {Broker} from "../../dist/broker";
 
 ////////////////////////////////////////////////////////
 

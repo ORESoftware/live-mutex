@@ -11,7 +11,6 @@ import chalk from "chalk";
 import {createParser} from "./json-parser";
 
 //project
-
 import {forDebugging} from './shared-internal';
 const debugLog = process.argv.indexOf('--lmx-debug') > 0;
 
@@ -35,7 +34,7 @@ import {weAreDebugging} from './we-are-debugging';
 import Timer = NodeJS.Timer;
 import {EventEmitter} from 'events';
 import * as path from "path";
-import {LMXLockRequestError, LMXUnlockRequestError} from "./index";
+import {LMXLockRequestError, LMXUnlockRequestError} from "./shared-internal";
 if (weAreDebugging) {
   log.debug('Live-Mutex client is in debug mode. Timeouts are turned off.');
 }

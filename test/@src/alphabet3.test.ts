@@ -3,7 +3,7 @@
 import suman = require('suman');
 const Test = suman.init(module);
 const async = require('async');
-import {Broker} from "../../broker";
+import {Broker} from "../../dist/broker";
 import * as path from "path";
 import * as fs from 'fs';
 import cp = require('child_process');

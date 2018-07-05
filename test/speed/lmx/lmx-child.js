@@ -1,7 +1,7 @@
 'use strict';
 
 const path = require('path');
-const {Client} = require('live-mutex/client');
+const {Client} = require('live-mutex');
 const async = require('async');
 const a = Array.apply(null, {length: 100});
 const start = Date.now();

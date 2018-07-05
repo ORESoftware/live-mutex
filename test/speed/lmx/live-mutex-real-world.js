@@ -1,8 +1,8 @@
 'use strict';
 
 const async = require('async');
-const lmUtils = require('live-mutex/utils');
-const {Client} = require('live-mutex/client');
+const {lmUtils} = require('live-mutex');
+const {Client} = require('live-mutex');
 const conf = Object.freeze({port: 7003});
 
 process.on('unhandledRejection', function (e) {

@@ -16,7 +16,8 @@ Test.create((b, assert, before, describe, it, path, fs, inject, after) => {
   assert.equal(a2z.length, 26, ' => Western alphabet is messed up.');
 
   const num = 100;
-  const conf = Object.freeze({port: 7028});
+  const port = 7000 + parseInt(process.env.SUMAN_CHILD_ID || '1');
+  const conf = Object.freeze({port});
 
   const handleEvents = function (v) {
 

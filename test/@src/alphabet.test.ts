@@ -3,8 +3,8 @@
 import suman = require('suman');
 const Test = suman.init(module);
 const async = require('async');
-import {Client} from "../../client";
-import {Broker} from "../../broker";
+import {Client} from "../../dist/client";
+import {Broker} from "../../dist/broker";
 
 ////////////////////////////////////////////////////////
 
@@ -18,7 +18,8 @@ Test.create(['lmUtils', (b, assert, before, describe, it, path, fs, inject, afte
 
   const num = 100;
 
-  const conf = Object.freeze({port: 7028});
+  const port = 7000 + parseInt(process.env.SUMAN_CHILD_ID || '1');
+  const conf = Object.freeze({port});
 
   const handleEvents = function (v) {
 

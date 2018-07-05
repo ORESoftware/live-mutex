@@ -18,7 +18,7 @@ module.exports = data => {  //load async deps for any of your suman tests
     dependencies: {
 
       'Broker': function () {
-        return import('../../dist/broker-1').then(v => v.default || v);
+        return import('../../dist/broker').then(v => v.default || v);
       },
 
       'LvMtxClient': function(){

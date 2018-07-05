@@ -3,8 +3,8 @@
 // note: this should run in less than 100 ms, even with logging
 
 const async = require('async');
-const lmUtils = require('live-mutex/utils');
-const {Client} = require('live-mutex/client');
+const {lmUtils} = require('live-mutex');
+const {Client} = require('live-mutex');
 
 const conf = Object.freeze({port: 7003});
 
