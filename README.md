@@ -1,6 +1,6 @@
 [![Build Status](https://travis-ci.org/ORESoftware/live-mutex.svg?branch=master)](https://travis-ci.org/ORESoftware/live-mutex)
 
-# Live-Mutex
+# Live-Mutex / LMX
 
 ### Disclaimer
 
@@ -9,26 +9,36 @@ Tested and proven on Node.js versions >= 6.0.0.
 
 ## About
 
-<b>Live-Mutex uses TCP/Unix Domain Sockets (UDS) to create an evented (non-polling) networked mutex API.</b>
+<b>Live-Mutex can use either TCP or Unix Domain Sockets (UDS) to create an evented (non-polling) networked mutex API.</b>
 <b>Live-Mutex is significantly (orders of magnitude) more performant than Lockfile and Warlock for high-concurrency locking requests.</b>
 <i>When Warlock and Lockfile are not finely/expertly tuned, 5x more performant becomes more like 30x or 40x.</i>
 <i>Live-Mutex should also be much less memory and CPU intensive than Lockfile and Warlock, because Live-Mutex is
 fully evented, and Lockfile and Warlock use a polling implementation by nature.</i>
 
-### Basic Metrics
+<br>
+This library is ideal for use cases for which a single broker is needed, and a distributed/networked locking mechanism <br>
+is out-of-reach or otherwise inconvenient. You can easily Dockerize the Live-Mutex broker using: https://github.com/ORESoftware/dockerize-lmx-broker
 
-On Linux, if we feed live-mutex 10,000 lock requests, 20 concurrently, live-mutex can go through all 10,000 lock/unlock cycles
+<br>
+On a single machine, use Unix Domain Sockets for max performance. On a network, use TCP. <br>
+To use UDS, pass in "udsPath" to the client and broker constructors. Otherwise for TCP, pass a host/port combo to both.
+
+<br>
+
+### Basic Metrics
+On Linux/Ubuntu, if we feed live-mutex 10,000 lock requests, 20 concurrently, live-mutex can go through all 10,000 lock/unlock cycles
 in less than 2 seconds, which means at least 5 lock/unlock cycles per millisecond.
 
 ### Rationale
-
 I used a couple of other libraries and they required manual retry logic and they used polling under the hood to acquire locks.
 It was difficult to fine tune those libraries and they were extremely slow for high lock request concurrency. <br>
 Other libraries are stuck with polling for simple reasons - the filesystem is dumb, and so is Redis (unless you write some <br>
-Lua scripts that can run on there - I don't know of any libraries that do that).<br>
+Lua scripts that can run on there - I don't know of any libraries that do that).
+
 <br>
-If we create an intelligent broker that can queue locking requests, <br>
-then we can create something that's both more performant and more developer friendly. Enter live-mutex. <br>
+
+If we create an intelligent broker that can queue locking requests, then we can create something that's both more performant and <br>
+more developer friendly. Enter live-mutex. <br>
 
 
 # Installation
@@ -43,12 +53,11 @@ For usage with Node.js libraries:
 
 ### Who needs it
 
-1. Library developers who want a very fast application-level locking mechanism (and who cannot install Redis).<br>
+1. Library developers who want a very fast application-level locking mechanism (and who cannot install Redis or other distributed locking system).<br>
 2. Application developers using MongoDB (MongoDB has ttl indexes on collections, but this requires a polling implementation).<br>
-3. Developers who normally use the Lockfile library, but need something faster, or multi-machine. <br> (Lockfile can really work on
-one machine, Live-Mutex can work on a network.)
+3. Developers who normally use the Lockfile library, but need something faster, or multi-machine. <br> (Lockfile can really work on one machine, Live-Mutex can work on a network.)
 
-In more detail:<br>
+<b> In more detail:</b>
 See: `docs/detailed-explanation.md`
 
 
@@ -246,9 +255,9 @@ const c = new Client({port: 3999, ttl: 11000, lockRequestTimeout: 2000, maxRetri
 
 c.ensure().then(c => {
     // lock will retry a maximum of 5 times, with 2 seconds between each retry
-   return c.lock(key);
+   return c.acquire(key);
 })
-.then(function({key, id, unlock}){
+.then(({key, id, unlock}) => {
 
    // we have acquired a lock on the key, if we don't release the lock after 11 seconds
    // it will be unlocked for us.
@@ -257,7 +266,7 @@ c.ensure().then(c => {
 
    // runUnlock/execUnlock will return a promise, and execute the unlock convenience function for us
    return c.execUnlock(unlock)
-     .catch(e => ({errror:e}));  // we ignore any unlocking errors, which is usually fine
+     .catch(e => ({error:e}));  // we ignore any unlocking errors, which is usually fine
 });
 ```
 
@@ -363,8 +372,7 @@ You almost certainly do not need more than one client.
 However, if you do some empirical test, and find a client pool might be beneficial/faster, etc. Try this:
 
 ```js
-
-const {Client} = require('live-mutex/client');
+const {Client} = require('live-mutex');
 
 exports.createPool = function(opts){
   
@@ -375,6 +383,4 @@ exports.createPool = function(opts){
      new Client(opts).connect()
   ]);
 }
-
-
 ```

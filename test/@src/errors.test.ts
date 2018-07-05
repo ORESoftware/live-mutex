@@ -3,6 +3,7 @@
 import suman = require('suman');
 const Test = suman.init(module);
 const async = require('async');
+import * as lmx from 'live-mutex';
 import {Client, Broker, LMXUnlockRequestError, LMXLockRequestError} from "live-mutex";
 
 ////////////////////////////////////////////////////////
