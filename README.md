@@ -136,18 +136,11 @@ lmx_start_server # defaults to port 6970
 ## Importing the library using Node.js
 
 ```js
-
-const {Broker} = require('live-mutex/broker');
-const {Client} = require('live-mutex/client');
-const lmUtils = require('live-mutex/utils');
-
-// there are aliases, which are more descriptive:
-const {LMBroker, LvMtxBroker} = require('live-mutex/broker');  // these are simply aliases of Broker
-const {LMClient, LvMtxClient} = require('live-mutex/client');  // these are simply aliases of Client
-
 // alternatively you can import all of these directly
-import {Client, Broker, lmUtils}  from 'live-mutex';
+import {Client, Broker}  from 'live-mutex';
 
+// aliases of the above;
+import {LMXClient, LMXBroker} from 'live-mutex';
 ```
 
 # Simple example
