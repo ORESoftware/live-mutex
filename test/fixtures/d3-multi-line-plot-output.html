@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang='en'>
+
+<head>
+
+  <link href='http://getbootstrap.com/dist/css/bootstrap.min.css' rel='stylesheet'>
+  <link href='http://getbootstrap.com/examples/justified-nav/justified-nav.css' rel='stylesheet'>
+  <script src='http://d3js.org/d3.v3.min.js' charset='utf-8'></script>
+
+  <style>
+
+    #visualisation {
+      padding: 0 20px;
+    }
+    
+    .axis path {
+      fill: none;
+      stroke: #777;
+      shape-rendering: crispEdges;
+    }
+
+    .axis text {
+      font-family: Lato;
+      font-size: 13px;
+    }
+
+  </style>
+
+</head>
+
+<body>
+
+<div class='container'>
+
+  <div class='jumbotron'>
+    <svg id='visualisation'></svg>
+
+    <script>
+
+
+
+      const values = heapTotal.concat(heapUsed).concat(rss).reduce(function (prev, curr) {
+
+        return {
+          xMin: Math.min(prev.xMin, curr.x),
+          xMax: Math.max(prev.xMax, curr.x),
+          yMin: Math.min(prev.yMin, curr.y),
+          yMax: Math.max(prev.yMax, curr.y),
+        }
+
+      }, {
+        xMin: Number.MAX_SAFE_INTEGER,
+        xMax: -1,
+        yMin: Number.MAX_SAFE_INTEGER,
+        yMax: -1
+      });
+
+
+      let vis = d3.select('#visualisation'),
+        WIDTH = 1200,
+        HEIGHT = 800,
+        MARGINS = {
+          top: 20,
+          right: 20,
+          bottom: 20,
+          left: 50
+        },
+        xScale = d3.scale.linear().range([MARGINS.left, WIDTH - MARGINS.right]).domain([values.xMin - 50, values.xMax + 50]),
+        yScale = d3.scale.linear().range([HEIGHT - MARGINS.top, MARGINS.bottom]).domain([values.yMin - 50, values.yMax + 50]),
+        xAxis = d3.svg.axis()
+        .scale(xScale),
+        yAxis = d3.svg.axis()
+        .scale(yScale)
+        .orient('left');
+
+      vis.attr("width", WIDTH)
+      .attr("height", HEIGHT);
+
+      vis.append('svg:g')
+      .attr('class', 'x axis')
+      .attr('transform', 'translate(0,' + (HEIGHT - MARGINS.bottom) + ')')
+      .call(xAxis);
+
+      vis.append('svg:g')
+      .attr('class', 'y axis')
+      .attr('transform', 'translate(' + (MARGINS.left) + ',0)')
+      .call(yAxis);
+
+      let lineGen = d3.svg.line()
+      .x(function (d) {
+        return xScale(d.x);
+      })
+      .y(function (d) {
+        return yScale(d.y);
+      })
+      .interpolate('basis');
+
+      vis.append('svg:path')
+      .attr('d', lineGen(heapUsed))
+      .attr('stroke', 'green')
+      .attr('stroke-width', 2)
+      .attr('fill', 'none');
+
+      vis.append('svg:path')
+      .attr('d', lineGen(heapTotal))
+      .attr('stroke', 'blue')
+      .attr('stroke-width', 2)
+      .attr('fill', 'none');
+
+      vis.append('svg:path')
+      .attr('d', lineGen(rss))
+      .attr('stroke', 'red')
+      .attr('stroke-width', 2)
+      .attr('fill', 'none');
+
+
+    </script>
+  </div>
+
+</div>
+
+</body>
+
+</html>

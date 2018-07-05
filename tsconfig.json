@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "skipLibCheck": true,
+    "outDir": "dist",
+    "declaration": true,
+    "baseUrl": ".",
+    "target": "es6",
+    "module": "commonjs",
+    "noImplicitAny": true,
+    "removeComments": true,
+    "allowUnreachableCode": false,
+    "lib": [
+      "es2015",
+      "es2016",
+      "es2017"
+    ]
+  },
+  "compileOnSave": false,
+  "include": [
+    "src"
+  ]
+}

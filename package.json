@@ -1,0 +1,56 @@
+{
+  "name": "live-mutex",
+  "version": "0.1.1051",
+  "description": "Simple mutex that uses a TCP server; useful if you cannot install Redis, etc.",
+  "main": "dist/index.js",
+  "typings": "dist/index.d.ts",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "lmx_acquire_lock": "assets/cli/acquire.js",
+    "lmx_release_lock": "assets/cli/release.js",
+    "lmx_inspect_broker": "assets/cli/inspect.js",
+    "lmx_launch_broker": "assets/cli/start-server.js",
+    "lmx_start_server": "assets/cli/start-server.js",
+    "lmx_ls": "assets/cli/ls.js",
+    "lmx": "assets/lmx.sh"
+  },
+  "scripts": {
+    "test": "./scripts/test.sh",
+    "postinstall": "./assets/postinstall.sh"
+  },
+  "r2g": {
+    "test": "npm link suman && suman --"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ORESoftware/live-mutex.git"
+  },
+  "author": "Olegzandr VD",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/ORESoftware/live-mutex/issues"
+  },
+  "homepage": "https://github.com/ORESoftware/live-mutex#readme",
+  "dependencies": {
+    "@oresoftware/linked-queue": "latest",
+    "chalk": "^2.4.1",
+    "tcp-ping": "^0.1.1",
+    "uuid": "^3.1.0"
+  },
+  "devDependencies": {
+    "@types/async": "^2.0.49",
+    "@types/core-js": "^0.9.46",
+    "@types/lodash": "^4.14.50",
+    "@types/node": "^10.1.2",
+    "@types/uuid": "^3.4.3"
+  },
+  "optionalDependencies": {
+    "async": "^2.6.0",
+    "bluebird": "^3.4.7",
+    "handlebars": "^4.0.10",
+    "lockfile": "^1.0.3",
+    "lodash": "^4.17.3",
+    "node-redis-warlock": "^0.2.0",
+    "redis": "^2.6.3"
+  }
+}

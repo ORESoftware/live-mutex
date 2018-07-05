@@ -1,0 +1,25 @@
+
+# https://docs.travis-ci.com/user/languages/javascript-with-nodejs#Node.js-v4-(or-io.js-v3)-compiler-requirements
+
+language: node_js
+node_js:
+  - '6'
+  - '7'
+  - '8'
+  - '9'
+  - '10'
+env:
+  - CXX=g++-4.8
+addons:
+  apt:
+    sources:
+      - ubuntu-toolchain-r-test
+    packages:
+      - g++-4.8
+
+before_install: './scripts/travis/before_install.sh'
+install: './scripts/travis/install.sh'
+script: './scripts/test.sh'
+after_script: './scripts/travis/after_script.sh'
+notifications:
+  email: false

@@ -1,0 +1,19 @@
+{
+  "linkToItself": true,
+  "alwaysReinstall": false,
+  "alwaysRelink": false,
+  "searchRoots": [
+    "$HOME/WebstormProjects/oresoftware"
+  ],
+  "ignore": [
+    "/node_modules/",
+    "/.git/"
+  ],
+  "comments": [
+    "put any comment you want here"
+  ],
+  "list": [
+    "@oresoftware/linked-queue"
+  ]
+}
+
