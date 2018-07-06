@@ -747,6 +747,10 @@ export class Client {
     return [key, opts, cb];
   }
 
+  // lock(key: string, cb: LMClientLockCallBack, z?: LMClientLockCallBack) : void;
+
+  lock(key: string, cb: LMClientLockCallBack) : void;
+
   lock(key: string, opts: any, cb?: LMClientLockCallBack) {
 
     this.bookkeeping[key] = this.bookkeeping[key] || {

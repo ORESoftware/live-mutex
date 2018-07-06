@@ -42,12 +42,24 @@ Test.create({mode: 'parallel'}, ['lmUtils', function (b, assert, before, it) {
   });
   
   it.cb('yes 2', {timeout: 30000}, t => {
+
     new Client(conf, function (err, c) {
-      if (err) return t(err);
-      this.lock('z', function (err,unlock) {
+
+      if (err) {
+        return t(err);
+      }
+
+      c.lock('z', null, function (err,unlock) {
         if (err) return t(err);
         unlock(t.done);
       });
+
+      c.lock('z', function (err,unlock) {
+
+        if (err) return t(err);
+        unlock(t.done);
+      });
+
     });
   });
   
