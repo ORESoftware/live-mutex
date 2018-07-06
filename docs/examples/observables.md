@@ -1,5 +1,5 @@
 
-### For more examples see the test directory
+
 ### Example usage with RxJS5 Observables
 
 ```js
@@ -83,4 +83,7 @@
      };
 
 ```
+
+
+##### (For more examples see the test directory)
 
