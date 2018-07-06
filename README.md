@@ -42,7 +42,7 @@ Lua scripts that can run on there - I don't know of any libraries that do that).
 
 <br>
 
-If we create an intelligent broker that can queue locking requests, then we can create something that's both more performant and
+If we create an intelligent broker that can enqueue locking requests, then we can create something that's both more performant and
 more developer friendly. Enter live-mutex.
 
 <br>
@@ -51,11 +51,11 @@ more developer friendly. Enter live-mutex.
 
 For command line tools:
 
-## ```$ npm install -g live-mutex```
+#### ```$ npm install -g live-mutex```
 
 For usage with Node.js libraries:
 
-## ```$ npm install live-mutex --save```
+#### ```$ npm install live-mutex --save```
 
 ### Who needs it
 
@@ -67,20 +67,20 @@ For usage with Node.js libraries:
 See: `docs/detailed-explanation.md` and `docs/about.md`
 
 
-## Usage and Best Practices
+## Basic Usage and Best Practices
 
 The Live-Mutex API is completely asynchronous and requires usage of async initialization for both
 the client and broker instances. This library requires a Node.js process to run a TCP server. This can be within one of your existing Node.js
 processes, or more likely launched separately. In other words, a live-mutex client could also be the broker,
 there is nothing wrong with that. For any given key there should be one broker. For absolute speed, you could use separate
 brokers (in separate Node.js processes)for separate keys, but that's not really very necessary.
-Unix Domain Sockets are about 10-20% faster than TCP, depending on how well tuned TCP is on your system.
+Unix Domain Sockets are about 10-50% faster than TCP, depending on how well-tuned TCP is on your system.
 
 Three things to remember:
 
 1. You need to initialize a broker before connecting any clients, otherwise your clients will pass back an error upon calling `connect()`.
 2. You need to call `ensure()/connect()` on a client or use the asynchronous callback passed to the constructor, before
-calling client.lock() or client.unlock().
+calling `client.lock()` or `client.unlock()`.
 3. Live-Mutex clients and brokers are *not* event emitters. <br> The two classes wrap Node.js sockets, but the sockets connections
 are not exposed to the user of the library.
 4. To use TCP and host/port use `{port: <number>, host: <string>}`, to use Unix Domain Sockets, use `{udsPath: <absoluteFilePath>}`.
@@ -88,7 +88,6 @@ are not exposed to the user of the library.
    You probably only need one broker for any given host, and probably only need one broker if you use multiple keys,
    but you can always use more than one broker per host, and use different ports. Obviously, it would not work
    to use multiple brokers for the same key, that is the one thing you should not do.
-
 
 
 <br>
@@ -162,20 +161,22 @@ const opts = {port: '<port>' , host: '<host>'};
  const client = new Client(opts);
 
  // calling ensure before each critical section means that we ensure we have a connected client
+ // for shorter lived applications, calling ensure more than once is not as important
+
  return client.ensure().then(c =>  {   // (c is the same object as client)
     return c.acquire('<key>').then(({key,id}) => {
         return c.release('<key>', id);
      });
  });
+
 ```
 
-#### Using vanilla callbacks (higher performance + a convenience unlock function)
+#### Using vanilla callbacks (higher performance + easy to use convenience unlock function)
 
 ```js
-client.ensure(function(err){
-   client.lock('<key>', function(err, unlock){
-       // unlock is a convenience function, bound to the right key + request uuid
-       unlock(function(err){
+client.ensure(err => {
+   client.lock('<key>', (err, unlock) => {
+       unlock(function(err){  // unlock is a convenience function, bound to the correct key + request uuid
 
        });
    });
@@ -185,21 +186,22 @@ client.ensure(function(err){
 #### If you want the key and request id, use:
 
 ```js
-client.ensure(function(err){
-   client.lock('<key>', function(err, {id, key}){
-       client.unlock(key, id, function(err){
+client.ensure(err => {
+   client.lock('<key>', (err, {id, key}) => {
+       client.unlock(key, id, err => {
+
            // note that if we don't use the unlock convenience callback,
            // that we should definitely pass the id of the original request.
            // this is for safety - we only want to unlock the corresponding lock,
            // which is defined not just by the right key, but also the right request id.
+
        });
    });
 });
 ```
 
-// note: using this id ensures that the unlock call corresponds with the original corresponding lock call
-// otherwise what could happen in your program is that you could call
-// unlock() for a key that was not supposed to be unlocked by your current call
+<b>note:</b> using the id ensures that the unlock call corresponds with the original corresponding lock call otherwise what could happen in your program is that you could call
+unlock() for a key/id that was not supposed to be unlocked by your current call.
 
 
 ### Usage without the call id (this is less safe):
