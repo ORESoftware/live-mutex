@@ -20,12 +20,12 @@ fully evented, and Lockfile and Warlock use a polling implementation by nature.
 
 <br>
 
-This library is ideal for use cases for which a single broker is needed, and a more robust distributed locking mechanism <br>
-is out-of-reach or otherwise inconvenient. You can easily Dockerize the Live-Mutex broker using: https://github.com/ORESoftware/dockerize-lmx-broker
+This library is ideal for use cases where a more robust <i>distributed</i> locking mechanism is out-of-reach or otherwise inconvenient.
+You can easily Dockerize the Live-Mutex broker using: https://github.com/ORESoftware/dockerize-lmx-broker
 
 <br>
 
-On a single machine, use Unix Domain Sockets for max performance. On a network, use TCP. <br>
+On a single machine, use Unix Domain Sockets for max performance. On a network, use TCP.
 To use UDS, pass in "udsPath" to the client and broker constructors. Otherwise for TCP, pass a host/port combo to both.
 
 <br>
