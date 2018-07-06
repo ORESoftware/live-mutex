@@ -98,11 +98,11 @@ The real power of this library comes with usage with Node.js, but we can use thi
 
 ```bash
 
-###  in shell 1, we launch a live-mutex server/broker
+#  in shell 1, we launch a live-mutex server/broker
 $ lmx start            # 6970 is the default port
 
 
-###  in shell 2, we acquire/release locks on key "foo"
+#  in shell 2, we acquire/release locks on key "foo"
 $ lmx acquire foo      # 6970 is the default port
 $ lmx release foo      # 6970 is the default port
 
@@ -141,7 +141,7 @@ By default, a lock request will retry 3 times, on an interval defined by `opts.l
 That would mean that the a lock request may fail with a timeout error after 9 seconds. To change the number of retries:
 to use zero retries, use either `{retry: false}` or `{maxRetries: 0}`.
 
-There is a built-in retry mechanism for locking requests. On the other hand for unlock requests - there is no built-in retry functionality. <br>
+There is a built-in retry mechanism for locking requests. On the other hand for unlock requests - there is no built-in retry functionality.
 If you absolutely need an unlock request to succeed, use `opts.force = true`. Otherwise, implement your own retry mechanism for unlocking. If you want the library
 to implement automatic retries for unlocking, please file an ticket.
 
@@ -281,6 +281,24 @@ client.lock/unlock call.
 ### Usage with RxJS5 Observables
  => see `docs/examples/observables.md`
 
+
+
+## Non-binary mutex/semaphore
+
+By default, only one lockholder can hold a lock at any moment, and that means `{max:1}`.
+To change a particular key to allow more than one lockholder, use {max:x}, like so:
+
+```js
+
+c.lock('<key>', {max:12}, (err,val) => {
+   // using the max option like so, now as many as 12 lockholders can hold the lock for key '<key>'
+});
+
+```
+
+Non-binary semaphores are well-supported by live-mutex and are a primary feature.
+
+<br>
 
 ## Live-Mutex utils
 
