@@ -2,7 +2,7 @@
 ## In more detail
 
 Live-Mutex is very useful and convenient for developers who need a multi-process locking mechanism, but may find it
-inconvenient or impossible to use Redis, or similar proven mutex brokers. In other words, this library is designed to support other
+inconvenient or impossible to use Redis, or similar proven networked semaphores. In other words, this library is designed to support other
 libraries more so than applications.
 
 For example, an `npm install` routine could easily benefit from using `live-mutex` over the currently library that's used (lockfile).
