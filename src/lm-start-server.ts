@@ -41,9 +41,7 @@ process.once('uncaughtException', function (e: any) {
 const b = new Broker(v);
 
 process.once('exit', function () {
-  b.close(function () {
-    log.debug('broker closed.');
-  });
+  b.close(null);
 });
 
 b.emitter.on('warning', function () {

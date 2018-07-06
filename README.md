@@ -30,11 +30,11 @@ To use UDS, pass in "udsPath" to the client and broker constructors. Otherwise f
 
 <br>
 
-### Basic Metrics
+## Basic Metrics
 On Linux/Ubuntu, if we feed live-mutex 10,000 lock requests, 20 concurrently, live-mutex can go through all 10,000 lock/unlock cycles
 in less than 2 seconds, which means at least 5 lock/unlock cycles per millisecond.
 
-### Rationale
+## Rationale
 I used a couple of other libraries and they required manual retry logic and they used polling under the hood to acquire locks.
 It was difficult to fine tune those libraries and they were extremely slow for high lock request concurrency. <br>
 Other libraries are stuck with polling for simple reasons - the filesystem is dumb, and so is Redis (unless you write some <br>
@@ -64,7 +64,7 @@ For usage with Node.js libraries:
 <br>
 
 
-## Basic Usage and Best Practices
+# Basic Usage and Best Practices
 
 The Live-Mutex API is completely asynchronous and requires usage of async initialization for both
 the client and broker instances. It should be apparent by now that this library requires a Node.js process to run a server, and that server stores the locking info, as a single source of truth.
@@ -124,7 +124,7 @@ in Node.js, by using `{env: true}` in your Node.js code.
 
 ```js
 // alternatively you can import all of these directly
-import {Client, Broker}  from 'live-mutex';
+import {Client, Broker} from 'live-mutex';
 
 // aliases of the above;
 import {LMXClient, LMXBroker} from 'live-mutex';
@@ -144,6 +144,9 @@ to use zero retries, use either `{retry: false}` or `{maxRetries: 0}`.
 There is a built-in retry mechanism for locking requests. On the other hand for unlock requests - there is no built-in retry functionality.
 If you absolutely need an unlock request to succeed, use `opts.force = true`. Otherwise, implement your own retry mechanism for unlocking. If you want the library
 to implement automatic retries for unlocking, please file an ticket.
+
+As explained in a later section, by default this library uses <i>binary semaphores</i>, which means only one lockholder per key at a time.
+If you want more than one lockholder to be able hold the lock for a certain key at time, use `{max:x}` where x is an integer greater than 1.
 
 
 ### Using the library with Promises (recommended usage)

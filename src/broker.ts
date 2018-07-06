@@ -700,8 +700,6 @@ export class Broker {
 
 
     log.debug('setting writer flag to true.');
-
-
     lck.writerFlag = true;
 
     this.send(ws, {
