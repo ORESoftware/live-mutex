@@ -28,6 +28,22 @@ lmx(){
       return 0;
    fi
 
+
+    if [ "$first_arg" == "get" ]; then
+
+      local second_arg="$2";
+
+      if [ -z "$second_arg" ]; then
+        echo >&2 "'\$ lmx get foo', requires that 'foo' be defined/non-empty."
+        return 1
+      fi
+
+      local z="lmx_setting_$second_arg";
+      echo "${!z}"  # "this is called "indirection", see: Evaluating indirect/reference variables"
+      return 0;
+   fi
+
+
    if ! type -f lmx &> /dev/null || ! which lmx &> /dev/null; then
 
       npm i -s -g 'live-mutex' || {

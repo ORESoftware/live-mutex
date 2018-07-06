@@ -20,21 +20,21 @@ fully evented, and Lockfile and Warlock use a polling implementation by nature.
 
 <br>
 
-This library is ideal for use cases for which a single broker is needed, and a more robust distributed locking mechanism <br>
-is out-of-reach or otherwise inconvenient. You can easily Dockerize the Live-Mutex broker using: https://github.com/ORESoftware/dockerize-lmx-broker
+This library is ideal for use cases where a more robust <i>distributed</i> locking mechanism is out-of-reach or otherwise inconvenient.
+You can easily Dockerize the Live-Mutex broker using: https://github.com/ORESoftware/dockerize-lmx-broker
 
 <br>
 
-On a single machine, use Unix Domain Sockets for max performance. On a network, use TCP. <br>
+On a single machine, use Unix Domain Sockets for max performance. On a network, use TCP.
 To use UDS, pass in "udsPath" to the client and broker constructors. Otherwise for TCP, pass a host/port combo to both.
 
 <br>
 
-### Basic Metrics
+## Basic Metrics
 On Linux/Ubuntu, if we feed live-mutex 10,000 lock requests, 20 concurrently, live-mutex can go through all 10,000 lock/unlock cycles
 in less than 2 seconds, which means at least 5 lock/unlock cycles per millisecond.
 
-### Rationale
+## Rationale
 I used a couple of other libraries and they required manual retry logic and they used polling under the hood to acquire locks.
 It was difficult to fine tune those libraries and they were extremely slow for high lock request concurrency. <br>
 Other libraries are stuck with polling for simple reasons - the filesystem is dumb, and so is Redis (unless you write some <br>
@@ -42,8 +42,11 @@ Lua scripts that can run on there - I don't know of any libraries that do that).
 
 <br>
 
-If we create an intelligent broker that can queue locking requests, then we can create something that's both more performant and
+If we create an intelligent broker that can enqueue locking requests, then we can create something that's both more performant and
 more developer friendly. Enter live-mutex.
+
+<b> In more detail:</b>
+See: `docs/detailed-explanation.md` and `docs/about.md`
 
 <br>
 
@@ -51,61 +54,55 @@ more developer friendly. Enter live-mutex.
 
 For command line tools:
 
-## ```$ npm install -g live-mutex```
+#### ```$ npm install -g live-mutex```
 
 For usage with Node.js libraries:
 
-## ```$ npm install live-mutex --save```
-
-### Who needs it
-
-1. Library developers who want a very fast application-level locking mechanism (and who cannot install Redis or other distributed locking system).<br>
-2. Application developers using MongoDB (MongoDB has ttl indexes on collections, but this requires a polling implementation).<br>
-3. Developers who normally use the Lockfile library, but need something faster, or multi-machine. <br> (Lockfile can really work on one machine, Live-Mutex can work on a network.)
-
-<b> In more detail:</b>
-See: `docs/detailed-explanation.md` and `docs/about.md`
+#### ```$ npm install live-mutex --save```
 
 
-## Usage and Best Practices
+<br>
+
+
+# Basic Usage and Best Practices
 
 The Live-Mutex API is completely asynchronous and requires usage of async initialization for both
-the client and broker instances. This library requires a Node.js process to run a TCP server. This can be within one of your existing Node.js
-processes, or more likely launched separately. In other words, a live-mutex client could also be the broker,
-there is nothing wrong with that. For any given key there should be one broker. For absolute speed, you could use separate
-brokers (in separate Node.js processes)for separate keys, but that's not really very necessary.
-Unix Domain Sockets are about 10-20% faster than TCP, depending on how well tuned TCP is on your system.
+the client and broker instances. It should be apparent by now that this library requires a Node.js process to run a server, and that server stores the locking info, as a single source of truth.
+The broker can be within one of your existing Node.js processes, or more likely launched separately. In other words, a live-mutex client could also be the broker,
+there is nothing wrong with that. For any given key there should be only one broker. For absolute speed, you could use separate
+brokers (in separate Node.js processes) for separate keys, but that's not really very necessary.
+Unix Domain Sockets are about 10-50% faster than TCP, depending on how well-tuned TCP is on your system.
 
 Three things to remember:
 
 1. You need to initialize a broker before connecting any clients, otherwise your clients will pass back an error upon calling `connect()`.
-2. You need to call `ensure()/connect()` on a client or use the asynchronous callback passed to the constructor, before
-calling client.lock() or client.unlock().
-3. Live-Mutex clients and brokers are *not* event emitters. <br> The two classes wrap Node.js sockets, but the sockets connections
-are not exposed to the user of the library.
+2. You need to call `ensure()/connect()` on a client or use the asynchronous callback passed to the constructor, before calling `client.lock()` or `client.unlock()`.
+3. Live-Mutex clients and brokers are *not* event emitters. <br> The two classes wrap Node.js sockets, but the socket connections are not exposed.
 4. To use TCP and host/port use `{port: <number>, host: <string>}`, to use Unix Domain Sockets, use `{udsPath: <absoluteFilePath>}`.
-5. The same process that is a client can also be a broker. Live-Mutex is designed for this.
+5. If there is an error or Promise rejection, the lock was not acquired, otherwise the lock was acquired.
+   This is nicer than other libraries that ask that you check the type of the second argument, instead of just checking
+   for the presence of an error.
+6. The same process that is a client can also be a broker. Live-Mutex is designed for this.
    You probably only need one broker for any given host, and probably only need one broker if you use multiple keys,
    but you can always use more than one broker per host, and use different ports. Obviously, it would not work
    to use multiple brokers for the same key, that is the one thing you should not do.
-
 
 
 <br>
 
 # Examples
 
-## Command line:
+## Using shell / command line:
 
 The real power of this library comes with usage with Node.js, but we can use this functionality at the command line too:
 
 ```bash
 
-###  in shell 1, we launch a live-mutex server/broker
+#  in shell 1, we launch a live-mutex server/broker
 $ lmx start            # 6970 is the default port
 
 
-###  in shell 2, we acquire/release locks on key "foo"
+#  in shell 2, we acquire/release locks on key "foo"
 $ lmx acquire foo      # 6970 is the default port
 $ lmx release foo      # 6970 is the default port
 
@@ -119,14 +116,19 @@ $ lmx set port 6982
 $ lmx set uds_path "$PWD/zoom"
 ```
 
-If `uds_path` is set, it will override host/port. You must use `$ lmx set a b`, to change settings.
+If `uds_path` is set, it will override host/port. You must use `$ lmx set a b`, to change settings. You can elect to use these environment variables
+in Node.js, by using `{env: true}` in your Node.js code.
 
+
+<br>
+
+# Using Node.js
 
 ## Importing the library using Node.js
 
 ```js
 // alternatively you can import all of these directly
-import {Client, Broker}  from 'live-mutex';
+import {Client, Broker} from 'live-mutex';
 
 // aliases of the above;
 import {LMXClient, LMXBroker} from 'live-mutex';
@@ -134,22 +136,21 @@ import {LMXClient, LMXBroker} from 'live-mutex';
 
 # Simple example
 
-To see a *complete* and *simple* example of using a broker and client in the same process, see: <br>
-```=> docs/examples/simple.md```
+To see a *complete* and *simple* example of using a broker and client in the same process, see: `=> docs/examples/simple.md`
 
 
 ### A note on default behavior
 
 By default, a lock request will retry 3 times, on an interval defined by `opts.lockRequestTimeout`, which defaults to 3 seconds.
-That would mean that the a lock request may fail with a timeout error after 9 seconds.
+That would mean that the a lock request may fail with a timeout error after 9 seconds. To change the number of retries:
+to use zero retries, use either `{retry: false}` or `{maxRetries: 0}`.
 
-If there is an error or Promise rejection, the lock was not acquired, otherwise the lock was acquired.
-This is nicer than other libraries that ask that you check the type of the second argument, instead of just checking
-for the presence of an error.
-
-Unlock requests - there are no builtin retries for unlock requests - if you absolutely need an unlock request to succeed,
-use `opts.force = true`. Otherwise, implement your own retry mechanism for unlocking. If you want the library
+There is a built-in retry mechanism for locking requests. On the other hand for unlock requests - there is no built-in retry functionality.
+If you absolutely need an unlock request to succeed, use `opts.force = true`. Otherwise, implement your own retry mechanism for unlocking. If you want the library
 to implement automatic retries for unlocking, please file an ticket.
+
+As explained in a later section, by default this library uses <i>binary semaphores</i>, which means only one lockholder per key at a time.
+If you want more than one lockholder to be able hold the lock for a certain key at time, use `{max:x}` where x is an integer greater than 1.
 
 
 ### Using the library with Promises (recommended usage)
@@ -161,20 +162,22 @@ const opts = {port: '<port>' , host: '<host>'};
  const client = new Client(opts);
 
  // calling ensure before each critical section means that we ensure we have a connected client
+ // for shorter lived applications, calling ensure more than once is not as important
+
  return client.ensure().then(c =>  {   // (c is the same object as client)
     return c.acquire('<key>').then(({key,id}) => {
         return c.release('<key>', id);
      });
  });
+
 ```
 
-#### Using vanilla callbacks (higher performance + a convenience unlock function)
+#### Using vanilla callbacks (higher performance + easy to use convenience unlock function)
 
 ```js
-client.ensure(function(err){
-   client.lock('<key>', function(err, unlock){
-       // unlock is a convenience function, bound to the right key + request uuid
-       unlock(function(err){
+client.ensure(err => {
+   client.lock('<key>', (err, unlock) => {
+       unlock(err => {  // unlock is a convenience function, bound to the correct key + request uuid
 
        });
    });
@@ -184,30 +187,31 @@ client.ensure(function(err){
 #### If you want the key and request id, use:
 
 ```js
-client.ensure(function(err){
-   client.lock('<key>', function(err, {id, key}){
-       client.unlock(key, id, function(err){
+client.ensure(err => {
+   client.lock('<key>', (err, {id, key}) => {
+       client.unlock(key, id, err => {
+
            // note that if we don't use the unlock convenience callback,
            // that we should definitely pass the id of the original request.
            // this is for safety - we only want to unlock the corresponding lock,
            // which is defined not just by the right key, but also the right request id.
+
        });
    });
 });
 ```
 
-// note: using this id ensures that the unlock call corresponds with the original corresponding lock call
-// otherwise what could happen in your program is that you could call
-// unlock() for a key that was not supposed to be unlocked by your current call
+<b>note:</b> using the id ensures that the unlock call corresponds with the original corresponding lock call otherwise what could happen in your program is that you could call
+unlock() for a key/id that was not supposed to be unlocked by your current call.
 
 
 ### Usage without the call id (this is less safe):
 
 ```js
 const client = new Client(opts);
-client.ensure(function(err, c){
-  c.lock('<key>', function(err){       // c and client are same object
-      c.unlock('<key>',function(err){
+client.ensure((err, c) => {
+  c.lock('<key>', (err, v) => {       // c and client are same object
+      c.unlock('<key>', err => {
 
       });
   });
@@ -225,6 +229,7 @@ Any *locking* errors will mostly be due to the failure to acquire a lock before 
 *Unlocking* errors should be very rare, and most likely will happen if the process running the broker goes down
 or is overwhelmed. You can simply log unlocking errors, and otherwise ignore them.
 
+<br>
 
 ## Client constructor and client.lock() method options
 
@@ -250,6 +255,8 @@ c.ensure().then(c => {
 });
 ```
 
+<br>
+
 ## The current default values for constructor options:
 
 * `env` => `false`, if you set `env` to true, then Node.js lib will default to settings set from process.env (when you called: `$ lmx set port 5000`);
@@ -264,7 +271,10 @@ c.ensure().then(c => {
 As already stated, unless you are using different options for different lock requests for the same client, <br>
 simply pass these options to the client constructor which allows you to avoid passing an options object for each <br>
 client.lock/unlock call.
-  
+
+
+<br>
+
 ## Usage with Promises and RxJS5 Observables:
   
   This library conciously uses a CPS interface as this is the most primitive and performant async interface.
@@ -284,6 +294,24 @@ client.lock/unlock call.
 ### Usage with RxJS5 Observables
  => see `docs/examples/observables.md`
 
+
+
+## Non-binary mutex/semaphore
+
+By default, only one lockholder can hold a lock at any moment, and that means `{max:1}`.
+To change a particular key to allow more than one lockholder, use {max:x}, like so:
+
+```js
+
+c.lock('<key>', {max:12}, (err,val) => {
+   // using the max option like so, now as many as 12 lockholders can hold the lock for key '<key>'
+});
+
+```
+
+Non-binary semaphores are well-supported by live-mutex and are a primary feature.
+
+<br>
 
 ## Live-Mutex utils
 

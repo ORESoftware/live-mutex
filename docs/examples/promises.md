@@ -1,3 +1,7 @@
+
+##### (For more examples see the test directory)
+
+
 #### This library exposes lock and unlock as vanilla callback methods:
 #### And this library exposes acquire/acquireLock/lockp as promisified lock methods and
 #### release/releaseLock/unlockp as promisified unlock methods

@@ -132,9 +132,10 @@ export interface LMClientUnlockOpts {
 }
 
 export interface LMLockSuccessData {
-  acquired: boolean,
+  (fn: EVCallback): void
+  acquired: true,
   key: string,
-  unlock?: LMCallableLockSuccessData,
+  unlock: LMLockSuccessData,
   lockUuid: string,
   readersCount: number,
   id: string
@@ -146,14 +147,11 @@ export interface LMUnlockSuccessData {
   id: string
 }
 
-export interface LMCallableLockSuccessData extends LMLockSuccessData {
-  (fn: EVCallback): void  // unlock convenience callback
-}
 
 export type EVCallback = (err?: any, val?: any) => void;
 
 export interface LMClientLockCallBack {
-  (err: LMXClientLockException, v?: LMCallableLockSuccessData): void;
+  (err: LMXClientLockException, v?: LMLockSuccessData): void;
 }
 
 export interface LMClientUnlockCallBack {
@@ -248,7 +246,6 @@ export class Client {
 
     if (cb) {
       assert(typeof cb === 'function', 'optional second argument to Live-Mutex Client constructor must be a function.');
-      cb = cb.bind(this);
       if (process.domain) {
         cb = process.domain.bind(cb);
       }
@@ -602,7 +599,7 @@ export class Client {
     });
   }
 
-  unlockp(key: string, opts?: Partial<LMClientUnlockOpts>): Promise<string> {
+  unlockp(key: string, opts?: Partial<LMClientUnlockOpts>): Promise<LMUnlockSuccessData> {
     return new Promise((resolve, reject) => {
       this.unlock(key, opts, function (err, val) {
         err ? reject(err) : resolve(val);
@@ -626,7 +623,7 @@ export class Client {
     return this.unlockp.apply(this, arguments);
   }
 
-  run(fn: EVCallback) {
+  run(fn: LMLockSuccessData) {
     return new Promise((resolve, reject) => {
       fn((err, val) => {
         err ? reject(err) : resolve(val);
@@ -634,11 +631,11 @@ export class Client {
     });
   }
 
-  runUnlock(fn: LMCallableLockSuccessData): Promise<any> {
+  runUnlock(fn: LMLockSuccessData): Promise<any> {
     return this.run.apply(this, arguments);
   }
 
-  execUnlock(fn: LMCallableLockSuccessData): Promise<any> {
+  execUnlock(fn: LMLockSuccessData): Promise<any> {
     return this.run.apply(this, arguments);
   }
 
@@ -748,7 +745,12 @@ export class Client {
     return [key, opts, cb];
   }
 
-  lock(key: string, opts: any, cb?: LMClientLockCallBack) {
+  // lock(key: string, cb: LMClientLockCallBack, z?: LMClientLockCallBack) : void;
+
+  lock(key: string, cb: LMClientLockCallBack) : void;
+  lock(key: string, opts: any, cb?: LMClientLockCallBack) :  void;
+
+  lock(key: string, opts: any, cb?: LMClientLockCallBack) :  void {
 
     this.bookkeeping[key] = this.bookkeeping[key] || {
       rawLockCount: 0,
@@ -769,6 +771,8 @@ export class Client {
       if (typeof cb === 'function') {
         return process.nextTick(cb, err);
       }
+      log.error('No callback was passed to accept the following error.',
+        'Please include a callback as the final argument to the client.lock() routine.');
       throw err;
     }
 
@@ -839,17 +843,17 @@ export class Client {
     catch (err) {
 
       if (typeof cb === 'function') {
-        cb = cb.bind(this);
         return process.nextTick(cb, err);
       }
 
+      log.error('No callback was passed to accept the following error.',
+        'Please include a callback as the final argument to the client.lock() routine.');
       throw err;
     }
 
-    cb = cb.bind(this);
 
     if (process.domain) {
-      cb = process.domain.bind(cb);
+      cb = process.domain.bind(cb as any);
     }
 
     // if (rawLockCount - unlockCount > 5) {
@@ -1102,6 +1106,7 @@ export class Client {
       if (typeof cb === 'function') {
         return process.nextTick(cb, err);
       }
+      log.error('No callback was passed to accept the following error.');
       throw err;
     }
 
@@ -1110,9 +1115,8 @@ export class Client {
     }
 
     if (cb && cb !== this.noop) {
-      cb = cb.bind(this);
       if (process.domain) {
-        cb = process.domain.bind(cb);
+        cb = process.domain.bind(cb as any);
       }
     }
 

@@ -1,6 +1,6 @@
 
 
-Here is a simple example of starting a broker and creating a client with the Promise API:
+## Here is a simple example of starting a broker and creating a client with the Promise API:
 
 ```js
 const {Client, Broker} = require('live-mutex');
@@ -36,15 +36,18 @@ Promise.all([
 });
 ```
 
-here is the same example as above but more condensed and with comments:
+here is the same example as above but with comments:
 
 ```js
 
 Promise.all([
+
   // if we omit options objects to either constructor, then the default host:port is localhost:6970
   new Broker().ensure(),
+
   // `new Client().connect()` is just an alias for `new Client().ensure()`
   new Client().connect()
+
 ])
 .then(function ([b, c]) {
 
@@ -59,12 +62,12 @@ Promise.all([
     console.error(...arguments);
   });
 
-  return c.lockp('foo');   // c.acquire and c.acquireLock are aliases to c.lockp
+  return c.acquire('foo');   // c.acquire and c.acquireLock are aliases to c.lockp
 
 })
 .then(({id, key}) => {
 
-  return c.unlockp(key, id);   // c.release and c.releaseLock are aliases to c.unlockp
+  return c.release(key, id);   // c.release and c.releaseLock are aliases to c.unlockp
 
 });
 .catch(e => {
@@ -73,3 +76,6 @@ Promise.all([
 });
 
 ```
+
+
+##### (For more examples see the test directory)
