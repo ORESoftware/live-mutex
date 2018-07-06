@@ -79,7 +79,10 @@ Three things to remember:
 2. You need to call `ensure()/connect()` on a client or use the asynchronous callback passed to the constructor, before calling `client.lock()` or `client.unlock()`.
 3. Live-Mutex clients and brokers are *not* event emitters. <br> The two classes wrap Node.js sockets, but the socket connections are not exposed.
 4. To use TCP and host/port use `{port: <number>, host: <string>}`, to use Unix Domain Sockets, use `{udsPath: <absoluteFilePath>}`.
-5. The same process that is a client can also be a broker. Live-Mutex is designed for this.
+5. If there is an error or Promise rejection, the lock was not acquired, otherwise the lock was acquired.
+   This is nicer than other libraries that ask that you check the type of the second argument, instead of just checking
+   for the presence of an error.
+6. The same process that is a client can also be a broker. Live-Mutex is designed for this.
    You probably only need one broker for any given host, and probably only need one broker if you use multiple keys,
    but you can always use more than one broker per host, and use different ports. Obviously, it would not work
    to use multiple brokers for the same key, that is the one thing you should not do.
@@ -129,21 +132,17 @@ import {LMXClient, LMXBroker} from 'live-mutex';
 
 # Simple example
 
-To see a *complete* and *simple* example of using a broker and client in the same process, see: <br>
-```=> docs/examples/simple.md```
+To see a *complete* and *simple* example of using a broker and client in the same process, see: `=> docs/examples/simple.md`
 
 
 ### A note on default behavior
 
 By default, a lock request will retry 3 times, on an interval defined by `opts.lockRequestTimeout`, which defaults to 3 seconds.
-That would mean that the a lock request may fail with a timeout error after 9 seconds.
+That would mean that the a lock request may fail with a timeout error after 9 seconds. To change the number of retries:
+to use zero retries, use either `{retry: false}` or `{maxRetries: 0}`.
 
-If there is an error or Promise rejection, the lock was not acquired, otherwise the lock was acquired.
-This is nicer than other libraries that ask that you check the type of the second argument, instead of just checking
-for the presence of an error.
-
-Unlock requests - there are no builtin retries for unlock requests - if you absolutely need an unlock request to succeed,
-use `opts.force = true`. Otherwise, implement your own retry mechanism for unlocking. If you want the library
+There is a built-in retry mechanism for locking requests. On the other hand for unlock requests - there is no built-in retry functionality. <br>
+If you absolutely need an unlock request to succeed, use `opts.force = true`. Otherwise, implement your own retry mechanism for unlocking. If you want the library
 to implement automatic retries for unlocking, please file an ticket.
 
 
