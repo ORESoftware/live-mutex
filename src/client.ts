@@ -132,9 +132,9 @@ export interface LMClientUnlockOpts {
 }
 
 export interface LMLockSuccessData {
-  acquired: boolean,
+  acquired: true,
   key: string,
-  unlock?: LMCallableLockSuccessData,
+  unlock: LMCallableLockSuccessData,
   lockUuid: string,
   readersCount: number,
   id: string
@@ -248,7 +248,6 @@ export class Client {
 
     if (cb) {
       assert(typeof cb === 'function', 'optional second argument to Live-Mutex Client constructor must be a function.');
-      cb = cb.bind(this);
       if (process.domain) {
         cb = process.domain.bind(cb);
       }
@@ -602,7 +601,7 @@ export class Client {
     });
   }
 
-  unlockp(key: string, opts?: Partial<LMClientUnlockOpts>): Promise<string> {
+  unlockp(key: string, opts?: Partial<LMClientUnlockOpts>): Promise<LMUnlockSuccessData> {
     return new Promise((resolve, reject) => {
       this.unlock(key, opts, function (err, val) {
         err ? reject(err) : resolve(val);
@@ -626,7 +625,7 @@ export class Client {
     return this.unlockp.apply(this, arguments);
   }
 
-  run(fn: EVCallback) {
+  run(fn: LMCallableLockSuccessData) {
     return new Promise((resolve, reject) => {
       fn((err, val) => {
         err ? reject(err) : resolve(val);
@@ -769,6 +768,8 @@ export class Client {
       if (typeof cb === 'function') {
         return process.nextTick(cb, err);
       }
+      log.error('No callback was passed to accept the following error.',
+        'Please include a callback as the final argument to the client.lock() routine.');
       throw err;
     }
 
@@ -839,17 +840,17 @@ export class Client {
     catch (err) {
 
       if (typeof cb === 'function') {
-        cb = cb.bind(this);
         return process.nextTick(cb, err);
       }
 
+      log.error('No callback was passed to accept the following error.',
+        'Please include a callback as the final argument to the client.lock() routine.');
       throw err;
     }
 
-    cb = cb.bind(this);
 
     if (process.domain) {
-      cb = process.domain.bind(cb);
+      cb = process.domain.bind(cb as any);
     }
 
     // if (rawLockCount - unlockCount > 5) {
@@ -1102,6 +1103,7 @@ export class Client {
       if (typeof cb === 'function') {
         return process.nextTick(cb, err);
       }
+      log.error('No callback was passed to accept the following error.');
       throw err;
     }
 
@@ -1110,9 +1112,8 @@ export class Client {
     }
 
     if (cb && cb !== this.noop) {
-      cb = cb.bind(this);
       if (process.domain) {
-        cb = process.domain.bind(cb);
+        cb = process.domain.bind(cb as any);
       }
     }
 
