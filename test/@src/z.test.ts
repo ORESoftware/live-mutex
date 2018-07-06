@@ -49,13 +49,13 @@ Test.create({mode: 'parallel'}, ['lmUtils', function (b, assert, before, it) {
         return t(err);
       }
 
-      c.lock('z', null, function (err,unlock) {
+      c.lock('z', {}, function (err,unlock) {
+
         if (err) return t(err);
         unlock(t.done);
       });
 
       c.lock('z', function (err,unlock) {
-
         if (err) return t(err);
         unlock(t.done);
       });
