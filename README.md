@@ -170,7 +170,7 @@ const opts = {port: '<port>' , host: '<host>'};
 ```js
 client.ensure(err => {
    client.lock('<key>', (err, unlock) => {
-       unlock(function(err){  // unlock is a convenience function, bound to the correct key + request uuid
+       unlock(err => {  // unlock is a convenience function, bound to the correct key + request uuid
 
        });
    });
@@ -202,9 +202,9 @@ unlock() for a key/id that was not supposed to be unlocked by your current call.
 
 ```js
 const client = new Client(opts);
-client.ensure(function(err, c){
-  c.lock('<key>', function(err){       // c and client are same object
-      c.unlock('<key>',function(err){
+client.ensure((err, c) => {
+  c.lock('<key>', (err, v) => {       // c and client are same object
+      c.unlock('<key>', err => {
 
       });
   });
