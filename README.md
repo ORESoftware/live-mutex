@@ -222,6 +222,7 @@ Any *locking* errors will mostly be due to the failure to acquire a lock before 
 *Unlocking* errors should be very rare, and most likely will happen if the process running the broker goes down
 or is overwhelmed. You can simply log unlocking errors, and otherwise ignore them.
 
+<br>
 
 ## Client constructor and client.lock() method options
 
@@ -247,6 +248,8 @@ c.ensure().then(c => {
 });
 ```
 
+<br>
+
 ## The current default values for constructor options:
 
 * `env` => `false`, if you set `env` to true, then Node.js lib will default to settings set from process.env (when you called: `$ lmx set port 5000`);
@@ -261,7 +264,10 @@ c.ensure().then(c => {
 As already stated, unless you are using different options for different lock requests for the same client, <br>
 simply pass these options to the client constructor which allows you to avoid passing an options object for each <br>
 client.lock/unlock call.
-  
+
+
+<br>
+
 ## Usage with Promises and RxJS5 Observables:
   
   This library conciously uses a CPS interface as this is the most primitive and performant async interface.
