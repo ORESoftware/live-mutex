@@ -45,6 +45,9 @@ Lua scripts that can run on there - I don't know of any libraries that do that).
 If we create an intelligent broker that can enqueue locking requests, then we can create something that's both more performant and
 more developer friendly. Enter live-mutex.
 
+<b> In more detail:</b>
+See: `docs/detailed-explanation.md` and `docs/about.md`
+
 <br>
 
 # Installation
@@ -56,15 +59,6 @@ For command line tools:
 For usage with Node.js libraries:
 
 #### ```$ npm install live-mutex --save```
-
-### Who needs it
-
-1. Library developers who want a very fast application-level locking mechanism (and who cannot install Redis or other distributed locking system).<br>
-2. Application developers using MongoDB (MongoDB has ttl indexes on collections, but this requires a polling implementation).<br>
-3. Developers who normally use the Lockfile library, but need something faster, or multi-machine. <br> (Lockfile can really work on one machine, Live-Mutex can work on a network.)
-
-<b> In more detail:</b>
-See: `docs/detailed-explanation.md` and `docs/about.md`
 
 
 ## Basic Usage and Best Practices

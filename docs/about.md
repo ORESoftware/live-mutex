@@ -9,6 +9,13 @@ you'd need/want a locking mechanism in this case. For synchronization in a singl
 find a must more performant solution elsewhere. Live-Mutex performance is good when doing multi-process
 synchronization.
 
+### Who needs it
+
+1. Library developers who want a very fast application-level locking mechanism (and who cannot install Redis or other distributed locking system).<br>
+2. Application developers using MongoDB (MongoDB has ttl indexes on collections, but this requires a polling implementation).<br>
+3. Developers who normally use the Lockfile library, but need something faster, or multi-machine. <br> (Lockfile can really work on one machine, Live-Mutex can work on a network.)
+
+
 ## Alternatives to Live-Mutex
 
 The NPM lockfile library works OK for the same purpose, but Live-Mutex is:
