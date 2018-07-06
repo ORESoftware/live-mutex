@@ -92,7 +92,7 @@ Three things to remember:
 
 # Examples
 
-## Command line:
+## Using shell / command line:
 
 The real power of this library comes with usage with Node.js, but we can use this functionality at the command line too:
 
@@ -119,6 +119,10 @@ $ lmx set uds_path "$PWD/zoom"
 If `uds_path` is set, it will override host/port. You must use `$ lmx set a b`, to change settings. You can elect to use these environment variables
 in Node.js, by using `{env: true}` in your Node.js code.
 
+
+<br>
+
+# Using Node.js
 
 ## Importing the library using Node.js
 
