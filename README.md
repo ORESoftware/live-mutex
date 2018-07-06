@@ -252,6 +252,7 @@ c.ensure().then(c => {
 
 ## The current default values for constructor options:
 
+* `env` => `false`, if you set `env` to true, then Node.js lib will default to settings set from process.env (when you called: `$ lmx set port 5000`);
 * `port` => `6970`
 * `host` => `localhost`
 * `ttl` => `4000`ms. If 4000ms elapses, if the lock still exists, the lock will be automatically released by the broker.
