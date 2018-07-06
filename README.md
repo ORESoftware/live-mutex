@@ -119,7 +119,8 @@ $ lmx set port 6982
 $ lmx set uds_path "$PWD/zoom"
 ```
 
-If `uds_path` is set, it will override host/port. You must use `$ lmx set a b`, to change settings.
+If `uds_path` is set, it will override host/port. You must use `$ lmx set a b`, to change settings. You can elect to use these environment variables
+in Node.js, by using `{env: true}` in your Node.js code.
 
 
 ## Importing the library using Node.js
