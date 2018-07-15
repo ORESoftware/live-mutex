@@ -51,7 +51,7 @@ process.once('uncaughtException', function (err) {
 });
 
 const getSelectable = function (selectable, original) {
-  return Object.keys(selectable).reduce((a, b) => (a[b] = original[b], a), {})
+  return Object.keys(selectable).reduce((a, b) => (a[b] = original[b], a), {});
 };
 
 const clientOpts = Object.assign(v, {keepLocksAfterDeath: true});

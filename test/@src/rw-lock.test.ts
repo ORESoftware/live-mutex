@@ -10,6 +10,8 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
 
   console.log('suman child id:',process.env.SUMAN_CHILD_ID);
 
+  return;
+
   const port = 7000 + parseInt(process.env.SUMAN_CHILD_ID || '1');
   const conf = Object.freeze({port});
 
