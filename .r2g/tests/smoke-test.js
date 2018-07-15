@@ -19,7 +19,6 @@ Promise.all([
 
   const promises = new Array(20).fill(null).map(v => {
    return c.lockp('foo').then(v => {
-
      const rand = Math.random()*300;
      return new Promise(r => setTimeout(r,rand)).then(_  => v);
     })
