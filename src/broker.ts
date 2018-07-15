@@ -237,16 +237,18 @@ export class Broker {
       this.socketFile = path.resolve(opts.udsPath);
     }
 
-    this.emitter.on('warning', () => {
-      if (this.emitter.listenerCount('warning') < 2) {
+
+    const self = this;
+
+    this.emitter.on('warning', function() {
+      if (self.emitter.listenerCount('warning') < 2) {
         process.emit.call(process, 'warning',
-          ...Array.from(arguments).map(v => (typeof v === 'string' ? v : util.inspect(v))));
+          ...(Array.from(arguments).map(v => (typeof v === 'string' ? v : util.inspect(v)))));
         process.emit.call(process, 'warning',
           'Add a "warning" event listener to the Live-Mutex broker to get rid of this message.');
       }
     });
 
-    const self = this;
 
     this.send = (ws, data, cb) => {
 
