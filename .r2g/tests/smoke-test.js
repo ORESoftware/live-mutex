@@ -10,21 +10,28 @@ Promise.all([
 .then(function ([b, c]) {
 
   b.emitter.on('warning', function () {
-    console.error(...arguments);
+    console.error('broker warning:', ...arguments);
   });
 
   c.emitter.on('warning', function () {
-    console.error(...arguments);
+    console.error('client warning:', ...arguments);
   });
 
-  return c.lockp('foo', {}).then(({id, key}) => {
+  const promises = new Array(20).fill(null).map(v => {
+   return c.lockp('foo').then(v => {
 
-    return c.unlockp(key, id).then(v => {
+     const rand = Math.random()*300;
+     return new Promise(r => setTimeout(r,rand)).then(_  => v);
+    })
+    .then(({key, id}) =>  c.unlockp(key, id));
+  });
 
-      c.close();
-      process.exit(0);
+  return Promise.all(promises)
+  .then(values => {
 
-    });
+    console.log('all good');
+    process.exit(0);
+
   });
 
 })
