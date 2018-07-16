@@ -19,7 +19,10 @@
 					}
 				},
 				{
-                  "run": "sudo npm install -g typescript && tsc || echo 'whatevs' "
+                  "run": "npm set prefix=/home/circleci/npm && echo 'export PATH=$HOME/circleci/npm/bin:$PATH' >> /home/circleci/.bashrc"
+			    },
+				{
+                  "run": "npm install -g typescript && tsc || echo 'whatevs' "
                  },
 				{
 					"run": "npm install --loglevel=warn"
