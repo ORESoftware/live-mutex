@@ -9,7 +9,9 @@ no_color='\033[0m'
 branch="${1:-HEAD}"
 
 branch_name=`git rev-parse --abbrev-ref $branch`;
-git fetch origin;
+
+git fetch origin dev:dev;
+git fetch origin master:master;
 
 
 merge_base="$(git merge-base origin/dev $branch)"
