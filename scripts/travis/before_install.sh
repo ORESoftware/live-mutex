@@ -1,11 +1,8 @@
 #!/usr/bin/env bash
 
-npm install -g typescript
+if ! which tsc >/dev/null ; then
+    npm install -g typescript
+fi
 
-npm install      \
-    "@types/async"  \
-    "@types/core-js" \
-    "@types/lodash"  \
-    "@types/node"
 
 tsc || echo "whatever"
