@@ -1,9 +1,4 @@
 
-
-<img align="right" width="20%" height="20%" src="https://raw.githubusercontent.com/sumanjs/suman-docs/master/images/suman-hex.png">
-<img align="right" width="20%" height="20%" src="https://raw.githubusercontent.com/sumanjs/suman-docs/master/images/suman-hex.png">
-
-
 <a align="right" href="https://travis-ci.org/ORESoftware/live-mutex">
     <img align="right" alt="Travis Build Status" src="https://travis-ci.org/ORESoftware/live-mutex.svg?branch=master">
 </a>
@@ -11,10 +6,6 @@
 <a align="right" href="https://circleci.com/gh/ORESoftware/live-mutex">
     <img align="right" alt="CircleCI Build Status" src="https://circleci.com/gh/ORESoftware/live-mutex.png?circle-token=8ee83a1b06811c9a167e71d12b52f8cf7f786581">
 </a>
-
-[![Travis Build Status](https://travis-ci.org/ORESoftware/live-mutex.svg?branch=master)](https://travis-ci.org/ORESoftware/live-mutex)
-[![CircleCI Status](https://circleci.com/gh/ORESoftware/live-mutex.png?circle-token=8ee83a1b06811c9a167e71d12b52f8cf7f786581)](https://circleci.com/gh/ORESoftware/live-mutex)
-
 
 
 # Live-Mutex / LMX  :lock: + :unlock:
