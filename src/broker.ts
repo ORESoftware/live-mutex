@@ -114,12 +114,16 @@ export interface UuidHash {
   [key: string]: boolean
 }
 
+export interface LockholdersType {
+  [key: string]: { pid: number, ws: net.Socket, uuid: string }
+}
+
 export interface LockObj {
   // current number of lockholders for this lock/key is Object.keys(lockholders).length
   readers?: number;
   max: number, // max number of lockholders
   lockholderTimeouts: UuidHash,
-  lockholders: { [key: string]: { pid: number, ws: net.Socket, uuid: string } },  // uuid(s) that hold the lock
+  lockholders: LockholdersType,  // uuid(s) that hold the lock
   notify: LinkedQueue, //Array<NotifyObj>,
   key: string,
   keepLocksAfterDeath: boolean
@@ -237,10 +241,9 @@ export class Broker {
       this.socketFile = path.resolve(opts.udsPath);
     }
 
-
     const self = this;
 
-    this.emitter.on('warning', function() {
+    this.emitter.on('warning', function () {
       if (self.emitter.listenerCount('warning') < 2) {
         process.emit.call(process, 'warning',
           ...(Array.from(arguments).map(v => (typeof v === 'string' ? v : util.inspect(v)))));
@@ -248,7 +251,6 @@ export class Broker {
           'Add a "warning" event listener to the Live-Mutex broker to get rid of this message.');
       }
     });
-
 
     this.send = (ws, data, cb) => {
 
@@ -700,7 +702,6 @@ export class Broker {
       });
     }
 
-
     log.debug('setting writer flag to true.');
     lck.writerFlag = true;
 
@@ -1056,7 +1057,6 @@ export class Broker {
           lck.readers++
         }
 
-
         if (endRead) {
           // in case something weird happens, never let it go below 0.
           lck.readers = Math.max(0, --lck.readers);
@@ -1110,7 +1110,7 @@ export class Broker {
       const lckTemp = locks[key] = {
         readers: 0,
         max: max || 1,
-        lockholders: {},
+        lockholders: <LockholdersType>{},
         keepLocksAfterDeath,
         lockholderTimeouts: {},
         key,
@@ -1217,7 +1217,6 @@ export class Broker {
           'count before:', countBefore, 'count after:', countAfter);
       }
 
-
       if (uuid && ws) {
 
         // if no uuid is defined, then unlock was called by something other than the client
@@ -1254,7 +1253,6 @@ export class Broker {
           log.debug(data.rwStatus, 'has released lock on key:', key,
             'count before:', countBefore, 'count after:', countAfter);
         }
-
 
         if (uuid && ws) {
 
