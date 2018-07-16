@@ -16,7 +16,7 @@ const noop = function () {
 
 //project
 import {forDebugging} from './shared-internal';
-const debugLog = process.argv.indexOf('--lmx-debug') > 0;
+const debugLog = process.argv.indexOf('--lmx-debug') > 0 || process.env.lmx_debug === 'yes';
 
 export const log = {
   info: console.log.bind(console, chalk.gray.bold('[lmx broker info]')),
@@ -123,6 +123,7 @@ export interface LockObj {
   readers?: number;
   max: number, // max number of lockholders
   lockholderTimeouts: UuidHash,
+  lockholdersAllReleased: UuidHash,
   lockholders: LockholdersType,  // uuid(s) that hold the lock
   notify: LinkedQueue, //Array<NotifyObj>,
   key: string,
@@ -245,10 +246,8 @@ export class Broker {
 
     this.emitter.on('warning', function () {
       if (self.emitter.listenerCount('warning') < 2) {
-        process.emit.call(process, 'warning',
-          ...(Array.from(arguments).map(v => (typeof v === 'string' ? v : util.inspect(v)))));
-        process.emit.call(process, 'warning',
-          'Add a "warning" event listener to the Live-Mutex broker to get rid of this message.');
+        process.emit.call(process, 'warning', ...arguments);
+        process.emit.call(process, 'warning', 'Add a "warning" event listener to the LMX broker to get rid of this message.');
       }
     });
 
@@ -480,7 +479,7 @@ export class Broker {
         }
 
         callable = false;
-        this.emitter.emit('warning', chalk.yellow.bold(`[live-mutex broker] "${event}" event has occurred.`));
+        this.emitter.emit('warning', `"${event}" event has occurred.`);
         connectedClients.forEach(function (v, k) {
           // destroy each connected client
           k.destroy();
@@ -491,12 +490,8 @@ export class Broker {
       }
     };
 
-    process.on('uncaughtException', function (e: any) {
-      log.error('Uncaught Exception:', e && e.stack || e);
-    });
-
     process.once('exit', sigEvent('exit'));
-    process.once('uncaughtException', sigEvent('uncaughtException'));
+    // process.once('uncaughtException', sigEvent('uncaughtException'));
     process.once('SIGINT', sigEvent('SIGINT'));
     process.once('SIGTERM', sigEvent('SIGTERM'));
 
@@ -721,6 +716,7 @@ export class Broker {
       readers: 0,
       max: max || 1,
       lockholders: {},
+      lockholdersAllReleased: {},
       keepLocksAfterDeath,
       lockholderTimeouts: {},
       key,
@@ -1113,6 +1109,7 @@ export class Broker {
         lockholders: <LockholdersType>{},
         keepLocksAfterDeath,
         lockholderTimeouts: {},
+        lockholdersAllReleased: {},
         key,
         notify: new LinkedQueue(),
         to: null as Timer,
@@ -1194,27 +1191,26 @@ export class Broker {
     // the uuid from the original lock call, as a safeguard
     // this prevents a function from being called at the wrong time, or more than once, etc.
 
-    let same = true;
+    let same = null;
     if (_uuid && lck) {
       same = Boolean(lck.lockholders[_uuid]);
+      log.debug('same is:', same);
+    }
+    else if (lck){
+      log.debug('no _uuid was passed to unlock');
     }
 
     if (lck && (same || force)) {
 
-      const max = lck.max;
       const ln = lck.notify.length;
       clearTimeout(lck.to);
       delete lck.lockholderTimeouts[_uuid];
 
-      if (max === 1 && force) {
+      if (force) {
+        Object.keys(lck.lockholders).forEach(v => {
+          lck.lockholdersAllReleased[v] = true;
+        });
         lck.lockholders = {};
-      }
-      else {
-        const countBefore = Object.keys(lck.lockholders).length;
-        delete lck.lockholders[_uuid];
-        const countAfter = Object.keys(lck.lockholders).length;
-        log.debug(data.rwStatus, 'has released lock on key:', key,
-          'count before:', countBefore, 'count after:', countAfter);
       }
 
       if (uuid && ws) {
@@ -1238,21 +1234,13 @@ export class Broker {
 
       const ln = lck.notify.length;
 
-      if (lck.lockholderTimeouts[_uuid]) {
+      if (lck.lockholderTimeouts[_uuid] || lck.lockholdersAllReleased[_uuid]) {
+
+        log.debug('lockholderTimeout occured');
 
         delete lck.lockholderTimeouts[_uuid];
-        const max = lck.max;
+        delete lck.lockholdersAllReleased[_uuid];
 
-        if (max === 1 && force) {
-          lck.lockholders = {};
-        }
-        else {
-          const countBefore = Object.keys(lck.lockholders).length;
-          delete lck.lockholders[_uuid];
-          const countAfter = Object.keys(lck.lockholders).length;
-          log.debug(data.rwStatus, 'has released lock on key:', key,
-            'count before:', countBefore, 'count after:', countAfter);
-        }
 
         if (uuid && ws) {
 
@@ -1290,14 +1278,10 @@ export class Broker {
 
         }
         else if (uuid) {
-
-          this.emitter.emit('warning',
-            chalk.red('Implemenation warning - Missing ws (we have a uuid but no ws connection).'));
+          this.emitter.emit('warning', 'Implemenation warning - Missing ws (we have a uuid but no ws connection).');
         }
         else if (ws) {
-
-          this.emitter.emit('warning',
-            chalk.red('Implemenation warning - Missing uuid (we have socket connection but no uuid).'));
+          this.emitter.emit('warning', 'Implemenation warning - Missing uuid (we have socket connection but no uuid).');
         }
       }
 
@@ -1305,6 +1289,7 @@ export class Broker {
     else {
 
       // lck is not defined
+      log.debug('lock was not defined / no longer existed.');
 
       log.debug(data.rwStatus, 'has released lock on key:', key);
 

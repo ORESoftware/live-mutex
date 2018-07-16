@@ -20,7 +20,7 @@ Test.create({mode: 'series'}, ['Client', 'lmUtils', 'Promise', function (b, asse
     return new Broker(conf).start();
   });
 
-  it.skip.cb('yes - 1', {timeout: 3900}, t => {
+  it.cb('yes - 1', {timeout: 3900}, t => {
 
     const c = Client.create(conf);
     c.ensure((err, c) => {
@@ -37,9 +37,9 @@ Test.create({mode: 'series'}, ['Client', 'lmUtils', 'Promise', function (b, asse
     });
   });
 
-  it.skip('yes - 2', {timeout: 3900}, t => {
+  it.cb('yes - 2', {timeout: 3900}, t => {
     const c = new Client(conf);
-    return c.ensure().then(function () {
+     c.ensure().then(function () {
       c.lock('z', function (err) {
         if (err) return t(err);
         c.unlock('z', t);
@@ -74,7 +74,7 @@ Test.create({mode: 'series'}, ['Client', 'lmUtils', 'Promise', function (b, asse
 
     const c = Client.create(conf);
 
-    c.ensure().then(c => {
+    return c.ensure().then(c => {
       return c.lockp('z').then(({unlock, acquired}) => {
         if (acquired !== true) {
           return Promise.reject('acquired was not true.');

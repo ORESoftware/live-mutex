@@ -35,6 +35,7 @@ import Timer = NodeJS.Timer;
 import {EventEmitter} from 'events';
 import * as path from "path";
 import {LMXLockRequestError, LMXUnlockRequestError} from "./shared-internal";
+import {LMXClientLockException, LMXClientUnlockException} from "./exceptions";
 if (weAreDebugging) {
   log.debug('Live-Mutex client is in debug mode. Timeouts are turned off.');
 }
@@ -123,11 +124,11 @@ export interface UuidBooleanHash {
   [key: string]: boolean;
 }
 
-export interface LMClientLockOpts {
+export interface LMXClientLockOpts {
 
 }
 
-export interface LMClientUnlockOpts {
+export interface LMXClientUnlockOpts {
 
 }
 
@@ -158,51 +159,7 @@ export interface LMClientUnlockCallBack {
   (err: LMXClientUnlockException, v?: LMUnlockSuccessData): void
 }
 
-export class LMXClientLockException {
 
-  code: LMXLockRequestError;
-  message: string;
-  key: string;
-  id: string;
-  stack: string;
-
-  constructor(key: string, id: string, code: LMXLockRequestError, message: string) {
-    this.id = id;
-    this.key = key;
-    this.code = code;
-
-    if (typeof message !== 'string') {
-      message = util.inspect(message, {breakLength: Infinity});
-    }
-
-    this.message = message;
-    this.stack = message;
-  }
-
-}
-
-export class LMXClientUnlockException {
-
-  code: LMXUnlockRequestError;
-  message: string;
-  key: string;
-  id: string;
-  stack: string;
-
-  constructor(key: string, id: string, code: LMXUnlockRequestError, message: string) {
-    this.id = id;
-    this.key = key;
-    this.code = code;
-
-    if (typeof message !== 'string') {
-      message = util.inspect(message, {breakLength: Infinity});
-    }
-
-    this.message = message;
-    this.stack = message;
-  }
-
-}
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
@@ -543,7 +500,7 @@ export class Client {
 
   };
 
-  static create(opts: Partial<ClientOpts>): Client {
+  static create(opts?: ClientOpts): Client {
     return new Client(opts);
   }
 
@@ -591,7 +548,7 @@ export class Client {
 
   }
 
-  lockp(key: string, opts?: Partial<LMClientLockOpts>): Promise<LMLockSuccessData> {
+  lockp(key: string, opts?: Partial<LMXClientLockOpts>): Promise<LMLockSuccessData> {
     return new Promise((resolve, reject) => {
       this.lock(key, opts, function (err, val) {
         err ? reject(err) : resolve(val);
@@ -599,7 +556,7 @@ export class Client {
     });
   }
 
-  unlockp(key: string, opts?: Partial<LMClientUnlockOpts>): Promise<LMUnlockSuccessData> {
+  unlockp(key: string, opts?: Partial<LMXClientUnlockOpts>): Promise<LMUnlockSuccessData> {
     return new Promise((resolve, reject) => {
       this.unlock(key, opts, function (err, val) {
         err ? reject(err) : resolve(val);
@@ -607,19 +564,19 @@ export class Client {
     });
   }
 
-  acquire(key: string, opts?: Partial<LMClientLockOpts>) {
+  acquire(key: string, opts?: Partial<LMXClientLockOpts>) {
     return this.lockp.apply(this, arguments);
   }
 
-  release(key: string, opts?: Partial<LMClientUnlockOpts>) {
+  release(key: string, opts?: Partial<LMXClientUnlockOpts>) {
     return this.unlockp.apply(this, arguments);
   }
 
-  acquireLock(key: string, opts?: Partial<LMClientLockOpts>) {
+  acquireLock(key: string, opts?: Partial<LMXClientLockOpts>) {
     return this.lockp.apply(this, arguments);
   }
 
-  releaseLock(key: string, opts?: Partial<LMClientUnlockOpts>) {
+  releaseLock(key: string, opts?: Partial<LMXClientUnlockOpts>) {
     return this.unlockp.apply(this, arguments);
   }
 
@@ -1011,7 +968,7 @@ export class Client {
         boundUnlock.readersCount = Number.isInteger(data.readersCount) ? data.readersCount : null;
         boundUnlock.key = key;
         boundUnlock.unlock = boundUnlock.release = boundUnlock;
-        boundUnlock.lockUuid = uuid;
+        boundUnlock.lockUuid = boundUnlock.id = uuid;
         return cb(null, boundUnlock);
       }
 
