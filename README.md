@@ -1,5 +1,7 @@
 
 
+:lock: + :unlock:
+
 <a align="right" href="https://travis-ci.org/ORESoftware/live-mutex">
     <img align="right" alt="Travis Build Status" src="https://travis-ci.org/ORESoftware/live-mutex.svg?branch=master">
 </a>
@@ -11,9 +13,7 @@
 </a>
 
 
-
-
-# Live-Mutex / LMX  :lock: + :unlock:
+# Live-Mutex / LMX
 
 ### Disclaimer
 
