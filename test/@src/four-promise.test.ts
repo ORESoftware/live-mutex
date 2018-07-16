@@ -29,9 +29,9 @@ Test.create({mode: 'series'}, ['Client', 'lmUtils', 'Promise', function (b, asse
         return t.fail(err);
       }
 
-      c.lock('z', function (err) {
+      c.lock('z', function (err, {id}) {
         if (err) return t(err);
-        c.unlock('z', t);
+        c.unlock('z', id ,t);
       });
 
     });
@@ -40,9 +40,9 @@ Test.create({mode: 'series'}, ['Client', 'lmUtils', 'Promise', function (b, asse
   it.cb('yes - 2', {timeout: 3900}, t => {
     const c = new Client(conf);
      c.ensure().then(function () {
-      c.lock('z', function (err) {
+      c.lock('z', function (err, {id}) {
         if (err) return t(err);
-        c.unlock('z', t);
+        c.unlock('z', id, t);
       });
     });
   });
@@ -51,10 +51,10 @@ Test.create({mode: 'series'}, ['Client', 'lmUtils', 'Promise', function (b, asse
     const c = Client.create(conf);
     c.ensure().then(c => {
       t.log('client is ensured.');
-      c.lock('z', function (err) {
+      c.lock('z', function (err, {id}) {
         t.log('acquired lock on z.');
         if (err) return t(err);
-        c.unlock('z', t);
+        c.unlock('z', id, t);
       });
     });
   });
@@ -98,8 +98,8 @@ Test.create({mode: 'series'}, ['Client', 'lmUtils', 'Promise', function (b, asse
   it('yes - 7', {timeout: 3900}, t => {
 
     return Client.create(conf).ensure().then((c) => {
-      return c.lockp('z').then(() => {
-        return c.unlockp('z');
+      return c.lockp('z').then(({id}) => {
+        return c.unlockp('z', id);
       });
     });
 

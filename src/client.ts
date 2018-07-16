@@ -500,7 +500,7 @@ export class Client {
 
   };
 
-  static create(opts?: ClientOpts): Client {
+  static create(opts?: Partial<ClientOpts>): Client {
     return new Client(opts);
   }
 

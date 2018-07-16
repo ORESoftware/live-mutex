@@ -83,7 +83,7 @@ Test.create(['lmUtils', (b, assert, before, describe, it, path, fs, inject, afte
 
             count.val--;
 
-            c.unlock('foo', cb);
+            c.unlock('foo', v.id, cb);
 
           }, Math.ceil(Math.random() * 10));
 

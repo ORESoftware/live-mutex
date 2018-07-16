@@ -44,7 +44,7 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
       it('locks/unlocks', t => {
         const c = t.supply.client as Client;
         return c.lockp('a').then(function (v) {
-          return c.unlockp('a');
+          return c.unlockp('a', v.id);
         });
       });
     });
@@ -52,7 +52,7 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
     it('locks/unlocks', t => {
       const c = t.supply.client as Client;
       return c.lockp('a').then(function (v) {
-        return c.unlockp('a');
+        return c.unlockp('a', v.id);
       });
     });
 
@@ -71,6 +71,12 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
       return c.lockp('foo').then(function (unlock) {
         return c.runUnlock(unlock);
       });
+    });
+
+    it('locks/unlocks super special 2', async t => {
+      const c = t.supply.client as Client;
+      const unlock = await c.acquire('foo');
+      return c.execUnlock(unlock);
     });
 
     it('locks/unlocks super special 2', async t => {
@@ -98,9 +104,9 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
 
     it('locks/unlocks', async t => {
       const c = t.supply.client;
-      await c.lockp('a');
+      const {id} = await c.lockp('a');
       await Promise.delay(100);
-      return c.unlockp('a');
+      return c.unlockp('a', id);
     });
 
   });
