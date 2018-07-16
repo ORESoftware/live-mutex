@@ -34,9 +34,9 @@ Test.create({mode: 'parallel'}, ['lmUtils', function (b, assert, before, it) {
   
   it.cb('yes 1', {timeout: 30000}, t => {
     const client = new Client(conf, (err, c) => {
-      c.lock('z', function (err) {
+      c.lock('z', function (err,v) {
         if (err) return t(err);
-        c.unlock('z', t);
+        c.unlock('z', v.id,t);
       });
     });
   });
@@ -67,9 +67,9 @@ Test.create({mode: 'parallel'}, ['lmUtils', function (b, assert, before, it) {
     const client = new Client(conf);
     return client.ensure(function (err, c) {
       if (err) return t(err);
-      c.lock('z', function (err) {
+      c.lock('z', function (err, v) {
         if (err) return t(err);
-        c.unlock('z', t);
+        c.unlock('z',v.id, t);
       });
     });
   });
@@ -77,9 +77,9 @@ Test.create({mode: 'parallel'}, ['lmUtils', function (b, assert, before, it) {
   it.cb('yes 4', {timeout: 30000}, t => {
     const client = new Client(conf);
     return client.ensure().then(function (c) {
-      c.lock('z', function (err) {
+      c.lock('z', function (err, v) {
         if (err) return t(err);
-        c.unlock('z', t.done);
+        c.unlock('z', v.id,t.done);
       });
     });
   });

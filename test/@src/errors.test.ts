@@ -56,8 +56,9 @@ Test.create((b, assert, before, describe, it, path, fs, inject, after) => {
 
     it.cb('count characters => expect num*26', {timeout: 300}, t => {
 
-      c.lock('zoom', {}, (err,val) => {
+      c.lock('zoo3838m', {}, (err,val) => {
 
+        t.done();
 
 
       });

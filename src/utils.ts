@@ -4,7 +4,7 @@
 import * as cp from 'child_process';
 
 //npm
-const ping = require('tcp-ping');
+import ping = require('tcp-ping');
 
 //project
 import {Broker} from './broker';
@@ -15,11 +15,13 @@ const log = {
   error: console.error.bind(console, ' [live-mutex utils]')
 };
 
+export type EVCb<T> = (err: any, val?: T) => void
+
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
-export const once = function (ctx, fn: Function) {
+export const once = function (ctx: any, fn: Function) {
   let callable = true;
-  return function (err) {
+  return function (err: any) {
     if (callable) {
       callable = false;
       return fn.apply(ctx === 'that' ? this : ctx, arguments);
@@ -30,7 +32,7 @@ export const once = function (ctx, fn: Function) {
   }
 };
 
-export const launchSocketServer = function (opts: any, cb: Function) {
+export const launchSocketServer = function (opts: any, cb: EVCb<any>) {
   
   const host = opts.host || 'localhost';
   const port = opts.port || 6970;
@@ -64,7 +66,7 @@ export const launchSocketServerp = function (opts: any): Promise<any> {
 export const conditionallyLaunchSocketServer = launchSocketServer;
 export const conditionallyLaunchSocketServerp = launchSocketServerp;
 
-export const launchBrokerInChildProcess = function (opts: any, cb: Function) {
+export const launchBrokerInChildProcess = function (opts: any, cb: EVCb<any>) {
   
   const host = opts.host || 'localhost';
   const port = opts.port || 8019;
@@ -77,11 +79,11 @@ export const launchBrokerInChildProcess = function (opts: any, cb: Function) {
     }
     
     if (available) {
-      log.debug(`live-mutex broker/server was already live at ${host}:${port}.`);
+      log.info(`live-mutex broker/server was already live at ${host}:${port}.`);
       return cb(null, {host, port, alreadyRunning: true});
     }
     
-    log.debug(`live-mutex is launching new broker at '${host}:${port}'.`);
+    log.info(`live-mutex is launching new broker at '${host}:${port}'.`);
     
     const n = cp.spawn('node', [p], {
       detached,
@@ -130,7 +132,7 @@ export const launchBrokerInChildProcess = function (opts: any, cb: Function) {
   
 };
 
-export const launchBrokerInChildProcessp = function (opts): Promise<any> {
+export const launchBrokerInChildProcessp = function (opts: any): Promise<any> {
   return new Promise((resolve, reject) => {
     launchBrokerInChildProcess(opts, (err, val) => {
       err ? reject(err) : resolve(val);

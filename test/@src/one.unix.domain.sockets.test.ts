@@ -91,7 +91,7 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps, path) 
         }
 
         setTimeout(function () {
-          c.unlock('a', t.done);
+          c.unlock('a', v.id, t.done);
         }, 1000);
 
       });

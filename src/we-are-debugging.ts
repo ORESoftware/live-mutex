@@ -13,6 +13,7 @@ const expressions = [
   'debug',
   '--debug-brk',
   '--inspect',
+  '--inspect-brk',
   '--debug=5858',
   '--debug-brk=5858'
 ];
