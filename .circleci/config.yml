@@ -19,7 +19,7 @@
 					}
 				},
 				{
-                  "run": "npm install -g typescript && tsc || echo 'whatevs' "
+                  "run": "sudo npm install -g typescript && tsc || echo 'whatevs' "
                  },
 				{
 					"run": "npm install --loglevel=warn"
