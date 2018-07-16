@@ -3,7 +3,7 @@
 const path = require('path');
 const async = require('async');
 const cp = require('child_process');
-const {Broker} = require('live-mutex/broker');
+const {Broker} = require('live-mutex');
 const b = new Broker({udsPath: path.resolve(process.env.HOME + '/.ore/z.unix.lock')});
 
 b.emitter.on('warning', function () {

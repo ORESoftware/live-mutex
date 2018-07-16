@@ -1,7 +1,6 @@
 'use strict';
 
 const async = require('async');
-const lmUtils = require('live-mutex/utils');
 const {Broker, Client} = require('live-mutex');
 // const conf = Object.freeze({port: 6970});
 

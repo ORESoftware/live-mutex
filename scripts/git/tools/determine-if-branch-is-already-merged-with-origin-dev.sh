@@ -10,8 +10,8 @@ branch="${1:-HEAD}"
 
 branch_name=`git rev-parse --abbrev-ref $branch`;
 
-git fetch origin dev:dev;
-git fetch origin master:master;
+git fetch origin dev;
+git fetch origin master;
 
 
 merge_base="$(git merge-base origin/dev $branch)"
