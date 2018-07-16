@@ -5,11 +5,11 @@
 
 
 <a align="right" href="https://travis-ci.org/ORESoftware/live-mutex">
-    <img border="0" alt="Travis Build Status" src="https://travis-ci.org/ORESoftware/live-mutex.svg?branch=master" width="100" height="100">
+    <img align="right" alt="Travis Build Status" src="https://travis-ci.org/ORESoftware/live-mutex.svg?branch=master">
 </a>
 
 <a align="right" href="https://circleci.com/gh/ORESoftware/live-mutex">
-    <img border="0" alt="Travis Build Status" src="https://circleci.com/gh/ORESoftware/live-mutex.png?circle-token=8ee83a1b06811c9a167e71d12b52f8cf7f786581" width="100" height="100">
+    <img align="right" alt="CircleCI Build Status" src="https://circleci.com/gh/ORESoftware/live-mutex.png?circle-token=8ee83a1b06811c9a167e71d12b52f8cf7f786581">
 </a>
 
 [![Travis Build Status](https://travis-ci.org/ORESoftware/live-mutex.svg?branch=master)](https://travis-ci.org/ORESoftware/live-mutex)
