@@ -1,6 +1,11 @@
-[![Travis Build Status](https://travis-ci.org/ORESoftware/live-mutex.svg?branch=master)](https://travis-ci.org/ORESoftware/live-mutex)
 
+<div style="text-align: right">
+
+[![Travis Build Status](https://travis-ci.org/ORESoftware/live-mutex.svg?branch=master)](https://travis-ci.org/ORESoftware/live-mutex)
 [![CircleCI Status](https://circleci.com/gh/ORESoftware/live-mutex.png?circle-token=8ee83a1b06811c9a167e71d12b52f8cf7f786581)](https://circleci.com/gh/ORESoftware/live-mutex)
+
+ </div>
+
 
 # Live-Mutex / LMX  :lock: + :unlock:
 
