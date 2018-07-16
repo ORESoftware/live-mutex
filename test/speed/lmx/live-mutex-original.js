@@ -2,7 +2,9 @@
 
 const async = require('async');
 const {Client} = require('live-mutex');
-const conf = Object.freeze({port: 6970});
+// const conf = Object.freeze({port: 6970});
+
+const conf = Object.freeze({udsPath:  process.env.HOME+ '/uds.temp.sock' });
 
 process.on('unhandledRejection', function (e) {
     console.error('unhandled rejection => ', e.stack || e);
@@ -21,7 +23,7 @@ client.ensure().then(function () {
     let lockholders = 0;
     let max = 1;
 
-    async.eachLimit(a, 300, function (val, cb) {
+    async.eachLimit(a, 20, function (val, cb) {
 
         client.lock('foo', {max}, function (err, unlock) {
 
@@ -32,7 +34,7 @@ client.ensure().then(function () {
             lockholders++;
 
             if (lockholders > max) {
-                return cb(new Error('Should never have more than 1 lockholder.'));
+                return cb(new Error(`Should never have more than ${max} lockholders.`));
             }
 
             lockholders--;

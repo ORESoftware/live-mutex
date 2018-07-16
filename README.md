@@ -22,8 +22,8 @@ Tested and proven on Node.js versions >= 6.0.0.
 
 ## About
 
-* Written in TypeScript for maintainability and easy of use.
-* Live-Mutex is a non-distributed mutex for synchronization across multiple processes/threads.
+* Written in TypeScript for maintainability and ease of use by users.
+* Live-Mutex is a non-distributed mutex/semaphore for synchronization across multiple processes/threads.
 * Non-distributed means no failover if the broker goes down, but the upside is higher-performance.
 * By default, a binary semaphore, but can be used to create a non-binary semaphore, where multiple lockholders can hold a lock, for example, to do some form of rate limiting.
 * Live-Mutex can use either TCP or Unix Domain Sockets (UDS) to create an evented (non-polling) networked mutex API.
@@ -45,8 +45,9 @@ To use UDS, pass in "udsPath" to the client and broker constructors. Otherwise f
 <br>
 
 ## Basic Metrics
-On Linux/Ubuntu, if we feed live-mutex 10,000 lock requests, 20 concurrently, live-mutex can go through all 10,000 lock/unlock cycles
-in less than 2 seconds, which means at least 5 lock/unlock cycles per millisecond.
+On Linux/Ubuntu, if we feed live-mutex 10,000 lock requests, 20 concurrently, LMX can go through all 10,000 lock/unlock cycles
+in less than 2 seconds, which means at least 5 lock/unlock cycles per millisecond. That's with TCP. Using Unix Domain Sockets (for use on a single machine),
+LMX can reach at least 8.5 lock/unlock cycles per millisecond.
 
 <br>
 
@@ -89,7 +90,7 @@ there is nothing wrong with that. For any given key there should be only one bro
 brokers (in separate Node.js processes) for separate keys, but that's not really very necessary.
 Unix Domain Sockets are about 10-50% faster than TCP, depending on how well-tuned TCP is on your system.
 
-Things to keep in mind:
+<b> Things to keep in mind: </b>
 
 1. You need to initialize a broker before connecting any clients, otherwise your clients will pass back an error upon calling `connect()`.
 2. You need to call `ensure()/connect()` on a client or use the asynchronous callback passed to the constructor, before calling `client.lock()` or `client.unlock()`.
