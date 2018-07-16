@@ -6,6 +6,8 @@ if [[ ! -d "node_modules" ]]; then
     exit 1;
 fi
 
+npm config set unsafe-perm=true
+
 lib_name="live-mutex";
 
 export PATH=${PATH}:"$(pwd)/node_modules/.bin"
@@ -31,6 +33,6 @@ if ! which suman &> /dev/null ; then
 fi
 
 
-npm link suman
+sudo npm link  suman
 
 suman -- #coverage test/@src/*.ts # --inherit-all-stdio #--inherit-stdio
