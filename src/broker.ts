@@ -820,7 +820,7 @@ export class Broker {
     if (!obj && count < 1) {
       // note: only delete lock if no client is remaining to claim it
       // No other connections waiting for lock with key, so we deleted the lock
-      delete locks[key];
+      // delete locks[key];
     }
 
     if (!obj) {
@@ -1236,8 +1236,6 @@ export class Broker {
 
       if (lck.lockholderTimeouts[_uuid] || lck.lockholdersAllReleased[_uuid]) {
 
-        log.debug('lockholderTimeout occured');
-
         delete lck.lockholderTimeouts[_uuid];
         delete lck.lockholdersAllReleased[_uuid];
 
@@ -1290,7 +1288,6 @@ export class Broker {
 
       // lck is not defined
       log.debug('lock was not defined / no longer existed.');
-
       log.debug(data.rwStatus, 'has released lock on key:', key);
 
       this.emitter.emit('warning', 'Live-Mutex implementation warning => no lock with key => "' + key + '"');

@@ -37,7 +37,7 @@ const client = new Client({port}, function (err, c) {
   });
 
 
-  async.timesLimit(1000, 140, function (n, cb) {
+  async.timesLimit(10000, 140, function (n, cb) {
 
     let randomKey = keys[Math.floor(Math.random() * keys.length)];
     console.log('count', n, 'randomKey', randomKey);
