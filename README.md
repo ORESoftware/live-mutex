@@ -205,17 +205,16 @@ client.ensure(err => {
 unlock() for a key/id that was not supposed to be unlocked by your current call.
 
 
-### Usage without the call id (this is less safe):
+### Using the unlock convenience callback with promises:
+
+We use a utility method on Client to promisify and run the unlock convenience callback.
 
 ```js
-const client = new Client(opts);
-client.ensure((err, c) => {
-  c.lock('<key>', (err, v) => {       // c and client are same object
-      c.unlock('<key>', err => {
-
-      });
-  });
-});
+ return client.ensure().then(c =>  {   // (c is the same object as client)
+    return c.acquire('<key>').then(unlock => {
+        return c.execUnlock(unlock);
+     });
+ });
 
 ```
 
@@ -230,6 +229,45 @@ Any *locking* errors will mostly be due to the failure to acquire a lock before 
 or is overwhelmed. You can simply log unlocking errors, and otherwise ignore them.
 
 <br>
+
+## You must use the lock id, or {force:true} to reliably unlock
+
+You must either pass the lock id, or use force, to unlock a lock:
+
+<b> works:</b>
+
+```js
+ return client.ensure().then(c =>  {   // (c is the same object as client)
+    return c.acquire('<key>').then(({key,id}) => {
+        return c.release('<key>', id);
+     });
+ });
+```
+
+<b> works:</b>
+```js
+ return client.ensure().then(c =>  {   // (c is the same object as client)
+    return c.acquire('<key>').then(({key,id}) => {
+        return c.release('<key>', {force:true});
+     });
+ });
+```
+
+<b> will not work:</b>
+
+```js
+ return client.ensure().then(c =>  {   // (c is the same object as client)
+    return c.acquire('<key>').then(({key,id}) => {
+        return c.release('<key>');
+     });
+ });
+```
+
+<i> If it's not clear, the lock id is the id of the lock, which is unique for each and every critical section.</i>
+
+Although using the lock id is preferred, `{force:true}` is acceptable, and imperative if you need to unlock from a different process,
+where you won't easily have access to the lock id from another process.
+
 
 ## Client constructor and client.lock() method options
 
@@ -250,8 +288,7 @@ c.ensure().then(c => {
    // note that if we want to use the unlock convenience function, it's available here
 
    // runUnlock/execUnlock will return a promise, and execute the unlock convenience function for us
-   return c.execUnlock(unlock)
-     .catch(e => ({error:e}));  // we ignore any unlocking errors, which is usually fine
+   return c.execUnlock(unlock);
 });
 ```
 
