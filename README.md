@@ -1,6 +1,6 @@
 [![Build Status](https://travis-ci.org/ORESoftware/live-mutex.svg?branch=master)](https://travis-ci.org/ORESoftware/live-mutex)
 
-# Live-Mutex / LMX
+# Live-Mutex / LMX  :lock: / :unlock:
 
 ### Disclaimer
 
@@ -73,7 +73,7 @@ there is nothing wrong with that. For any given key there should be only one bro
 brokers (in separate Node.js processes) for separate keys, but that's not really very necessary.
 Unix Domain Sockets are about 10-50% faster than TCP, depending on how well-tuned TCP is on your system.
 
-Three things to remember:
+Things to keep in mind:
 
 1. You need to initialize a broker before connecting any clients, otherwise your clients will pass back an error upon calling `connect()`.
 2. You need to call `ensure()/connect()` on a client or use the asynchronous callback passed to the constructor, before calling `client.lock()` or `client.unlock()`.
@@ -134,10 +134,14 @@ import {Client, Broker} from 'live-mutex';
 import {LMXClient, LMXBroker} from 'live-mutex';
 ```
 
+<br>
+
 # Simple example
 
 To see a *complete* and *simple* example of using a broker and client in the same process, see: `=> docs/examples/simple.md`
 
+
+<br>
 
 ### A note on default behavior
 
@@ -151,6 +155,8 @@ to implement automatic retries for unlocking, please file an ticket.
 
 As explained in a later section, by default this library uses <i>binary semaphores</i>, which means only one lockholder per key at a time.
 If you want more than one lockholder to be able hold the lock for a certain key at time, use `{max:x}` where x is an integer greater than 1.
+
+<br>
 
 
 ### Using the library with Promises (recommended usage)
@@ -172,6 +178,8 @@ const opts = {port: '<port>' , host: '<host>'};
 
 ```
 
+<br>
+
 #### Using vanilla callbacks (higher performance + easy to use convenience unlock function)
 
 ```js
@@ -183,6 +191,8 @@ client.ensure(err => {
    });
 });
 ```
+
+<br>
 
 #### If you want the key and request id, use:
 
@@ -203,6 +213,8 @@ client.ensure(err => {
 
 <b>note:</b> using the id ensures that the unlock call corresponds with the original corresponding lock call otherwise what could happen in your program is that you could call
 unlock() for a key/id that was not supposed to be unlocked by your current call.
+
+<br>
 
 
 ### Using the unlock convenience callback with promises:
@@ -268,6 +280,7 @@ You must either pass the lock id, or use force, to unlock a lock:
 Although using the lock id is preferred, `{force:true}` is acceptable, and imperative if you need to unlock from a different process,
 where you won't easily have access to the lock id from another process.
 
+<br>
 
 ## Client constructor and client.lock() method options
 
@@ -331,6 +344,8 @@ client.lock/unlock call.
 ### Usage with RxJS5 Observables
  => see `docs/examples/observables.md`
 
+
+<br>
 
 
 ## Non-binary mutex/semaphore

@@ -14,7 +14,7 @@ git fetch origin dev;
 git fetch origin master;
 
 
-merge_base="$(git merge-base origin/dev $branch)"
+merge_base="$(git merge-base $branch origin/dev)"
 merge_source_current_commit="$(git rev-parse $branch)"
 
 
@@ -25,7 +25,7 @@ else
     echo -e "${green}Branch with name '$branch_name' is merged with origin/dev, now checking against origin/master${no_color}";
 fi
 
-merge_base="$(git merge-base origin/master $branch)"
+merge_base="$(git merge-base $branch origin/master)"
 
 if [ "$merge_base" != "$merge_source_current_commit" ]; then
     echo -e "${red}Branch with name '$branch_name' is not completely merged with orign/master.${no_color}";
