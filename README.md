@@ -9,6 +9,7 @@ Tested and proven on Node.js versions >= 6.0.0.
 
 ## About
 
+* Written in TypeScript for maintainability and easy of use.
 * Live-Mutex is a non-distributed mutex for synchronization across multiple processes/threads.
 * Non-distributed means no failover if the broker goes down, but the upside is higher-performance.
 * By default, a binary semaphore, but can be used to create a non-binary semaphore, where multiple lockholders can hold a lock, for example, to do some form of rate limiting.
@@ -34,9 +35,11 @@ To use UDS, pass in "udsPath" to the client and broker constructors. Otherwise f
 On Linux/Ubuntu, if we feed live-mutex 10,000 lock requests, 20 concurrently, live-mutex can go through all 10,000 lock/unlock cycles
 in less than 2 seconds, which means at least 5 lock/unlock cycles per millisecond.
 
+<br>
+
 ## Rationale
 I used a couple of other libraries and they required manual retry logic and they used polling under the hood to acquire locks.
-It was difficult to fine tune those libraries and they were extremely slow for high lock request concurrency. <br>
+It was difficult to finetune those libraries and they were extremely slow for high lock request concurrency. <br>
 Other libraries are stuck with polling for simple reasons - the filesystem is dumb, and so is Redis (unless you write some <br>
 Lua scripts that can run on there - I don't know of any libraries that do that).
 
