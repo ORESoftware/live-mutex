@@ -27,7 +27,7 @@ fi
 
 
 if ! which suman &> /dev/null ; then
-    npm install -g suman;
+    npm install -g suman@1.1.51244;
 fi
 
 
