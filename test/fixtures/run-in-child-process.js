@@ -4,7 +4,7 @@
 const {Client} = require('live-mutex');
 const async = require('async');
 
-let times = 10;
+let times = 3;
 let keys = [];
 
 for (let i = 0; i < times; i++) {
@@ -12,7 +12,7 @@ for (let i = 0; i < times; i++) {
 }
 
 let min = 5;
-let max = 1900;
+let max = 3900;
 
 
 process.on('warning', function (e) {
