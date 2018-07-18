@@ -1183,11 +1183,12 @@ export class Client {
         
         this.cleanUp(uuid);
         this.bookkeeping[key].unlockCount++;
-        this.write({
-          uuid: uuid,
-          key: key,
-          type: 'unlock-received'
-        });
+        
+        // this.write({
+        //   uuid: uuid,
+        //   key: key,
+        //   type: 'unlock-received'
+        // });
         
         return cb(null, {id: uuid, key, unlocked: true});
       }

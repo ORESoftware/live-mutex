@@ -3,8 +3,9 @@
 
 const {Client} = require('live-mutex');
 const async = require('async');
+const chalk = require('chalk');
 
-let times = 3;
+let times = 10;
 let keys = [];
 
 for (let i = 0; i < times; i++) {
@@ -12,7 +13,7 @@ for (let i = 0; i < times; i++) {
 }
 
 let min = 5;
-let max = 3900;
+let max = 11900;
 
 
 process.on('warning', function (e) {
@@ -26,7 +27,6 @@ const client = new Client({port}, function (err, c) {
   if (err) {
     throw err;
   }
-
 
   c.emitter.on('warning', function (v) {
     console.error('client warning',...arguments);
@@ -45,6 +45,7 @@ const client = new Client({port}, function (err, c) {
     client.lock(randomKey, function (err, unlock) {
 
       if (err && String(err.stack || err.message || err).match(/lock request timed out/ig)) {
+        console.error(chalk.red('lock request timed out for key:'), randomKey);
         return cb(null);
       }
 

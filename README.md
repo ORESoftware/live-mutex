@@ -47,7 +47,7 @@ To use UDS, pass in "udsPath" to the client and broker constructors. Otherwise f
 ## Basic Metrics
 On Linux/Ubuntu, if we feed live-mutex 10,000 lock requests, 20 concurrently, LMX can go through all 10,000 lock/unlock cycles
 in less than 2 seconds, which means at least 5 lock/unlock cycles per millisecond. That's with TCP. Using Unix Domain Sockets (for use on a single machine),
-LMX can reach at least 8.5 lock/unlock cycles per millisecond.
+LMX can reach at least 8.5 lock/unlock cycles per millisecond, about 30% more performant than TCP.
 
 <br>
 

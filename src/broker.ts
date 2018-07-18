@@ -132,7 +132,8 @@ export interface LockObj {
   key: string,
   keepLocksAfterDeath: boolean
   to: NodeJS.Timer,
-  writerFlag: boolean
+  writerFlag: boolean,
+  timestampEmptied: number
 }
 
 export interface NotifyObj {
@@ -181,6 +182,7 @@ export class Broker {
   emitter = new EventEmitter();
   noDelay = true;
   socketFile = '';
+  lockCounts = 0;
   registeredListeners = <{ [key: string]: Array<RegisteredListener> }>{};
   
   ///////////////////////////////////////////////////////////////
@@ -312,19 +314,17 @@ export class Broker {
       }
       
       if (data.type === 'lock-received') {
-        
-        self.bookkeeping[data.key].lockCount++;
         clearTimeout(self.timeouts[data.key]);
         return delete self.timeouts[data.key];
       }
       
-      if (data.type === 'unlock-received') {
-        
-        const key = data.key;
-        clearTimeout(self.timeouts[key]);
-        delete self.timeouts[key];
-        return self.bookkeeping[key].unlockCount++;
-      }
+      // if (data.type === 'unlock-received') {
+      //
+      //   const key = data.key;
+      //   clearTimeout(self.timeouts[key]);
+      //   delete self.timeouts[key];
+      //   return self.bookkeeping[key].unlockCount++;
+      // }
       
       if (data.type === 'lock-client-timeout') {
         
@@ -734,7 +734,8 @@ export class Broker {
       key,
       notify: new LinkedQueue(),
       to: null,
-      writerFlag: false
+      writerFlag: false,
+      timestampEmptied: null
     };
     
   }
@@ -835,8 +836,8 @@ export class Broker {
     
     if (!obj && count < 1) {
       // note: only delete lock if no client is remaining to claim it
-      // No other connections waiting for lock with key, so we deleted the lock
-      // delete locks[key];
+      // we add a timestamp telling us the the time the
+      lck.timestampEmptied = Date.now();
     }
     
     if (!obj) {
@@ -906,7 +907,6 @@ export class Broker {
       
       this.emitter.emit('warning', `implementation error, bad data sent to broker => ${util.inspect(data)}`);
       
-      // if this timeout happens, then we can no longer cross-verify uuid's
       if (locks.has(key)) {
         
         let lckTemp = locks.get(key);
@@ -918,7 +918,8 @@ export class Broker {
           notifyList.push(obj.uuid, obj);
         }
         
-        notifyList.forEach((lqv: LinkedQueueValue) => {
+        // get the first 5, ideally we'd mix requests from different clients/ws
+        notifyList.deq(5).forEach((lqv: LinkedQueueValue) => {
           const obj = lqv.value;
           self.send(obj.ws, {
             key: data.key,
@@ -961,11 +962,48 @@ export class Broker {
     
   }
   
+  cleanUpLocks() {
+    
+    this.lockCounts = 0;
+    const now = Date.now();
+    this.locks.forEach((v, k) => {
+      
+      if (!v.timestampEmptied) {
+        // timestampEmptied is probably null
+        return;
+      }
+      
+      if (now - v.timestampEmptied < 2000) {   // 21600000
+        // 6 hours has not transpired since last emptied
+        return;
+      }
+      
+      const notify = v.notify.getLength();
+      const count = Object.keys(v.lockholders).length;
+      
+      if (count < 1 && notify < 1) {
+        // we delete the lock object because it hasn't been used in a while
+        log.info(chalk.yellow('deleted lock object with key:'), k);
+        this.locks.delete(k);
+      }
+      
+    });
+  }
+  
   lock(data: any, ws: net.Socket) {
     
     const key = data.key;
     const keepLocksAfterDeath = Boolean(data.keepLocksAfterDeath);
     const lck = this.locks.get(key);
+    
+    if (lck) {
+      lck.timestampEmptied = null;
+    }
+    
+    if (++this.lockCounts > 29999) {  // 29999
+      this.cleanUpLocks();
+    }
+    
     const uuid = data.uuid;
     const pid = data.pid;
     const max = data.max;  // max lockholders
@@ -1128,7 +1166,8 @@ export class Broker {
         key,
         notify: new LinkedQueue(),
         to: null as Timer,
-        writerFlag: false
+        writerFlag: false,
+        timestampEmptied: null
       });
       
       const lckTemp = this.locks.get(key);
