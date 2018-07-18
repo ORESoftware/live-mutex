@@ -962,7 +962,7 @@ export class Broker {
     
   }
   
-  cleanUpLocks() {
+  cleanUpLocks() : void {
     
     this.lockCounts = 0;
     const now = Date.now();
