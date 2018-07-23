@@ -1000,7 +1000,8 @@ export class Broker {
       lck.timestampEmptied = null;
     }
     
-    if (++this.lockCounts > 29999) {  // 29999
+    if (++this.lockCounts > 29999) {
+      // we look into cleaning up old locks every 30,000 lock requests
       this.cleanUpLocks();
     }
     
