@@ -66,20 +66,23 @@ more developer friendly. Enter live-mutex.
 See: `docs/detailed-explanation.md` and `docs/about.md`
 
 <br>
+<br>
 
 # Installation
 
-For command line tools:
+##### For command line tools:
 
-#### ```$ npm install -g live-mutex```
+>
+>```$ npm install -g live-mutex```
+>
 
-For usage with Node.js libraries:
+##### For usage with Node.js libraries:
 
-#### ```$ npm install live-mutex --save```
-
+>
+>```$ npm install live-mutex --save```
+>
 
 <br>
-
 
 # Basic Usage and Best Practices
 
