@@ -12,6 +12,12 @@
     <img align="right" alt="CircleCI Build Status" src="https://circleci.com/gh/ORESoftware/live-mutex.png?circle-token=8ee83a1b06811c9a167e71d12b52f8cf7f786581">
 </a>
 
+<br>
+
+[![Version](https://img.shields.io/npm/v/live-mutex.svg?colorB=green)](https://www.npmjs.com/package/live-mutex)
+
+<br>
+
 
 # Live-Mutex / LMX
 
