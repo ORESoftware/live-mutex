@@ -52,7 +52,7 @@ let onFinish = function () {
 };
 
 process.once('SIGINT', onFinish);
-setTimeout(onFinish, 1000000);
+setTimeout(onFinish, 10000000);
 
 new Broker({port: multi_process_port}).ensure(function (err, b) {
 
@@ -65,7 +65,7 @@ new Broker({port: multi_process_port}).ensure(function (err, b) {
     process.exit(1);
   });
 
-  async.timesLimit(20, 9, function (n, cb) {
+  async.timesLimit(20, 6, function (n, cb) {
 
     const k = cp.spawn('node', [p], {
       env: Object.assign({}, process.env, {

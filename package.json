@@ -1,6 +1,6 @@
 {
   "name": "live-mutex",
-  "version": "0.1.1054",
+  "version": "0.1.1055",
   "description": "Simple mutex that uses a TCP server; useful if you cannot install Redis, etc.",
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
@@ -19,7 +19,7 @@
     "postinstall": "./assets/postinstall.sh"
   },
   "r2g": {
-    "test": "npm link suman && suman --"
+    "test": "npm link suman && suman --default"
   },
   "repository": {
     "type": "git",
@@ -32,7 +32,7 @@
   },
   "homepage": "https://github.com/ORESoftware/live-mutex#readme",
   "dependencies": {
-    "@oresoftware/linked-queue": "0.1.102",
+    "@oresoftware/linked-queue": "0.1.103",
     "chalk": "^2.4.1",
     "tcp-ping": "^0.1.1",
     "uuid": "^3.1.0"

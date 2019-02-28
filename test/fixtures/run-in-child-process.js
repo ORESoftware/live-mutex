@@ -3,6 +3,7 @@
 
 const {Client} = require('live-mutex');
 const async = require('async');
+const chalk = require('chalk');
 
 let times = 10;
 let keys = [];
@@ -12,7 +13,7 @@ for (let i = 0; i < times; i++) {
 }
 
 let min = 5;
-let max = 1900;
+let max = 11900;
 
 
 process.on('warning', function (e) {
@@ -27,7 +28,6 @@ const client = new Client({port}, function (err, c) {
     throw err;
   }
 
-
   c.emitter.on('warning', function (v) {
     console.error('client warning',...arguments);
   });
@@ -37,7 +37,7 @@ const client = new Client({port}, function (err, c) {
   });
 
 
-  async.timesLimit(1000, 140, function (n, cb) {
+  async.timesLimit(10000, 140, function (n, cb) {
 
     let randomKey = keys[Math.floor(Math.random() * keys.length)];
     console.log('count', n, 'randomKey', randomKey);
@@ -45,6 +45,7 @@ const client = new Client({port}, function (err, c) {
     client.lock(randomKey, function (err, unlock) {
 
       if (err && String(err.stack || err.message || err).match(/lock request timed out/ig)) {
+        console.error(chalk.red('lock request timed out for key:'), randomKey);
         return cb(null);
       }
 

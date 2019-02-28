@@ -1,8 +1,18 @@
 #!/usr/bin/env bash
 
-get_latest_lmx(){
-  . "$HOME/.oresoftware/bash/lmx.sh";
+
+all_export="yep";
+
+if [[ ! "$SHELLOPTS" =~ "allexport" ]]; then
+    all_export="nope";
+    set -a;
+fi
+
+
+lmx_get_latest(){
+  . "$BASH_SOURCE";
 }
+
 
 lmx(){
 
@@ -57,5 +67,7 @@ lmx(){
 
 }
 
-export -f lmx;
-export -f get_latest_lmx;
+
+if [ "$all_export" == "nope" ]; then
+  set +a;
+fi

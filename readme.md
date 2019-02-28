@@ -1,4 +1,23 @@
-[![Build Status](https://travis-ci.org/ORESoftware/live-mutex.svg?branch=master)](https://travis-ci.org/ORESoftware/live-mutex)
+
+
+:lock: + :unlock:
+
+<a align="right" href="https://travis-ci.org/ORESoftware/live-mutex">
+    <img align="right" alt="Travis Build Status" src="https://travis-ci.org/ORESoftware/live-mutex.svg?branch=master">
+</a>
+
+<br>
+
+<a align="right" href="https://circleci.com/gh/ORESoftware/live-mutex">
+    <img align="right" alt="CircleCI Build Status" src="https://circleci.com/gh/ORESoftware/live-mutex.png?circle-token=8ee83a1b06811c9a167e71d12b52f8cf7f786581">
+</a>
+
+<br>
+
+[![Version](https://img.shields.io/npm/v/live-mutex.svg?colorB=green)](https://www.npmjs.com/package/live-mutex)
+
+<br>
+
 
 # Live-Mutex / LMX
 
@@ -9,7 +28,8 @@ Tested and proven on Node.js versions >= 6.0.0.
 
 ## About
 
-* Live-Mutex is a non-distributed mutex for synchronization across multiple processes/threads.
+* Written in TypeScript for maintainability and ease of use by users.
+* Live-Mutex is a non-distributed mutex/semaphore for synchronization across multiple processes/threads.
 * Non-distributed means no failover if the broker goes down, but the upside is higher-performance.
 * By default, a binary semaphore, but can be used to create a non-binary semaphore, where multiple lockholders can hold a lock, for example, to do some form of rate limiting.
 * Live-Mutex can use either TCP or Unix Domain Sockets (UDS) to create an evented (non-polling) networked mutex API.
@@ -31,12 +51,15 @@ To use UDS, pass in "udsPath" to the client and broker constructors. Otherwise f
 <br>
 
 ## Basic Metrics
-On Linux/Ubuntu, if we feed live-mutex 10,000 lock requests, 20 concurrently, live-mutex can go through all 10,000 lock/unlock cycles
-in less than 2 seconds, which means at least 5 lock/unlock cycles per millisecond.
+On Linux/Ubuntu, if we feed live-mutex 10,000 lock requests, 20 concurrently, LMX can go through all 10,000 lock/unlock cycles
+in less than 2 seconds, which means at least 5 lock/unlock cycles per millisecond. That's with TCP. Using Unix Domain Sockets (for use on a single machine),
+LMX can reach at least 8.5 lock/unlock cycles per millisecond, about 30% more performant than TCP.
+
+<br>
 
 ## Rationale
 I used a couple of other libraries and they required manual retry logic and they used polling under the hood to acquire locks.
-It was difficult to fine tune those libraries and they were extremely slow for high lock request concurrency. <br>
+It was difficult to finetune those libraries and they were extremely slow for high lock request concurrency. <br>
 Other libraries are stuck with polling for simple reasons - the filesystem is dumb, and so is Redis (unless you write some <br>
 Lua scripts that can run on there - I don't know of any libraries that do that).
 
@@ -49,20 +72,23 @@ more developer friendly. Enter live-mutex.
 See: `docs/detailed-explanation.md` and `docs/about.md`
 
 <br>
+<br>
 
 # Installation
 
-For command line tools:
+##### For command line tools:
 
-#### ```$ npm install -g live-mutex```
+>
+>```$ npm install -g live-mutex```
+>
 
-For usage with Node.js libraries:
+##### For usage with Node.js libraries:
 
-#### ```$ npm install live-mutex --save```
-
+>
+>```$ npm install live-mutex --save```
+>
 
 <br>
-
 
 # Basic Usage and Best Practices
 
@@ -73,7 +99,7 @@ there is nothing wrong with that. For any given key there should be only one bro
 brokers (in separate Node.js processes) for separate keys, but that's not really very necessary.
 Unix Domain Sockets are about 10-50% faster than TCP, depending on how well-tuned TCP is on your system.
 
-Three things to remember:
+<b> Things to keep in mind: </b>
 
 1. You need to initialize a broker before connecting any clients, otherwise your clients will pass back an error upon calling `connect()`.
 2. You need to call `ensure()/connect()` on a client or use the asynchronous callback passed to the constructor, before calling `client.lock()` or `client.unlock()`.
@@ -134,10 +160,14 @@ import {Client, Broker} from 'live-mutex';
 import {LMXClient, LMXBroker} from 'live-mutex';
 ```
 
+<br>
+
 # Simple example
 
 To see a *complete* and *simple* example of using a broker and client in the same process, see: `=> docs/examples/simple.md`
 
+
+<br>
 
 ### A note on default behavior
 
@@ -151,6 +181,8 @@ to implement automatic retries for unlocking, please file an ticket.
 
 As explained in a later section, by default this library uses <i>binary semaphores</i>, which means only one lockholder per key at a time.
 If you want more than one lockholder to be able hold the lock for a certain key at time, use `{max:x}` where x is an integer greater than 1.
+
+<br>
 
 
 ### Using the library with Promises (recommended usage)
@@ -172,6 +204,8 @@ const opts = {port: '<port>' , host: '<host>'};
 
 ```
 
+<br>
+
 #### Using vanilla callbacks (higher performance + easy to use convenience unlock function)
 
 ```js
@@ -183,6 +217,8 @@ client.ensure(err => {
    });
 });
 ```
+
+<br>
 
 #### If you want the key and request id, use:
 
@@ -203,6 +239,8 @@ client.ensure(err => {
 
 <b>note:</b> using the id ensures that the unlock call corresponds with the original corresponding lock call otherwise what could happen in your program is that you could call
 unlock() for a key/id that was not supposed to be unlocked by your current call.
+
+<br>
 
 
 ### Using the unlock convenience callback with promises:
@@ -268,6 +306,7 @@ You must either pass the lock id, or use force, to unlock a lock:
 Although using the lock id is preferred, `{force:true}` is acceptable, and imperative if you need to unlock from a different process,
 where you won't easily have access to the lock id from another process.
 
+<br>
 
 ## Client constructor and client.lock() method options
 
@@ -331,6 +370,8 @@ client.lock/unlock call.
 ### Usage with RxJS5 Observables
  => see `docs/examples/observables.md`
 
+
+<br>
 
 
 ## Non-binary mutex/semaphore
