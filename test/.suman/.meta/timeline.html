@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>
+    Title
+  </title>
+  <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+</head>
+<body>
+
+
+<script type="text/javascript">
+
+  google.charts.load("current", {packages: ["timeline"]});
+  google.charts.setOnLoadCallback(drawChart);
+
+  function drawChart() {
+    var container = document.getElementById('suman-test-timeline');
+    var chart = new google.visualization.Timeline(container);
+    var dataTable = new google.visualization.DataTable();
+
+    dataTable.addColumn({type: 'string', id: 'Term'});
+    dataTable.addColumn({type: 'string', id: 'Name'});
+    dataTable.addColumn({type: 'date', id: 'Start'});
+    dataTable.addColumn({type: 'date', id: 'End'});
+
+    let tasksRaw = JSON.parse('[{"startDate":1538284062221,"endDate":1538284063543,"transformStartDate":1538284062123,"transformEndDate":1538284062210,"taskName":"alphabet3.test.ts","status":"SUCCEEDED"},{"startDate":1538284062231,"endDate":1538284075807,"transformStartDate":1538284062115,"transformEndDate":1538284062222,"taskName":"alphabet2.test.ts","status":"SUCCEEDED"},{"startDate":1538284062245,"endDate":1538284074434,"transformStartDate":1538284062119,"transformEndDate":1538284062234,"taskName":"alphabet.test.ts","status":"SUCCEEDED"},{"startDate":1538284062341,"endDate":1538284074199,"transformStartDate":1538284062212,"transformEndDate":1538284062333,"taskName":"errors.test.ts","status":"SUCCEEDED"},{"startDate":1538284062352,"endDate":1538284067238,"transformStartDate":1538284062236,"transformEndDate":1538284062342,"taskName":"general.test.ts","status":"SUCCEEDED"},{"startDate":1538284062372,"endDate":1538284063368,"transformStartDate":1538284062223,"transformEndDate":1538284062358,"taskName":"four-promise.test.ts","status":"SUCCEEDED"},{"startDate":1538284062548,"endDate":1538284066944,"transformStartDate":1538284062334,"transformEndDate":1538284062507,"taskName":"one.test.ts","status":"SUCCEEDED"},{"startDate":1538284062589,"endDate":1538284067038,"transformStartDate":1538284062343,"transformEndDate":1538284062548,"taskName":"one.unix.domain.sockets.test.ts","status":"SUCCEEDED"},{"startDate":1538284063382,"endDate":1538284063953,"transformStartDate":1538284062360,"transformEndDate":1538284062593,"taskName":"promises.test.ts","status":"SUCCEEDED"},{"startDate":1538284063546,"endDate":1538284063922,"transformStartDate":1538284062508,"transformEndDate":1538284062763,"taskName":"rw-lock.test.ts","status":"SUCCEEDED"},{"startDate":1538284063926,"endDate":1538284075504,"transformStartDate":1538284062549,"transformEndDate":1538284062964,"taskName":"semaphore.test.ts","status":"SUCCEEDED"},{"startDate":1538284063956,"endDate":1538284064417,"transformStartDate":1538284062594,"transformEndDate":1538284063065,"taskName":"ts.test.ts","status":"SUCCEEDED"},{"startDate":1538284064420,"endDate":1538284068383,"transformStartDate":1538284062763,"transformEndDate":1538284063072,"taskName":"two.test.ts","status":"SUCCEEDED"},{"startDate":1538284066952,"endDate":1538284067431,"transformStartDate":1538284062964,"transformEndDate":1538284063223,"taskName":"z.test.ts","status":"SUCCEEDED"}]');
+
+    let tasks = [];
+    let colors = [];
+
+    tasksRaw.forEach(function (t, i) {
+
+      // we have two separate tasks per item, one for transform, one for run
+      if (t.transformStartDate && t.transformEndDate) {
+        tasks.push([
+          String(i + 1),
+          t.taskName,
+          new Date(t.transformStartDate),
+          new Date(t.transformEndDate),
+        ]);
+      }
+
+      if (t.startDate && t.endDate) {
+
+        if (t.status === 'FAILED') {
+          colors.push('yellow');
+        }
+        else if (t.status === 'SUCCEEDED') {
+          colors.push('green');
+        }
+        else {
+          colors.push('blue');
+        }
+
+        tasks.push([
+          String(i + 1),
+          t.taskName,
+          new Date(t.startDate),
+          new Date(t.endDate)
+        ]);
+      }
+    });
+
+    dataTable.addRows(tasks);
+
+    // dataTable.addRows([
+    //   ['1', 'George Washington', new Date(1789, 3, 30), new Date(1797, 2, 4)],
+    //   ['2', 'John Adams', new Date(1797, 2, 4), new Date(1801, 2, 4)],
+    //   ['3', 'Thomas Jefferson', new Date(1801, 2, 4), new Date(1809, 2, 4)]
+    // ]);
+
+    var options = {
+      colors: colors
+      // timeline: { singleColor: '#8d8' },
+    };
+
+    chart.draw(dataTable, options);
+  }
+
+
+</script>
+
+<div id="suman-test-timeline" style="height: 900px;"></div>
+
+</body>
+</html>

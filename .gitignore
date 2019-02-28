@@ -6,9 +6,8 @@ node_modules
 coverage
 .nyc_output
 .vscode
-dist/*
-test/@target
-test/.suman/.meta
+dist
+@target
 
 ### matching
 *.log
@@ -16,7 +15,6 @@ test/.suman/.meta
 *.DS_Store
 
 ### files
-package-lock.json
 yarn.lock
 
 ### matching

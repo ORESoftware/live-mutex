@@ -3,7 +3,7 @@
   "alwaysReinstall": false,
   "alwaysRelink": false,
   "searchRoots": [
-    "$HOME/WebstormProjects/oresoftware"
+    "../.."
   ],
   "ignore": [
     "/node_modules/",

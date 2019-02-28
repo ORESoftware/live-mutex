@@ -1,4 +1,4 @@
 
 
 const {Broker} = require('live-mutex');
-new Broker({port: 7987}).ensure();
+new Broker({udsPath: process.env.HOME+ '/uds.temp.sock'}).ensure();
