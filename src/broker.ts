@@ -525,8 +525,9 @@ export class Broker {
         
         wss.once('error', reject);
         
-        let cnkt: any = self.socketFile || self.port;
-        wss.listen(cnkt, () => {
+        let cnkt: any = self.socketFile ? [self.socketFile] : [self.port, self.host];
+        
+        wss.listen(...cnkt, () => {
           
           self.isOpen = true;
           clearTimeout(to);

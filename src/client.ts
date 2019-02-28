@@ -437,9 +437,9 @@ export class Client {
           reject('[lmx] err: client connection timeout after 2000ms.');
         }, 3000);
         
-        let cnkt: any = self.socketFile || {port: self.port};
+        let cnkt: any = self.socketFile ? [self.socketFile] : [self.port, self.host];
         
-        ws = net.createConnection(cnkt, () => {
+        ws = net.createConnection(...cnkt, () => {
           self.isOpen = true;
           clearTimeout(to);
           ws.removeListener('error', onFirstErr);
