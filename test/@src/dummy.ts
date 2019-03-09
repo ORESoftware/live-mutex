@@ -1,10 +1,10 @@
 'use strict';
 
-const async = require('async');
-const {lmUtils} = require('live-mutex');
-const {Broker, Client} = require('live-mutex');
+import async = require('async');
+import {lmUtils} from 'live-mutex';
+import {Broker, Client} from 'live-mutex';
 const conf = Object.freeze({port: 6970});
-const util = require('util');
+import util = require('util');
 
 process.on('unhandledRejection', function (e) {
   console.error('unhandledRejection => ', e.stack || e);

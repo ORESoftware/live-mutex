@@ -3,6 +3,7 @@
 
 import {Client, log, validConstructorOptions, validLockOptions} from "./client";
 import chalk from "chalk";
+import util = require('util');
 const index = process.argv.indexOf('--json');
 let v = null as any;
 
@@ -44,12 +45,12 @@ process.once('error' as any, function (e: any) {
 });
 
 process.once('unhandledRejection', function (e: any) {
-  log.error('unhandledRejection:', e && e.message || e);
+  log.error('unhandledRejection:', chalk.magenta(util.inspect(e)));
   process.exit(1);
 });
 
 process.once('uncaughtException', function (e: any) {
-  log.error('uncaughtException:', e && e.message || e);
+  log.error('uncaughtException:', chalk.magenta(util.inspect(e)));
   process.exit(1);
 });
 
