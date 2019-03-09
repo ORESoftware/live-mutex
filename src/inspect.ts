@@ -31,12 +31,20 @@ s.pipe(createParser()).on('data', function (d: any) {
   process.stdout.write(prompt);
 });
 
-const acceptableCommands = {
+const acceptableCommands = <{
+  [index:string]: boolean,
+  'lockcount': true,
+  'clientcount': true,
+  'clear': true,
+  'help': true
+}>{
   'lockcount': true,
   'clientcount': true,
   'clear': true,
   'help': true
 };
+
+
 
 const prompt = chalk.blueBright(`(${host}:${port})`) + chalk.blueBright.bold(` lmx > `);
 

@@ -28,8 +28,8 @@ Tested and proven on Node.js versions >= 6.0.0.
 
 ## About
 
-* Written in TypeScript for maintainability and ease of use by users.
-* Live-Mutex is a non-distributed mutex/semaphore for synchronization across multiple processes/threads.
+* Written in TypeScript for maintainability and ease of use.
+* Live-Mutex is a *non-distributed* networked mutex/semaphore for synchronization across multiple processes/threads.
 * Non-distributed means no failover if the broker goes down, but the upside is higher-performance.
 * By default, a binary semaphore, but can be used to create a non-binary semaphore, where multiple lockholders can hold a lock, for example, to do some form of rate limiting.
 * Live-Mutex can use either TCP or Unix Domain Sockets (UDS) to create an evented (non-polling) networked mutex API.
@@ -88,6 +88,14 @@ See: `docs/detailed-explanation.md` and `docs/about.md`
 >```$ npm install live-mutex --save```
 >
 
+##### Docker image for the broker
+
+>
+>  docker pull oresoftware/live-mutex-broker:latest
+>
+>  docker run -p 6970:6970 -it oresoftware/live-mutex-broker:latest
+> 
+
 <br>
 
 # Basic Usage and Best Practices
@@ -116,10 +124,11 @@ Unix Domain Sockets are about 10-50% faster than TCP, depending on how well-tune
 
 <br>
 
-# Examples
+# Client Examples
 
 ## Using shell / command line:
 
+(First, make sure you install the library as a global package with NPM). 
 The real power of this library comes with usage with Node.js, but we can use this functionality at the command line too:
 
 ```bash
@@ -166,7 +175,6 @@ import {LMXClient, LMXBroker} from 'live-mutex';
 
 To see a *complete* and *simple* example of using a broker and client in the same process, see: `=> docs/examples/simple.md`
 
-
 <br>
 
 ### A note on default behavior
@@ -191,16 +199,16 @@ If you want more than one lockholder to be able hold the lock for a certain key 
 const opts = {port: '<port>' , host: '<host>'};
 // check to see if the websocket broker is already running, if not, launch one in this process
 
- const client = new Client(opts);
+const client = new Client(opts);
 
- // calling ensure before each critical section means that we ensure we have a connected client
- // for shorter lived applications, calling ensure more than once is not as important
+// calling ensure before each critical section means that we ensure we have a connected client
+// for shorter lived applications, calling ensure more than once is not as important
 
- return client.ensure().then(c =>  {   // (c is the same object as client)
-    return c.acquire('<key>').then(({key,id}) => {
-        return c.release('<key>', id);
-     });
+return client.ensure().then(c =>  {   // (c is the same object as client)
+ return c.acquire('<key>').then(({key,id}) => {
+    return c.release('<key>', id);
  });
+});
 
 ```
 
@@ -283,6 +291,7 @@ You must either pass the lock id, or use force, to unlock a lock:
 ```
 
 <b> works:</b>
+
 ```js
  return client.ensure().then(c =>  {   // (c is the same object as client)
     return c.acquire('<key>').then(({key,id}) => {
@@ -425,21 +434,21 @@ to see if the web-socket server is running somewhere. I have had a lot of luck w
 
 ```js
 
-  const ping = require('tcp-ping');
+const ping = require('tcp-ping');
 
-  ping.probe(host, port, function (err, available) {
+ping.probe(host, port, function (err, available) {
 
-        if (err) {
-            // handle it
-        }
-        else if (available) {
-            // tcp server is already listening on the given host/port
-        }
-        else {
-           // nothing is listening so you should launch a new server/broker, as stated above
-           // the broker can run in the same process as a client, or a separate process, either way
-        }
-    });
+    if (err) {
+        // handle it
+    }
+    else if (available) {
+        // tcp server is already listening on the given host/port
+    }
+    else {
+       // nothing is listening so you should launch a new server/broker, as stated above
+       // the broker can run in the same process as a client, or a separate process, either way
+    }
+});
 
 
 ```
