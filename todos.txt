@@ -25,3 +25,9 @@ similar to unlock-requestors being able to force unlock even if they don't have 
  just plummets, whereas LM stays fairly linear. There's a tremendous difference there, night and day.
  It's just a matter of how much concurrency you need. If you need a really high level of concurrency for your locking,
  LM is way way better.
+
+ use:
+
+  "name": "@oresoftware/json-stream-parser",
+   "version": "0.0.1008",
+

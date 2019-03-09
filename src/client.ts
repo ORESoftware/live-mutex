@@ -16,9 +16,9 @@ import {forDebugging} from './shared-internal';
 const debugLog = process.argv.indexOf('--lmx-debug') > 0;
 
 export const log = {
-  info: console.log.bind(console, chalk.gray.bold('[lmx info]')),
-  warn: console.error.bind(console, chalk.magenta.bold('[lmx warning]')),
-  error: console.error.bind(console, chalk.red.bold('[lmx error]')),
+  info: console.log.bind(console, chalk.gray.bold('lmx info:')),
+  warn: console.error.bind(console, chalk.magenta.bold('lmx warning:')),
+  error: console.error.bind(console, chalk.red.bold('lmx error:')),
   debug: function (...args: any[]) {
     if (debugLog) {
       let newTime = Date.now();
@@ -151,7 +151,6 @@ export interface LMUnlockSuccessData {
   id: string
 }
 
-
 export type EVCallback = (err?: any, val?: any) => void;
 
 export interface LMClientLockCallBack {
@@ -161,7 +160,6 @@ export interface LMClientLockCallBack {
 export interface LMClientUnlockCallBack {
   (err: LMXClientUnlockException, v?: LMUnlockSuccessData): void
 }
-
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
@@ -186,7 +184,7 @@ export class Client {
   write: (data: any, cb?: Function) => void;
   isOpen: boolean;
   close: Function;
-  lockQueues = {}  as { [key: string]: Array<any> };
+  lockQueues = {} as { [key: string]: Array<any> };
   keepLocksAfterDeath = false;
   keepLocksOnExit = false;
   emitter = new EventEmitter();
@@ -313,7 +311,6 @@ export class Client {
       }
     });
     
-    
     this.write = (data: any, cb?: Function) => {
       
       if (!ws) {
@@ -434,11 +431,13 @@ export class Client {
         };
         
         let to = setTimeout(function () {
-          reject('[lmx] err: client connection timeout after 2000ms.');
+          reject('[lmx] err: client connection timeout after 3000ms.');
         }, 3000);
         
-        let cnkt: any = self.socketFile ? [self.socketFile] : [self.port, self.host];
+        let cnkt: Array<any> = self.socketFile ? [self.socketFile] : [self.port, self.host];
         
+        
+        // @ts-ignore
         ws = net.createConnection(...cnkt, () => {
           self.isOpen = true;
           clearTimeout(to);
@@ -451,34 +450,34 @@ export class Client {
         }
         
         ws.setEncoding('utf8')
-        .once('end', () => {
-          this.emitter.emit('warning', '[lmx] => client stream "end" event occurred.');
-        })
-        .once('error', onFirstErr)
-        .once('close', () => {
-          self.isOpen = false;
-        })
-        .on('error', (e) => {
-          self.isOpen = false;
-          this.emitter.emit('warning', '[lmx] client error => ' + e.message || util.inspect(e));
-        })
-        .pipe(createParser())
-        .on('data', onData)
-        .once('error', function (e: any) {
-          self.write({error: String(e && e.stack || e)}, function () {
-            ws.end();
+          .once('end', () => {
+            this.emitter.emit('warning', '[lmx] => client stream "end" event occurred.');
+          })
+          .once('error', onFirstErr)
+          .once('close', () => {
+            self.isOpen = false;
+          })
+          .on('error', (e) => {
+            self.isOpen = false;
+            this.emitter.emit('warning', '[lmx] client error => ' + e.message || util.inspect(e));
+          })
+          .pipe(createParser())
+          .on('data', onData)
+          .once('error', function (e: any) {
+            self.write({error: String(e && e.stack || e)}, function () {
+              ws.end();
+            });
           });
-        });
       })
       // if the user passes a callback, we fire the callback here
-      .then(val => {
-          cb && cb.call(self, null, val);
-          return val;
-        },
-        err => {
-          cb && cb.call(self, err);
-          return Promise.reject(err);
-        });
+        .then(val => {
+            cb && cb.call(self, null, val);
+            return val;
+          },
+          err => {
+            cb && cb.call(self, err);
+            return Promise.reject(err);
+          });
     };
     
     process.once('exit', () => {
@@ -551,7 +550,7 @@ export class Client {
   
   lockp(key: string, opts?: Partial<LMXClientLockOpts>): Promise<LMLockSuccessData> {
     return new Promise((resolve, reject) => {
-      this.lock(key, opts, function (err, val) {
+      this.lock(key, opts, (err, val) => {
         err ? reject(err) : resolve(val);
       });
     });
@@ -559,7 +558,7 @@ export class Client {
   
   unlockp(key: string, opts?: Partial<LMXClientUnlockOpts>): Promise<LMUnlockSuccessData> {
     return new Promise((resolve, reject) => {
-      this.unlock(key, opts, function (err, val) {
+      this.unlock(key, opts, (err, val) => {
         err ? reject(err) : resolve(val);
       });
     });
@@ -809,17 +808,11 @@ export class Client {
       throw err;
     }
     
-    
     if (process.domain) {
       cb = process.domain.bind(cb as any);
     }
     
-    // if (rawLockCount - unlockCount > 5) {
-    //   this.lockQueues[key].unshift([key, opts, cb]);
-    // }
-    // else {
     this.lockInternal(key, opts, cb);
-    // }
     
   }
   
@@ -1005,7 +998,6 @@ export class Client {
         
         return;
       }
-      
       
       this.fireLockCallbackWithError(cb, new LMXClientLockException(
         key,

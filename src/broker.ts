@@ -21,9 +21,9 @@ import {forDebugging} from './shared-internal';
 const debugLog = process.argv.indexOf('--lmx-debug') > 0 || process.env.lmx_debug === 'yes';
 
 export const log = {
-  info: console.log.bind(console, chalk.gray.bold('[lmx broker info]')),
-  error: console.error.bind(console, chalk.red.bold('[lmx broker error]')),
-  warn: console.error.bind(console, chalk.yellow.bold('[lmx broker warning]')),
+  info: console.log.bind(console, chalk.gray.bold('lmx broker info:')),
+  error: console.error.bind(console, chalk.red.bold('lmx broker error:')),
+  warn: console.error.bind(console, chalk.yellow.bold('lmx broker warning:')),
   debug: function (...args: any[]) {
     if (debugLog) {
       let newTime = Date.now();

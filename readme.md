@@ -28,8 +28,8 @@ Tested and proven on Node.js versions >= 6.0.0.
 
 ## About
 
-* Written in TypeScript for maintainability and ease of use by users.
-* Live-Mutex is a non-distributed mutex/semaphore for synchronization across multiple processes/threads.
+* Written in TypeScript for maintainability and ease of use.
+* Live-Mutex is a *non-distributed* networked mutex/semaphore for synchronization across multiple processes/threads.
 * Non-distributed means no failover if the broker goes down, but the upside is higher-performance.
 * By default, a binary semaphore, but can be used to create a non-binary semaphore, where multiple lockholders can hold a lock, for example, to do some form of rate limiting.
 * Live-Mutex can use either TCP or Unix Domain Sockets (UDS) to create an evented (non-polling) networked mutex API.
