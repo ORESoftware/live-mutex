@@ -26,6 +26,7 @@ RUN sudo chmod -R 777  /home/node
 #RUN sudo chown -R $(whoami) /usr/local/lib
 #RUN sudo chown -R $(whoami) /usr/local/etc
 
+RUN npm set unsafe-perm true
 RUN npm set cache-min 9999999
 RUN npm set progress=false
 
