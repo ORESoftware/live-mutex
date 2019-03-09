@@ -10,15 +10,11 @@
     <img align="right" alt="CircleCI Build Status" src="https://circleci.com/gh/ORESoftware/live-mutex.png?circle-token=8ee83a1b06811c9a167e71d12b52f8cf7f786581">
 </a>
 
-
 <br>
 
-<img align="right" alt="CircleCI Build Status" src="https://img.shields.io/npm/v/live-mutex.svg?colorB=green">
-
-
-<p align="right">
-[![Version](https://img.shields.io/npm/v/live-mutex.svg?colorB=green)](https://www.npmjs.com/package/live-mutex)
-</p>
+<a align="right" href="https://www.npmjs.com/package/live-mutex">
+<img align="right" alt="Latest NPM version" src="https://img.shields.io/npm/v/live-mutex.svg?colorB=green">
+</a>
 
 <br>
 
@@ -87,19 +83,19 @@ See: `docs/detailed-explanation.md` and `docs/about.md`
 
 # Installation
 
-##### For command line tools:
+##### <i> For command line tools: </i>
 
 >
 >```$ npm install -g live-mutex```
 >
 
-##### For usage with Node.js libraries:
+##### <i> For usage with Node.js libraries: </i>
 
 >
 >```$ npm install live-mutex --save```
 >
 
-##### Docker image for the broker
+##### <i> Docker image for the broker: </i>
 
 >
 >  `$ docker pull oresoftware/live-mutex-broker:latest`
@@ -384,11 +380,11 @@ client.lock/unlock call.
 
 
 ### Usage with Promises:
- => see `docs/examples/promises.md`
+> see: `docs/examples/promises.md`
 
 
 ### Usage with RxJS5 Observables
- => see `docs/examples/observables.md`
+> see: `docs/examples/observables.md`
 
 
 <br>
