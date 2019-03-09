@@ -1,7 +1,5 @@
 
 
-:lock: + :unlock:
-
 <a align="right" href="https://travis-ci.org/ORESoftware/live-mutex">
     <img align="right" alt="Travis Build Status" src="https://travis-ci.org/ORESoftware/live-mutex.svg?branch=master">
 </a>
@@ -18,8 +16,15 @@
 
 <br>
 
+------------------
 
-# Live-Mutex / LMX
+<p align="center">
+  <img src="https://raw.githubusercontent.com/oresoftware/media/master/namespaces/live-mutex/lmx-logo.png?x=33">
+</p>
+
+-------------------
+
+# Live-Mutex / LMX  :lock: + :unlock:
 
 ### Disclaimer
 
@@ -91,9 +96,9 @@ See: `docs/detailed-explanation.md` and `docs/about.md`
 ##### Docker image for the broker
 
 >
->  docker pull oresoftware/live-mutex-broker:latest
+>  `$ docker pull oresoftware/live-mutex-broker:latest`
 >
->  docker run -p 6970:6970 -it oresoftware/live-mutex-broker:latest
+>  `$ docker run -p 6970:6970 -it oresoftware/live-mutex-broker:latest`
 > 
 
 <br>
