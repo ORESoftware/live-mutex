@@ -30,8 +30,10 @@
 
 ### Disclaimer
 
-Tested on *nix and MacOS - (probably will work on Windows, but not tested on Windows). <br>
-Tested and proven on Node.js versions >= 6.0.0.
+>
+> Tested on *nix and MacOS - (probably will work on Windows, but not tested on Windows). <br>
+> Tested and proven on Node.js versions >= 6.0.0.
+>
 
 ## About
 
