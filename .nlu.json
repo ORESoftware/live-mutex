@@ -13,6 +13,7 @@
     "put any comment you want here"
   ],
   "list": [
+    "@oresoftware/json-stream-parser",
     "@oresoftware/linked-queue"
   ]
 }
