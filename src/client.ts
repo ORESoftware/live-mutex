@@ -364,6 +364,9 @@ export class Client {
       
       const fn = self.resolutions[uuid];
       const to = self.timeouts[uuid];
+  
+      delete self.timeouts[uuid];
+      delete self.resolutions[uuid]; // might be redundant
       
       if (fn && to) {
         this.emitter.emit('warning', 'Function and timeout both exist => Live-Mutex implementation error.');
@@ -371,7 +374,6 @@ export class Client {
       
       if (to) {
         this.emitter.emit('warning', 'Client side lock/unlock request timed-out.');
-        delete self.timeouts[uuid];
         if (data.acquired === true && data.type === 'lock') {
           self.write({uuid: uuid, _uuid, key: data.key, type: 'lock-received-rejected'});
         }
@@ -379,7 +381,6 @@ export class Client {
       }
       
       if (fn) {
-        // fn.call(this, null, data);
         fn.call(this, data.error, data);
         return;
       }
