@@ -221,6 +221,34 @@ return client.ensure().then(c =>  {   // (c is the same object as client)
 
 ```
 
+
+### Using async/await
+
+```typescript
+    const times = 10000;
+    const start = Date.now();
+    
+    async.timesLimit(times, 25, async n => {
+      
+      const {id, key} = await c.acquire('foo');
+      // do your thing here
+      return await c.release(key, id);
+      
+    }, err => {
+      
+      if (err) {
+        throw err;
+      }
+      
+      const diff = Date.now() - start;
+      console.log('Time required for live-mutex:', diff);
+      console.log('Lock/unlock cycles per millisecond:', Number(times / diff).toFixed(3));
+      process.exit(0);
+      
+    });
+
+```
+
 <br>
 
 #### Using vanilla callbacks (higher performance + easy to use convenience unlock function)
