@@ -82,10 +82,7 @@ class LMXClient:
 
     def send_message(self, d):
         data = (json.dumps(d) + '\n').encode()
-        # data=json.dumps(d)
-        logging.warning(data)
         self.s.sendall(data)
-        # self.s.sendall('bop'.encode())
 
     def connect(self):
         self.s.connect(('localhost', 6970))
@@ -110,7 +107,7 @@ class LMXClient:
         self.timeouts[str(call_id)] = None
         # self.resolutions[str(call_id)] = self.make_lock_acquired(cb)
         self.resolutions[str(call_id)] = self.make_lock_acquired
-        logging.warning(repr(self.resolutions))
+        # logging.warning(repr(self.resolutions))
         self.send_message(lock_data)
 
     def make_lock_acquired(self, cb, bar):
@@ -174,7 +171,7 @@ class LMXClient:
             if "error" not in d:
                 d["error"]=None
 
-            setattr(d,'error',None)
+            # setattr(d,'error',None)
 
             try:
                 print('about to run the func')
@@ -188,7 +185,7 @@ class LMXClient:
         print("nothing matched, hmmm")
 
     def listen_for_messages(self):
-        logging.warning('listening for socket messages...')
+        print('listening for socket messages...')
         rec = ''
         while self.connected is True:
             data = self.s.recv(10)
