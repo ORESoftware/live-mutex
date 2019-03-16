@@ -64,9 +64,9 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
     
     it.cb('locks/unlocks', t => {
 
-      const c = t.supply.client;
+      const c : Client = t.supply.client;
       
-      c.lock('a', 1100, function (err, v) {
+      c.lock('a', 1100,  (err, v) => {
         
         if (err) {
           return t.fail(err);

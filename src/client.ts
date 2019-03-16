@@ -184,7 +184,6 @@ export class Client {
   write: (data: any, cb?: Function) => void;
   isOpen: boolean;
   close: Function;
-  lockQueues = {} as { [key: string]: Array<any> };
   keepLocksAfterDeath = false;
   keepLocksOnExit = false;
   emitter = new EventEmitter();
@@ -605,41 +604,19 @@ export class Client {
   }
   
   protected fireUnlockCallbackWithError(cb: LMClientUnlockCallBack, err: LMXClientUnlockException) {
-    
     const uuid = err.id;
-    const key = err.key;
-    
+    const key = err.key; // unused
     this.cleanUp(uuid);
-    
-    try {
-      const v = this.lockQueues[key] && this.lockQueues[key].pop();
-      v && this.lockInternal.apply(this, v);
-    }
-    catch (err) {
-      this.emitter.emit('warning', err);
-    }
-    
     this.emitter.emit('warning', err.message);
-    cb(err);
+    cb(err, <LMUnlockSuccessData>{}); // need to pass empty object in case the user uses an object destructure call
   }
   
   protected fireLockCallbackWithError(cb: LMClientLockCallBack, err: LMXClientLockException) {
-    
     const uuid = err.id;
-    const key = err.key;
-    
+    const key = err.key;  // unused
     this.cleanUp(uuid);
-    
-    try {
-      const v = this.lockQueues[key] && this.lockQueues[key].pop();
-      v && this.lockInternal.apply(this, v);
-    }
-    catch (err) {
-      this.emitter.emit('warning', err.message);
-    }
-    
     this.emitter.emit('warning', err.message);
-    cb(err);
+    cb(err, <LMLockSuccessData>{}); // need to pass empty object in case the user uses an object destructure call
   }
   
   ls(opts: any, cb?: ErrFirstDataCallback) {
@@ -706,7 +683,7 @@ export class Client {
   // lock(key: string, cb: LMClientLockCallBack, z?: LMClientLockCallBack) : void;
   
   lock(key: string, cb: LMClientLockCallBack): void;
-  lock(key: string, opts: any, cb?: LMClientLockCallBack): void;
+  lock(key: string, opts: any, cb: LMClientLockCallBack): void;
   
   lock(key: string, opts: any, cb?: LMClientLockCallBack): void {
     
@@ -716,8 +693,7 @@ export class Client {
       lockCount: 0,
       unlockCount: 0
     };
-    
-    this.lockQueues[key] = this.lockQueues[key] || [];
+
     
     const rawLockCount = ++this.bookkeeping[key].rawLockCount;
     const unlockCount = this.bookkeeping[key].unlockCount;
@@ -749,29 +725,53 @@ export class Client {
         assert(opts['semaphore'] > 0, '"semaphore" options property must be a positive integer.');
       }
       
-      if (opts['force']) {
+      if ('force' in opts) {
         assert.equal(typeof opts.force, 'boolean', ' => Live-Mutex usage error => ' +
           '"force" option must be a boolean value. Coerce it on your side, for safety.');
       }
-      
-      if (opts['maxRetries']) {
-        assert(Number.isInteger(opts.maxRetries), '"retry" option must be an integer.');
+
+      if ('retry' in opts) {
+        assert.equal(typeof opts.force, 'boolean', ' => Live-Mutex usage error => ' +
+            '"retry" option must be a boolean value. Coerce it on your side, for safety.');
+        opts.__maxRetries = 0;
+      }
+
+      if ('maxRetries' in opts) {
+        assert(Number.isInteger(opts.maxRetries), '"maxRetries" option must be an integer.');
         assert(opts.maxRetries >= 0 && opts.maxRetries <= 20,
-          '"retry" option must be an integer between 0 and 20 inclusive.');
+          '"maxRetries" option must be an integer between 0 and 20 inclusive.');
+        if('__maxRetries' in opts){
+          assert.strictEqual(opts.__maxRetries, opts.maxRetries, 'maxRetries values do not match.');
+        }
+        opts.__maxRetries = opts.maxRetries;
       }
       
-      if (opts['maxRetry']) {
-        assert(Number.isInteger(opts.maxRetry), '"retry" option must be an integer.');
+      if ('maxRetry' in opts) {
+        assert(Number.isInteger(opts.maxRetry), '"maxRetry" option must be an integer.');
         assert(opts.maxRetry >= 0 && opts.maxRetry <= 20,
-          '"retry" option must be an integer between 0 and 20 inclusive.');
+          '"maxRetry" option must be an integer between 0 and 20 inclusive.');
+        if('__maxRetries' in opts){
+          assert.strictEqual(opts.__maxRetries, opts.maxRetry, 'maxRetries values do not match.');
+        }
+        opts.__maxRetries = opts.maxRetry;
       }
       
-      if (opts['retryMax']) {
-        assert(Number.isInteger(opts.retryMax), '"retry" option must be an integer.');
+      if ('retryMax' in opts) {
+        assert(Number.isInteger(opts.retryMax), '"retryMax" option must be an integer.');
         assert(opts.retryMax >= 0 && opts.retryMax <= 20,
-          '"retry" option must be an integer between 0 and 20 inclusive.');
+          '"retryMax" option must be an integer between 0 and 20 inclusive.');
+        if('__maxRetries' in opts){
+          assert.strictEqual(opts.__maxRetries, opts.retryMax, 'maxRetries values do not match.');
+        }
+        opts.__maxRetries = opts.retryMax;
       }
-      
+
+      if(!('__maxRetries' in opts)){
+        opts.__maxRetries = this.lockRetryMax;
+      }
+
+      assert(Number.isInteger(opts.__maxRetries), '__maxRetries value must be an integer.');
+
       if (opts['ttl']) {
         assert(Number.isInteger(opts.ttl),
           ' => Live-Mutex usage error => Please pass an integer representing milliseconds as the value for "ttl".');
@@ -832,10 +832,10 @@ export class Client {
     const uuid = opts._uuid = opts._uuid || UUID.v4();
     const ttl = opts.ttl || this.ttl;
     const lrt = opts.lockRequestTimeout || this.lockRequestTimeout;
-    const maxRetries = opts.maxRetry || opts.maxRetries || this.lockRetryMax;
+    const maxRetries = opts.__maxRetries;
     const retryCount = opts.__retryCount;
     const forceUnlock = opts.forceUnlock === true;
-    const noRetry = opts.retry === false;
+
     
     if (retryCount > maxRetries) {
       return cb(new LMXClientLockException(
@@ -863,14 +863,6 @@ export class Client {
       // noRetry
       if (newRetryCount >= maxRetries) {
         
-        try {
-          const v = this.lockQueues[key] && this.lockQueues[key].pop();
-          v && this.lockInternal.apply(this, v);
-        }
-        catch (err) {
-          this.emitter.emit('warning', err);
-        }
-        
         this.timeouts[uuid] = true;
         self.write({uuid, key, type: 'lock-client-timeout'});
         
@@ -895,14 +887,6 @@ export class Client {
     }, lrt);
     
     this.resolutions[uuid] = (err, data) => {
-      
-      try {
-        const v = this.lockQueues[key] && this.lockQueues[key].pop();
-        v && this.lockInternal.apply(this, v);
-      }
-      catch (err) {
-        this.emitter.emit('warning', err);
-      }
       
       if (timedOut) {
         return;
@@ -1095,22 +1079,13 @@ export class Client {
     const uuid = UUID.v4();
     const rwStatus = opts.rwStatus || null;
     const urt = opts.unlockRequestTimeout || this.unlockRequestTimeout;
-    
     let timedOut = false;
     
     this.timers[uuid] = setTimeout(() => {
       
       timedOut = true;
       this.timeouts[uuid] = true;
-      
-      try {
-        const v = this.lockQueues[key] && this.lockQueues[key].pop();
-        v && this.lockInternal.apply(this, v);
-      }
-      catch (err) {
-        this.emitter.emit('warning', err);
-      }
-      
+
       this.fireUnlockCallbackWithError(cb, new LMXClientUnlockException(
         key, uuid,
         LMXUnlockRequestError.BadOrMismatchedId,
@@ -1123,14 +1098,6 @@ export class Client {
       
       delete this.timeouts[uuid];
       clearTimeout(this.timers[uuid]);
-      
-      try {
-        const v = this.lockQueues[key] && this.lockQueues[key].pop();
-        v && this.lockInternal.apply(this, v);
-      }
-      catch (err) {
-        this.emitter.emit('warning', err.message);
-      }
       
       if (timedOut) {
         return;

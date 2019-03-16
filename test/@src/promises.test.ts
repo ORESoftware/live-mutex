@@ -59,8 +59,8 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
     const makePromiseProvider = function (unlock) {
       return function (input: string) {
         return new Promise(function (resolve, reject) {
-          unlock(function (err) {
-            err ? reject(err) : resolve();
+          unlock(function (err, v) {
+            err ? reject(err) : resolve(v);
           });
         });
       }
