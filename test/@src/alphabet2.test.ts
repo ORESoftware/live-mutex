@@ -16,8 +16,8 @@ Test.create(['lmUtils', (b, assert, before, describe, it, path, fs, inject, afte
   const original = 'abcdefghijklmnopqrstuvwxyz';
   const alphabet = original.split('');
   const result = [];
+  const port = process.env.lmx_port ? parseInt(process.env.lmx_port) : (7000 + parseInt(process.env.SUMAN_CHILD_ID || '1'));
 
-  const port = 7000 + parseInt(process.env.SUMAN_CHILD_ID || '1');
   const conf = Object.freeze({port});
 
 
@@ -35,7 +35,8 @@ Test.create(['lmUtils', (b, assert, before, describe, it, path, fs, inject, afte
   };
 
   inject(j => {
-    j.register('broker', new Broker(conf).ensure().then(handleEvents));
+    const brokerConf = Object.assign({}, conf, {noListen: process.env.lmx_broker_no_listen === 'yes'});
+    j.register('broker', new Broker(brokerConf).ensure().then(handleEvents));
   });
 
   describe('post', function (b) {

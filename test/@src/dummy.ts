@@ -3,7 +3,8 @@
 import async = require('async');
 import {lmUtils} from 'live-mutex';
 import {Broker, Client} from 'live-mutex';
-const conf = Object.freeze({port: 6970});
+const port = process.env.lmx_port ? parseInt(process.env.lmx_port) : (7000 + parseInt(process.env.SUMAN_CHILD_ID || '1'));
+const conf = Object.freeze({port});
 import util = require('util');
 
 process.on('unhandledRejection', function (e) {
@@ -13,8 +14,10 @@ process.on('unhandledRejection', function (e) {
 ///////////////////////////////////////////////////////////////////
 
 Promise.all([
-  new Broker(conf).ensure(),
-  // console.log(''),
+  ((() => {
+    const brokerConf = Object.assign({}, conf, {noListen: process.env.lmx_broker_no_listen === 'yes'});
+    return new Broker(conf).ensure()
+  })()),
   new Client(conf).ensure()
 ])
 .then(function ([b, c]) {
