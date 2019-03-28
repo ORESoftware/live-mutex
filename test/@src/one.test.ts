@@ -13,7 +13,7 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
 
   console.log('suman child id:',process.env.SUMAN_CHILD_ID);
 
-  const port = 7000 + parseInt(process.env.SUMAN_CHILD_ID || '1');
+  const port = process.env.lmx_port ? parseInt(process.env.lmx_port) : (7000 + parseInt(process.env.SUMAN_CHILD_ID || '1'));
   const conf = Object.freeze({port});
 
   const handleEvents = function (v) {
@@ -30,8 +30,9 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
   };
   
   inject(() => {
+    const brokerConf = Object.assign({}, conf, {noListen: process.env.lmx_broker_no_listen === 'yes'});
     return {
-      broker: new Broker(conf).ensure().then(handleEvents)
+      broker: new Broker(brokerConf).ensure().then(handleEvents)
     }
   });
 
@@ -64,9 +65,9 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
     
     it.cb('locks/unlocks', t => {
 
-      const c = t.supply.client;
+      const c : Client = t.supply.client;
       
-      c.lock('a', 1100, function (err, v) {
+      c.lock('a', 1100,  (err, v) => {
         
         if (err) {
           return t.fail(err);

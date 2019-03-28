@@ -12,7 +12,7 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
 
   return;
 
-  const port = 7000 + parseInt(process.env.SUMAN_CHILD_ID || '1');
+  const port = process.env.lmx_port ? parseInt(process.env.lmx_port) : (7000 + parseInt(process.env.SUMAN_CHILD_ID || '1'));
   const conf = Object.freeze({port});
 
   const writeKey = 'write-key';
@@ -31,8 +31,10 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
   };
 
   inject(() => {
+    const brokerConf = Object.assign({}, conf, {noListen: process.env.lmx_broker_no_listen === 'yes'});
+  
     return {
-      broker: new Broker(conf).ensure().then(handleEvents)
+      broker: new Broker(brokerConf).ensure().then(handleEvents)
     }
   });
 

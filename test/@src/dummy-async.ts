@@ -15,7 +15,10 @@ process.on('unhandledRejection', function (e) {
 ///////////////////////////////////////////////////////////////////
 
 Promise.all([
-    new Broker(conf).ensure(),
+  ((() => {
+    // const brokerConf = Object.assign({}, conf, {noListen: process.env.lmx_broker_no_listen === 'yes'});
+    return new Broker(conf).ensure()
+  })()),
     new Client(conf).ensure()
   ])
   .then(function ([b, c]) {

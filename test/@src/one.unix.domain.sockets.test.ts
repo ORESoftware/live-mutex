@@ -15,7 +15,6 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps, path) 
 
   const conf = Object.freeze({udsPath: path.resolve(process.env.HOME + '/suman.test.unix.sock')});
 
-
   const handleEvents = function (v) {
 
     v.emitter.on('warning', w => {
