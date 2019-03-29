@@ -6,8 +6,7 @@ const {Test} = suman.init(module);
 import async = require('async');
 import {Broker, Client} from '../../dist';
 
-///////////////////////////////////////////////////////////////
-
+//@ts-ignore
 Test.create(['Promise', function (b, it, inject, describe, before, $deps, path) {
   
   const conf = Object.freeze({udsPath: path.resolve(process.env.HOME + '/suman.test2.unix.sock')});

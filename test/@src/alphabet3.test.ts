@@ -10,6 +10,7 @@ import cp = require('child_process');
 
 ////////////////////////////////////////////////////////
 
+//@ts-ignore
 Test.create(['lmUtils', (b, assert, before, describe, it, path, inject, after) => {
 
   const {lmUtils} = b.ioc;

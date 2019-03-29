@@ -5,8 +5,7 @@ import suman = require('suman');
 const Test = suman.init(module);
 import {Client, lmUtils, Broker} from 'live-mutex';
 
-/////////////////////////////////////////////////////////
-
+//@ts-ignore
 Test.create({mode: 'series'}, ['Client', 'lmUtils', 'Promise', function (b, assert) {
 
     const {Promise} = b.ioc;

@@ -8,6 +8,7 @@ import {Broker} from "../../dist/broker";
 
 ////////////////////////////////////////////////////////
 
+// @ts-ignore
 Test.create(['lmUtils', (b, assert, before, describe, it, path, fs, inject, after) => {
 
   const {lmUtils} = b.ioc;
@@ -17,10 +18,8 @@ Test.create(['lmUtils', (b, assert, before, describe, it, path, fs, inject, afte
   const alphabet = original.split('');
   const result = [];
   const port = process.env.lmx_port ? parseInt(process.env.lmx_port) : (7000 + parseInt(process.env.SUMAN_CHILD_ID || '1'));
-
-  const conf = Object.freeze({port});
-
-
+  const conf = {port};
+  
   const handleEvents = function (v) {
 
     v.emitter.on('warning', w => {

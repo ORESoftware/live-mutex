@@ -419,7 +419,8 @@ export class Client {
       
       if (ws) {
         ws.removeAllListeners();
-        ws.destroy((err: any) => err && log.error(err.message || err));
+        //@ts-ignore
+        ws.destroy((err: any) => (err && log.error(err.message || err)));
       }
       
       return connectPromise = new Promise((resolve, reject) => {
@@ -703,7 +704,7 @@ export class Client {
     }
     catch (err) {
       if (typeof cb === 'function') {
-        return process.nextTick(cb, err);
+        return process.nextTick(cb, err, {});
       }
       log.error('No callback was passed to accept the following error.',
         'Please include a callback as the final argument to the client.lock() routine.');
@@ -801,7 +802,7 @@ export class Client {
     catch (err) {
       
       if (typeof cb === 'function') {
-        return process.nextTick(cb, err);
+        return process.nextTick(cb, err, {});
       }
       
       log.error('No callback was passed to accept the following error.',
@@ -838,7 +839,7 @@ export class Client {
 
     
     if (retryCount > maxRetries) {
-      return cb(new LMXClientLockException(
+      return this.fireLockCallbackWithError(cb,new LMXClientLockException(
         key,
         uuid,
         LMXLockRequestError.MaxRetries,
@@ -848,14 +849,14 @@ export class Client {
     
     const rwStatus = opts.rwStatus || null;
     const max = opts.max;
-    const self = this;
+   
     let timedOut = false;
     
     this.timers[uuid] = setTimeout(() => {
       
       timedOut = true;
       delete this.timers[uuid];
-      delete self.resolutions[uuid];
+      delete this.resolutions[uuid];
       
       const currentRetryCount = opts.__retryCount;
       const newRetryCount = ++opts.__retryCount;
@@ -864,9 +865,9 @@ export class Client {
       if (newRetryCount >= maxRetries) {
         
         this.timeouts[uuid] = true;
-        self.write({uuid, key, type: 'lock-client-timeout'});
+        this.write({uuid, key, type: 'lock-client-timeout'});
         
-        return cb(new LMXClientLockException(
+        return this.fireLockCallbackWithError(cb,new LMXClientLockException(
           key,
           uuid,
           LMXLockRequestError.RequestTimeoutError,
@@ -876,13 +877,13 @@ export class Client {
       }
       
       this.emitter.emit('warning',
-        `retrying lock request for key '${key}', on host:port '${self.getHost()}:${self.getPort()}', ` +
+        `retrying lock request for key '${key}', on host:port '${this.getHost()}:${this.getPort()}', ` +
         `retry attempt # ${newRetryCount}`,
       );
       
       // this has to be called synchronously,
       // so we can get a new resolution callback on the books
-      self.lockInternal(key, opts, cb);
+      this.lockInternal(key, opts, cb);
       
     }, lrt);
     
@@ -940,9 +941,9 @@ export class Client {
       if (data.acquired === true) {
         // lock was acquired for the given key, yippee
         this.cleanUp(uuid);
-        self.bookkeeping[key].lockCount++;
-        self.write({uuid, key, type: 'lock-received'}); // we let the broker know that we received the lock
-        const boundUnlock = self.unlock.bind(self, key, {_uuid: uuid, rwStatus, force: forceUnlock});
+        this.bookkeeping[key].lockCount++;
+        this.write({uuid, key, type: 'lock-received'}); // we let the broker know that we received the lock
+        const boundUnlock = this.unlock.bind(this, key, {_uuid: uuid, rwStatus, force: forceUnlock});
         boundUnlock.acquired = true;
         boundUnlock.readersCount = Number.isInteger(data.readersCount) ? data.readersCount : null;
         boundUnlock.key = key;
@@ -953,7 +954,7 @@ export class Client {
       
       if (data.reelection === true) {
         this.cleanUp(uuid);
-        return self.lockInternal(key, opts, cb);
+        return this.lockInternal(key, opts, cb);
       }
       
       if (data.acquired === false) {
@@ -969,8 +970,8 @@ export class Client {
           // and doesn't even want to wait until the timeout elapses.
           // such that even if wait === false and maxRetries === 1,
           // we still wouldn't wait for the timeout to elapse
-          
-          self.giveups[uuid] = true;
+  
+          this.giveups[uuid] = true;
           
           this.fireLockCallbackWithError(cb, new LMXClientLockException(
             key,
@@ -1039,7 +1040,7 @@ export class Client {
     }
     catch (err) {
       if (typeof cb === 'function') {
-        return process.nextTick(cb, err);
+        return process.nextTick(cb, err, {});
       }
       log.error('No callback was passed to accept the following error.');
       throw err;
@@ -1073,7 +1074,7 @@ export class Client {
       }
     }
     catch (err) {
-      return process.nextTick(cb, err);
+      return process.nextTick(cb, err, {});
     }
     
     const uuid = UUID.v4();

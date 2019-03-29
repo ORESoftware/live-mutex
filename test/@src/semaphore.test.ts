@@ -6,8 +6,7 @@ const async = require('async');
 import {Client} from "../../dist/client";
 import {Broker} from "../../dist/broker";
 
-////////////////////////////////////////////////////////
-
+//@ts-ignore
 Test.create(['lmUtils', (b, assert, before, describe, it, path, fs, inject, after) => {
 
   const {lmUtils} = b.ioc;

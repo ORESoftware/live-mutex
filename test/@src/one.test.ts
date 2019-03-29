@@ -4,8 +4,7 @@ import * as suman from 'suman';
 const {Test} = suman.init(module);
 import {Broker, Client} from '../../dist';
 
-///////////////////////////////////////////////////////////////
-
+//@ts-ignore
 Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
   
   const {Promise} = b.ioc;

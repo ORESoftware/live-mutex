@@ -5,8 +5,7 @@ const {Test} = suman.init(module);
 global.Promise = require('bluebird');
 import {Client, Broker} from '../../dist';
 
-///////////////////////////////////////////////////////////////////////////////////////
-
+//@ts-ignore
 Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
 
   const {Promise} = b.ioc;
