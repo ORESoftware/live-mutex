@@ -329,7 +329,7 @@ export class Broker {
       //   return self.bookkeeping[key].unlockCount++;
       // }
 
-      if (data.type === 'lock-client-timeout') {
+      if (data.type === 'lock-client-timeout' || data.type === 'lock-client-error') {
 
         // if the client times out, we don't want to send them any more messages
         const lck = self.locks.get(key);
@@ -344,8 +344,6 @@ export class Broker {
       }
 
       if (data.type === 'lock-received-rejected') {
-        
-        // lock-received-rejected
 
         const lck = self.locks.get(key);
 
@@ -590,7 +588,7 @@ export class Broker {
     return this.emitter.once.apply(this.emitter, arguments);
   }
 
-  close(cb: Function): void {
+  close(cb: (err: any) => void): void {
     this.wss.close(cb);
   }
 

@@ -189,6 +189,7 @@ export class Client {
   emitter = new EventEmitter();
   noDelay = true;
   socketFile = '';
+  recovering = false;
   readerCounts = <{ [key: string]: number }>{};
   writeKeys = <{ [key: string]: true }>{}; // keeps track of whether a key has been registered as a write key
   
@@ -363,9 +364,9 @@ export class Client {
       
       const fn = self.resolutions[uuid];
       const to = self.timeouts[uuid];
-  
+      
       delete self.timeouts[uuid];
-      delete self.resolutions[uuid]; // might be redundant
+      // delete self.resolutions[uuid]; // might be redundant
       
       if (fn && to) {
         this.emitter.emit('warning', 'Function and timeout both exist => Live-Mutex implementation error.');
@@ -400,13 +401,13 @@ export class Client {
       
     };
     
-    this.ensure = this.connect = (cb?: Function) => {
+    this.ensure = this.connect = (cb?: (err: any, v?: Client) => void) => {
       
       if (cb && typeof cb !== 'function') {
-        throw new Error('optional argument to ensure/connect must be a function.');
+        throw new Error('Optional argument to ensure/connect must be a function.');
       }
       
-      if (connectPromise && ws.writable && self.isOpen) {
+      if (!this.recovering && (connectPromise && ws && ws.writable && self.isOpen)) {
         return connectPromise.then((val) => {
             cb && cb.call(self, null, val);
             return val;
@@ -417,6 +418,8 @@ export class Client {
           });
       }
       
+      this.recovering = false;
+      
       if (ws) {
         ws.removeAllListeners();
         //@ts-ignore
@@ -426,17 +429,16 @@ export class Client {
       return connectPromise = new Promise((resolve, reject) => {
         
         let onFirstErr = (e: any) => {
-          let err = '[lmx] client error => ' + (e && e.message || e);
+          let err = 'LMX client error => ' + (e && e.message || e);
           this.emitter.emit('warning', err);
           reject(err);
         };
         
         let to = setTimeout(function () {
-          reject('[lmx] err: client connection timeout after 3000ms.');
+          reject('LMX err: client connection timeout after 3000ms.');
         }, 3000);
         
         let cnkt: Array<any> = self.socketFile ? [self.socketFile] : [self.port, self.host];
-        
         
         // @ts-ignore
         ws = net.createConnection(...cnkt, () => {
@@ -452,22 +454,24 @@ export class Client {
         
         ws.setEncoding('utf8')
           .once('end', () => {
-            this.emitter.emit('warning', '[lmx] => client stream "end" event occurred.');
+            this.emitter.emit('warning', 'LMX => client stream "end" event occurred.');
           })
           .once('error', onFirstErr)
           .once('close', () => {
             self.isOpen = false;
+              ws.destroy();
           })
           .on('error', (e) => {
             self.isOpen = false;
-            this.emitter.emit('warning', '[lmx] client error => ' + e.message || util.inspect(e));
+            this.emitter.emit('warning', 'LMX client error => ' + e.message || util.inspect(e));
           })
           .pipe(createParser())
           .on('data', onData)
-          .once('error', function (e: any) {
-            self.write({error: String(e && e.stack || e)}, function () {
-              ws.end();
-            });
+          .once('error',  (e: any) => {
+              this.recovering = true;
+              ws.destroy();
+              ws.removeAllListeners();
+              this.ensure(); // create new connection
           });
       })
       // if the user passes a callback, we fire the callback here
@@ -694,7 +698,6 @@ export class Client {
       lockCount: 0,
       unlockCount: 0
     };
-
     
     const rawLockCount = ++this.bookkeeping[key].rawLockCount;
     const unlockCount = this.bookkeeping[key].unlockCount;
@@ -730,18 +733,18 @@ export class Client {
         assert.equal(typeof opts.force, 'boolean', ' => Live-Mutex usage error => ' +
           '"force" option must be a boolean value. Coerce it on your side, for safety.');
       }
-
+      
       if ('retry' in opts) {
         assert.equal(typeof opts.force, 'boolean', ' => Live-Mutex usage error => ' +
-            '"retry" option must be a boolean value. Coerce it on your side, for safety.');
+          '"retry" option must be a boolean value. Coerce it on your side, for safety.');
         opts.__maxRetries = 0;
       }
-
+      
       if ('maxRetries' in opts) {
         assert(Number.isInteger(opts.maxRetries), '"maxRetries" option must be an integer.');
         assert(opts.maxRetries >= 0 && opts.maxRetries <= 20,
           '"maxRetries" option must be an integer between 0 and 20 inclusive.');
-        if('__maxRetries' in opts){
+        if ('__maxRetries' in opts) {
           assert.strictEqual(opts.__maxRetries, opts.maxRetries, 'maxRetries values do not match.');
         }
         opts.__maxRetries = opts.maxRetries;
@@ -751,7 +754,7 @@ export class Client {
         assert(Number.isInteger(opts.maxRetry), '"maxRetry" option must be an integer.');
         assert(opts.maxRetry >= 0 && opts.maxRetry <= 20,
           '"maxRetry" option must be an integer between 0 and 20 inclusive.');
-        if('__maxRetries' in opts){
+        if ('__maxRetries' in opts) {
           assert.strictEqual(opts.__maxRetries, opts.maxRetry, 'maxRetries values do not match.');
         }
         opts.__maxRetries = opts.maxRetry;
@@ -761,18 +764,18 @@ export class Client {
         assert(Number.isInteger(opts.retryMax), '"retryMax" option must be an integer.');
         assert(opts.retryMax >= 0 && opts.retryMax <= 20,
           '"retryMax" option must be an integer between 0 and 20 inclusive.');
-        if('__maxRetries' in opts){
+        if ('__maxRetries' in opts) {
           assert.strictEqual(opts.__maxRetries, opts.retryMax, 'maxRetries values do not match.');
         }
         opts.__maxRetries = opts.retryMax;
       }
-
-      if(!('__maxRetries' in opts)){
+      
+      if (!('__maxRetries' in opts)) {
         opts.__maxRetries = this.lockRetryMax;
       }
-
+      
       assert(Number.isInteger(opts.__maxRetries), '__maxRetries value must be an integer.');
-
+      
       if (opts['ttl']) {
         assert(Number.isInteger(opts.ttl),
           ' => Live-Mutex usage error => Please pass an integer representing milliseconds as the value for "ttl".');
@@ -814,6 +817,17 @@ export class Client {
       cb = process.domain.bind(cb as any);
     }
     
+    if (!this.isOpen) {
+      return process.nextTick(() => {
+        this.fireLockCallbackWithError(cb, new LMXClientLockException(
+          key,
+          null,
+          LMXLockRequestError.ConnectionClosed,
+          `Connection was closed (and/or a client connection error occurred.)`
+        ));
+      });
+    }
+    
     this.lockInternal(key, opts, cb);
     
   }
@@ -836,10 +850,18 @@ export class Client {
     const maxRetries = opts.__maxRetries;
     const retryCount = opts.__retryCount;
     const forceUnlock = opts.forceUnlock === true;
-
+    
+    if (!this.isOpen) {
+      return this.fireLockCallbackWithError(cb, new LMXClientLockException(
+        key,
+        uuid,
+        LMXLockRequestError.ConnectionClosed,
+        `Connection was closed (and/or a client connection error occurred.)`
+      ));
+    }
     
     if (retryCount > maxRetries) {
-      return this.fireLockCallbackWithError(cb,new LMXClientLockException(
+      return this.fireLockCallbackWithError(cb, new LMXClientLockException(
         key,
         uuid,
         LMXLockRequestError.MaxRetries,
@@ -849,7 +871,7 @@ export class Client {
     
     const rwStatus = opts.rwStatus || null;
     const max = opts.max;
-   
+    
     let timedOut = false;
     
     this.timers[uuid] = setTimeout(() => {
@@ -861,13 +883,25 @@ export class Client {
       const currentRetryCount = opts.__retryCount;
       const newRetryCount = ++opts.__retryCount;
       
+      if (!this.isOpen) {
+        this.timeouts[uuid] = true;
+        this.write({uuid, key, type: 'lock-client-error'});
+        
+        return this.fireLockCallbackWithError(cb, new LMXClientLockException(
+          key,
+          uuid,
+          LMXLockRequestError.ConnectionClosed,
+          `Connection was closed (and/or a client connection error occurred.)`
+        ));
+      }
+      
       // noRetry
       if (newRetryCount >= maxRetries) {
         
         this.timeouts[uuid] = true;
         this.write({uuid, key, type: 'lock-client-timeout'});
         
-        return this.fireLockCallbackWithError(cb,new LMXClientLockException(
+        return this.fireLockCallbackWithError(cb, new LMXClientLockException(
           key,
           uuid,
           LMXLockRequestError.RequestTimeoutError,
@@ -970,7 +1004,7 @@ export class Client {
           // and doesn't even want to wait until the timeout elapses.
           // such that even if wait === false and maxRetries === 1,
           // we still wouldn't wait for the timeout to elapse
-  
+          
           this.giveups[uuid] = true;
           
           this.fireLockCallbackWithError(cb, new LMXClientLockException(
@@ -1086,11 +1120,11 @@ export class Client {
       
       timedOut = true;
       this.timeouts[uuid] = true;
-
+      
       this.fireUnlockCallbackWithError(cb, new LMXClientUnlockException(
         key, uuid,
         LMXUnlockRequestError.BadOrMismatchedId,
-        ` [lmx] Unlock request to unlock key => "${key}" timed out.`
+        ` LMX Unlock request to unlock key => "${key}" timed out.`
       ));
       
     }, urt);
