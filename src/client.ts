@@ -203,9 +203,6 @@ export class Client {
     
     if (cb) {
       assert(typeof cb === 'function', 'optional second argument to Live-Mutex Client constructor must be a function.');
-      if (process.domain) {
-        cb = process.domain.bind(cb);
-      }
     }
     
     Object.keys(opts).forEach(function (key) {
@@ -403,8 +400,11 @@ export class Client {
     
     this.ensure = this.connect = (cb?: (err: any, v?: Client) => void) => {
       
-      if (cb && typeof cb !== 'function') {
-        throw new Error('Optional argument to ensure/connect must be a function.');
+      if (cb) {
+        assert(typeof cb === 'function', 'Optional argument to ensure/connect must be a function.');
+        if (process.domain) {
+          cb = process.domain.bind(cb);
+        }
       }
       
       if (!this.recovering && (connectPromise && ws && ws.writable && self.isOpen)) {
@@ -428,17 +428,17 @@ export class Client {
       
       return connectPromise = new Promise((resolve, reject) => {
         
-        let onFirstErr = (e: any) => {
+        const onFirstErr = (e: any) => {
           let err = 'LMX client error => ' + (e && e.message || e);
           this.emitter.emit('warning', err);
           reject(err);
         };
         
-        let to = setTimeout(function () {
+        const to = setTimeout(function () {
           reject('LMX err: client connection timeout after 3000ms.');
         }, 3000);
         
-        let cnkt: Array<any> = self.socketFile ? [self.socketFile] : [self.port, self.host];
+        const cnkt: Array<any> = self.socketFile ? [self.socketFile] : [self.port, self.host];
         
         // @ts-ignore
         ws = net.createConnection(...cnkt, () => {
@@ -452,27 +452,32 @@ export class Client {
           ws.setNoDelay(true);
         }
         
+        const recover = (e: any) => {
+          this.recovering = true;
+          e && this.emitter.emit('warning', 'LMX client error => ' + e.message || util.inspect(e));
+          ws.destroy();
+          ws.removeAllListeners();
+          this.ensure(); // create new connection
+        };
+        
         ws.setEncoding('utf8')
-          .once('end', () => {
-            this.emitter.emit('warning', 'LMX => client stream "end" event occurred.');
-          })
+          
           .once('error', onFirstErr)
           .once('close', () => {
-            self.isOpen = false;
-              ws.destroy();
+            this.emitter.emit('warning', 'LMX => client stream "close" event occurred.');
+            recover(null);
           })
-          .on('error', (e) => {
-            self.isOpen = false;
-            this.emitter.emit('warning', 'LMX client error => ' + e.message || util.inspect(e));
+          .once('end', () => {
+            this.emitter.emit('warning', 'LMX => client stream "end" event occurred.');
+            recover(null);
+          })
+          .once('error', (e: any) => {
+            this.emitter.emit('warning', 'LMX => client stream "error" event occurred.');
+            recover(e);
           })
           .pipe(createParser())
           .on('data', onData)
-          .once('error',  (e: any) => {
-              this.recovering = true;
-              ws.destroy();
-              ws.removeAllListeners();
-              this.ensure(); // create new connection
-          });
+        
       })
       // if the user passes a callback, we fire the callback here
         .then(val => {
@@ -486,11 +491,11 @@ export class Client {
     };
     
     process.once('exit', () => {
-      ws && ws.end();
+      ws && ws.destroy();
     });
     
     this.close = () => {
-      return ws && ws.end();
+      return ws && ws.destroy();
     };
     
     this.bookkeeping = {};
