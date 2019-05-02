@@ -562,7 +562,6 @@ export class Broker {
 
     };
 
-    this.bookkeeping = {};
     this.rejected = {};
     this.timeouts = {};
     this.wsToUUIDs = new Map(); // keys are ws objects, values are lock key maps {uuid: true}
@@ -1048,14 +1047,6 @@ export class Broker {
     const force = data.force;
     const retryCount = data.retryCount;
 
-    this.bookkeeping[key] = this.bookkeeping[key] || {
-      rawLockCount: 0,
-      rawUnlockCount: 0,
-      lockCount: 0,
-      unlockCount: 0
-    };
-
-    this.bookkeeping[key].rawLockCount++;
 
     if (lck) {
 
@@ -1250,14 +1241,6 @@ export class Broker {
       }
     }
 
-    this.bookkeeping[key] = this.bookkeeping[key] || {
-      rawLockCount: 0,
-      rawUnlockCount: 0,
-      lockCount: 0,
-      unlockCount: 0
-    };
-
-    this.bookkeeping[key].rawUnlockCount++;
 
     // if the user passed _uuid, then we check it, other true
     // _uuid is the uuid of the original lockholder call
