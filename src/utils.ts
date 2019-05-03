@@ -19,6 +19,27 @@ export type EVCb<T> = (err: any, val?: T) => void
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
+
+export const compareVersions = (clientVersion: string, serverVersion: string) => {
+
+  const [majorA, minorA] = clientVersion.split('.');
+  const [majorB, minorB] = serverVersion.split('.');
+
+  if(majorA !== majorB){
+    throw `Major versions are different - client version:${clientVersion}, server version:${serverVersion}`;
+  }
+
+  const minorAInt = Number.parseInt(minorA.charAt(0));
+  const minorBInt = Number.parseInt(minorB.charAt(0));
+
+  if(Math.abs(minorAInt - minorBInt) > 0){
+    throw `Minor versions are different - client version:${clientVersion}, server version:${serverVersion}`;
+  }
+
+};
+
+
+
 export const once = function (ctx: any, fn: Function) {
   let callable = true;
   return function (err: any) {
