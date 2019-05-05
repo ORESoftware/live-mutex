@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
 
+set -e;
+
 version=`read_json -k 'version' -f package.json`;
 semver "$version"; # validate semver version
 

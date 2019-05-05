@@ -1,1 +1,9 @@
 node_modules
+src
+scripts
+docs
+.idea
+.git
+.circleci
+.r2g
+lib

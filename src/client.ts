@@ -497,8 +497,7 @@ export class Client {
     this.close = () => {
       return ws && ws.destroy();
     };
-    
-    this.bookkeeping = {};
+
     this.timeouts = {};
     this.resolutions = {};
     this.giveups = {};
@@ -696,16 +695,6 @@ export class Client {
   lock(key: string, opts: any, cb: LMClientLockCallBack): void;
   
   lock(key: string, opts: any, cb?: LMClientLockCallBack): void {
-    
-    this.bookkeeping[key] = this.bookkeeping[key] || {
-      rawLockCount: 0,
-      rawUnlockCount: 0,
-      lockCount: 0,
-      unlockCount: 0
-    };
-    
-    const rawLockCount = ++this.bookkeeping[key].rawLockCount;
-    const unlockCount = this.bookkeeping[key].unlockCount;
     
     try {
       [key, opts, cb] = this.parseLockOpts(key, opts, cb);
@@ -980,7 +969,6 @@ export class Client {
       if (data.acquired === true) {
         // lock was acquired for the given key, yippee
         this.cleanUp(uuid);
-        this.bookkeeping[key].lockCount++;
         this.write({uuid, key, type: 'lock-received'}); // we let the broker know that we received the lock
         const boundUnlock = this.unlock.bind(this, key, {_uuid: uuid, rwStatus, force: forceUnlock});
         boundUnlock.acquired = true;
@@ -1064,15 +1052,6 @@ export class Client {
   }
   
   unlock(key: string, opts: any, cb?: LMClientUnlockCallBack) {
-    
-    this.bookkeeping[key] = this.bookkeeping[key] || {
-      rawLockCount: 0,
-      rawUnlockCount: 0,
-      lockCount: 0,
-      unlockCount: 0
-    };
-    
-    this.bookkeeping[key].rawUnlockCount++;
     
     try {
       [key, opts, cb] = this.parseUnlockOpts(key, opts, cb);
@@ -1182,7 +1161,6 @@ export class Client {
       if (data.unlocked === true) {
         
         this.cleanUp(uuid);
-        this.bookkeeping[key].unlockCount++;
         
         // this.write({
         //   uuid: uuid,
