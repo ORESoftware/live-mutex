@@ -8,7 +8,8 @@
   "ignore": [
     "/node_modules/",
     "/.git/",
-    "suman-old"
+    "suman-old",
+    "suman-mono/suman"
   ],
   "comments": [
     "put any comment you want here"
