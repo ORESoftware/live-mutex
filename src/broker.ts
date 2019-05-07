@@ -46,6 +46,13 @@ if (weAreDebugging) {
   log.error('broker is in debug mode. Timeouts are turned off.');
 }
 
+const brokerPackage = require('../package.json');
+
+if(!(brokerPackage.version && typeof brokerPackage.version === 'string')){
+  throw new Error('Broker NPM package did not have a top-level field that is a string.');
+}
+
+
 process.on('warning', function (e: any) {
   log.error('warning:', e && e.message || e);
 });
@@ -283,6 +290,10 @@ export class Broker {
 
       if (data.inspectCommand) {
         return self.inspect(data, ws);
+      }
+      
+      if(data.type === 'version'){
+        return self.onVersion(data,ws);
       }
 
       if (data.type === 'ls') {
@@ -597,6 +608,10 @@ export class Broker {
 
   getHost() {
     return this.host;
+  }
+  
+  onVersion(data: any, ws: net.Socket) {
+    return this.send(ws, {type:'broker-version', brokerVersion: brokerPackage.version});
   }
 
   ls(data: any, ws: net.Socket) {

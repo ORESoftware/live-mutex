@@ -14,6 +14,11 @@ import {createParser} from "./json-parser";
 import {forDebugging} from './shared-internal';
 
 const debugLog = process.argv.indexOf('--lmx-debug') > 0;
+const clientPackage = require('../package.json');
+
+if(!(clientPackage.version && typeof clientPackage.version === 'string')){
+  throw new Error('Client NPM package did not have a top-level field that is a string.');
+}
 
 export const log = {
   info: console.log.bind(console, chalk.gray.bold('lmx info:')),
@@ -37,6 +42,7 @@ import {EventEmitter} from 'events';
 import * as path from "path";
 import {LMXLockRequestError, LMXUnlockRequestError} from "./shared-internal";
 import {LMXClientLockException, LMXClientUnlockException} from "./exceptions";
+import {compareVersions} from "./compare-versions";
 
 if (weAreDebugging) {
   log.debug('Live-Mutex client is in debug mode. Timeouts are turned off.');
@@ -347,12 +353,33 @@ export class Client {
       if (data.warning) {
         this.emitter.emit('warning', data.warning);
       }
+  
+      if(data.type === 'broker-version'){
+    
+        const clientVersion = clientPackage.version;
+        const brokerVersion = data.brokerVersion;
+    
+        try{
+          // compareVersions(clientVersion, brokerVersion);
+          compareVersions(clientVersion, '0.1.205');
+        }
+        catch(err){
+          const errMessage = `Client version is not compatable with broker,` +
+            ` client version: '${clientVersion}', broker version: '${brokerVersion}'.`;
+          log.error(err);
+          log.error(errMessage);
+          this.emitter.emit('error', errMessage);
+          this.close();
+        }
+        return;
+      }
       
       if (!uuid) {
         return this.emitter.emit('warning',
           'Potential Live-Mutex implementation error => message did not contain uuid =>' + util.inspect(data)
         );
       }
+   
       
       if (self.giveups[uuid]) {
         delete self.giveups[uuid];
@@ -445,6 +472,7 @@ export class Client {
           self.isOpen = true;
           clearTimeout(to);
           ws.removeListener('error', onFirstErr);
+          this.write({ type: 'version',value: clientPackage.version});
           resolve(this);
         });
         
