@@ -29,7 +29,7 @@ export const log = {
       let newTime = Date.now();
       let elapsed = newTime - forDebugging.previousTime;
       forDebugging.previousTime = newTime;
-      console.log(chalk.yellow.bold('[lmx client debugging]'), 'elapsed millis:', `(${elapsed})`, ...args);
+      console.log(chalk.yellow.bold('lmx client debugging:'), 'elapsed millis:', `(${elapsed})`, ...args);
     }
   }
 };

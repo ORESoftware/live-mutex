@@ -11,8 +11,8 @@ import {Broker} from './broker';
 const p = require.resolve('./launch-broker-child');
 
 const log = {
-  info: console.log.bind(console, ' [live-mutex utils]'),
-  error: console.error.bind(console, ' [live-mutex utils]')
+  info: console.log.bind(console, 'lmx utils:'),
+  error: console.error.bind(console, 'lmx utils:')
 };
 
 export type EVCb<T> = (err: any, val?: T) => void
