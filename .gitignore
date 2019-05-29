@@ -8,6 +8,7 @@ coverage
 .vscode
 dist
 @target
+test/.suman/.meta
 
 ### matching
 *.log

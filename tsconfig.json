@@ -4,7 +4,7 @@
     "outDir": "dist",
     "declaration": true,
     "baseUrl": ".",
-    "target": "es6",
+    "target": "es2017",
     "module": "commonjs",
     "noImplicitAny": true,
     "removeComments": true,

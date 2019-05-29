@@ -13,7 +13,8 @@ export enum LMXLockRequestError {
   BadArgumentsError = 'bad_args',
   InternalError = 'internal_error',
   UnknownException = 'unknown_exception',
-  WaitOptionSetToFalse = 'wait_option_is_false'
+  WaitOptionSetToFalse = 'wait_option_is_false',
+  ConnectionClosed = 'connection_closed'
 }
 
 export enum LMXUnlockRequestError {

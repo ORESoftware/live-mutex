@@ -11,13 +11,42 @@ import {Broker} from './broker';
 const p = require.resolve('./launch-broker-child');
 
 const log = {
-  info: console.log.bind(console, ' [live-mutex utils]'),
-  error: console.error.bind(console, ' [live-mutex utils]')
+  info: console.log.bind(console, 'lmx utils:'),
+  error: console.error.bind(console, 'lmx utils:')
 };
 
 export type EVCb<T> = (err: any, val?: T) => void
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+export const compareVersions = (clientVersion: string, brokerVersion: string) => {
+  
+  if(!(clientVersion && typeof clientVersion === 'string')){
+    throw new Error(`The client version is not defined as string: ${clientVersion}`);
+  }
+  
+  if(!(brokerVersion && typeof brokerVersion === 'string')){
+    throw new Error(`The broker version is not defined as string: ${brokerVersion}`);
+  }
+
+  const [majorA, minorA] = clientVersion.split('.');
+  const [majorB, minorB] = brokerVersion.split('.');
+
+  if(majorA !== majorB){
+    throw `Major versions are different - client version:${clientVersion}, server version:${brokerVersion}`;
+  }
+
+  const minorAInt = Number.parseInt(minorA.charAt(0));
+  const minorBInt = Number.parseInt(minorB.charAt(0));
+
+  if(Math.abs(minorAInt - minorBInt) > 0){
+    throw `Minor versions are different - client version:${clientVersion}, server version:${brokerVersion}`;
+  }
+
+};
+
+
 
 export const once = function (ctx: any, fn: Function) {
   let callable = true;

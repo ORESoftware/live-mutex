@@ -4,8 +4,7 @@ import * as suman from 'suman';
 const {Test} = suman.init(module);
 import {Broker, Client} from '../../dist';
 
-///////////////////////////////////////////////////////////////
-
+//@ts-ignore
 Test.create(['Promise', function (b, it, inject, describe, before, $deps, path) {
 
   const {Promise} = b.ioc;
@@ -14,7 +13,6 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps, path) 
   console.log('suman child id:',process.env.SUMAN_CHILD_ID);
 
   const conf = Object.freeze({udsPath: path.resolve(process.env.HOME + '/suman.test.unix.sock')});
-
 
   const handleEvents = function (v) {
 

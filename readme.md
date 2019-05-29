@@ -1,7 +1,5 @@
 
 
-:lock: + :unlock:
-
 <a align="right" href="https://travis-ci.org/ORESoftware/live-mutex">
     <img align="right" alt="Travis Build Status" src="https://travis-ci.org/ORESoftware/live-mutex.svg?branch=master">
 </a>
@@ -14,17 +12,28 @@
 
 <br>
 
-[![Version](https://img.shields.io/npm/v/live-mutex.svg?colorB=green)](https://www.npmjs.com/package/live-mutex)
+<a align="right" href="https://www.npmjs.com/package/live-mutex">
+<img align="right" alt="Latest NPM version" src="https://img.shields.io/npm/v/live-mutex.svg?colorB=green">
+</a>
 
 <br>
 
+------------------
 
-# Live-Mutex / LMX
+<p align="center">
+  <img src="https://raw.githubusercontent.com/oresoftware/media/master/namespaces/live-mutex/lmx-logo.png?x=33">
+</p>
+
+-------------------
+
+# Live-Mutex / LMX  :lock: + :unlock:
 
 ### Disclaimer
 
-Tested on *nix and MacOS - (probably will work on Windows, but not tested on Windows). <br>
-Tested and proven on Node.js versions >= 6.0.0.
+>
+> Tested on *nix and MacOS - (probably will work on Windows, but not tested on Windows). <br>
+> Tested and proven on Node.js versions >= 6.0.0.
+>
 
 ## About
 
@@ -76,24 +85,24 @@ See: `docs/detailed-explanation.md` and `docs/about.md`
 
 # Installation
 
-##### For command line tools:
+##### <i> For command line tools: </i>
 
 >
 >```$ npm install -g live-mutex```
 >
 
-##### For usage with Node.js libraries:
+##### <i> For usage with Node.js libraries: </i>
 
 >
 >```$ npm install live-mutex --save```
 >
 
-##### Docker image for the broker
+##### <i> Docker image for the broker: </i>
 
 >
->  docker pull oresoftware/live-mutex-broker:latest
+>  `$ docker pull oresoftware/live-mutex-broker:latest`
 >
->  docker run -p 6970:6970 -it oresoftware/live-mutex-broker:latest
+>  `$ docker run -p 6970:6970 -it oresoftware/live-mutex-broker:latest`
 > 
 
 <br>
@@ -209,6 +218,34 @@ return client.ensure().then(c =>  {   // (c is the same object as client)
     return c.release('<key>', id);
  });
 });
+
+```
+
+
+### Using async/await
+
+```typescript
+    const times = 10000;
+    const start = Date.now();
+    
+    async.timesLimit(times, 25, async n => {
+      
+      const {id, key} = await c.acquire('foo');
+      // do your thing here
+      return await c.release(key, id);
+      
+    }, err => {
+      
+      if (err) {
+        throw err;
+      }
+      
+      const diff = Date.now() - start;
+      console.log('Time required for live-mutex:', diff);
+      console.log('Lock/unlock cycles per millisecond:', Number(times / diff).toFixed(3));
+      process.exit(0);
+      
+    });
 
 ```
 
@@ -373,11 +410,11 @@ client.lock/unlock call.
 
 
 ### Usage with Promises:
- => see `docs/examples/promises.md`
+> see: `docs/examples/promises.md`
 
 
 ### Usage with RxJS5 Observables
- => see `docs/examples/observables.md`
+> see: `docs/examples/observables.md`
 
 
 <br>
