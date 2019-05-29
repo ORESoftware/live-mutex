@@ -16,7 +16,7 @@ import {forDebugging} from './shared-internal';
 const debugLog = process.argv.indexOf('--lmx-debug') > 0;
 const clientPackage = require('../package.json');
 
-if(!(clientPackage.version && typeof clientPackage.version === 'string')){
+if (!(clientPackage.version && typeof clientPackage.version === 'string')) {
   throw new Error('Client NPM package did not have a top-level field that is a string.');
 }
 
@@ -181,6 +181,7 @@ export class Client {
   lockRequestTimeout: number;
   lockRetryMax: number;
   ws: net.Socket;
+  cannotContinue = false;
   timeouts: IUuidTimeoutBool;
   resolutions: IClientResolution;
   bookkeeping: IBookkeepingHash;
@@ -188,7 +189,7 @@ export class Client {
   connect: Ensure;
   giveups: UuidBooleanHash;
   timers: { [key: string]: Timer };
-  write: (data: any, cb?: Function) => void;
+  write: (data: any, cb?: EVCb<any>) => void;
   isOpen: boolean;
   close: Function;
   keepLocksAfterDeath = false;
@@ -330,8 +331,7 @@ export class Client {
       
       if ('keepLocksAfterDeath' in data) {
         data.keepLocksAfterDeath = Boolean(data.keepLocksAfterDeath);
-      }
-      else {
+      } else {
         data.keepLocksAfterDeath = this.keepLocksAfterDeath || false;
       }
       
@@ -355,32 +355,22 @@ export class Client {
         this.emitter.emit('warning', data.warning);
       }
   
-      if(data.type === 'broker-version'){
-    
-        const clientVersion = clientPackage.version;
-        const brokerVersion = data.brokerVersion;
-    
-        try{
-          // compareVersions(clientVersion, brokerVersion);
-          compareVersions(clientVersion, '0.1.205');
-        }
-        catch(err){
-          const errMessage = `Client version is not compatable with broker,` +
-            ` client version: '${clientVersion}', broker version: '${brokerVersion}'.`;
-          log.error(err);
-          log.error(errMessage);
-          this.emitter.emit('error', errMessage);
-          this.close();
-        }
+  
+      if(data.type === 'version-mismatch'){
+        this.emitter.emit('error', data);
+        log.error(data);
+        this.write({type: 'version-mismatch-confirmed'});
+        
         return;
       }
+      
       
       if (!uuid) {
         return this.emitter.emit('warning',
           'Potential Live-Mutex implementation error => message did not contain uuid =>' + util.inspect(data)
         );
       }
-   
+      
       
       if (self.giveups[uuid]) {
         delete self.giveups[uuid];
@@ -473,7 +463,7 @@ export class Client {
           self.isOpen = true;
           clearTimeout(to);
           ws.removeListener('error', onFirstErr);
-          this.write({ type: 'version',value: clientPackage.version});
+          this.write({type: 'version', value: clientPackage.version});
           resolve(this);
         });
         
@@ -526,7 +516,7 @@ export class Client {
     this.close = () => {
       return ws && ws.destroy();
     };
-
+    
     this.timeouts = {};
     this.resolutions = {};
     this.giveups = {};
@@ -689,11 +679,9 @@ export class Client {
     if (typeof opts === 'function') {
       cb = opts;
       opts = {};
-    }
-    else if (typeof opts === 'boolean') {
+    } else if (typeof opts === 'boolean') {
       opts = {force: opts};
-    }
-    else if (typeof opts === 'number') {
+    } else if (typeof opts === 'number') {
       opts = {ttl: opts};
     }
     
@@ -703,22 +691,26 @@ export class Client {
     
   }
   
-  parseUnlockOpts(key: string, opts?: any, cb?: any): [string, any, LMClientUnlockCallBack] {
+  private parseUnlockOpts(key: string, opts?: any, cb?: any): [string, any, LMClientUnlockCallBack] {
     
     if (typeof opts === 'function') {
       cb = opts;
       opts = {};
-    }
-    else if (typeof opts === 'boolean') {
+    } else if (typeof opts === 'boolean') {
       opts = {force: opts};
-    }
-    else if (typeof opts === 'string') {
+    } else if (typeof opts === 'string') {
       opts = {_uuid: opts};
     }
     
     opts = opts || {};
     assert(typeof cb === 'function', 'Please use a callback as the last argument to the unlock method.');
     return [key, opts, cb];
+  }
+  
+  _simulateVersionMismatch() {
+    this.write({
+      type: 'simulate-version-mismatch',
+    });
   }
   
   // lock(key: string, cb: LMClientLockCallBack, z?: LMClientLockCallBack) : void;
@@ -730,14 +722,36 @@ export class Client {
     
     try {
       [key, opts, cb] = this.parseLockOpts(key, opts, cb);
-    }
-    catch (err) {
+    } catch (err) {
       if (typeof cb === 'function') {
         return process.nextTick(cb, err, {});
       }
       log.error('No callback was passed to accept the following error.',
         'Please include a callback as the final argument to the client.lock() routine.');
       throw err;
+    }
+    
+    
+    if (!this.isOpen) {
+      return process.nextTick(() => {
+        this.fireLockCallbackWithError(cb, new LMXClientLockException(
+          key,
+          null,
+          LMXLockRequestError.ConnectionClosed,
+          `Connection was closed (and/or a client connection error occurred.)`
+        ));
+      });
+    }
+    
+    if(this.cannotContinue){
+      return process.nextTick(() => {
+        this.fireLockCallbackWithError(cb, new LMXClientLockException(
+          key,
+          null,
+          LMXLockRequestError.CannotContinue,
+          `'Client cannot make any lock requests, most likely due to version mismatch between client and broker.'`
+        ));
+      });
     }
     
     try {
@@ -827,8 +841,7 @@ export class Client {
         assert(opts._uuid, 'Live-Mutex internal error: no _uuid past to retry call.');
       }
       
-    }
-    catch (err) {
+    } catch (err) {
       
       if (typeof cb === 'function') {
         return process.nextTick(cb, err, {});
@@ -838,20 +851,9 @@ export class Client {
         'Please include a callback as the final argument to the client.lock() routine.');
       throw err;
     }
-    
+  
     if (process.domain) {
       cb = process.domain.bind(cb as any);
-    }
-    
-    if (!this.isOpen) {
-      return process.nextTick(() => {
-        this.fireLockCallbackWithError(cb, new LMXClientLockException(
-          key,
-          null,
-          LMXLockRequestError.ConnectionClosed,
-          `Connection was closed (and/or a client connection error occurred.)`
-        ));
-      });
     }
     
     this.lockInternal(key, opts, cb);
@@ -1087,8 +1089,7 @@ export class Client {
     
     try {
       [key, opts, cb] = this.parseUnlockOpts(key, opts, cb);
-    }
-    catch (err) {
+    } catch (err) {
       if (typeof cb === 'function') {
         return process.nextTick(cb, err, {});
       }
@@ -1122,8 +1123,7 @@ export class Client {
         assert(opts.lockRequestTimeout >= 20 && opts.lockRequestTimeout <= 800000,
           ' => "ttl" for a lock needs to be integer between 3 and 800000 millis.');
       }
-    }
-    catch (err) {
+    } catch (err) {
       return process.nextTick(cb, err, {});
     }
     

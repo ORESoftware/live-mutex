@@ -14,6 +14,7 @@ export enum LMXLockRequestError {
   InternalError = 'internal_error',
   UnknownException = 'unknown_exception',
   WaitOptionSetToFalse = 'wait_option_is_false',
+  CannotContinue = 'cannot_continue',
   ConnectionClosed = 'connection_closed'
 }
 
