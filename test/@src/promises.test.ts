@@ -5,8 +5,7 @@ const {Test} = suman.init(module);
 global.Promise = require('bluebird');
 import {Client, Broker} from '../../dist';
 
-///////////////////////////////////////////////////////////////////////////////////////
-
+//@ts-ignore
 Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
 
   const {Promise} = b.ioc;
@@ -14,7 +13,7 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
 
   console.log('suman child id:',process.env.SUMAN_CHILD_ID);
 
-  const port = 7000 + parseInt(process.env.SUMAN_CHILD_ID || '1');
+  const port = process.env.lmx_port ? parseInt(process.env.lmx_port) : (7000 + parseInt(process.env.SUMAN_CHILD_ID || '1'));
   const conf = Object.freeze({port});
 
   const handleEvents = function (v) {
@@ -30,7 +29,10 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
     return v;
   };
 
-  before(h => new Broker(conf).start().then(handleEvents));
+  before(h => {
+    const brokerConf = Object.assign({}, conf, {noListen: process.env.lmx_broker_no_listen === 'yes'});
+    return new Broker(brokerConf).start().then(handleEvents)
+  });
 
   before('get client', h => {
     return new Client(conf).ensure().then(function (c) {
@@ -59,8 +61,8 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
     const makePromiseProvider = function (unlock) {
       return function (input: string) {
         return new Promise(function (resolve, reject) {
-          unlock(function (err) {
-            err ? reject(err) : resolve();
+          unlock(function (err, v) {
+            err ? reject(err) : resolve(v);
           });
         });
       }

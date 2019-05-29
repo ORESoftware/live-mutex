@@ -6,8 +6,7 @@ const async = require('async');
 import {Client} from "../../dist/client";
 import {Broker} from "../../dist/broker";
 
-////////////////////////////////////////////////////////
-
+// @ts-ignore
 Test.create(['lmUtils', (b, assert, before, describe, it, path, fs, inject, after) => {
 
   const {lmUtils} = b.ioc;
@@ -17,8 +16,10 @@ Test.create(['lmUtils', (b, assert, before, describe, it, path, fs, inject, afte
   assert.equal(a2z.length, 26, ' => Western alphabet is messed up.');
 
   const num = 100;
-
-  const port = 7000 + parseInt(process.env.SUMAN_CHILD_ID || '1');
+  const noListen = process.env.lmx_broker_no_listen === 'yes';
+  const port = 6970;
+  // const port = noListen ? 6970 : (
+  //   process.env.lmx_port ? parseInt(process.env.lmx_port) : (7000 + parseInt(process.env.SUMAN_CHILD_ID || '1')));
   const conf = Object.freeze({port});
 
   const handleEvents = function (v) {
@@ -33,9 +34,12 @@ Test.create(['lmUtils', (b, assert, before, describe, it, path, fs, inject, afte
 
     return v;
   };
+  
+  console.log({port});
 
   inject(j => {
-    j.register('broker', new Broker(conf).ensure().then(handleEvents));
+    const brokerConf = Object.assign({}, conf, {noListen});
+    j.register('broker', new Broker(brokerConf).ensure().then(handleEvents));
   });
 
   inject(j => {

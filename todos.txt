@@ -31,3 +31,14 @@ similar to unlock-requestors being able to force unlock even if they don't have 
   "name": "@oresoftware/json-stream-parser",
    "version": "0.0.1008",
 
+
+do the F#
+
+https://www.baeldung.com/java-nio2-async-socket-channel
+
+if connection lost (server goes down)
+client calls should have error passed to them, not just "end" event.
+although the timeout might suffice.
+
+
+

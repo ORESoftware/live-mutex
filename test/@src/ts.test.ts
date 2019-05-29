@@ -13,11 +13,12 @@ Test.create([function (b, inject, describe, before, it, $deps, $core) {
   const {chalk: colors, async, lodash: _} = $deps;
 
   console.log('suman child id:',process.env.SUMAN_CHILD_ID);
-  const port = 7000 + parseInt(process.env.SUMAN_CHILD_ID || '1');
+  const port = process.env.lmx_port ? parseInt(process.env.lmx_port) : (7000 + parseInt(process.env.SUMAN_CHILD_ID || '1'));
   const conf = Object.freeze({port});
   
   inject(j => {
-    j.register('broker', new Broker(conf).ensure());
+    const brokerConf = Object.assign({}, conf, {noListen: process.env.lmx_broker_no_listen === 'yes'});
+    j.register('broker', new Broker(brokerConf).ensure());
   });
   
   inject(j => {

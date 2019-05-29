@@ -7,13 +7,18 @@
   ],
   "ignore": [
     "/node_modules/",
-    "/.git/"
+    "/.git/",
+    "suman-old",
+    "suman-mono/suman"
   ],
   "comments": [
     "put any comment you want here"
   ],
   "list": [
-    "@oresoftware/linked-queue"
+    "@oresoftware/json-stream-parser",
+    "@oresoftware/linked-queue",
+    "suman",
+    "live-mutex"
   ]
 }
 

@@ -8,6 +8,7 @@ import {Broker} from "../../dist/broker";
 
 ////////////////////////////////////////////////////////
 
+// @ts-ignore
 Test.create(['lmUtils', (b, assert, before, describe, it, path, fs, inject, after) => {
 
   const {lmUtils} = b.ioc;
@@ -16,11 +17,9 @@ Test.create(['lmUtils', (b, assert, before, describe, it, path, fs, inject, afte
   const original = 'abcdefghijklmnopqrstuvwxyz';
   const alphabet = original.split('');
   const result = [];
-
-  const port = 7000 + parseInt(process.env.SUMAN_CHILD_ID || '1');
-  const conf = Object.freeze({port});
-
-
+  const port = process.env.lmx_port ? parseInt(process.env.lmx_port) : (7000 + parseInt(process.env.SUMAN_CHILD_ID || '1'));
+  const conf = {port};
+  
   const handleEvents = function (v) {
 
     v.emitter.on('warning', w => {
@@ -35,7 +34,8 @@ Test.create(['lmUtils', (b, assert, before, describe, it, path, fs, inject, afte
   };
 
   inject(j => {
-    j.register('broker', new Broker(conf).ensure().then(handleEvents));
+    const brokerConf = Object.assign({}, conf, {noListen: process.env.lmx_broker_no_listen === 'yes'});
+    j.register('broker', new Broker(brokerConf).ensure().then(handleEvents));
   });
 
   describe('post', function (b) {
