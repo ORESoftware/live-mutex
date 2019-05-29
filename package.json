@@ -43,8 +43,7 @@
     "@types/lodash": "^4.14.50",
     "@types/node": "^10.1.2",
     "@types/tcp-ping": "^0.1.0",
-    "@types/uuid": "^3.4.3",
-    "suman": "1.1.51244"
+    "@types/uuid": "^3.4.3"
   },
   "optionalDependencies": {
     "async": "^2.6.0",

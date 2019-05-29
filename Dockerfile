@@ -1,4 +1,4 @@
-FROM node:11
+FROM node:12.3.1-alpine
 
 ENV live_mutex_host "0.0.0.0"
 ENV live_mutex_port 6970
@@ -8,9 +8,11 @@ USER root
 
 WORKDIR "/app"
 
+RUN npm set unsafe-perm true
+
 COPY package.json .
 COPY package-lock.json .
-COPY assets/postinstall.sh assets/postinstall.sh
+COPY assets assets
 
 RUN npm i --production
 
