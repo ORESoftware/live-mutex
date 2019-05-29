@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env sh
 
 set -e;
 
@@ -27,22 +27,28 @@ cat assets/shell.sh > "$HOME/.oresoftware/bash/lmx.sh" || {
 (
 
     shell_file="node_modules/@oresoftware/shell/assets/shell.sh";
+
     [ -f "$shell_file" ] && cat "$shell_file" > "$HOME/.oresoftware/shell.sh" && {
         echo "Successfully copied @oresoftware/shell/assets/shell.sh to $HOME/.oresoftware/shell.sh";
         exit 0;
     }
 
     shell_file="../shell/assets/shell.sh";
+
     [ -f "$shell_file" ] &&  cat "../shell/assets/shell.sh" > "$HOME/.oresoftware/shell.sh" && {
         echo "Successfully copied @oresoftware/shell/assets/shell.sh to $HOME/.oresoftware/shell.sh";
         exit 0;
     }
 
+    if ! command -v curl &> /dev/null; then
+       exit 0;
+    fi
+
     curl -H 'Cache-Control: no-cache' \
          "https://raw.githubusercontent.com/oresoftware/shell/master/assets/shell.sh?$(date +%s)" \
           --output "$HOME/.oresoftware/shell.sh" 2> /dev/null || {
            echo "curl command failed to read shell.sh";
-           exit 1;
+           exit 0;
     }
 )
 

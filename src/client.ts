@@ -43,6 +43,7 @@ import * as path from "path";
 import {LMXLockRequestError, LMXUnlockRequestError} from "./shared-internal";
 import {LMXClientLockException, LMXClientUnlockException} from "./exceptions";
 import {compareVersions} from "./compare-versions";
+import {EVCb} from "./utils";
 
 if (weAreDebugging) {
   log.debug('Live-Mutex client is in debug mode. Timeouts are turned off.');
@@ -656,7 +657,10 @@ export class Client {
     cb(err, <LMLockSuccessData>{}); // need to pass empty object in case the user uses an object destructure call
   }
   
-  ls(opts: any, cb?: ErrFirstDataCallback) {
+  ls(cb: EVCb<any>): void;
+  ls(opts: any, cb?: EVCb<any>): void;
+  
+  ls(opts: any, cb?: EVCb<any>) {
     
     if (typeof opts === 'function') {
       cb = opts;
