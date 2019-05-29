@@ -5,6 +5,10 @@ export const forDebugging = {
 };
 
 
+export enum LMXClientError {
+  VersionMismatch = 'version_mismatch',
+  UnknownError = 'unknown_error'
+}
 
 export enum LMXLockRequestError {
   GenericLockError = 'generic_lock_error',
@@ -24,7 +28,6 @@ export enum LMXUnlockRequestError {
   InternalError = 'internal_error',
   GeneralUnlockError = 'general_unlock_error'
 }
-
 
 
 export enum RWStatus {

@@ -44,6 +44,8 @@ import {LMXLockRequestError, LMXUnlockRequestError} from "./shared-internal";
 import {LMXClientLockException, LMXClientUnlockException} from "./exceptions";
 import {compareVersions} from "./compare-versions";
 import {EVCb} from "./utils";
+import {LMXClientException} from "./exceptions";
+import {LMXClientError} from "./shared-internal";
 
 if (weAreDebugging) {
   log.debug('Live-Mutex client is in debug mode. Timeouts are turned off.');
@@ -109,10 +111,9 @@ export interface IUuidTimeoutBool {
   [key: string]: boolean
 }
 
-export type ErrFirstDataCallback = (err: any, val?: any) => void;
 
 export interface IClientResolution {
-  [key: string]: ErrFirstDataCallback
+  [key: string]: EVCb<any>
 }
 
 export interface IBookkeepingHash {
@@ -354,13 +355,14 @@ export class Client {
       if (data.warning) {
         this.emitter.emit('warning', data.warning);
       }
-  
-  
-      if(data.type === 'version-mismatch'){
+      
+      
+      if (data.type === 'version-mismatch') {
         this.emitter.emit('error', data);
         log.error(data);
+        this.cannotContinue = true;
         this.write({type: 'version-mismatch-confirmed'});
-        
+        this._fireCallbacksPrematurely(new Error('Version-match => ' + util.inspect(data)));
         return;
       }
       
@@ -372,16 +374,17 @@ export class Client {
       }
       
       
-      if (self.giveups[uuid]) {
-        delete self.giveups[uuid];
-        return;
-      }
-      
       const fn = self.resolutions[uuid];
       const to = self.timeouts[uuid];
       
       delete self.timeouts[uuid];
-      // delete self.resolutions[uuid]; // might be redundant
+      // delete self.resolutions[uuid]; // don't do this here, the same resolution fn might need to be called more than once
+      
+      if (self.giveups[uuid]) {
+        delete self.giveups[uuid];
+        delete self.resolutions[uuid];
+        return;
+      }
       
       if (fn && to) {
         this.emitter.emit('warning', 'Function and timeout both exist => Live-Mutex implementation error.');
@@ -532,7 +535,27 @@ export class Client {
     return new Client(opts);
   }
   
-  requestLockInfo(key: string, opts?: any, cb?: Function) {
+  private _fireCallbacksPrematurely(err: any) {
+    
+    for (let k of Object.keys(this.timers)) {
+      clearTimeout(this.timers[k]);
+    }
+    
+    this.timers = {};
+    
+    err = err || new Error('Unknown error - firing resolution callbacks prematurely.');
+    
+    err.forcePrematureCallback = true;
+    
+    for (let k of Object.keys(this.resolutions)) {
+      const fn = this.resolutions[k];
+      delete this.resolutions[k];
+      fn.call(this, err, err);
+    }
+    
+  }
+  
+  requestLockInfo(key: string, opts?: any, cb?: EVCb<any>) {
     
     assert.equal(typeof key, 'string', 'Key passed to lmx#lock needs to be a string.');
     
@@ -548,6 +571,16 @@ export class Client {
       
       clearTimeout(this.timers[uuid]);
       delete this.timeouts[uuid];
+      
+      if (err) {
+        return this.fireCallbackWithError(cb, new LMXClientException(
+          key,
+          null,
+          LMXClientError.UnknownError,
+          err,
+          `Unknown error - see included "originalError" object.)`
+        ));
+      }
       
       if (String(key) !== String(data.key)) {
         delete this.resolutions[uuid];
@@ -647,6 +680,15 @@ export class Client {
     cb(err, <LMLockSuccessData>{}); // need to pass empty object in case the user uses an object destructure call
   }
   
+  protected fireCallbackWithError(cb: EVCb<any>, err: LMXClientException) {
+    const uuid = err.id;
+    const key = err.key;  // unused
+    this.cleanUp(uuid);
+    this.emitter.emit('warning', err.message);
+    cb(err, <any>{}); // need to pass empty object in case the user uses an object destructure call
+  }
+  
+  
   ls(cb: EVCb<any>): void;
   ls(opts: any, cb?: EVCb<any>): void;
   
@@ -691,7 +733,7 @@ export class Client {
     
   }
   
-  private parseUnlockOpts(key: string, opts?: any, cb?: any): [string, any, LMClientUnlockCallBack] {
+  parseUnlockOpts(key: string, opts?: any, cb?: any): [string, any, LMClientUnlockCallBack] {
     
     if (typeof opts === 'function') {
       cb = opts;
@@ -711,6 +753,16 @@ export class Client {
     this.write({
       type: 'simulate-version-mismatch',
     });
+  }
+  
+  _makeBrokerSideError(){
+    this.write({
+      type: 'end-connection-from-broker-for-testing-purposes',
+    });
+  }
+  
+  _makeClientSideError(){
+    this.close();
   }
   
   // lock(key: string, cb: LMClientLockCallBack, z?: LMClientLockCallBack) : void;
@@ -743,7 +795,7 @@ export class Client {
       });
     }
     
-    if(this.cannotContinue){
+    if (this.cannotContinue) {
       return process.nextTick(() => {
         this.fireLockCallbackWithError(cb, new LMXClientLockException(
           key,
@@ -851,7 +903,7 @@ export class Client {
         'Please include a callback as the final argument to the client.lock() routine.');
       throw err;
     }
-  
+    
     if (process.domain) {
       cb = process.domain.bind(cb as any);
     }

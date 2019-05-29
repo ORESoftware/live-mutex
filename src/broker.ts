@@ -301,6 +301,10 @@ export class Broker {
         return self.onVersion({value: '0.0.1'}, ws);
       }
       
+      if(data.type === 'end-connection-from-broker-for-testing-purposes'){
+        return self.abruptlyCloseConnction(ws);
+      }
+      
       const key = data.key;
       
       if (data.ttl === null) {
@@ -584,6 +588,11 @@ export class Broker {
     return this.host;
   }
   
+  abruptlyCloseConnction(ws:LMXSocket){
+    ws.destroy();
+  }
+  
+  
   onVersion(data: any, ws: LMXSocket) {
     
     const clientVersion = data.value;
@@ -600,6 +609,7 @@ export class Broker {
       this.emitter.emit('error', errMessage);
       this.send(ws, {type: 'version-mismatch', versions: {clientVersion, brokerVersion}});
       ws.destroyTimeout = setTimeout(() => {
+        // we delay destroy the connection, so that we can tell the client about a version mismatch
         ws.destroy();
       }, 2000);
     }
