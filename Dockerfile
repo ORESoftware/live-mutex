@@ -9,10 +9,15 @@ USER root
 WORKDIR "/app"
 
 COPY package.json .
-RUN npm install --production
+COPY package-lock.json .
+COPY assets/postinstall.sh assets/postinstall.sh
+
+RUN npm i --production
+
 COPY . .
 
 ARG CACHEBUST=1
 
-ENTRYPOINT node dist/lm-start-server.js
+ENTRYPOINT ["node", "dist/lm-start-server.js"]
+CMD []
 
