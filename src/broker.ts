@@ -21,9 +21,9 @@ import {forDebugging} from './shared-internal';
 const debugLog = process.argv.indexOf('--lmx-debug') > 0 || process.env.lmx_debug === 'yes';
 
 export const log = {
-  info: console.log.bind(console, chalk.gray.bold('lmx broker info:')),
-  error: console.error.bind(console, chalk.red.bold('lmx broker error:')),
-  warn: console.error.bind(console, chalk.yellow.bold('lmx broker warning:')),
+  info: console.log.bind(console, chalk.gray.bold('lmx info:')),
+  error: console.error.bind(console, chalk.red.bold('lmx error:')),
+  warn: console.error.bind(console, chalk.yellow.bold('lmx warning:')),
   debug: function (...args: any[]) {
     if (debugLog) {
       let newTime = Date.now();
@@ -55,8 +55,13 @@ if (!(brokerPackage.version && typeof brokerPackage.version === 'string')) {
 }
 
 
+process.on('uncaughtException', e => {
+  log.error('Uncaught Exception occured in Broker process:', typeof e === 'string' ? e : util.inspect(e));
+});
+
+
 process.on('warning', function (e: any) {
-  log.error('warning:', e && e.message || e);
+  log.debug('warning:', e && e.message || e);
 });
 
 ///////////////////////////////////////////////////////////////////
@@ -262,8 +267,9 @@ export class Broker {
     
     this.emitter.on('warning', function () {
       if (self.emitter.listenerCount('warning') < 2) {
-        process.emit.call(process, 'warning', ...arguments);
-        process.emit.call(process, 'warning', 'Add a "warning" event listener to the LMX broker to get rid of this message.');
+        log.warn('No "warning" event handlers attached by end-user to client.emitter, therefore logging these errors from library:');
+        log.warn(...arguments);
+        log.warn('Add a "warning" event listener to the LMX broker to get rid of this message.');
       }
     });
     
@@ -301,8 +307,12 @@ export class Broker {
         return self.onVersion({value: '0.0.1'}, ws);
       }
       
-      if(data.type === 'end-connection-from-broker-for-testing-purposes'){
-        return self.abruptlyCloseConnction(ws);
+      if (data.type === 'end-connection-from-broker-for-testing-purposes') {
+        return self.abruptlyEndConnection(ws);
+      }
+  
+      if (data.type === 'destroy-connection-from-broker-for-testing-purposes') {
+        return self.abruptlyDestroyConnection(ws);
       }
       
       const key = data.key;
@@ -429,17 +439,20 @@ export class Broker {
       ws.once('disconnect', () => {
         this.cleanupConnection(ws);
         ws.destroy();
+        ws.removeAllListeners();
       });
       
       ws.once('end', () => {
         this.cleanupConnection(ws);
         ws.destroy();
+        ws.removeAllListeners();
       });
       
-      ws.once('error', (err) => {
-        this.emitter.emit('warning', 'live-mutex client error ' + (err && err.stack || err));
+      ws.on('error', (err) => {
+        this.emitter.emit('warning', 'LMX client error ' + (err && err.stack || err));
         this.cleanupConnection(ws);
         ws.destroy();
+        ws.removeAllListeners();
       });
       
       ws.pipe(createParser())
@@ -478,7 +491,6 @@ export class Broker {
     };
     
     process.once('exit', sigEvent('exit'));
-    // process.once('uncaughtException', sigEvent('uncaughtException'));
     process.once('SIGINT', sigEvent('SIGINT'));
     process.once('SIGTERM', sigEvent('SIGTERM'));
     
@@ -588,8 +600,16 @@ export class Broker {
     return this.host;
   }
   
-  abruptlyCloseConnction(ws:LMXSocket){
+  abruptlyDestroyConnection(ws: LMXSocket) {
+    log.error('Connection will be destroyed.');
     ws.destroy();
+    ws.removeAllListeners();
+  }
+  
+  abruptlyEndConnection(ws: LMXSocket) {
+    log.error('Connection will be ended.');
+    ws.end();
+    ws.removeAllListeners();
   }
   
   
@@ -611,6 +631,7 @@ export class Broker {
       ws.destroyTimeout = setTimeout(() => {
         // we delay destroy the connection, so that we can tell the client about a version mismatch
         ws.destroy();
+        ws.removeAllListeners();
       }, 2000);
     }
     // return this.send(ws, {type:'broker-version', brokerVersion: brokerPackage.version});
@@ -625,7 +646,7 @@ export class Broker {
     
     ws.lmxClosed = true;
     
-    ws.removeAllListeners();
+    // ws.removeAllListeners();
     
     this.connectedClients.delete(ws);
     
@@ -984,7 +1005,9 @@ export class Broker {
         let notifyList = lckTemp.notify;
         
         if (!self.rejected[obj.uuid]) {
-          notifyList.push(obj.uuid, obj);
+          if(!notifyList.contains(obj.uuid)){
+            notifyList.push(obj.uuid, obj);
+          }
         }
         
         // get the first 5, ideally we'd mix requests from different clients/ws

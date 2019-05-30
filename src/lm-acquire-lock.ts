@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 'use strict';
 
-import {Client, log, validConstructorOptions, validLockOptions} from "./client";
+import {Client, log} from "./client";
 import chalk from "chalk";
 import util = require('util');
 const index = process.argv.indexOf('--json');
@@ -74,6 +74,8 @@ c.ensure().then(function (c) {
   const lockOptions = Object.assign({ttl: null, keepLocksAfterDeath: true}, v);
 
   c.lock(v.key, lockOptions, function (e: any) {
+    
+    c.setNoRecover();
 
     if (e) {
       log.error(chalk.magenta.bold(e && e.message || e));

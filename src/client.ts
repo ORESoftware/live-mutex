@@ -143,7 +143,7 @@ export interface LMXClientUnlockOpts {
 }
 
 export interface LMLockSuccessData {
-  (fn: EVCallback): void
+  (fn?: EVCallback): void
   
   acquired: true,
   key: string,
@@ -178,6 +178,7 @@ export class Client {
   listeners: Object;
   opts: Partial<ClientOpts>;
   ttl: number;
+  noRecover: boolean;
   unlockRequestTimeout: number;
   lockRequestTimeout: number;
   lockRetryMax: number;
@@ -192,9 +193,11 @@ export class Client {
   timers: { [key: string]: Timer };
   write: (data: any, cb?: EVCb<any>) => void;
   isOpen: boolean;
-  close: Function;
+  close: () => void;
   keepLocksAfterDeath = false;
   keepLocksOnExit = false;
+  createNewConnection: () => void;
+  endCurrentConnection: () => void;
   emitter = new EventEmitter();
   noDelay = true;
   socketFile = '';
@@ -312,15 +315,25 @@ export class Client {
     
     this.emitter.on('warning', function () {
       if (self.emitter.listenerCount('warning') < 2) {
-        process.emit.call(process, 'warning', ...Array.from(arguments).map(v => (typeof v === 'string' ? v : util.inspect(v))));
-        process.emit.call(process, 'warning', 'Add a "warning" event listener to the Live-Mutex client to get rid of this message.');
+        log.warn('No "warning" event handler(s) attached by end-user to client.emitter, therefore logging these errors from LMX library:');
+        log.warn(...Array.from(arguments).map(v => (typeof v === 'string' ? v : util.inspect(v))));
+        log.warn('Add a "warning" event listener to the Live-Mutex client to get rid of this message.');
       }
     });
     
-    this.write = (data: any, cb?: Function) => {
+    this.write = (data: any, cb?: EVCb<any>) => {
       
       if (!ws) {
         throw new Error('please call ensure()/connect() on this Live-Mutex client, before using the lock/unlock methods.');
+      }
+      
+      if (!ws.writable) {
+        return this.ensure((err, val) => {
+          if (err) {
+            throw new Error('Could not reconnect.');
+          }
+          this.write(data, cb);
+        });
       }
       
       data.max = data.max || null;
@@ -373,21 +386,21 @@ export class Client {
         );
       }
       
+      const fn = this.resolutions[uuid];
+      const to = this.timeouts[uuid];
       
-      const fn = self.resolutions[uuid];
-      const to = self.timeouts[uuid];
-      
-      delete self.timeouts[uuid];
+      delete this.timeouts[uuid];
       // delete self.resolutions[uuid]; // don't do this here, the same resolution fn might need to be called more than once
       
-      if (self.giveups[uuid]) {
-        delete self.giveups[uuid];
-        delete self.resolutions[uuid];
+      if (this.giveups[uuid]) {
+        clearTimeout(this.timers[uuid]);
+        delete this.giveups[uuid];
+        delete this.resolutions[uuid];
         return;
       }
       
       if (fn && to) {
-        this.emitter.emit('warning', 'Function and timeout both exist => Live-Mutex implementation error.');
+        this.emitter.emit('error', 'Function and timeout both exist => Live-Mutex implementation error.');
       }
       
       if (to) {
@@ -410,7 +423,7 @@ export class Client {
         
         this.emitter.emit('warning', `Rejecting lock acquisition for key => "${data.key}".`);
         
-        self.write({
+        this.write({
           uuid: uuid,
           key: data.key,
           type: 'lock-received-rejected'
@@ -442,9 +455,8 @@ export class Client {
       this.recovering = false;
       
       if (ws) {
+        ws.destroy();
         ws.removeAllListeners();
-        //@ts-ignore
-        ws.destroy((err: any) => (err && log.error(err.message || err)));
       }
       
       return connectPromise = new Promise((resolve, reject) => {
@@ -474,13 +486,44 @@ export class Client {
           ws.setNoDelay(true);
         }
         
+        let called = false;
+        
         const recover = (e: any) => {
+          
+          console.error('RECOVERY HAPPENED.');
+          console.error('RECOVERY HAPPENED.');
+          console.error('RECOVERY HAPPENED.');
+          console.error('RECOVERY HAPPENED.');
+  
+          
+          if (called) {
+            return;
+          }
+          
+          called = true;
+          
+          if (this.noRecover) {
+            return;
+          }
+          
           this.recovering = true;
           e && this.emitter.emit('warning', 'LMX client error => ' + e.message || util.inspect(e));
-          ws.destroy();
-          ws.removeAllListeners();
+          
+          if (!ws.destroyed) {
+            ws.destroy();
+            ws.removeAllListeners();
+          }
+          
+          for (let resol of Object.entries(this.resolutions)) {
+            this.giveups[resol[0]] = true;
+            clearTimeout(this.timers[resol[0]]);
+            resol[1]('Error: Connection ended/closed. ' +
+              'A new connection will be created but all locking requests in-flight should get receive errors in the callbacks.', {});
+          }
+          
           this.ensure(); // create new connection
         };
+        
         
         ws.setEncoding('utf8')
           
@@ -493,7 +536,7 @@ export class Client {
             this.emitter.emit('warning', 'LMX => client stream "end" event occurred.');
             recover(null);
           })
-          .once('error', (e: any) => {
+          .on('error', (e: any) => {
             this.emitter.emit('warning', 'LMX => client stream "error" event occurred.');
             recover(e);
           })
@@ -515,8 +558,18 @@ export class Client {
     process.once('exit', () => {
       ws && ws.destroy();
     });
+  
+  
+    this.endCurrentConnection = () => {
+      return ws && ws.end();
+    };
     
     this.close = () => {
+      this.noRecover = true;
+      return ws && ws.destroy();
+    };
+    
+    this.createNewConnection = () => {
       return ws && ws.destroy();
     };
     
@@ -531,6 +584,12 @@ export class Client {
     
   };
   
+  onSocketDestroy(err: any) {
+    console.log('Socket destroy callback error:', err);
+  }
+  
+  
+  
   static create(opts?: Partial<ClientOpts>): Client {
     return new Client(opts);
   }
@@ -542,17 +601,26 @@ export class Client {
     }
     
     this.timers = {};
-    
     err = err || new Error('Unknown error - firing resolution callbacks prematurely.');
     
-    err.forcePrematureCallback = true;
-    
     for (let k of Object.keys(this.resolutions)) {
+      
       const fn = this.resolutions[k];
       delete this.resolutions[k];
-      fn.call(this, err, err);
+      
+      const e = {
+        forcePrematureCallback: true,
+        message: err.message,
+        stack: err.stack,
+      };
+      
+      fn.call(this, e, e);
     }
     
+  }
+  
+  setNoRecover() {
+    this.noRecover = true;
   }
   
   requestLockInfo(key: string, opts?: any, cb?: EVCb<any>) {
@@ -745,7 +813,14 @@ export class Client {
     }
     
     opts = opts || {};
-    assert(typeof cb === 'function', 'Please use a callback as the last argument to the unlock method.');
+    
+    if(cb){
+      assert(typeof cb === 'function', 'Please use a callback as the last argument to the unlock method.');
+    }
+    else{
+      cb = this.noop;
+    }
+   
     return [key, opts, cb];
   }
   
@@ -755,13 +830,19 @@ export class Client {
     });
   }
   
-  _makeBrokerSideError(){
+  _invokeBrokerSideEndCall() {
     this.write({
-      type: 'end-connection-from-broker-for-testing-purposes',
+      type: 'end-connection-from-broker-for-testing-purposes'
     });
   }
   
-  _makeClientSideError(){
+  _invokeBrokerSideDestroyCall() {
+    this.write({
+      type: 'destroy-connection-from-broker-for-testing-purposes'
+    });
+  }
+  
+  _makeClientSideError() {
     this.close();
   }
   
@@ -1125,8 +1206,10 @@ export class Client {
     
   }
   
-  noop() {
+  noop(err?: any) {
     // this is a no-operation, obviously
+    // no ref to this, so can't use "this" here
+    err && log.error(err);
   }
   
   getPort() {
@@ -1137,7 +1220,11 @@ export class Client {
     return this.host;
   }
   
-  unlock(key: string, opts: any, cb?: LMClientUnlockCallBack) {
+  unlock(key: string) : void;
+  unlock(key: string, opts: any) : void;
+  unlock(key: string, opts: any, cb: LMClientUnlockCallBack): void;
+  
+  unlock(key: string, opts?: any, cb?: LMClientUnlockCallBack) {
     
     try {
       [key, opts, cb] = this.parseUnlockOpts(key, opts, cb);
