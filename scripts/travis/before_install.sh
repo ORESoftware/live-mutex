@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
-if ! which tsc >/dev/null ; then
-    npm install -g typescript
-fi
 
+rm -rf node_modules
+npm i -f --loglevel=warn
 
-tsc || echo "whatever"
+npm i -f -g 'typescript@3.5.1'
+
