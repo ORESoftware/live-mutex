@@ -462,6 +462,7 @@ export class Client {
       return connectPromise = new Promise((resolve, reject) => {
         
         const onFirstErr = (e: any) => {
+          this.noRecover = true;
           let err = 'LMX client error => ' + (e && e.message || e);
           this.emitter.emit('warning', err);
           reject(err);
@@ -489,12 +490,6 @@ export class Client {
         let called = false;
         
         const recover = (e: any) => {
-          
-          console.error('RECOVERY HAPPENED.');
-          console.error('RECOVERY HAPPENED.');
-          console.error('RECOVERY HAPPENED.');
-          console.error('RECOVERY HAPPENED.');
-  
           
           if (called) {
             return;

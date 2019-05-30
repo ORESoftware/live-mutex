@@ -61,8 +61,13 @@ Test.create([function (b, inject, describe, before, it, $deps, $core) {
         
         c.lock('foo' + n, (err, val) => {
           console.log({err,val});
+          
+          if(err){
+            return cb(null);
+          }
+          
           t.unlock();
-          cb(null, {err,val});
+          cb(null);
         });
         
       }, (err,val) => {

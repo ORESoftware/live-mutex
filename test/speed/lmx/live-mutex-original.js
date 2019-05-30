@@ -36,11 +36,14 @@ client.ensure().then(function () {
             if (lockholders > max) {
                 return cb(new Error(`Should never have more than ${max} lockholders.`));
             }
-
-            lockholders--;
-
+            
             // console.log('unlocking...' + count++);
-            unlock(cb);
+            unlock.unlock(err => {
+  
+              lockholders--;
+              cb();
+              
+            });
 
         });
 

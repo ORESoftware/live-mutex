@@ -56,7 +56,8 @@ if (!(brokerPackage.version && typeof brokerPackage.version === 'string')) {
 
 
 process.on('uncaughtException', e => {
-  log.error('Uncaught Exception occured in Broker process:', typeof e === 'string' ? e : util.inspect(e));
+  log.error('Uncaught Exception event occurred in Broker process:\n',
+    typeof e === 'string' ? e : util.inspect(e));
 });
 
 
@@ -470,8 +471,7 @@ export class Broker {
     });
     
     let callable = true;
-    let sigEvent = (event: any) => {
-      return (err: any) => {
+    let sigEvent = (event: any) => (err: any) => {
         
         err && this.emitter.emit('warning', err);
         if (!callable) {
@@ -487,7 +487,6 @@ export class Broker {
         wss.close(function () {
           process.exit(1);
         });
-      }
     };
     
     process.once('exit', sigEvent('exit'));
