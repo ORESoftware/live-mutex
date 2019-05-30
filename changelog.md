@@ -7,6 +7,13 @@
 
 ## Wed May 29 22:22:30 PDT 2019
 
+
+### changed:
+
+No longer supporting Node.js 6 or 7.
+Node.js 8+ supported.
+
+
 ### removed:
 
 Remove the following deps from optionalDependencies:
