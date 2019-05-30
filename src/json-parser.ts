@@ -9,10 +9,6 @@ export interface IParsedObject {
   [index: string]: any
 }
 
-
 export const createParser = function (v?: JSONParserOpts) {
   return new JSONParser(v)
 };
-
-export const createJSONParser = createParser;
-export default createParser;
