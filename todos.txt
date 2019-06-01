@@ -1,4 +1,6 @@
 
+CircleCI docs - configuration - https://circleci.com/docs/2.0/configuration-reference/
+
 Use Docker with TravisCI: https://docs.travis-ci.com/user/docker/
 
 
