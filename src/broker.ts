@@ -449,7 +449,7 @@ export class Broker {
         ws.removeAllListeners();
       });
       
-      ws.on('error', (err) => {
+      ws.once('error', (err) => {
         this.emitter.emit('warning', 'LMX client error ' + (err && err.stack || err));
         this.cleanupConnection(ws);
         ws.destroy();

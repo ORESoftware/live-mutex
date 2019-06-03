@@ -39,13 +39,13 @@ client.ensure().then(function () {
             
             // console.log('unlocking...' + count++);
             
-            unlock.unlock(err => {
-               if(!err){
-                 lockholders--;
-               }
-                err && console.error(err);
-            });
-            return cb();
+            // unlock.unlock(err => {
+            //    if(!err){
+            //      lockholders--;
+            //    }
+            //     err && console.error(err);
+            // });
+            // return cb();
             
             unlock.unlock(err => {
   
