@@ -2,9 +2,9 @@
 
 const async = require('async');
 const {Client} = require('live-mutex');
-const conf = Object.freeze({port: 6970});
+// const conf = Object.freeze({port: 6970});
 
-// const conf = Object.freeze({udsPath:  process.env.HOME+ '/uds.temp.sock' });
+const conf = Object.freeze({udsPath:  process.env.HOME+ '/uds.temp.sock' });
 
 process.on('unhandledRejection', function (e) {
     console.error('unhandled rejection => ', e.stack || e);
@@ -66,8 +66,8 @@ client.ensure().then(function () {
         console.log(' => Time required for live-mutex => ', diff);
         console.log(' => Lock/unlock cycles per millisecond => ', Number(a.length / diff).toFixed(3));
         
-        setInterval(() => {},300);
-        // process.exit(0);
+        // setInterval(() => {},300);
+        process.exit(0);
     });
 
 });
