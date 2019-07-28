@@ -10,7 +10,7 @@ import {
 }
 from "./client";
 
-import {LMXLockRequestError} from "./index";
+import {LMXLockRequestError} from "./main";
 import chalk from "chalk";
 import {weAreDebugging} from "./we-are-debugging";
 import {forDebugging} from './shared-internal';

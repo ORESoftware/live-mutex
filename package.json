@@ -2,9 +2,9 @@
   "name": "live-mutex",
   "version": "0.1.1061",
   "description": "Simple mutex that uses a TCP server; useful if you cannot install Redis, etc.",
-  "main": "dist/index.js",
-  "typings": "dist/index.d.ts",
-  "types": "dist/index.d.ts",
+  "main": "dist/main.js",
+  "typings": "dist/main.d.ts",
+  "types": "dist/main.d.ts",
   "bin": {
     "lmx_acquire_lock": "assets/cli/acquire.js",
     "lmx_release_lock": "assets/cli/release.js",

@@ -24,12 +24,12 @@ export const log = {
   info: console.log.bind(console, chalk.gray.bold('lmx info:')),
   error: console.error.bind(console, chalk.red.bold('lmx error:')),
   warn: console.error.bind(console, chalk.yellow.bold('lmx warning:')),
-  debug: function (...args: any[]) {
+  debug (...args: any[]) {
     if (debugLog) {
       let newTime = Date.now();
       let elapsed = newTime - forDebugging.previousTime;
       forDebugging.previousTime = newTime;
-      console.log(chalk.yellow.bold('[lmx broker debugging]'), 'elapsed millis:', `(${elapsed})`, ...args);
+      console.log(chalk.yellow.bold('lmx broker debugging:'), 'elapsed millis:', `(${elapsed})`, ...args);
     }
   }
 };
@@ -915,7 +915,7 @@ export class Broker {
     let lqValue: LinkedQueueValue<NotifyObj>;
     let n: NotifyObj;
     
-    while (lqValue = notifyList.shift()) {
+    while (lqValue = notifyList.dequeue()) {
       n = lqValue.value;
       if (n.ws && n.ws.writable) {
         break;

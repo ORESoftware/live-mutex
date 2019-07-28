@@ -24,7 +24,7 @@ export const log = {
   info: console.log.bind(console, chalk.gray.bold('lmx info:')),
   warn: console.error.bind(console, chalk.magenta.bold('lmx warning:')),
   error: console.error.bind(console, chalk.red.bold('lmx error:')),
-  debug: function (...args: any[]) {
+  debug(...args: any[]) {
     if (debugLog) {
       let newTime = Date.now();
       let elapsed = newTime - forDebugging.previousTime;
@@ -111,20 +111,8 @@ export interface IUuidTimeoutBool {
   [key: string]: boolean
 }
 
-
 export interface IClientResolution {
   [key: string]: EVCb<any>
-}
-
-export interface IBookkeepingHash {
-  [key: string]: IBookkeeping;
-}
-
-export interface IBookkeeping {
-  rawLockCount: number,
-  rawUnlockCount: number;
-  lockCount: number;
-  unlockCount: number;
 }
 
 export type LMClientCallBack = (err: any, c?: Client) => void;
@@ -186,7 +174,6 @@ export class Client {
   cannotContinue = false;
   timeouts: IUuidTimeoutBool;
   resolutions: IClientResolution;
-  bookkeeping: IBookkeepingHash;
   ensure: Ensure;
   connect: Ensure;
   giveups: UuidBooleanHash;
@@ -217,12 +204,12 @@ export class Client {
       assert(typeof cb === 'function', 'optional second argument to Live-Mutex Client constructor must be a function.');
     }
     
-    Object.keys(opts).forEach(function (key) {
+    for (const key of Object.keys(opts)) {
       if (!validConstructorOptions[key]) {
         throw new Error('An option passed to Live-Mutex Client constructor is ' +
           `not a recognized option => "${key}", \n valid options are: ` + util.inspect(validConstructorOptions));
       }
-    });
+    }
     
     if (opts['host']) {
       assert(typeof opts.host === 'string', ' => "host" option needs to be a string.');
@@ -345,7 +332,8 @@ export class Client {
       
       if ('keepLocksAfterDeath' in data) {
         data.keepLocksAfterDeath = Boolean(data.keepLocksAfterDeath);
-      } else {
+      }
+      else {
         data.keepLocksAfterDeath = this.keepLocksAfterDeath || false;
       }
       
@@ -369,7 +357,6 @@ export class Client {
         this.emitter.emit('warning', data.warning);
       }
       
-      
       if (data.type === 'version-mismatch') {
         this.emitter.emit('error', data);
         log.error(data);
@@ -378,7 +365,6 @@ export class Client {
         this._fireCallbacksPrematurely(new Error('Version-match => ' + util.inspect(data)));
         return;
       }
-      
       
       if (!uuid) {
         return this.emitter.emit('warning',
@@ -519,7 +505,6 @@ export class Client {
           this.ensure(); // create new connection
         };
         
-        
         ws.setEncoding('utf8')
           
           .once('error', onFirstErr)
@@ -553,8 +538,7 @@ export class Client {
     process.once('exit', () => {
       ws && ws.destroy();
     });
-  
-  
+    
     this.endCurrentConnection = () => {
       return ws && ws.end();
     };
@@ -580,10 +564,8 @@ export class Client {
   };
   
   onSocketDestroy(err: any) {
-    console.log('Socket destroy callback error:', err);
+    log.info('Socket destroy callback error:', err);
   }
-  
-  
   
   static create(opts?: Partial<ClientOpts>): Client {
     return new Client(opts);
@@ -751,7 +733,6 @@ export class Client {
     cb(err, <any>{}); // need to pass empty object in case the user uses an object destructure call
   }
   
-  
   ls(cb: EVCb<any>): void;
   ls(opts: any, cb?: EVCb<any>): void;
   
@@ -784,9 +765,11 @@ export class Client {
     if (typeof opts === 'function') {
       cb = opts;
       opts = {};
-    } else if (typeof opts === 'boolean') {
+    }
+    else if (typeof opts === 'boolean') {
       opts = {force: opts};
-    } else if (typeof opts === 'number') {
+    }
+    else if (typeof opts === 'number') {
       opts = {ttl: opts};
     }
     
@@ -801,21 +784,23 @@ export class Client {
     if (typeof opts === 'function') {
       cb = opts;
       opts = {};
-    } else if (typeof opts === 'boolean') {
+    }
+    else if (typeof opts === 'boolean') {
       opts = {force: opts};
-    } else if (typeof opts === 'string') {
+    }
+    else if (typeof opts === 'string') {
       opts = {_uuid: opts};
     }
     
     opts = opts || {};
     
-    if(cb){
+    if (cb) {
       assert(typeof cb === 'function', 'Please use a callback as the last argument to the unlock method.');
     }
-    else{
+    else {
       cb = this.noop;
     }
-   
+    
     return [key, opts, cb];
   }
   
@@ -850,7 +835,8 @@ export class Client {
     
     try {
       [key, opts, cb] = this.parseLockOpts(key, opts, cb);
-    } catch (err) {
+    }
+    catch (err) {
       if (typeof cb === 'function') {
         return process.nextTick(cb, err, {});
       }
@@ -858,7 +844,6 @@ export class Client {
         'Please include a callback as the final argument to the client.lock() routine.');
       throw err;
     }
-    
     
     if (!this.isOpen) {
       return process.nextTick(() => {
@@ -969,7 +954,8 @@ export class Client {
         assert(opts._uuid, 'Live-Mutex internal error: no _uuid past to retry call.');
       }
       
-    } catch (err) {
+    }
+    catch (err) {
       
       if (typeof cb === 'function') {
         return process.nextTick(cb, err, {});
@@ -1215,15 +1201,16 @@ export class Client {
     return this.host;
   }
   
-  unlock(key: string) : void;
-  unlock(key: string, opts: any) : void;
+  unlock(key: string): void;
+  unlock(key: string, opts: any): void;
   unlock(key: string, opts: any, cb: LMClientUnlockCallBack): void;
   
   unlock(key: string, opts?: any, cb?: LMClientUnlockCallBack) {
     
     try {
       [key, opts, cb] = this.parseUnlockOpts(key, opts, cb);
-    } catch (err) {
+    }
+    catch (err) {
       if (typeof cb === 'function') {
         return process.nextTick(cb, err, {});
       }
@@ -1257,7 +1244,8 @@ export class Client {
         assert(opts.lockRequestTimeout >= 20 && opts.lockRequestTimeout <= 800000,
           ' => "ttl" for a lock needs to be integer between 3 and 800000 millis.');
       }
-    } catch (err) {
+    }
+    catch (err) {
       return process.nextTick(cb, err, {});
     }
     
