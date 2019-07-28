@@ -2,14 +2,19 @@
 # https://docs.travis-ci.com/user/languages/javascript-with-nodejs#Node.js-v4-(or-io.js-v3)-compiler-requirements
 
 language: node_js
+
+git:
+  depth: 1
+
 node_js:
-  - '6'
-  - '7'
   - '8'
   - '9'
   - '10'
+  - '11'
+  - '12'
 env:
   - CXX=g++-4.8
+  - DOCKER_COMPOSE_VERSION=1.4.2
 addons:
   apt:
     sources:

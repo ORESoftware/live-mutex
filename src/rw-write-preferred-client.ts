@@ -10,6 +10,7 @@ import UUID = require('uuid');
 //project
 import {Client, ClientOpts, LMClientCallBack, LMClientUnlockCallBack} from "./client";
 import {weAreDebugging} from "./we-are-debugging";
+import {EVCb} from "./utils";
 
 
 /////////////////////////////////////////////////////////////////////////////////
@@ -95,7 +96,7 @@ export class RWLockWritePrefClient extends Client {
     });
   }
 
-  acquireWriteLock(key: string, opts: any, cb?: any) {
+  acquireWriteLock(key: string, opts: any, cb?: EVCb<any>) {
 
     try {
       [key, opts, cb] = this.parseUnlockOpts(key, opts, cb);
@@ -132,7 +133,7 @@ export class RWLockWritePrefClient extends Client {
 
   }
 
-  releaseWriteLock(key: string, opts: any, cb: any) {
+  releaseWriteLock(key: string, opts: any, cb: EVCb<any>) {
 
     try {
       [key, opts, cb] = this.parseUnlockOpts(key, opts, cb);
@@ -171,7 +172,7 @@ export class RWLockWritePrefClient extends Client {
 
   }
 
-  acquireReadLock(key: string, opts: any, cb: any) {
+  acquireReadLock(key: string, opts: any, cb: EVCb<any>) {
 
     try {
       [key, opts, cb] = this.parseUnlockOpts(key, opts, cb);
@@ -213,7 +214,7 @@ export class RWLockWritePrefClient extends Client {
 
   }
 
-  releaseReadLock(key: string, opts: any, cb: any) {
+  releaseReadLock(key: string, opts: any, cb: EVCb<any>) {
 
     try {
       [key, opts, cb] = this.parseUnlockOpts(key, opts, cb);
@@ -250,7 +251,7 @@ export class RWLockWritePrefClient extends Client {
 
   }
 
-  registerWriteFlagCheck(key: string, opts: any, cb: any) {
+  registerWriteFlagCheck(key: string, opts: any, cb: EVCb<any>) {
 
     const uuid = UUID.v4();
 
@@ -264,7 +265,7 @@ export class RWLockWritePrefClient extends Client {
 
   }
 
-  registerWriteFlagAndReadersCheck(key: string, opts: any, cb: any) {
+  registerWriteFlagAndReadersCheck(key: string, opts: any, cb: EVCb<any>) {
 
     const uuid = UUID.v4();
 
@@ -291,7 +292,7 @@ export class RWLockWritePrefClient extends Client {
     });
   }
 
-  decrementReaders(key: string, cb: any) {
+  decrementReaders(key: string, cb: EVCb<any>) {
     const uuid = UUID.v4();
     this.resolutions[uuid] = cb;
     this.write({
@@ -301,7 +302,7 @@ export class RWLockWritePrefClient extends Client {
     });
   }
 
-  setWriteFlagToFalse(key: string, cb: any) {
+  setWriteFlagToFalse(key: string, cb: EVCb<any>) {
     const uuid = UUID.v4();
     this.resolutions[uuid] = cb;
     this.write({

@@ -1,13 +1,13 @@
 
 
 <a align="right" href="https://travis-ci.org/ORESoftware/live-mutex">
-    <img align="right" alt="Travis Build Status" src="https://travis-ci.org/ORESoftware/live-mutex.svg?branch=master">
+    <img align="right" alt="Travis Build Status" src="https://travis-ci.org/ORESoftware/live-mutex.svg?branch=dev">
 </a>
 
 <br>
 
 <a align="right" href="https://circleci.com/gh/ORESoftware/live-mutex">
-    <img align="right" alt="CircleCI Build Status" src="https://circleci.com/gh/ORESoftware/live-mutex.png?circle-token=8ee83a1b06811c9a167e71d12b52f8cf7f786581">
+    <img align="right" alt="CircleCI Build Status" src="https://circleci.com/gh/ORESoftware/live-mutex.png?branch=dev&circle-token=8ee83a1b06811c9a167e71d12b52f8cf7f786581">
 </a>
 
 <br>
@@ -32,7 +32,7 @@
 
 >
 > Tested on *nix and MacOS - (probably will work on Windows, but not tested on Windows). <br>
-> Tested and proven on Node.js versions >= 6.0.0.
+> Tested and proven on Node.js versions >= 8.0.0.
 >
 
 ## About

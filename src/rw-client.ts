@@ -7,10 +7,8 @@ import {
   ClientOpts,
   EndReadCallback,
   LMClientCallBack,
-  LMXClientLockException
 }
 from "./client";
-
 
 import {LMXLockRequestError} from "./index";
 import chalk from "chalk";
@@ -33,6 +31,8 @@ export const log = {
 };
 
 import {RWStatus} from "./shared-internal";
+import {EVCb} from "./utils";
+import {LMXClientLockException} from "./exceptions";
 
 ////////////////////////////////////////////////////////////////////////
 
@@ -122,7 +122,7 @@ export class RWLockClient extends Client {
     });
   }
 
-  beginWrite(key: string, opts: any, cb?: any) {
+  beginWrite(key: string, opts: any, cb?: EVCb<any>) {
 
     try {
       [key, opts, cb] = this.parseLockOpts(key, opts, cb);
@@ -150,7 +150,7 @@ export class RWLockClient extends Client {
     });
   }
 
-  endWrite(key: string, opts: any, cb?: any) {
+  endWrite(key: string, opts: any, cb?: EVCb<any>) {
 
     try {
       [key, opts, cb] = this.parseUnlockOpts(key, opts, cb);
@@ -165,7 +165,7 @@ export class RWLockClient extends Client {
     this.unlock(key, opts, cb);
   }
 
-  beginRead(key: string, opts: any, cb: any) {
+  beginRead(key: string, opts: any, cb: EVCb<any>) {
 
     try {
       [key, opts, cb] = this.parseLockOpts(key, opts, cb);

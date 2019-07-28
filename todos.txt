@@ -1,11 +1,12 @@
 
-* clients should be given an array of host/port combinations to try to connect to
+CircleCI docs - configuration - https://circleci.com/docs/2.0/configuration-reference/
+
+Use Docker with TravisCI: https://docs.travis-ci.com/user/docker/
+
 
 * priority lock request should be put at front of queue
 
 * provide option to just use lockUuid, and not unlock fn
-
-* lck.notify array should be a key/value hash
 
 * allow lock-requestors to force their way to obtaining a lock
 similar to unlock-requestors being able to force unlock even if they don't have the key

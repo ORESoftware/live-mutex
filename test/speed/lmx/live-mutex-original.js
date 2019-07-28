@@ -36,11 +36,23 @@ client.ensure().then(function () {
             if (lockholders > max) {
                 return cb(new Error(`Should never have more than ${max} lockholders.`));
             }
-
-            lockholders--;
-
+            
             // console.log('unlocking...' + count++);
-            unlock(cb);
+            
+            // unlock.unlock(err => {
+            //    if(!err){
+            //      lockholders--;
+            //    }
+            //     err && console.error(err);
+            // });
+            // return cb();
+            
+            unlock.unlock(err => {
+  
+              lockholders--;
+              cb(err);
+              
+            });
 
         });
 
@@ -53,6 +65,8 @@ client.ensure().then(function () {
         const diff = Date.now() - start;
         console.log(' => Time required for live-mutex => ', diff);
         console.log(' => Lock/unlock cycles per millisecond => ', Number(a.length / diff).toFixed(3));
+        
+        // setInterval(() => {},300);
         process.exit(0);
     });
 

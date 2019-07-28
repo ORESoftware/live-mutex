@@ -39,8 +39,8 @@ process.once('uncaughtException', function (e: any) {
   process.exit(1);
 });
 
-const getSelectable = function (selectable, original) {
-  return Object.keys(selectable).reduce((a, b) => (a[b] = original[b], a), {})
+const getSelectable = function (selectable: object, original:any) {
+  return Object.keys(selectable).reduce((a, b) => (a[b] = original[b], a), {} as any)
 };
 
 const clientOpts = getSelectable(validConstructorOptions, v);

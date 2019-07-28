@@ -1,3 +1,6 @@
 #!/usr/bin/env bash
 
-npm install --loglevel=warn
+tsc || {
+  echo 'Could not compile with tsc. Exiting with 1.' > /dev/stderr
+  exit 1;
+}
