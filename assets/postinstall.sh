@@ -2,14 +2,14 @@
 
 set -e;
 
-if [[ "$lmx_skip_postinstall" == "yes" ]]; then
+if [ "$lmx_skip_postinstall" = "yes" ]; then
   echo "skipping r2g postinstall routine.";
   exit 0;
 fi
 
 export lmx_skip_postinstall="yes";
 
-if [[ "$oresoftware_local_dev" == "yes" ]]; then
+if [ "$oresoftware_local_dev" = "yes" ]; then
     echo "Running the lmx postinstall script in oresoftware local development env."
 fi
 
@@ -40,7 +40,7 @@ cat assets/shell.sh > "$HOME/.oresoftware/bash/lmx.sh" || {
         exit 0;
     }
 
-    if ! command -v curl &> /dev/null; then
+    if ! command -v curl > /dev/null; then
        exit 0;
     fi
 
@@ -53,9 +53,9 @@ cat assets/shell.sh > "$HOME/.oresoftware/bash/lmx.sh" || {
 )
 
 
-echo; echo -e "${ores_green} => lxm was installed successfully.${ores_no_color}";
-echo -e "Add the following line to your .bashrc/.bash_profile files:";
-echo -e "${ores_cyan} . \"\$HOME/.oresoftware/shell.sh\"${ores_no_color}"; echo;
+echo; echo "${ores_green} => lxm was installed successfully.${ores_no_color}";
+echo "Add the following line to your .bashrc/.bash_profile files:";
+echo "${ores_cyan} . \"\$HOME/.oresoftware/shell.sh\"${ores_no_color}"; echo;
 
 
 

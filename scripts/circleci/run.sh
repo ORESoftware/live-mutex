@@ -2,6 +2,8 @@
 
 set -e;
 
+env | sort;
+
 npm i
 tsc
 npm link suman

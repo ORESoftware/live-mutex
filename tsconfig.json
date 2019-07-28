@@ -4,15 +4,15 @@
     "outDir": "dist",
     "declaration": true,
     "baseUrl": ".",
-    "target": "es2017",
+    "target": "es2018",
     "rootDir": "src",
     "module": "commonjs",
     "noImplicitAny": true,
     "removeComments": true,
     "allowUnreachableCode": false,
     "lib": [
-      "es2016",
-      "es2017"
+      "es2017",
+      "es2018"
     ]
   },
   "compileOnSave": false,

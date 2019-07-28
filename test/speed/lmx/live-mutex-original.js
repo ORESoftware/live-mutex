@@ -38,10 +38,19 @@ client.ensure().then(function () {
             }
             
             // console.log('unlocking...' + count++);
+            
+            // unlock.unlock(err => {
+            //    if(!err){
+            //      lockholders--;
+            //    }
+            //     err && console.error(err);
+            // });
+            // return cb();
+            
             unlock.unlock(err => {
   
               lockholders--;
-              cb();
+              cb(err);
               
             });
 
@@ -56,6 +65,8 @@ client.ensure().then(function () {
         const diff = Date.now() - start;
         console.log(' => Time required for live-mutex => ', diff);
         console.log(' => Lock/unlock cycles per millisecond => ', Number(a.length / diff).toFixed(3));
+        
+        // setInterval(() => {},300);
         process.exit(0);
     });
 
