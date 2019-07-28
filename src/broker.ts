@@ -146,7 +146,7 @@ export interface LockObj {
   lockholderTimeouts: UuidHash,
   lockholdersAllReleased: UuidHash,
   lockholders: LockholdersType,  // uuid(s) that hold the lock
-  notify: LinkedQueue, //Array<NotifyObj>,
+  notify: LinkedQueue<NotifyObj>, //Array<NotifyObj>,
   key: string,
   keepLocksAfterDeath: boolean
   to: NodeJS.Timer,
@@ -912,37 +912,37 @@ export class Broker {
     
     const self = this;
     
-    let lqValue: LinkedQueueValue;
-    let obj: NotifyObj;
+    let lqValue: LinkedQueueValue<NotifyObj>;
+    let n: NotifyObj;
     
     while (lqValue = notifyList.shift()) {
-      obj = lqValue.value;
-      if (obj.ws && obj.ws.writable) {
+      n = lqValue.value;
+      if (n.ws && n.ws.writable) {
         break;
       }
     }
     
     const count = Object.keys(lck.lockholders).length;
     
-    if (!obj && count < 1) {
+    if (!n && count < 1) {
       // note: only delete lock if no client is remaining to claim it
       // we add a timestamp telling us the the time the
       lck.timestampEmptied = Date.now();
     }
     
-    if (!obj) {
+    if (!n) {
       return;
     }
     
     // Sending ws client the "acquired" message
     // set the timeout for the next ws to acquire lock, if not within alloted time, we simple call unlock
     
-    let ws = obj.ws;
-    let ttl = obj.ttl;
-    let uuid = obj.uuid;
+    let ws = n.ws;
+    let ttl = n.ttl;
+    let uuid = n.uuid;
     
     if (ttl !== Infinity) {
-      ttl = weAreDebugging ? 50000000 : (obj.ttl || this.lockExpiresAfter);
+      ttl = weAreDebugging ? 50000000 : (n.ttl || this.lockExpiresAfter);
     }
     
     if (!this.wsToKeys.get(ws)) {
@@ -951,14 +951,14 @@ export class Broker {
     
     this.wsToKeys.get(ws)[key] = true;
     
-    lck.lockholders[uuid] = {pid: obj.pid, uuid, ws};
-    lck.keepLocksAfterDeath = obj.keepLocksAfterDeath || false;
+    lck.lockholders[uuid] = {pid: n.pid, uuid, ws};
+    lck.keepLocksAfterDeath = n.keepLocksAfterDeath || false;
     let ln = lck.notify.length;
     
-    this.send(obj.ws, {
+    this.send(n.ws, {
       readersCount: lck.readers,
       key: data.key,
-      uuid: obj.uuid,
+      uuid: n.uuid,
       type: 'lock',
       lockRequestCount: ln,
       acquired: true
@@ -1003,15 +1003,17 @@ export class Broker {
         let ln = lck.notify.length;
         let notifyList = lckTemp.notify;
         
-        if (!self.rejected[obj.uuid]) {
-          if(!notifyList.contains(obj.uuid)){
-            notifyList.push(obj.uuid, obj);
+        if (!self.rejected[n.uuid]) {
+          if(!notifyList.contains(n.uuid)){
+            notifyList.push(n.uuid, n);
           }
         }
         
         // get the first 5, ideally we'd mix requests from different clients/ws
-        notifyList.deq(5).forEach((lqv: LinkedQueueValue) => {
+        notifyList.deq(5).forEach(lqv => {
+          
           const obj = lqv.value;
+          
           self.send(obj.ws, {
             key: data.key,
             uuid: obj.uuid,
@@ -1019,6 +1021,7 @@ export class Broker {
             lockRequestCount: ln,
             reelection: true
           });
+          
         });
       }
       
