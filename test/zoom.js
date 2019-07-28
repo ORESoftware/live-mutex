@@ -1,5 +1,5 @@
 
-const {Client, Broker} = require('../dist');
+const {Client, Broker} = require('../dist/main');
 
 const client = new Client();
 const broker = new Broker();

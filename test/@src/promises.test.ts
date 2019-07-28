@@ -3,7 +3,7 @@
 import * as suman from 'suman';
 const {Test} = suman.init(module);
 global.Promise = require('bluebird');
-import {Client, Broker} from '../../dist';
+import {Client, Broker} from '../../dist/main';
 
 //@ts-ignore
 Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
