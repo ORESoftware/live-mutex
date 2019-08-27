@@ -1,5 +1,6 @@
 
 ### folders
+.circleci
 node_modules
 .idea
 src

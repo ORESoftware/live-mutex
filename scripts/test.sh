@@ -14,16 +14,18 @@ if ! which suman-tools &> /dev/null ; then
     npm install -g suman-tools;
 fi
 
-IS_GLOBALLY_SYMLINKED=`suman-tools --is-symlinked-globally="${lib_name}"`
-IS_LOCALLY_SYMLINKED=`suman-tools --is-symlinked-locally="${lib_name}"`
+#IS_GLOBALLY_SYMLINKED=`suman-tools --is-symlinked-globally="${lib_name}"`
+#IS_LOCALLY_SYMLINKED=`suman-tools --is-symlinked-locally="${lib_name}"`
+#
+#if [[ ${IS_GLOBALLY_SYMLINKED} != *"affirmative"* ]]; then
+#    npm link # create a global symlink for this library, so that we can create a local symlink
+#fi
+#
+#if [[ ${IS_LOCALLY_SYMLINKED} != *"affirmative"* || ${IS_GLOBALLY_SYMLINKED} != *"affirmative"* ]]; then
+#    npm link "${lib_name}" # create a global symlink for this library, so that we can create a local symlink
+#fi
 
-if [[ ${IS_GLOBALLY_SYMLINKED} != *"affirmative"* ]]; then
-    npm link # create a global symlink for this library, so that we can create a local symlink
-fi
-
-if [[ ${IS_LOCALLY_SYMLINKED} != *"affirmative"* || ${IS_GLOBALLY_SYMLINKED} != *"affirmative"* ]]; then
-    npm link "${lib_name}" # create a global symlink for this library, so that we can create a local symlink
-fi
+./test/setup-test.sh
 
 
 if ! which suman &> /dev/null ; then
