@@ -6,7 +6,7 @@ const async = require('async');
 const {Broker} = require('live-mutex');
 const colors = require('chalk');
 const util = require('util');
-const Handlebars = require('handlebars');
+const Handlebars = require('handlebars');   //   you need to npm link  "handlebars": "^4.0.10",
 const fs = require('fs');
 
 //////////////////////////////////////////

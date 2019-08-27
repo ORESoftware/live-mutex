@@ -7,7 +7,7 @@ const {Broker} = require('live-mutex');
 const util = require('util');
 const colors = require('chalk');
 const fs = require('fs');
-const Handlebars = require('handlebars');
+const Handlebars = require('handlebars');   //  you need to npm link  "handlebars": "^4.0.10",
 
 ////////////////////////////////////////////////////////////////
 

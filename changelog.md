@@ -1,8 +1,17 @@
 
-
 # Live-Mutex Change-Log
 
 -------------------------------------------------------------
+
+## Mon Aug 26 18:19:32 PDT 2019
+
+### changed:
+
+removed async, handlebars, lodash
+because of vulnerabilities and because their install size was massive.
+For testing, we need async, so we now have test/setup-test.sh
+in order to install the proper test deps, instead of using optionalDependencies in package.json.
+
 
 ## Sat Jul 27 21:03:20 PDT 2019
 

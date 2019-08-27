@@ -39,17 +39,8 @@
     "uuid": "^3.3.2"
   },
   "devDependencies": {
-    "@types/async": "^2.0.49",
-    "@types/lodash": "^4.14.50",
     "@types/node": "^10.1.2",
     "@types/tcp-ping": "^0.1.0",
     "@types/uuid": "^3.4.3"
-  },
-  "optionalDependencies": {
-    "async": "^2.6.0",
-    "bluebird": "^3.4.7",
-    "handlebars": "^4.0.10",
-    "lockfile": "^1.0.3",
-    "lodash": "^4.17.11"
   }
 }
