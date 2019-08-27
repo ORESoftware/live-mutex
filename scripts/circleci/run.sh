@@ -5,10 +5,23 @@ set -e;
 env | sort;
 
 npm i
+
+echo
+
 tsc
-npm link suman
-ln -s `pwd` node_modules/live-mutex
+
+echo
+
+./test/setup-test.sh
+
+echo
+
 suman --default | cat
 
-echo "Whooop"
+echo
+
+echo "Here is the contents of test/@target:"
+
+echo
+
 ls -a 'test/@target'

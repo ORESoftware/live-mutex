@@ -1,16 +1,19 @@
 
 ### folders
+.circleci
 node_modules
 .idea
 src
 test
 docs
+scripts
 .tscmultiwatch
 .r2g
 coverage
 lib
 
 ### matching files
+*Dockerfile
 *.log
 *.md
 *.json
