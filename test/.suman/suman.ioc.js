@@ -3,7 +3,7 @@ module.exports = data => {
     return {
         dependencies: {
             'Broker': function () {
-                return Promise.resolve().then(() => require('../../dist/broker-1')).then(v => v.default || v);
+                return Promise.resolve().then(() => require('../../dist/broker')).then(v => v.default || v);
             },
             'LvMtxClient': function () {
                 return Promise.resolve().then(() => require('../../dist/client')).then(v => v.default || v);
@@ -15,7 +15,10 @@ module.exports = data => {
                 return Promise.resolve().then(() => require('../../dist/utils'));
             },
             'Promise': function () {
-                return require('bluebird');
+                Promise.delay = (t) => {
+                    return new Promise(r => setTimeout(r, t));
+                };
+                return Promise;
             }
         }
     };

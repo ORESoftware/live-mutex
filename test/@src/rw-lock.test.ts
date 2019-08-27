@@ -2,7 +2,7 @@
 
 import * as suman from 'suman';
 const {Test} = suman.init(module);
-import {RWLockClient, Broker} from '../../dist';
+import {RWLockClient, Broker} from '../../dist/main';
 
 ///////////////////////////////////////////////////////////////
 

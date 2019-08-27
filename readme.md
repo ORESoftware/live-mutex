@@ -517,3 +517,8 @@ exports.createPool = function(opts){
   ]);
 }
 ```
+
+
+### Testing
+
+> Look at test/readme.md

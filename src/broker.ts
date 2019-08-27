@@ -24,12 +24,12 @@ export const log = {
   info: console.log.bind(console, chalk.gray.bold('lmx info:')),
   error: console.error.bind(console, chalk.red.bold('lmx error:')),
   warn: console.error.bind(console, chalk.yellow.bold('lmx warning:')),
-  debug: function (...args: any[]) {
+  debug(...args: any[]) {
     if (debugLog) {
       let newTime = Date.now();
       let elapsed = newTime - forDebugging.previousTime;
       forDebugging.previousTime = newTime;
-      console.log(chalk.yellow.bold('[lmx broker debugging]'), 'elapsed millis:', `(${elapsed})`, ...args);
+      console.log(chalk.yellow.bold('lmx broker debugging:'), 'elapsed millis:', `(${elapsed})`, ...args);
     }
   }
 };
@@ -214,12 +214,12 @@ export class Broker {
     const opts = this.opts = o || {};
     assert(typeof opts === 'object', 'Options argument must be an object.');
     
-    Object.keys(opts).forEach((k) => {
+    for (const k of Object.keys(opts)) {
       if (!validConstructorOptions[k]) {
         throw new Error('An option passed to Live-Mutex#Broker constructor ' +
           `is not a recognized option => "${k}", valid options are: ${util.inspect(validConstructorOptions)}.`);
       }
-    });
+    }
     
     if (opts['lockExpiresAfter']) {
       assert(Number.isInteger(opts.lockExpiresAfter),
@@ -311,7 +311,7 @@ export class Broker {
       if (data.type === 'end-connection-from-broker-for-testing-purposes') {
         return self.abruptlyEndConnection(ws);
       }
-  
+      
       if (data.type === 'destroy-connection-from-broker-for-testing-purposes') {
         return self.abruptlyDestroyConnection(ws);
       }
@@ -431,7 +431,8 @@ export class Broker {
       let endWS = function () {
         try {
           ws.destroy();
-        } finally {
+        }
+        finally {
           // noop
         }
       };
@@ -472,21 +473,21 @@ export class Broker {
     
     let callable = true;
     let sigEvent = (event: any) => (err: any) => {
-        
-        err && this.emitter.emit('warning', err);
-        if (!callable) {
-          return;
-        }
-        
-        callable = false;
-        this.emitter.emit('warning', `"${event}" event has occurred.`);
-        this.connectedClients.forEach(function (v, k) {
-          // destroy each connected client
-          k.destroy();
-        });
-        wss.close(function () {
-          process.exit(1);
-        });
+      
+      err && this.emitter.emit('warning', err);
+      if (!callable) {
+        return;
+      }
+      
+      callable = false;
+      this.emitter.emit('warning', `"${event}" event has occurred.`);
+      this.connectedClients.forEach(function (v, k) {
+        // destroy each connected client
+        k.destroy();
+      });
+      wss.close(function () {
+        process.exit(1);
+      });
     };
     
     process.once('exit', sigEvent('exit'));
@@ -532,8 +533,8 @@ export class Broker {
       
       if (this.noListen) {
         return brokerPromise = Promise.resolve(this)
-          .then(onResolve)
-          .catch(onRejected)
+                                      .then(onResolve)
+                                      .catch(onRejected)
       }
       
       return brokerPromise = new Promise((resolve, reject) => {
@@ -619,7 +620,8 @@ export class Broker {
     
     try {
       compareVersions(clientVersion, brokerVersion);
-    } catch (err) {
+    }
+    catch (err) {
       this.cleanupConnection(ws);
       const errMessage = `Client version is not compatable with broker,` +
         ` client version: '${clientVersion}', broker version: '${brokerVersion}'.`;
@@ -655,22 +657,23 @@ export class Broker {
     const uuids = Object.keys(this.wsToUUIDs.get(ws) || {});
     this.wsToUUIDs.delete(ws);
     
-    this.locks.forEach((v, k) => {
+    for (let [k, v] of this.locks) {
       
       const notify = v.notify;
       
-      Object.keys(uuids).forEach(function (uuid) {
+      for (const uuid of Object.keys(uuids)) {
         notify.remove(uuid);
-      });
+      }
       
       if (v.isViaShell !== true) {
         // delete v[k];
         this.unlock({force: true, key: k, from: 'client socket closed/ended/errored'}, ws);
-      } else if (!v.keepLocksAfterDeath) {
+      }
+      else if (!v.keepLocksAfterDeath) {
         this.unlock({force: true, key: k, from: 'client socket closed/ended/errored'}, ws);
       }
       
-    });
+    }
     
   }
   
@@ -915,7 +918,7 @@ export class Broker {
     let lqValue: LinkedQueueValue<NotifyObj>;
     let n: NotifyObj;
     
-    while (lqValue = notifyList.shift()) {
+    while (lqValue = notifyList.dequeue()) {
       n = lqValue.value;
       if (n.ws && n.ws.writable) {
         break;
@@ -988,7 +991,8 @@ export class Broker {
       
       try {
         delete this.wsToKeys.get(ws)[key];
-      } catch (err) {
+      }
+      catch (err) {
         // ignore
       }
       
@@ -1004,7 +1008,7 @@ export class Broker {
         let notifyList = lckTemp.notify;
         
         if (!self.rejected[n.uuid]) {
-          if(!notifyList.contains(n.uuid)){
+          if (!notifyList.contains(n.uuid)) {
             notifyList.push(n.uuid, n);
           }
         }
@@ -1113,13 +1117,13 @@ export class Broker {
     }
     
     if (ws && uuid) {
-      if (!this.wsToUUIDs.get(ws)) {
+      if (!this.wsToUUIDs.has(ws)) {
         this.wsToUUIDs.set(ws, {});
       }
       this.wsToUUIDs.get(ws)[uuid] = true;
     }
     
-    if (ws && !this.wsToKeys.get(ws)) {
+    if (ws && !this.wsToKeys.has(ws)) {
       this.wsToKeys.set(ws, {});
     }
     
@@ -1150,7 +1154,8 @@ export class Broker {
           lck.notify.remove(uuid);
           lck.notify.unshift(uuid, {ws, uuid, pid, ttl, keepLocksAfterDeath});
           
-        } else {
+        }
+        else {
           
           const alreadyAdded = lck.notify.get(uuid);
           
@@ -1158,7 +1163,8 @@ export class Broker {
             
             if (retryCount > 0) {
               lck.notify.unshift(uuid, {ws, uuid, pid, ttl, keepLocksAfterDeath});
-            } else {
+            }
+            else {
               lck.notify.push(uuid, {ws, uuid, pid, ttl, keepLocksAfterDeath});
             }
           }
@@ -1172,7 +1178,8 @@ export class Broker {
           type: 'lock',
           acquired: false
         });
-      } else {
+      }
+      else {
         
         // lck exists and we are below the max amount of lockholders
         // so we can acquire the lock
@@ -1227,7 +1234,8 @@ export class Broker {
         });
       }
       
-    } else {
+    }
+    else {
       
       // there is no existing lck, so we create a new lck object
       
@@ -1310,11 +1318,19 @@ export class Broker {
       // this websocket connection no longer owns this key
       try {
         delete this.wsToKeys.get(ws)[key];
-      } catch (err) {
+      }
+      catch (err) {
         // ignore
       }
     }
     
+    
+    try {
+      delete this.wsToUUIDs.get(ws)[_uuid];
+    }
+    catch (err) {
+      // ignore
+    }
     
     // if the user passed _uuid, then we check it, other true
     // _uuid is the uuid of the original lockholder call
@@ -1326,7 +1342,8 @@ export class Broker {
     if (_uuid && lck) {
       same = Boolean(lck.lockholders[_uuid]);
       log.debug('same is:', same);
-    } else if (lck) {
+    }
+    else if (lck) {
       log.debug('no _uuid was passed to unlock');
     }
     
@@ -1337,9 +1354,9 @@ export class Broker {
       delete lck.lockholderTimeouts[_uuid];
       
       if (force) {
-        Object.keys(lck.lockholders).forEach(v => {
+        for (const v of Object.keys(lck.lockholders)) {
           lck.lockholdersAllReleased[v] = true;
-        });
+        }
         lck.lockholders = {};
       }
       
@@ -1359,7 +1376,8 @@ export class Broker {
       
       this.ensureNewLockHolder(lck, data);
       
-    } else if (lck) {
+    }
+    else if (lck) {
       
       const ln = lck.notify.length;
       
@@ -1386,7 +1404,8 @@ export class Broker {
         
         this.ensureNewLockHolder(lck, data);
         
-      } else {
+      }
+      else {
         
         if (uuid && ws) {
           
@@ -1402,14 +1421,17 @@ export class Broker {
             unlocked: false
           });
           
-        } else if (uuid) {
+        }
+        else if (uuid) {
           this.emitter.emit('warning', 'Implemenation warning - Missing ws (we have a uuid but no ws connection).');
-        } else if (ws) {
+        }
+        else if (ws) {
           this.emitter.emit('warning', 'Implemenation warning - Missing uuid (we have socket connection but no uuid).');
         }
       }
       
-    } else {
+    }
+    else {
       
       // lck is not defined
       log.debug('lock was not defined / no longer existed.');
@@ -1430,7 +1452,8 @@ export class Broker {
           unlocked: true,
           warning: `no lock with key => "${key}".`
         });
-      } else if (ws) {
+      }
+      else if (ws) {
         this.emitter.emit('warning', chalk.red('Implemenation warning - Missing uuid (we have socket connection but no uuid).'));
       }
     }
