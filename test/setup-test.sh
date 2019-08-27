@@ -17,3 +17,5 @@ npm link --no-save 'handlebars@4.1.1'
 
 npm link 'node-redis-warlock@^0.2.0'
 npm link 'redis@^2.6.3'
+
+tsc

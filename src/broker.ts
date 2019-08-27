@@ -55,12 +55,10 @@ if (!(brokerPackage.version && typeof brokerPackage.version === 'string')) {
   throw new Error('Broker NPM package did not have a top-level field that is a string.');
 }
 
-
 process.on('uncaughtException', e => {
   log.error('Uncaught Exception event occurred in Broker process:\n',
     typeof e === 'string' ? e : util.inspect(e));
 });
-
 
 process.on('warning', function (e: any) {
   log.debug('warning:', e && e.message || e);
@@ -414,7 +412,6 @@ export class Broker {
       
     };
     
-    
     const wss = this.wss = net.createServer((ws: LMXSocket) => {
       
       this.connectedClients.set(ws, true);
@@ -430,12 +427,10 @@ export class Broker {
       let endWS = function () {
         try {
           ws.destroy();
-        }
-        finally {
+        } finally {
           // noop
         }
       };
-      
       
       ws.once('disconnect', () => {
         this.cleanupConnection(ws);
@@ -532,8 +527,8 @@ export class Broker {
       
       if (this.noListen) {
         return brokerPromise = Promise.resolve(this)
-                                      .then(onResolve)
-                                      .catch(onRejected)
+          .then(onResolve)
+          .catch(onRejected)
       }
       
       return brokerPromise = new Promise((resolve, reject) => {
@@ -547,8 +542,16 @@ export class Broker {
         let cnkt: any = self.socketFile ? [self.socketFile] : [self.port, self.host];
         
         wss.listen(...cnkt, () => {
-  
-          fs.chmodSync(self.socketFile, '777');
+          
+          if (self.socketFile) {
+            try {
+              fs.chmodSync(self.socketFile, '777');
+            }
+            catch (e) {
+              log.error(e);
+            }
+          }
+          
           self.isOpen = true;
           clearTimeout(to);
           wss.removeListener('error', reject);
@@ -592,7 +595,7 @@ export class Broker {
     this.wss.close(cb);
   }
   
-  getListeningInterface(){
+  getListeningInterface() {
     return this.socketFile || this.port;
   }
   
@@ -615,7 +618,6 @@ export class Broker {
     ws.end();
     ws.removeAllListeners();
   }
-  
   
   onVersion(data: any, ws: LMXSocket) {
     
@@ -641,7 +643,6 @@ export class Broker {
     }
     // return this.send(ws, {type:'broker-version', brokerVersion: brokerPackage.version});
   }
-  
   
   cleanupConnection(ws: LMXSocket) {
     
@@ -1033,7 +1034,6 @@ export class Broker {
         });
       }
       
-      
     }, self.timeoutToFindNewLockholder);
     
     // done with this don't add anything here
@@ -1133,7 +1133,6 @@ export class Broker {
     
     const force = data.force;
     const retryCount = data.retryCount;
-    
     
     if (lck) {
       
@@ -1328,7 +1327,6 @@ export class Broker {
       }
     }
     
-    
     try {
       delete this.wsToUUIDs.get(ws)[_uuid];
     }
@@ -1389,7 +1387,6 @@ export class Broker {
         
         delete lck.lockholderTimeouts[_uuid];
         delete lck.lockholdersAllReleased[_uuid];
-        
         
         if (uuid && ws) {
           
