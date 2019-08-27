@@ -12,6 +12,7 @@ coverage
 lib
 
 ### matching files
+*Dockerfile
 *.log
 *.md
 *.json
