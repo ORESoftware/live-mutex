@@ -34,7 +34,12 @@ module.exports = data => {  //load async deps for any of your suman tests
       },
 
       'Promise': function () {
-        return require('bluebird');
+        
+        (Promise as any).delay = (t: number) => {
+          return new Promise(r => setTimeout(r,t));
+        };
+        
+        return Promise;
 
       }
 

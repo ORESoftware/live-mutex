@@ -2,7 +2,7 @@
 
 const path = require('path');
 const async = require('async');
-const {Broker, Client} = require('../dist');
+const {Broker, Client} = require('../dist/main');
 
 ///////////////////////////////////////////////////////////////
 

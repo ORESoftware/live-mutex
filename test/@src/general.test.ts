@@ -4,7 +4,7 @@ import * as suman from 'suman';
 
 const {Test} = suman.init(module);
 import async = require('async');
-import {Broker, Client} from '../../dist';
+import {Broker, Client} from '../../dist/main';
 
 //@ts-ignore
 Test.create(['Promise', function (b, it, inject, describe, before, $deps, path) {
