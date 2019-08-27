@@ -36,3 +36,5 @@ fi
 npm link suman
 
 suman -- #coverage test/@src/*.ts # --inherit-all-stdio #--inherit-stdio
+
+echo 'all good :) lulz'
