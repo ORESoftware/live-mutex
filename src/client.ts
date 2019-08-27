@@ -506,7 +506,7 @@ export class Client {
         };
         
         ws.setEncoding('utf8')
-          
+        
           .once('error', onFirstErr)
           .once('close', () => {
             this.emitter.emit('warning', 'LMX => client stream "close" event occurred.');
@@ -569,6 +569,10 @@ export class Client {
   
   static create(opts?: Partial<ClientOpts>): Client {
     return new Client(opts);
+  }
+  
+  getConnectionInterface() {
+    return this.socketFile || this.port;
   }
   
   private _fireCallbacksPrematurely(err: any) {

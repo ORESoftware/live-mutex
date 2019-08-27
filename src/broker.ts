@@ -590,6 +590,10 @@ export class Broker {
     this.wss.close(cb);
   }
   
+  getListeningInterface(){
+    return this.socketFile || this.port;
+  }
+  
   getPort() {
     return this.port;
   }
