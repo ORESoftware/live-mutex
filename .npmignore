@@ -5,6 +5,7 @@ node_modules
 src
 test
 docs
+scripts
 .tscmultiwatch
 .r2g
 coverage

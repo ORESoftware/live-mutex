@@ -19,7 +19,7 @@
     "postinstall": "./assets/postinstall.sh"
   },
   "r2g": {
-    "test": "npm link suman && suman --default"
+    "test": "./test/setup-test.sh && suman --default"
   },
   "repository": {
     "type": "git",
