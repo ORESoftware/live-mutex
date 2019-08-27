@@ -114,7 +114,7 @@ See: `docs/detailed-explanation.md` and `docs/about.md`
  <summary>Example</summary>
  
  You almost certainly don't want to do this, as using UDS is for one machine only, and this technique only
- works on Linux it does not work on MacOS.
+ works on Linux it does not work on MacOS (sharing sockets between host and container).
  
  When running on a single machine, here's how you do use UDS with Docker:
  
