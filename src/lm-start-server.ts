@@ -6,8 +6,13 @@ import util = require('util');
 let host = process.argv[3] || process.env.live_mutex_host || '0.0.0.0';
 let port = parseInt(process.argv[2] || process.env.live_mutex_port || '6970');
 const index = process.argv.indexOf('--json');
+const useUDS = process.env.use_uds === 'yes' || process.argv.indexOf('--use-uds') > 1;
 
 let v = {port,host} as any;
+
+if(useUDS){
+  v.udsPath = '/uds.sock'
+}
 
 if (index > 0) {
 

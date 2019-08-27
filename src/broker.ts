@@ -81,8 +81,6 @@ export const validConstructorOptions = <ValidConstructorOpts>{
   noListen: 'boolean'
 };
 
-/////////////////// interfaces /////////////////////////////////////
-
 export interface IBrokerOpts {
   lockExpiresAfter: number;
   timeoutToFindNewLockholder: number;
