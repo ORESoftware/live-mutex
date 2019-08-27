@@ -1,7 +1,7 @@
 'use strict';
 
 const async = require('async');
-const {Client} = require('../../dist');
+const {Client} = require('../../dist/main');
 const fs = require('fs');
 const port = parseInt(process.env.lm_port || '');
 const lockName = process.env.lm_lock_name;

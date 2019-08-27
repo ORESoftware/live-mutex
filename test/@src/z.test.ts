@@ -2,7 +2,7 @@
 
 import suman = require('suman');
 const Test = suman.init(module);
-import {Client} from '../../dist';
+import {Client} from '../../dist/main';
 
 /////////////////////////////////////////////////////
 

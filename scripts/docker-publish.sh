@@ -10,8 +10,15 @@ semver "$version"; # validate semver version
 
 tsc
 
-docker build -t "oresoftware/live-mutex-broker:$version" .
+version_tag="oresoftware/live-mutex-broker:$version";
+latest_tag='oresoftware/live-mutex-broker:latest'
 
-docker push "oresoftware/live-mutex-broker:$version"
+docker build -t  "$version_tag" .
+docker tag  "$latest_tag" "$version_tag"
+
+docker push "$version_tag"
+docker push "$latest_tag"
+
+
 
 
