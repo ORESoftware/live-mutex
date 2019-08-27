@@ -18,6 +18,6 @@ rm -f "$my_sock"
 
 (node dist/lm-start-server.js --use-uds) &
 
-sleep 4;
+sleep 2;
 
 node 'test/simple-uds-local-client.js'

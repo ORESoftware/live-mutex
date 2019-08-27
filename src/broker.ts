@@ -4,6 +4,7 @@
 import * as assert from 'assert';
 import * as net from 'net';
 import * as util from 'util';
+import * as fs from 'fs';
 
 //npm
 import chalk from "chalk";
@@ -546,7 +547,8 @@ export class Broker {
         let cnkt: any = self.socketFile ? [self.socketFile] : [self.port, self.host];
         
         wss.listen(...cnkt, () => {
-          
+  
+          fs.chmodSync(self.socketFile, '777');
           self.isOpen = true;
           clearTimeout(to);
           wss.removeListener('error', reject);

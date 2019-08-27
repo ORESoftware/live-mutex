@@ -7,6 +7,7 @@ ENV lmx_in_docker='yes'
 ENV FORCE_COLOR=1
 
 USER root
+RUN echo "user is: $USER"
 
 WORKDIR "/app"
 
