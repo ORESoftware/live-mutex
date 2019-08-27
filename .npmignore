@@ -6,10 +6,9 @@ src
 test
 docs
 .tscmultiwatch
-.docker.r2g
+.r2g
 coverage
 lib
-
 
 ### matching files
 *.log
