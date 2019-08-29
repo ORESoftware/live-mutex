@@ -8,11 +8,10 @@ import * as net from 'net';
 //npm
 import UUID = require('uuid');
 import chalk from "chalk";
-import {createParser} from "./json-parser";
 
 //project
+import {createParser} from "./json-parser";
 import {forDebugging} from './shared-internal';
-
 const debugLog = process.argv.indexOf('--lmx-debug') > 0;
 const clientPackage = require('../package.json');
 
@@ -971,8 +970,10 @@ export class Client {
         return process.nextTick(cb, err, {});
       }
       
-      log.error('No callback was passed to accept the following error.',
-        'Please include a callback as the final argument to the client.lock() routine.');
+      log.error(
+        'No callback was passed to accept the following error.',
+        'Please include a callback as the final argument to the client.lock() routine.'
+      );
       throw err;
     }
     

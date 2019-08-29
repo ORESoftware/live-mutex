@@ -10,11 +10,11 @@ import * as fs from 'fs';
 import chalk from "chalk";
 import {createParser} from "./json-parser";
 import {LinkedQueue, LinkedQueueValue} from '@oresoftware/linked-queue';
-const isLocalDev = process.env.oresoftware_local_dev === 'yes';
+
 
 //project
+const isLocalDev = process.env.oresoftware_local_dev === 'yes';
 import {forDebugging} from './shared-internal';
-
 const debugLog = process.argv.indexOf('--lmx-debug') > 0 || process.env.lmx_debug === 'yes';
 
 export const log = {
@@ -37,8 +37,9 @@ import {weAreDebugging} from './we-are-debugging';
 import {EventEmitter} from 'events';
 import * as path from "path";
 import Timer = NodeJS.Timer;
-import {RWStatus,inspectError} from "./shared-internal";
+import {RWStatus, inspectError} from "./shared-internal";
 import {compareVersions} from "./compare-versions";
+import {joinToStr} from "./shared-internal";
 
 if (weAreDebugging) {
   log.error('Broker is in debug mode. Timeouts are turned off.');
@@ -176,7 +177,6 @@ export interface RegisteredListener {
 }
 
 
-
 export class Broker {
   
   opts: IBrokerOptsPartial;
@@ -213,8 +213,10 @@ export class Broker {
     
     for (const k of Object.keys(opts)) {
       if (!validConstructorOptions[k]) {
-        throw new Error('An option passed to Live-Mutex#Broker constructor ' +
-          `is not a recognized option => "${k}", valid options are: ${util.inspect(validConstructorOptions)}.`);
+        throw new Error(joinToStr(
+          'An option passed to lmx broker constructor',
+          `is not a recognized option => "${k}", valid options are: ${util.inspect(validConstructorOptions)}.`
+        ));
       }
     }
     
@@ -256,8 +258,8 @@ export class Broker {
     this.noListen = opts.noListen === true;
     
     if ('udsPath' in opts && opts['udsPath'] !== undefined) {
-      assert(typeof opts.udsPath === 'string', '"udsPath" option must be a string.');
-      assert(path.isAbsolute(opts.udsPath), '"udsPath" option must be an absolute path.');
+      assert(typeof opts.udsPath === 'string', 'lmx broker "udsPath" option must be a string.');
+      assert(path.isAbsolute(opts.udsPath), 'lmx broker "udsPath" option must be an absolute path.');
       this.socketFile = path.resolve(opts.udsPath);
     }
     

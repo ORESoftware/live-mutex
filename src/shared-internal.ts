@@ -2,7 +2,7 @@ import * as util from "util";
 
 
 export const forDebugging = {
-   previousTime : Date.now()
+  previousTime: Date.now()
 };
 
 
@@ -11,6 +11,10 @@ export const inspectError = (err: any): string => {
     showHidden: true,
     depth: 5
   });
+};
+
+export const joinToStr = (...args: any[]): string => {
+  return args.map(inspectError).join(' ');
 };
 
 

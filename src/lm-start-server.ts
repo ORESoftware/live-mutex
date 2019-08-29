@@ -5,6 +5,7 @@ import * as fs from 'fs';
 import chalk from "chalk";
 import util = require('util');
 import * as path from "path";
+import {inspectError} from "./shared-internal";
 
 const cp = require('child_process');
 
@@ -16,7 +17,6 @@ const useUDS = process.env.use_uds === 'yes' || process.argv.indexOf('--use-uds'
 
 // @ts-ignore
 let v = {port, host} as any;
-
 
 if (useUDS && process.env.lmx_in_docker === 'yes') {
   v.udsPath = '/uds/uds.sock';
@@ -55,8 +55,6 @@ if (index > 1) {
   port = v.port = (v.port || port);
 }
 
-console.log('broker constructor options:', v);
-
 if (!Number.isInteger(port)) {
   log.error(chalk.magenta('Live-mutex: port could not be parsed to integer from command line input.'));
   log.error('Usage: lmx-start-server <key> <?port>');
@@ -64,15 +62,15 @@ if (!Number.isInteger(port)) {
 }
 
 process.once('warning' as any, function (e: any) {
-  log.error('process warning:', chalk.magenta(util.inspect(e)));
+  log.error('process warning:', chalk.magenta(inspectError(e)));
 });
 
 process.once('unhandledRejection', function (e: any) {
-  log.error('unhandled-rejection:', chalk.magenta(util.inspect(e)));
+  log.error('unhandled-rejection:', chalk.magenta(inspectError(e)));
 });
 
 process.once('uncaughtException', function (e: any) {
-  log.error('uncaught-exception:', chalk.magenta(util.inspect(e)));
+  log.error('uncaught-exception:', chalk.magenta(inspectError(e)));
 });
 
 const b = new Broker(v);
@@ -85,6 +83,11 @@ b.emitter.on('warning', function () {
   log.warn(...arguments);
 });
 
+b.emitter.on('error', function () {
+  log.error(...arguments);
+});
+
+
 b.ensure().then(function (b) {
    log.info(chalk.bold('LMX broker listening on:'), chalk.cyan.bold(String(b.getListeningInterface())));
   
@@ -96,6 +99,6 @@ b.ensure().then(function (b) {
   
  })
  .catch(function (err) {
-   log.error('caught:', err && err.message || err);
+   log.error('broker launch error:', inspectError(err));
    process.exit(1);
  });
