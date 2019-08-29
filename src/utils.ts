@@ -15,9 +15,7 @@ const log = {
   error: console.error.bind(console, 'lmx utils:')
 };
 
-export type EVCb<T> = (err: any, val?: T) => void
-
-//////////////////////////////////////////////////////////////////////////////////////////////////
+export type EVCb<T, E = any> = (err: E, val: T) => void
 
 
 export const once = function (ctx: any, fn: Function) {
@@ -41,7 +39,7 @@ export const launchSocketServer = function (opts: any, cb: EVCb<any>) {
   ping.probe(host, port, function (err, available) {
     
     if (err) {
-      return cb(err);
+      return cb(err, {});
     }
     
     if (available) {
@@ -76,7 +74,7 @@ export const launchBrokerInChildProcess = function (opts: any, cb: EVCb<any>) {
   ping.probe(host, port, function (err, available) {
     
     if (err) {
-      return cb(err)
+      return cb(err, {})
     }
     
     if (available) {

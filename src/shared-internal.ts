@@ -1,7 +1,16 @@
+import * as util from "util";
 
 
 export const forDebugging = {
    previousTime : Date.now()
+};
+
+
+export const inspectError = (err: any): string => {
+  return typeof err === 'string' ? err : util.inspect(err, {
+    showHidden: true,
+    depth: 5
+  });
 };
 
 

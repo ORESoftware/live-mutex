@@ -46,9 +46,10 @@ import {compareVersions} from "./compare-versions";
 import {EVCb} from "./utils";
 import {LMXClientException} from "./exceptions";
 import {LMXClientError} from "./shared-internal";
+import {inspectError} from "./shared-internal";
 
 if (weAreDebugging) {
-  log.debug('Live-Mutex client is in debug mode. Timeouts are turned off.');
+  log.debug('lmx client is in debug mode. Timeouts are turned off.');
 }
 
 /////////////////////////////////////////////////////////////////////////
@@ -198,76 +199,76 @@ export class Client {
     
     this.isOpen = false;
     const opts = this.opts = o || {};
-    assert(typeof opts === 'object', 'Bad arguments to live-mutex client constructor - options must be an object.');
+    assert(typeof opts === 'object', 'Bad arguments to lmx client constructor - options must be an object.');
     
     if (cb) {
-      assert(typeof cb === 'function', 'optional second argument to Live-Mutex Client constructor must be a function.');
+      assert(typeof cb === 'function', 'optional second argument to lmx Client constructor must be a function.');
     }
     
     for (const key of Object.keys(opts)) {
       if (!validConstructorOptions[key]) {
-        throw new Error('An option passed to Live-Mutex Client constructor is ' +
+        throw new Error('An option passed to lmx Client constructor is ' +
           `not a recognized option => "${key}", \n valid options are: ` + util.inspect(validConstructorOptions));
       }
     }
     
     if (opts['host']) {
-      assert(typeof opts.host === 'string', ' => "host" option needs to be a string.');
+      assert(typeof opts.host === 'string', 'lmx: "host" option needs to be a string.');
     }
     
     if (opts['port']) {
-      assert(Number.isInteger(opts.port), ' => "port" option needs to be an integer.');
-      assert(opts.port > 1024 && opts.port < 49152, ' => "port" integer needs to be in range (1025-49151).');
+      assert(Number.isInteger(opts.port), 'lmx: "port" option needs to be an integer.');
+      assert(opts.port > 1024 && opts.port < 49152, 'lmx: "port" integer needs to be in range (1025-49151).');
     }
     
     if (opts['listener']) {
-      assert(typeof opts.listener === 'function', ' => Listener should be a function.');
-      assert(typeof opts.key === 'string', ' => You must pass in a key to use listener functionality.');
+      assert(typeof opts.listener === 'function', 'lmx: listener option should be a function.');
+      assert(typeof opts.key === 'string', 'lmx: You must pass in a key to use listener functionality.');
     }
     
     if (opts['lockRetryMax']) {
       assert(Number.isInteger(opts.lockRetryMax),
-        ' => "lockRetryMax" option needs to be an integer.');
+        'lmx: "lockRetryMax" option needs to be an integer.');
       assert(opts.lockRetryMax >= 0 && opts.lockRetryMax <= 100,
-        ' => "lockRetryMax" integer needs to be in range (0-100).');
+        'lmx: "lockRetryMax" integer needs to be in range (0-100).');
     }
     
     if (opts['retryMax']) {
       assert(Number.isInteger(opts.retryMax),
-        ' => "retryMax" option needs to be an integer.');
+        'lmx: "retryMax" option needs to be an integer.');
       assert(opts.retryMax >= 0 && opts.retryMax <= 100,
-        ' => "retryMax" integer needs to be in range (0-100).');
+        'lmx: "retryMax" integer needs to be in range (0-100).');
     }
     
     if (opts['unlockRequestTimeout']) {
       assert(Number.isInteger(opts.unlockRequestTimeout),
-        ' => "unlockRequestTimeout" option needs to be an integer (representing milliseconds).');
+        'lmx: "unlockRequestTimeout" option needs to be an integer (representing milliseconds).');
       assert(opts.unlockRequestTimeout >= 20 && opts.unlockRequestTimeout <= 800000,
-        ' => "unlockRequestTimeout" needs to be integer between 20 and 800000 millis.');
+        'lmx: "unlockRequestTimeout" needs to be integer between 20 and 800000 millis.');
     }
     
     if (opts['lockRequestTimeout']) {
       assert(Number.isInteger(opts.lockRequestTimeout),
-        ' => "lockRequestTimeout" option needs to be an integer (representing milliseconds).');
+        'lmx: "lockRequestTimeout" option needs to be an integer (representing milliseconds).');
       assert(opts.lockRequestTimeout >= 20 && opts.lockRequestTimeout <= 800000,
-        ' => "lockRequestTimeout" needs to be integer between 20 and 800000 millis.');
+        'lmx: "lockRequestTimeout" needs to be integer between 20 and 800000 millis.');
     }
     
     if (opts['ttl']) {
       assert(Number.isInteger(opts.ttl),
-        ' => "ttl" option needs to be an integer (representing milliseconds).');
+        'lmx: "ttl" option needs to be an integer (representing milliseconds).');
       assert(opts.ttl >= 3 && opts.ttl <= 800000,
-        ' => "ttl" needs to be integer between 3 and 800000 millis.');
+        'lmx: "ttl" needs to be integer between 3 and 800000 millis.');
     }
     
     if ('keepLocksAfterDeath' in opts) {
       assert(typeof opts.keepLocksAfterDeath === 'boolean',
-        ' => "keepLocksAfterDeath" option needs to be a boolean.');
+        'lmx: "keepLocksAfterDeath" option needs to be a boolean.');
     }
     
     if ('keepLocksOnExit' in opts) {
       assert(typeof opts.keepLocksOnExit === 'boolean',
-        ' => "keepLocksOnExit" option needs to be a boolean.');
+        'lmx: "keepLocksOnExit" option needs to be a boolean.');
     }
     
     if (opts.ttl === null) {
@@ -276,7 +277,7 @@ export class Client {
     
     if ('noDelay' in opts && opts['noDelay'] !== undefined) {
       assert(typeof opts.noDelay === 'boolean',
-        ' => "noDelay" option needs to be an integer => ' + opts.noDelay);
+        'lmx: "noDelay" option needs to be an integer => ' + opts.noDelay);
       this.noDelay = opts.noDelay;
     }
     
@@ -304,14 +305,14 @@ export class Client {
       if (self.emitter.listenerCount('warning') < 2) {
         log.warn('No "warning" event handler(s) attached by end-user to client.emitter, therefore logging these errors from LMX library:');
         log.warn(...Array.from(arguments).map(v => (typeof v === 'string' ? v : util.inspect(v))));
-        log.warn('Add a "warning" event listener to the Live-Mutex client to get rid of this message.');
+        log.warn('Add a "warning" event listener to the lmx client to get rid of this message.');
       }
     });
     
     this.write = (data: any, cb?: EVCb<any>) => {
       
       if (!ws) {
-        throw new Error('please call ensure()/connect() on this Live-Mutex client, before using the lock/unlock methods.');
+        throw new Error('please call ensure()/connect() on this lmx client, before using the lock/unlock methods.');
       }
       
       if (!ws.writable) {
@@ -362,13 +363,13 @@ export class Client {
         log.error(data);
         this.cannotContinue = true;
         this.write({type: 'version-mismatch-confirmed'});
-        this._fireCallbacksPrematurely(new Error('Version-match => ' + util.inspect(data)));
+        this._fireCallbacksPrematurely(new Error('lmx version-match:' + util.inspect(data)));
         return;
       }
       
       if (!uuid) {
         return this.emitter.emit('warning',
-          'Potential Live-Mutex implementation error => message did not contain uuid =>' + util.inspect(data)
+          'Potential lmx implementation error => message did not contain uuid =>' + util.inspect(data)
         );
       }
       
@@ -386,7 +387,7 @@ export class Client {
       }
       
       if (fn && to) {
-        this.emitter.emit('error', 'Function and timeout both exist => Live-Mutex implementation error.');
+        this.emitter.emit('error', 'Function and timeout both existlmx implementation error.');
       }
       
       if (to) {
@@ -402,7 +403,7 @@ export class Client {
         return;
       }
       
-      this.emitter.emit('warning', 'Live-mutex implementation warning, ' +
+      this.emitter.emit('warning', 'lmx implementation warning, ' +
         'no fn with that uuid in the resolutions hash => ' + util.inspect(data, {breakLength: Infinity}));
       
       if (data.acquired === true && data.type === 'lock') {
@@ -449,16 +450,16 @@ export class Client {
         
         const onFirstErr = (e: any) => {
           this.noRecover = true;
-          let err = 'LMX client error => ' + (e && e.message || e);
+          const err = 'lmx client error: ' + inspectError(e);
           this.emitter.emit('warning', err);
           reject(err);
         };
         
         const to = setTimeout(function () {
-          reject('LMX err: client connection timeout after 3000ms.');
+          reject('lmx client err: client connection timeout after 3000ms.');
         }, 3000);
         
-        const cnkt: Array<any> = self.socketFile ? [self.socketFile] : [self.port, self.host];
+        const cnkt = self.socketFile ? [self.socketFile] : [self.port, self.host];
         
         // @ts-ignore
         ws = net.createConnection(...cnkt, () => {
@@ -488,36 +489,40 @@ export class Client {
           }
           
           this.recovering = true;
-          e && this.emitter.emit('warning', 'LMX client error => ' + e.message || util.inspect(e));
+          e && this.emitter.emit('warning', 'lmx client error: ' + inspectError(e));
           
           if (!ws.destroyed) {
             ws.destroy();
             ws.removeAllListeners();
           }
           
-          for (let resol of Object.entries(this.resolutions)) {
-            this.giveups[resol[0]] = true;
-            clearTimeout(this.timers[resol[0]]);
-            resol[1]('Error: Connection ended/closed. ' +
-              'A new connection will be created but all locking requests in-flight should get receive errors in the callbacks.', {});
+          for (const [k, v] of Object.entries(this.resolutions)) {
+            this.giveups[k] = true;
+            clearTimeout(this.timers[k]);
+            v('lmx connection ended/closed. ' +
+              'A new connection will be created but all locking requests' +
+              ' in-flight should get receive errors in the callbacks.', {});
           }
           
-          this.ensure(); // create new connection
+          // create new connection
+          this.ensure().then(_ => {
+            log.debug('new connection created, via recover routine.');
+          });
         };
         
         ws.setEncoding('utf8')
         
           .once('error', onFirstErr)
           .once('close', () => {
-            this.emitter.emit('warning', 'LMX => client stream "close" event occurred.');
+            this.emitter.emit('warning', 'lmx client stream "close" event occurred.');
             recover(null);
           })
           .once('end', () => {
-            this.emitter.emit('warning', 'LMX => client stream "end" event occurred.');
+            this.emitter.emit('warning', 'lmx client stream "end" event occurred.');
             recover(null);
           })
           .on('error', (e: any) => {
-            this.emitter.emit('warning', 'LMX => client stream "error" event occurred.');
+            this.emitter.emit('warning', 'lmx client stream "error" event occurred: ' + inspectError(e));
             recover(e);
           })
           .pipe(createParser())
@@ -563,7 +568,7 @@ export class Client {
     
   };
   
-  onSocketDestroy(err: any) {
+  private onSocketDestroy(err: any) {
     log.info('Socket destroy callback error:', err);
   }
   
@@ -575,14 +580,14 @@ export class Client {
     return this.socketFile || this.port;
   }
   
-  private _fireCallbacksPrematurely(err: any) {
+  private _fireCallbacksPrematurely(originalErr: any) {
     
-    for (let k of Object.keys(this.timers)) {
+    for (const k of Object.keys(this.timers)) {
       clearTimeout(this.timers[k]);
     }
     
     this.timers = {};
-    err = err || new Error('Unknown error - firing resolution callbacks prematurely.');
+    const err = new Error('Unknown error - firing resolution callbacks prematurely.');
     
     for (let k of Object.keys(this.resolutions)) {
       
@@ -590,9 +595,10 @@ export class Client {
       delete this.resolutions[k];
       
       const e = {
-        forcePrematureCallback: true,
         message: err.message,
         stack: err.stack,
+        forcePrematureCallback: true,
+        originalErrorString: inspectError(err)
       };
       
       fn.call(this, e, e);
@@ -633,15 +639,15 @@ export class Client {
       
       if (String(key) !== String(data.key)) {
         delete this.resolutions[uuid];
-        throw new Error('Live-Mutex implementation error => bad key.');
+        throw new Error('lmx implementation error => bad key.');
       }
       
       if (data.error) {
         this.emitter.emit('warning', data.error);
       }
       
-      if ([data.acquired, data.retry].filter(i => i).length > 1) {
-        throw new Error('Live-Mutex implementation error.');
+      if ([data.acquired, data.retry].filter(Boolean).length > 1) {
+        throw new Error('lmx implementation error, both "acquired" and "retry" options provided, there can be only one.');
       }
       
       if (data.lockInfo === true) {
@@ -764,7 +770,7 @@ export class Client {
     
   }
   
-  parseLockOpts(key: string, opts: any, cb?: any): [string, any, LMClientLockCallBack] {
+  private parseLockOpts(key: string, opts: any, cb?: any): [string, any, LMClientLockCallBack] {
     
     if (typeof opts === 'function') {
       cb = opts;
@@ -783,7 +789,7 @@ export class Client {
     
   }
   
-  parseUnlockOpts(key: string, opts?: any, cb?: any): [string, any, LMClientUnlockCallBack] {
+  private parseUnlockOpts(key: string, opts?: any, cb?: any): [string, any, LMClientUnlockCallBack] {
     
     if (typeof opts === 'function') {
       cb = opts;
@@ -873,7 +879,7 @@ export class Client {
     
     try {
       
-      assert.equal(typeof key, 'string', 'Key passed to live-mutex #lock needs to be a string.');
+      assert.equal(typeof key, 'string', 'Key passed to lmx #lock needs to be a string.');
       assert(typeof cb === 'function', 'callback function must be passed to Client lock() method; use lockp() or acquire() for promise API.');
       
       if ('max' in opts) {
@@ -887,12 +893,12 @@ export class Client {
       }
       
       if ('force' in opts) {
-        assert.equal(typeof opts.force, 'boolean', ' => Live-Mutex usage error => ' +
+        assert.equal(typeof opts.force, 'boolean', 'lmx usage error => ' +
           '"force" option must be a boolean value. Coerce it on your side, for safety.');
       }
       
       if ('retry' in opts) {
-        assert.equal(typeof opts.force, 'boolean', ' => Live-Mutex usage error => ' +
+        assert.equal(typeof opts.force, 'boolean', 'lmx usage error => ' +
           '"retry" option must be a boolean value. Coerce it on your side, for safety.');
         opts.__maxRetries = 0;
       }
@@ -935,9 +941,9 @@ export class Client {
       
       if (opts['ttl']) {
         assert(Number.isInteger(opts.ttl),
-          ' => Live-Mutex usage error => Please pass an integer representing milliseconds as the value for "ttl".');
+          'lmx usage error => Please pass an integer representing milliseconds as the value for "ttl".');
         assert(opts.ttl >= 3 && opts.ttl <= 800000,
-          ' => Live-Mutex usage error => "ttl" for a lock needs to be integer between 3 and 800000 millis.');
+          'lmx usage error => "ttl" for a lock needs to be integer between 3 and 800000 millis.');
       }
       
       if (opts['ttl'] === null) {
@@ -947,15 +953,15 @@ export class Client {
       
       if (opts['lockRequestTimeout']) {
         assert(Number.isInteger(opts.lockRequestTimeout),
-          ' => Please pass an integer representing milliseconds as the value for "ttl".');
+          'lmx: Please pass an integer representing milliseconds as the value for "ttl".');
         assert(opts.lockRequestTimeout >= 20 && opts.lockRequestTimeout <= 800000,
-          ' => "ttl" for a lock needs to be integer between 3 and 800000 millis.');
+          'lmx: "ttl" for a lock needs to be integer between 3 and 800000 millis.');
       }
       
       opts.__retryCount = opts.__retryCount || 0;
       
       if (opts.__retryCount > 0) {
-        assert(opts._uuid, 'Live-Mutex internal error: no _uuid past to retry call.');
+        assert(opts._uuid, 'lmx internal error: no _uuid past to retry call.');
       }
       
     }
@@ -1051,7 +1057,7 @@ export class Client {
           key,
           uuid,
           LMXLockRequestError.RequestTimeoutError,
-          `Live-Mutex client lock request timed out after ${lrt * opts.__retryCount} ms, ` +
+          `lmx client lock request timed out after ${lrt * opts.__retryCount} ms, ` +
           `${currentRetryCount} retries attempted to acquire lock for key "${key}".`
         ));
       }
@@ -1096,7 +1102,7 @@ export class Client {
           key,
           uuid,
           LMXLockRequestError.InternalError,
-          `Internal Live-Mutex error, mismatch in uuids => '${data.uuid}', -> '${uuid}'.`
+          `Internal lmx error, mismatch in uuids => '${data.uuid}', -> '${uuid}'.`
         ));
       }
       
@@ -1105,7 +1111,7 @@ export class Client {
           key,
           uuid,
           LMXLockRequestError.InternalError,
-          `Live-Mutex internal error: bad key, [1] => '${key}', [2] => '${data.key}'.`
+          `lmx internal error: bad key, [1] => '${key}', [2] => '${data.key}'.`
         ));
       }
       
@@ -1235,18 +1241,18 @@ export class Client {
     cb = cb || this.noop;
     
     try {
-      assert.equal(typeof key, 'string', 'Key passed to live-mutex #unlock needs to be a string.');
+      assert.equal(typeof key, 'string', 'Key passed to lmx #unlock needs to be a string.');
       
       if (opts['force']) {
-        assert.equal(typeof opts.force, 'boolean', ' => Live-Mutex usage error => ' +
+        assert.equal(typeof opts.force, 'boolean', 'lmx usage error => ' +
           '"force" option must be a boolean value. Coerce it on your side, for safety.');
       }
       
       if (opts['unlockRequestTimeout']) {
         assert(Number.isInteger(opts.lockRequestTimeout),
-          ' => Please pass an integer representing milliseconds as the value for "ttl".');
+          'lmx: Please pass an integer representing milliseconds as the value for "ttl".');
         assert(opts.lockRequestTimeout >= 20 && opts.lockRequestTimeout <= 800000,
-          ' => "ttl" for a lock needs to be integer between 3 and 800000 millis.');
+          'lmx: "ttl" for a lock needs to be integer between 3 and 800000 millis.');
       }
     }
     catch (err) {
@@ -1294,7 +1300,7 @@ export class Client {
           key,
           uuid,
           LMXUnlockRequestError.InternalError,
-          `Live-Mutex internal error: missing data in unlock resolution.`,
+          `lmx internal error: missing data in unlock resolution.`,
         ));
       }
       
@@ -1303,7 +1309,7 @@ export class Client {
           key,
           uuid,
           LMXUnlockRequestError.InternalError,
-          `Live-Mutex implementation error, bad key => first key: ${key}, second key: ${data.key}`,
+          `lmx implementation error, bad key => first key: ${key}, second key: ${data.key}`,
         ));
       }
       
@@ -1312,7 +1318,7 @@ export class Client {
           key,
           uuid,
           LMXUnlockRequestError.GeneralUnlockError,
-          'LMX request error: ' + data.error
+          'lmx request error: ' + data.error
         ));
       }
       
@@ -1345,7 +1351,7 @@ export class Client {
         key,
         uuid,
         LMXUnlockRequestError.GeneralUnlockError,
-        'Internal error: fallthrough in unlock resolution routine.'
+        'lmx internal/implementation error: fallthrough in unlock resolution routine.'
       ));
       
     };

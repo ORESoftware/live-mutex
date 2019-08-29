@@ -10,11 +10,7 @@ import * as fs from 'fs';
 import chalk from "chalk";
 import {createParser} from "./json-parser";
 import {LinkedQueue, LinkedQueueValue} from '@oresoftware/linked-queue';
-
 const isLocalDev = process.env.oresoftware_local_dev === 'yes';
-const noop = function () {
-  // do nothing obviously
-};
 
 //project
 import {forDebugging} from './shared-internal';
@@ -41,12 +37,11 @@ import {weAreDebugging} from './we-are-debugging';
 import {EventEmitter} from 'events';
 import * as path from "path";
 import Timer = NodeJS.Timer;
-import {RWStatus} from "./shared-internal";
+import {RWStatus,inspectError} from "./shared-internal";
 import {compareVersions} from "./compare-versions";
-import set = Reflect.set;
 
 if (weAreDebugging) {
-  log.error('broker is in debug mode. Timeouts are turned off.');
+  log.error('Broker is in debug mode. Timeouts are turned off.');
 }
 
 const brokerPackage = require('../package.json');
@@ -56,12 +51,11 @@ if (!(brokerPackage.version && typeof brokerPackage.version === 'string')) {
 }
 
 process.on('uncaughtException', e => {
-  log.error('Uncaught Exception event occurred in Broker process:\n',
-    typeof e === 'string' ? e : util.inspect(e));
+  log.error('Uncaught Exception event occurred in Broker process:', inspectError(e));
 });
 
 process.on('warning', function (e: any) {
-  log.debug('warning:', e && e.message || e);
+  log.debug('warning:', inspectError(e));
 });
 
 ///////////////////////////////////////////////////////////////////
@@ -133,7 +127,11 @@ export interface UuidHash {
 }
 
 export interface LockholdersType {
-  [key: string]: { pid: number, ws: net.Socket, uuid: string }
+  [key: string]: {
+    pid: number,
+    ws: net.Socket,
+    uuid: string
+  }
 }
 
 export interface LockObj {
@@ -177,6 +175,8 @@ export interface RegisteredListener {
   fn: Function
 }
 
+
+
 export class Broker {
   
   opts: IBrokerOptsPartial;
@@ -200,7 +200,7 @@ export class Broker {
   noDelay = true;
   socketFile = '';
   lockCounts = 0;
-  connectedClients = new Map();
+  connectedClients = new Set<net.Socket>();
   registeredListeners = <{ [key: string]: Array<RegisteredListener> }>{};
   
   ///////////////////////////////////////////////////////////////
@@ -220,16 +220,16 @@ export class Broker {
     
     if (opts['lockExpiresAfter']) {
       assert(Number.isInteger(opts.lockExpiresAfter),
-        ' => "expiresAfter" option needs to be an integer (milliseconds)');
+        'lmx broker: "expiresAfter" option needs to be an integer (milliseconds)');
       assert(opts.lockExpiresAfter > 20 && opts.lockExpiresAfter < 4000000,
-        ' => "expiresAfter" is not in range (20 to 4000000 ms).');
+        'lmx broker: "expiresAfter" is not in range (20 to 4000000 ms).');
     }
     
     if (opts['timeoutToFindNewLockholder']) {
       assert(Number.isInteger(opts.timeoutToFindNewLockholder),
-        ' => "timeoutToFindNewLockholder" option needs to be an integer (milliseconds)');
+        'lmx broker: "timeoutToFindNewLockholder" option needs to be an integer (milliseconds)');
       assert(opts.timeoutToFindNewLockholder > 20 && opts.timeoutToFindNewLockholder < 4000000,
-        ' => "timeoutToFindNewLockholder" is not in range (20 to 4000000 ms).');
+        'lmx broker: "timeoutToFindNewLockholder" is not in range (20 to 4000000 ms).');
     }
     
     if (opts['host']) {
@@ -238,14 +238,14 @@ export class Broker {
     
     if (opts['port']) {
       assert(Number.isInteger(opts.port),
-        ' => "port" option needs to be an integer => ' + opts.port);
+        'lmx broker: "port" option needs to be an integer => ' + opts.port);
       assert(opts.port > 1024 && opts.port < 49152,
-        ' => "port" integer needs to be in range (1025-49151).');
+        'lmx broker: "port" integer needs to be in range (1025-49151).');
     }
     
     if ('noDelay' in opts && opts['noDelay'] !== undefined) {
       assert(typeof opts.noDelay === 'boolean',
-        ' => "noDelay" option needs to be an integer => ' + opts.noDelay);
+        'lmx broker: "noDelay" option needs to be an integer => ' + opts.noDelay);
       this.noDelay = opts.noDelay;
     }
     
@@ -265,9 +265,9 @@ export class Broker {
     
     this.emitter.on('warning', function () {
       if (self.emitter.listenerCount('warning') < 2) {
-        log.warn('No "warning" event handlers attached by end-user to client.emitter, therefore logging these errors from library:');
+        log.warn('No "warning" event handlers attached by end-user to the broker emitter, therefore logging these errors from library:');
         log.warn(...arguments);
-        log.warn('Add a "warning" event listener to the LMX broker to get rid of this message.');
+        log.warn('Add a "warning" event listener to the lmx broker emitter to get rid of this message.');
       }
     });
     
@@ -414,7 +414,7 @@ export class Broker {
     
     const wss = this.wss = net.createServer((ws: LMXSocket) => {
       
-      this.connectedClients.set(ws, true);
+      this.connectedClients.add(ws);
       
       if (self.noDelay) {
         ws.setNoDelay(true);
@@ -427,7 +427,8 @@ export class Broker {
       let endWS = function () {
         try {
           ws.destroy();
-        } finally {
+        }
+        finally {
           // noop
         }
       };
@@ -445,7 +446,7 @@ export class Broker {
       });
       
       ws.once('error', (err) => {
-        this.emitter.emit('warning', 'LMX client error ' + (err && err.stack || err));
+        this.emitter.emit('warning', 'lmx client error: ' + inspectError(err));
         this.cleanupConnection(ws);
         ws.destroy();
         ws.removeAllListeners();
@@ -457,7 +458,7 @@ export class Broker {
         })
         .once('error', (e: any) => {
           self.send(ws, {
-              error: String(e && e.stack || e)
+              error: inspectError(e)
             },
             () => {
               ws.end();
@@ -465,23 +466,26 @@ export class Broker {
         });
     });
     
-    let callable = true;
+    let sigEventCallable = true;
+    
     let sigEvent = (event: any) => (err: any) => {
       
       err && this.emitter.emit('warning', err);
-      if (!callable) {
+      
+      if (!sigEventCallable) {
         return;
       }
       
-      callable = false;
+      sigEventCallable = false;
       this.emitter.emit('warning', `"${event}" event has occurred.`);
-      this.connectedClients.forEach(function (v, k) {
-        // destroy each connected client
-        k.destroy();
-      });
+      
+      for (const c of this.connectedClients) {
+        c.destroy();
+      }
       wss.close(function () {
         process.exit(1);
       });
+      
     };
     
     process.once('exit', sigEvent('exit'));
@@ -489,7 +493,7 @@ export class Broker {
     process.once('SIGTERM', sigEvent('SIGTERM'));
     
     wss.on('error', (err) => {
-      this.emitter.emit('warning', 'live-mutex broker error' + (err && err.stack || err));
+      this.emitter.emit('warning', 'lmx broker error' + inspectError(err));
     });
     
     let brokerPromise: Promise<any> = null;
@@ -526,15 +530,16 @@ export class Broker {
       };
       
       if (this.noListen) {
-        return brokerPromise = Promise.resolve(this)
-          .then(onResolve)
-          .catch(onRejected)
+        return brokerPromise =
+          Promise.resolve(this)
+                 .then(onResolve)
+                 .catch(onRejected)
       }
       
       return brokerPromise = new Promise((resolve, reject) => {
         
         let to = setTimeout(function () {
-          reject('Live-Mutex broker error: listening action timed out.')
+          reject('lmx broker error: listening action timed out.')
         }, 3000);
         
         wss.once('error', reject);
@@ -651,8 +656,6 @@ export class Broker {
     }
     
     ws.lmxClosed = true;
-    
-    // ws.removeAllListeners();
     
     this.connectedClients.delete(ws);
     
@@ -978,7 +981,7 @@ export class Broker {
       lck.to = setTimeout(() => {
         
         // delete locks[key]; => no, this.unlock will take care of that
-        this.emitter.emit('warning', `Live-Mutex Broker warning, lock object timed out after ${ttl}ms for key => "${key}".`);
+        this.emitter.emit('warning', `lmx broker warning, lock object timed out after ${ttl}ms for key => "${key}".`);
         
         // we set lck.lockholderTimeouts[uuid], so that when an unlock request for uuid comes into the broker
         // we know that it timed out already, and we know not to throw an error when the lock.uuid doesn't match
@@ -1050,7 +1053,7 @@ export class Broker {
     const lockRequestCount = lck ? lck.notify.length : null;
     
     if (isLocked && lockRequestCount > 0) {
-      this.emitter.emit('warning', ' => Live-Mutex implementation warning, lock is unlocked but ' +
+      this.emitter.emit('warning', 'lmx implementation warning, lock is unlocked but ' +
         'notify array has at least one item, for key => ' + key);
     }
     
@@ -1212,7 +1215,7 @@ export class Broker {
             
             // delete locks[key];  => no, this.unlock will take care of that
             this.emitter.emit('warning',
-              chalk.yellow.bold('Live-Mutex Broker warning, [1] lock object timed out for key => "' + key + '"'));
+              chalk.yellow.bold('lmx broker warning, [1] lock object timed out for key => "' + key + '"'));
             
             // we set lck.lockholderTimeouts[uuid], so that when an unlock request for uuid might come in to broker
             // we know that it timed out already, and we do not throw an error then
@@ -1282,7 +1285,7 @@ export class Broker {
         lckTemp.to = setTimeout(() => {
           
           // delete locks[key];  => no!, this.unlock will take care of that
-          this.emitter.emit('warning', 'Live-Mutex warning, [2] lock object timed out for key => "' + key + '"');
+          this.emitter.emit('warning', 'lmx broker warning [2]: lock object timed out for key => "' + key + '"');
           
           // we set lck.lockholderTimeouts[uuid], so that when an unlock request for uuid comes into the broker
           // we know that it timed out already, and we know not to throw an error when the lock.uuid doesn't match
@@ -1438,12 +1441,12 @@ export class Broker {
       log.debug('lock was not defined / no longer existed.');
       log.debug(data.rwStatus, 'has released lock on key:', key);
       
-      this.emitter.emit('warning', 'Live-Mutex implementation warning => no lock with key => "' + key + '"');
+      this.emitter.emit('warning', 'lmx broker implementation warning: no lock with key => "' + key + '"');
       
       // since the lock no longer exists for this key, remove ownership of this key
       if (ws && uuid) {
         
-        this.emitter.emit('warning', `Live-Mutex warning, no lock with key => '${key}'.`);
+        this.emitter.emit('warning', `lmx broker warning: no lock with key => '${key}'.`);
         
         this.send(ws, {
           uuid: uuid,
@@ -1455,7 +1458,7 @@ export class Broker {
         });
       }
       else if (ws) {
-        this.emitter.emit('warning', chalk.red('Implemenation warning - Missing uuid (we have socket connection but no uuid).'));
+        this.emitter.emit('warning', 'lmx implementation warning: missing uuid (we have a socket connection but no uuid).');
       }
     }
   }
