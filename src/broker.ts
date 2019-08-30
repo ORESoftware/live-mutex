@@ -31,7 +31,6 @@ export const log = {
   }
 };
 
-///////////////////////////////////////////////////////////////////
 
 import {weAreDebugging} from './we-are-debugging';
 import {EventEmitter} from 'events';
