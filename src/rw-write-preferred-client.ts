@@ -13,8 +13,6 @@ import {weAreDebugging} from "./we-are-debugging";
 import {EVCb} from "./utils";
 
 
-/////////////////////////////////////////////////////////////////////////////////
-
 export const log = {
   info: console.log.bind(console, chalk.gray.bold('[lmx client info]')),
   warn: console.error.bind(console, chalk.magenta.bold('[lmx client warning]')),
@@ -23,8 +21,6 @@ export const log = {
     weAreDebugging && console.log('[lmx debugging]', ...args);
   }
 };
-
-///////////////////////////////////////////////////////////////////////////////////////////////
 
 export class RWLockWritePrefClient extends Client {
 

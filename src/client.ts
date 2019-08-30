@@ -769,7 +769,7 @@ export class Client {
     
   }
   
-  private parseLockOpts(key: string, opts: any, cb?: any): [string, any, LMClientLockCallBack] {
+  protected parseLockOpts(key: string, opts: any, cb?: any): [string, any, LMClientLockCallBack] {
     
     if (typeof opts === 'function') {
       cb = opts;
@@ -788,7 +788,7 @@ export class Client {
     
   }
   
-  private parseUnlockOpts(key: string, opts?: any, cb?: any): [string, any, LMClientUnlockCallBack] {
+  protected parseUnlockOpts(key: string, opts?: any, cb?: any): [string, any, LMClientUnlockCallBack] {
     
     if (typeof opts === 'function') {
       cb = opts;

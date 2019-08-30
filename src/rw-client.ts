@@ -139,7 +139,7 @@ export class RWLockClient extends Client {
     this.lock(key, opts, (err, val) => {
 
       if (err) {
-        return cb(err);
+        return cb(err, {});
       }
 
       const boundEndWrite = this.endWrite.bind(this, key);
@@ -191,7 +191,7 @@ export class RWLockClient extends Client {
     this.lock(key, opts, (err, unlock) => {
 
       if (err) {
-        return cb(err);
+        return cb(err, {});
       }
 
       const readers = unlock.readersCount;
@@ -215,13 +215,13 @@ export class RWLockClient extends Client {
         return this.lock(writeKey, {rwStatus: RWStatus.LockingWriteKey}, err => {
 
           if (err) {
-            return cb(err);
+            return cb(err, {});
           }
 
           unlock(err => {
 
             if (err) {
-              return cb(err);
+              return cb(err, {});
             }
 
             cb(err, boundEndRead);
@@ -233,7 +233,7 @@ export class RWLockClient extends Client {
       unlock(err => {
 
         if (err) {
-          return cb(err);
+          return cb(err, {});
         }
 
         cb(err, boundEndRead);
