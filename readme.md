@@ -107,39 +107,6 @@ See: `docs/detailed-explanation.md` and `docs/about.md`
 
 <br>
 
-
-# Using Docker + Unix Domain Sockets
-
-<details>
- <summary>Example</summary>
- 
- You almost certainly don't want to do this, as using UDS is for one machine only, and this technique only
- works on Linux it does not work on MacOS (sharing sockets between host and container).
- 
- When running on a single machine, here's how you do use UDS with Docker:
- 
- ```bash
- my_sock="$(pwd)/foo/uds.sock";
- rm -f "$my_sock"
- docker run -d -v "$(pwd)/foo":/uds 'oresoftware/live-mutex-broker:latest' --use-uds
- 
- ```
- 
- The above passed the `--use-uds` boolean flag to the launch process, which tells the broker to use UDS instead of listening on a port.
- The -v option allows the host and container to share a portion of the filesystem. You should probably just delete the socket file
- before starting the container, in case the file already exists.  '/uds/uds.sock' is the path in the container that points to the socket file,
- it's a hardcoded fixed path.
- 
- When connecting to the broker with the Node.js client, you would use:
- 
- ```typescript
-  const client = new Client({udsPath: 'foo/uds.sock'});
- ```
-
-</details>
-
-<br>
-
 # Basic Usage and Best Practices
 
 The Live-Mutex API is completely asynchronous and requires usage of async initialization for both
@@ -585,3 +552,41 @@ exports.createPool = function(opts){
 ### Testing
 
 > Look at test/readme.md
+
+
+<br>
+
+
+## Using Docker + Unix Domain Sockets
+
+In short, you almost certainly can't do this, because apparently sockets cannot be shared between host and container.
+Meaning if your client is running on the host machine (or other container), but your broker is running in a container,
+it will likely not be possible, but that's ok, since you can just use TCP/ports.
+ 
+<details>
+ <summary>Example of an attempt</summary>
+ 
+ You almost certainly don't want to do this, as using UDS is for one machine only, and this technique only
+ works on Linux it does not work on MacOS (sharing sockets between host and container).
+ 
+ When running on a single machine, here's how you do use UDS with Docker:
+ 
+ ```bash
+ my_sock="$(pwd)/foo/uds.sock";
+ rm -f "$my_sock"
+ docker run -d -v "$(pwd)/foo":/uds 'oresoftware/live-mutex-broker:latest' --use-uds
+ 
+ ```
+ 
+ The above passed the `--use-uds` boolean flag to the launch process, which tells the broker to use UDS instead of listening on a port.
+ The -v option allows the host and container to share a portion of the filesystem. You should probably just delete the socket file
+ before starting the container, in case the file already exists.  '/uds/uds.sock' is the path in the container that points to the socket file,
+ it's a hardcoded fixed path.
+ 
+ When connecting to the broker with the Node.js client, you would use:
+ 
+ ```typescript
+  const client = new Client({udsPath: 'foo/uds.sock'});
+ ```
+
+</details>
