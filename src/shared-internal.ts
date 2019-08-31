@@ -2,6 +2,8 @@
 
 import * as util from "util";
 
+export type EVCb<T, E = any> = (err: E, val: T) => void
+
 export const forDebugging = {
   previousTime: Date.now()
 };

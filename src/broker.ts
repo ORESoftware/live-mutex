@@ -493,11 +493,11 @@ export class Broker {
     process.once('SIGINT', sigEvent('SIGINT'));
     process.once('SIGTERM', sigEvent('SIGTERM'));
     
-    wss.on('error', (err) => {
+    wss.on('error', (err: any) => {
       this.emitter.emit('warning', 'lmx broker error' + inspectError(err));
     });
     
-    let brokerPromise: Promise<any> = null;
+    let brokerPromise: Promise<any>;
     
     this.ensure = this.start = (cb?: TBrokerCB) => {
       

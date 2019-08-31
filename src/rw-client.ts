@@ -30,8 +30,7 @@ export const log = {
   }
 };
 
-import {RWStatus} from "./shared-internal";
-import {EVCb} from "./utils";
+import {RWStatus, EVCb} from "./shared-internal";
 import {LMXClientLockException} from "./exceptions";
 
 ////////////////////////////////////////////////////////////////////////

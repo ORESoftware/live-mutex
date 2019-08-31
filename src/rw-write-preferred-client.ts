@@ -10,7 +10,7 @@ import UUID = require('uuid');
 //project
 import {Client, ClientOpts, LMClientCallBack, LMClientUnlockCallBack} from "./client";
 import {weAreDebugging} from "./we-are-debugging";
-import {EVCb} from "./utils";
+import {EVCb} from "./shared-internal";
 
 
 export const log = {

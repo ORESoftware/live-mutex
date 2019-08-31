@@ -12,6 +12,7 @@ import chalk from "chalk";
 //project
 import {createParser} from "./json-parser";
 import {forDebugging} from './shared-internal';
+
 const debugLog = process.argv.indexOf('--lmx-debug') > 0;
 const clientPackage = require('../package.json');
 
@@ -42,7 +43,7 @@ import * as path from "path";
 import {LMXLockRequestError, LMXUnlockRequestError} from "./shared-internal";
 import {LMXClientLockException, LMXClientUnlockException} from "./exceptions";
 import {compareVersions} from "./compare-versions";
-import {EVCb} from "./utils";
+import {EVCb} from "./shared-internal";
 import {LMXClientException} from "./exceptions";
 import {LMXClientError} from "./shared-internal";
 import {inspectError} from "./shared-internal";
@@ -131,7 +132,7 @@ export interface LMXClientUnlockOpts {
 }
 
 export interface LMLockSuccessData {
-  (fn?: EVCallback): void
+  (fn?: LMClientUnlockCallBack): void
   
   acquired: true,
   key: string,
@@ -150,14 +151,20 @@ export interface LMUnlockSuccessData {
 export type EVCallback = (err?: any, val?: any) => void;
 
 export interface LMClientLockCallBack {
-  (err: LMXClientLockException, v?: LMLockSuccessData): void;
+  (err: LMXClientLockException, v: LMLockSuccessData): void;
 }
+
+
 
 export interface LMClientUnlockCallBack {
-  (err: LMXClientUnlockException, v?: LMUnlockSuccessData): void
+  (err: null | LMXClientUnlockException, v: LMUnlockSuccessData): void,
+  
+  acquired?: boolean,
+  unlock?: LMClientUnlockCallBack,
+  release?: LMClientUnlockCallBack,
+  key?: string,
+  readersCount?: number | null
 }
-
-//////////////////////////////////////////////////////////////////////////////////////////
 
 export class Client {
   
@@ -170,7 +177,7 @@ export class Client {
   unlockRequestTimeout: number;
   lockRequestTimeout: number;
   lockRetryMax: number;
-  ws: net.Socket;
+  ws: net.Socket = <any>null;
   cannotContinue = false;
   timeouts: IUuidTimeoutBool;
   resolutions: IClientResolution;
@@ -295,8 +302,8 @@ export class Client {
     this.lockRequestTimeout = weAreDebugging ? 5000000 : (opts.lockRequestTimeout || 3000);
     this.lockRetryMax = opts.lockRetryMax || opts.maxRetries || opts.retryMax || 3;
     
-    let ws: net.Socket = null;
-    let connectPromise: Promise<any> = null;
+    let ws: net.Socket = <any>null;
+    let connectPromise: Promise<any> = <any>null;
     
     const self = this;
     
@@ -510,7 +517,7 @@ export class Client {
         };
         
         ws.setEncoding('utf8')
-        
+          
           .once('error', onFirstErr)
           .once('close', () => {
             this.emitter.emit('warning', 'lmx client stream "close" event occurred.');
@@ -609,7 +616,9 @@ export class Client {
     this.noRecover = true;
   }
   
-  requestLockInfo(key: string, opts?: any, cb?: EVCb<any>) {
+  requestLockInfo(key: string, cb: EVCb<any>): void;
+  requestLockInfo(key: string, opts: any, cb: EVCb<any>): void;
+  requestLockInfo(key: string, opts: any | EVCb<any>, cb?: EVCb<any>) {
     
     assert.equal(typeof key, 'string', 'Key passed to lmx#lock needs to be a string.');
     
@@ -680,19 +689,19 @@ export class Client {
   }
   
   acquire(key: string, opts?: Partial<LMXClientLockOpts>) {
-    return this.lockp.apply(this, arguments);
+    return this.lockp.apply(this, <any>arguments);
   }
   
   release(key: string, opts?: Partial<LMXClientUnlockOpts>) {
-    return this.unlockp.apply(this, arguments);
+    return this.unlockp.apply(this, <any>arguments);
   }
   
   acquireLock(key: string, opts?: Partial<LMXClientLockOpts>) {
-    return this.lockp.apply(this, arguments);
+    return this.lockp.apply(this, <any>arguments);
   }
   
   releaseLock(key: string, opts?: Partial<LMXClientUnlockOpts>) {
-    return this.unlockp.apply(this, arguments);
+    return this.unlockp.apply(this, <any>arguments);
   }
   
   run(fn: LMLockSuccessData) {
@@ -1216,7 +1225,7 @@ export class Client {
   unlock(key: string, opts: any): void;
   unlock(key: string, opts: any, cb: LMClientUnlockCallBack): void;
   
-  unlock(key: string, opts?: any, cb?: LMClientUnlockCallBack) {
+  unlock(key: string, opts?: any | LMClientUnlockCallBack, cb?: LMClientUnlockCallBack) {
     
     try {
       [key, opts, cb] = this.parseUnlockOpts(key, opts, cb);
