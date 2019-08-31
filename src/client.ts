@@ -155,7 +155,6 @@ export interface LMClientLockCallBack {
 }
 
 
-
 export interface LMClientUnlockCallBack {
   (err: null | LMXClientUnlockException, v: LMUnlockSuccessData): void,
   
@@ -517,7 +516,7 @@ export class Client {
         };
         
         ws.setEncoding('utf8')
-          
+        
           .once('error', onFirstErr)
           .once('close', () => {
             this.emitter.emit('warning', 'lmx client stream "close" event occurred.');
@@ -688,19 +687,19 @@ export class Client {
     });
   }
   
-  acquire(key: string, opts?: Partial<LMXClientLockOpts>) {
+  acquire(key: string, opts?: Partial<LMXClientLockOpts>): Promise<LMLockSuccessData> {
     return this.lockp.apply(this, <any>arguments);
   }
   
-  release(key: string, opts?: Partial<LMXClientUnlockOpts>) {
+  release(key: string, opts?: Partial<LMXClientUnlockOpts>): Promise<LMUnlockSuccessData> {
     return this.unlockp.apply(this, <any>arguments);
   }
   
-  acquireLock(key: string, opts?: Partial<LMXClientLockOpts>) {
+  acquireLock(key: string, opts?: Partial<LMXClientLockOpts>): Promise<LMLockSuccessData> {
     return this.lockp.apply(this, <any>arguments);
   }
   
-  releaseLock(key: string, opts?: Partial<LMXClientUnlockOpts>) {
+  releaseLock(key: string, opts?: Partial<LMXClientUnlockOpts>): Promise<LMUnlockSuccessData> {
     return this.unlockp.apply(this, <any>arguments);
   }
   
