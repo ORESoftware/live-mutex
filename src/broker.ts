@@ -15,6 +15,7 @@ import {LinkedQueue, LinkedQueueValue} from '@oresoftware/linked-queue';
 //project
 const isLocalDev = process.env.oresoftware_local_dev === 'yes';
 import {forDebugging} from './shared-internal';
+
 const debugLog = process.argv.indexOf('--lmx-debug') > 0 || process.env.lmx_debug === 'yes';
 
 export const log = {
@@ -151,14 +152,13 @@ export interface LockObj {
 }
 
 export interface NotifyObj {
-  ws: net.Socket,
+  ws: LMXSocket,
   uuid: string,
   pid: number,
   ttl: number,
   keepLocksAfterDeath: boolean
 }
 
-/////////////////////////////////////////////////////////////////////////////
 
 export interface KeyToBool {
   [key: string]: boolean
@@ -190,19 +190,16 @@ export class Broker {
   locks = new Map<string, LockObj>();
   ensure: TEnsure;
   start: TEnsure;
-  wsToUUIDs: Map<net.Socket, UUIDToBool>;  // {uuid: true}
-  wsToKeys: Map<net.Socket, KeyToBool>; // {key: true}
-  bookkeeping: IBookkeepingHash;
+  wsToUUIDs: Map<LMXSocket, UUIDToBool>;  // {uuid: true}
+  wsToKeys: Map<LMXSocket, KeyToBool>; // {key: true}
   isOpen: boolean;
   wss: net.Server;
   emitter = new EventEmitter();
   noDelay = true;
   socketFile = '';
   lockCounts = 0;
-  connectedClients = new Set<net.Socket>();
+  connectedClients = new Set<LMXSocket>();
   registeredListeners = <{ [key: string]: Array<RegisteredListener> }>{};
-  
-  ///////////////////////////////////////////////////////////////
   
   constructor(o?: IBrokerOptsPartial, cb?: IErrorFirstCB) {
     
@@ -413,7 +410,7 @@ export class Broker {
       
     };
     
-    const wss = this.wss = net.createServer((ws: LMXSocket) => {
+    const wss = this.wss = net.createServer({}, (ws: LMXSocket) => {
       
       this.connectedClients.add(ws);
       
@@ -515,7 +512,7 @@ export class Broker {
             return val;
           },
           (err) => {
-            cb && cb.call(self, err);
+            cb && cb.call(self, err, <Broker>{});
             return Promise.reject(err);
           });
       }
@@ -526,7 +523,7 @@ export class Broker {
       };
       
       const onRejected = (err: any) => {
-        cb && cb.call(self, err);
+        cb && cb.call(self, err, <Broker>{});
         return Promise.reject(err);
       };
       
@@ -587,14 +584,19 @@ export class Broker {
     return new Broker(opts);
   }
   
-  on() {
-    log.warn('warning:', 'use b.emitter.on() instead of b.on()');
-    return this.emitter.on.apply(this.emitter, arguments);
+  private emit() {
+    log.warn('warning:', 'use b.emitter.emit() instead of b.emit()');
+    return this.emitter.emit.apply(this.emitter, <any>arguments);
   }
   
-  once() {
+  private on() {
+    log.warn('warning:', 'use b.emitter.on() instead of b.on()');
+    return this.emitter.on.apply(this.emitter, <any>arguments);
+  }
+  
+  private once() {
     log.warn('warning:', 'use b.emitter.once() instead of b.once()');
-    return this.emitter.once.apply(this.emitter, arguments);
+    return this.emitter.once.apply(this.emitter, <any>arguments);
   }
   
   close(cb: (err: any) => void): void {
@@ -686,11 +688,11 @@ export class Broker {
     
   }
   
-  ls(data: any, ws: net.Socket) {
+  ls(data: any, ws: LMXSocket) {
     return this.send(ws, {ls_result: Object.keys(this.locks), uuid: data.uuid});
   }
   
-  broadcast(data: any, ws: net.Socket) {
+  broadcast(data: any, ws: LMXSocket) {
     
     const key = data.key;
     const uuid = data.uuid;
@@ -699,17 +701,22 @@ export class Broker {
     log.debug('broadcasting for key:', key);
     
     while (v.length > 0) {
+      
       let p = v.pop();
-      p.fn();
-      this.send(p.ws, {
-        key: data.key,
-        uuid: p.uuid,
-        type: 'broadcast-result'
-      });
+      
+      p && p.fn && p.fn();
+      
+      if (p && p.ws) {
+        this.send(p.ws, {
+          key: data.key,
+          uuid: p.uuid,
+          type: 'broadcast-result'
+        });
+      }
+      
     }
     
     if (ws) {
-      
       // if we call broadcast via broker, ws is null, so check if it exists
       this.send(ws, {
         key: data.key,
@@ -852,9 +859,8 @@ export class Broker {
       this.locks.set(key, this.getDefaultLockObject(key, false, 1));
     }
     
-    let lck = this.locks.get(key);
-    
-    const readersCount = lck && lck.readers || 0;
+    const lck = this.locks.get(key);
+    const readersCount = lck.readers || 0;
     const writerFlag = lck.writerFlag || false;
     
     if (writerFlag) {
@@ -925,7 +931,7 @@ export class Broker {
     const self = this;
     
     let lqValue: LinkedQueueValue<NotifyObj>;
-    let n: NotifyObj;
+    let n: NotifyObj = <any>null;
     
     while (lqValue = notifyList.dequeue()) {
       n = lqValue.value;
@@ -999,6 +1005,7 @@ export class Broker {
       // if a client receives a reelection message, they will all retry to acquire the lock on this key
       
       try {
+        // @ts-ignore
         delete this.wsToKeys.get(ws)[key];
       }
       catch (err) {
@@ -1006,15 +1013,14 @@ export class Broker {
       }
       
       delete self.timeouts[key];
-      
       this.emitter.emit('warning', `Re-election occurring for key: "${key}"`);
       
       if (locks.has(key)) {
         
-        let lckTemp = locks.get(key);
+        const lckTemp: LockObj = locks.get(key);
         delete lckTemp.lockholders[uuid];
-        let ln = lck.notify.length;
-        let notifyList = lckTemp.notify;
+        const ln = lck.notify.length;
+        const notifyList = lckTemp.notify;
         
         if (!self.rejected[n.uuid]) {
           if (!notifyList.contains(n.uuid)) {
@@ -1096,7 +1102,7 @@ export class Broker {
     });
   }
   
-  lock(data: any, ws: net.Socket) {
+  lock(data: any, ws: LMXSocket) {
     
     const key = data.key;
     const keepLocksAfterDeath = Boolean(data.keepLocksAfterDeath);
@@ -1117,6 +1123,9 @@ export class Broker {
     const beginRead = data.rwStatus === RWStatus.BeginRead;
     const endRead = data.rwStatus === RWStatus.EndRead;
     const count = Object.keys(lck && lck.lockholders || {}).length;
+    const force = data.force;
+    const retryCount = data.retryCount;
+    
     log.debug(data.rwStatus, 'is contending for lock on key:', key, 'there is/are', count, 'lockholders.');
     let ttl = data.ttl;
     
@@ -1124,21 +1133,20 @@ export class Broker {
       ttl = weAreDebugging ? 500000000 : (data.ttl || this.lockExpiresAfter);
     }
     
-    if (ws && uuid) {
+    if (uuid) {
       if (!this.wsToUUIDs.has(ws)) {
         this.wsToUUIDs.set(ws, {});
       }
       this.wsToUUIDs.get(ws)[uuid] = true;
     }
     
-    if (ws && !this.wsToKeys.has(ws)) {
+    if (!this.wsToKeys.has(ws)) {
       this.wsToKeys.set(ws, {});
     }
     
-    const force = data.force;
-    const retryCount = data.retryCount;
-    
     if (lck) {
+      
+      // lock object with given key exists
       
       if (Number.isInteger(max)) {
         lck.max = max;
@@ -1149,7 +1157,9 @@ export class Broker {
       
       if (count >= lck.max) {
         
-        // console.log('count is too high:', count, 'max:', lck.max);
+        if (count > lck.max) {
+          log.debug('count is too high:', count, 'max:', lck.max);
+        }
         
         // Lock exists *and* already has a lockholder; adding ws to list of to be notified
         // if we are retrying, we may attempt to call lock() more than once
@@ -1157,7 +1167,7 @@ export class Broker {
         
         if (force) {
           
-          // because we use force we put it to the front of the line
+          // because of the force option, we put it to the front of the line
           lck.notify.remove(uuid);
           lck.notify.unshift(uuid, {ws, uuid, pid, ttl, keepLocksAfterDeath});
           
@@ -1185,129 +1195,116 @@ export class Broker {
           type: 'lock',
           acquired: false
         });
-      }
-      else {
         
-        // lck exists and we are below the max amount of lockholders
-        // so we can acquire the lock
-        
-        log.debug(data.rwStatus, 'has acquired lock on key:', key);
-        
-        lck.lockholders[uuid] = {ws, uuid, pid};
-        clearTimeout(lck.to);
-        
-        if (beginRead) {
-          // lck.readers = Math.max(20, lck.readers++);
-          lck.readers++
-        }
-        
-        if (endRead) {
-          // in case something weird happens, never let it go below 0.
-          lck.readers = Math.max(0, --lck.readers);
-        }
-        
-        if (ttl !== Infinity) {
-          
-          // if are using Infinity, there is no timeout
-          // if we are locking with the shell, there is not timeout
-          // otherwise if we are using the lib programmatically, we use a timeout
-          
-          lck.to = setTimeout(() => {
-            
-            // delete locks[key];  => no, this.unlock will take care of that
-            this.emitter.emit('warning',
-              chalk.yellow.bold('lmx broker warning, [1] lock object timed out for key => "' + key + '"'));
-            
-            // we set lck.lockholderTimeouts[uuid], so that when an unlock request for uuid might come in to broker
-            // we know that it timed out already, and we do not throw an error then
-            
-            if (this.locks.has(key)) {
-              this.locks.get(key).lockholderTimeouts[uuid] = true
-            }
-            this.unlock({key, force: true, from: 'ttl expired for lock (1)'});
-            
-          }, ttl);
-        }
-        
-        this.wsToKeys.get(ws)[key] = true;
-        
-        this.send(ws, {
-          readersCount: lck.readers,
-          uuid: uuid,
-          key: key,
-          lockRequestCount: ln,
-          type: 'lock',
-          acquired: true
-        });
+        return;
       }
       
-    }
-    else {
-      
-      // there is no existing lck, so we create a new lck object
-      
+      // lck exists and we are below the max amount of lockholders
+      // so we can acquire the lock
       log.debug(data.rwStatus, 'has acquired lock on key:', key);
       
-      if (!this.wsToKeys.has(ws)) {
-        this.wsToKeys.set(ws, {});
-      }
-      
-      this.wsToKeys.get(ws)[key] = true;
-      
-      this.locks.set(key, {
-        readers: 0,
-        max: max || 1,
-        lockholders: <LockholdersType>{},
-        keepLocksAfterDeath,
-        lockholderTimeouts: {},
-        lockholdersAllReleased: {},
-        key,
-        notify: new LinkedQueue(),
-        to: null as Timer,
-        writerFlag: false,
-        timestampEmptied: null
-      });
-      
-      const lckTemp = this.locks.get(key);
+      lck.lockholders[uuid] = {ws, uuid, pid};
+      clearTimeout(lck.to);
       
       if (beginRead) {
         // lck.readers = Math.max(20, lck.readers++);
-        lckTemp.readers++
+        lck.readers++
       }
       
       if (endRead) {
         // in case something weird happens, never let it go below 0.
-        lckTemp.readers = Math.max(0, --lckTemp.readers);
+        lck.readers = Math.max(0, --lck.readers);
       }
       
-      lckTemp.lockholders[uuid] = {ws, uuid, pid};
-      
       if (ttl !== Infinity) {
-        lckTemp.to = setTimeout(() => {
+        
+        // if are using Infinity, there is no timeout
+        // if we are locking with the shell, there is not timeout
+        // otherwise if we are using the lib programmatically, we use a timeout
+        
+        lck.to = setTimeout(() => {
           
-          // delete locks[key];  => no!, this.unlock will take care of that
-          this.emitter.emit('warning', 'lmx broker warning [2]: lock object timed out for key => "' + key + '"');
+          // delete locks[key];  => no, this.unlock will take care of that
+          this.emitter.emit('warning',
+            chalk.yellow.bold('lmx broker warning, [1] lock object timed out for key => "' + key + '"'));
           
-          // we set lck.lockholderTimeouts[uuid], so that when an unlock request for uuid comes into the broker
-          // we know that it timed out already, and we know not to throw an error when the lock.uuid doesn't match
-          // have to read the key, not use local lckTemp var
+          // we set lck.lockholderTimeouts[uuid], so that when an unlock request for uuid might come in to broker
+          // we know that it timed out already, and we do not throw an error then
+          
           if (this.locks.has(key)) {
-            this.locks.get(key).lockholderTimeouts[uuid] = true;
+            this.locks.get(key).lockholderTimeouts[uuid] = true
           }
-          this.unlock({key, force: true, from: 'ttl expired for lock (2)'});
+          
+          this.unlock({key, force: true, from: 'ttl expired for lock (1)'});
           
         }, ttl);
       }
       
+      this.wsToKeys.get(ws)[key] = true;
+      
       this.send(ws, {
-        readersCount: lckTemp.readers,
+        readersCount: lck.readers,
         uuid: uuid,
-        lockRequestCount: 0,
         key: key,
+        lockRequestCount: ln,
         type: 'lock',
         acquired: true
       });
+      
+      return;
     }
+    
+    
+    // this path: there is no existing lck, so we create a new lck object
+    
+    log.debug(data.rwStatus, 'has acquired lock on key:', key);
+    
+    if (!this.wsToKeys.has(ws)) {
+      this.wsToKeys.set(ws, {});
+    }
+    
+    this.wsToKeys.get(ws)[key] = true;
+    
+    const lckTemp = this.getDefaultLockObject(key, keepLocksAfterDeath, max);
+    this.locks.set(key, lckTemp);
+    
+    if (beginRead) {
+      // lck.readers = Math.max(20, lck.readers++);
+      lckTemp.readers++
+    }
+    
+    if (endRead) {
+      // in case something weird happens, never let it go below 0.
+      lckTemp.readers = Math.max(0, --lckTemp.readers);
+    }
+    
+    lckTemp.lockholders[uuid] = {ws, uuid, pid};
+    
+    if (ttl !== Infinity) {
+      lckTemp.to = setTimeout(() => {
+        
+        // delete locks[key];  => no!, this.unlock will take care of that
+        this.emitter.emit('warning', 'lmx broker warning [2]: lock object timed out for key => "' + key + '"');
+        
+        // we set lck.lockholderTimeouts[uuid], so that when an unlock request for uuid comes into the broker
+        // we know that it timed out already, and we know not to throw an error when the lock.uuid doesn't match
+        // have to read the key, not use local lckTemp var
+        if (this.locks.has(key)) {
+          this.locks.get(key).lockholderTimeouts[uuid] = true;
+        }
+        this.unlock({key, force: true, from: 'ttl expired for lock (2)'});
+        
+      }, ttl);
+    }
+    
+    this.send(ws, {
+      readersCount: lckTemp.readers,
+      uuid: uuid,
+      lockRequestCount: 0,
+      key: key,
+      type: 'lock',
+      acquired: true
+    });
     
   }
   
@@ -1324,18 +1321,20 @@ export class Broker {
       // we know for a fact that
       // this websocket connection no longer owns this key
       try {
+        // @ts-ignore
         delete this.wsToKeys.get(ws)[key];
       }
       catch (err) {
-        // ignore
+        // ignore err
       }
     }
     
     try {
+      // @ts-ignore
       delete this.wsToUUIDs.get(ws)[_uuid];
     }
     catch (err) {
-      // ignore
+      // ignore err
     }
     
     // if the user passed _uuid, then we check it, other true
@@ -1381,10 +1380,12 @@ export class Broker {
       }
       
       this.ensureNewLockHolder(lck, data);
-      
+      return;
     }
-    else if (lck) {
+    
+    if (lck) {
       
+      // we have a lock, but not the same key and force option was not used
       const ln = lck.notify.length;
       
       if (lck.lockholderTimeouts[_uuid] || lck.lockholdersAllReleased[_uuid]) {
@@ -1408,61 +1409,67 @@ export class Broker {
         }
         
         this.ensureNewLockHolder(lck, data);
-        
-      }
-      else {
-        
-        if (uuid && ws) {
-          
-          // if no uuid is defined, then unlock was called by something other than the client
-          // aka this library called unlock when there was a timeout
-          
-          this.send(ws, {
-            uuid: uuid,
-            key: key,
-            lockRequestCount: ln,
-            type: 'unlock',
-            error: 'You need to pass the correct uuid, or use force.',
-            unlocked: false
-          });
-          
-        }
-        else if (uuid) {
-          this.emitter.emit('warning', 'Implemenation warning - Missing ws (we have a uuid but no ws connection).');
-        }
-        else if (ws) {
-          this.emitter.emit('warning', 'Implemenation warning - Missing uuid (we have socket connection but no uuid).');
-        }
+        return;
       }
       
-    }
-    else {
       
-      // lck is not defined
-      log.debug('lock was not defined / no longer existed.');
-      log.debug(data.rwStatus, 'has released lock on key:', key);
-      
-      this.emitter.emit('warning', 'lmx broker implementation warning: no lock with key => "' + key + '"');
-      
-      // since the lock no longer exists for this key, remove ownership of this key
-      if (ws && uuid) {
+      if (uuid && ws) {
         
-        this.emitter.emit('warning', `lmx broker warning: no lock with key => '${key}'.`);
+        // if no uuid is defined, then unlock was called by something other than the client
+        // aka this library called unlock when there was a timeout
         
         this.send(ws, {
           uuid: uuid,
           key: key,
-          lockRequestCount: 0,
+          lockRequestCount: ln,
           type: 'unlock',
-          unlocked: true,
-          warning: `no lock with key => "${key}".`
+          error: 'You need to pass the correct uuid, or use force.',
+          unlocked: false
         });
+        
+      }
+      else if (uuid) {
+        this.emitter.emit('warning', 'lmx mplementation warning - Missing ws (we have a uuid but no ws connection).');
       }
       else if (ws) {
-        this.emitter.emit('warning', 'lmx implementation warning: missing uuid (we have a socket connection but no uuid).');
+        this.emitter.emit('warning', 'lmx implementation warning - Missing uuid (we have socket connection but no uuid).');
       }
+      else {
+        this.emitter.emit('warning', 'lmx implementation warning: missing uuid and socket connection.');
+      }
+      
+      return;
+    }
+    
+    
+    // lck is not defined
+    log.debug('lock was not defined / no longer existed.');
+    log.debug(data.rwStatus, 'has released lock on key:', key);
+    
+    this.emitter.emit('warning', 'lmx broker implementation warning: no lock with key => "' + key + '"');
+    
+    // since the lock no longer exists for this key, remove ownership of this key
+    if (ws && uuid) {
+      
+      this.emitter.emit('warning', `lmx broker warning: no lock with key => '${key}'.`);
+      
+      this.send(ws, {
+        uuid: uuid,
+        key: key,
+        lockRequestCount: 0,
+        type: 'unlock',
+        unlocked: true,
+        warning: `no lock with key => "${key}".`
+      });
+    }
+    else if (ws) {
+      this.emitter.emit('warning', 'lmx implementation warning: missing uuid (we have a socket connection but no uuid).');
+    }
+    else {
+      this.emitter.emit('warning', 'lmx implementation warning: missing uuid and socket connection.');
     }
   }
+  
 }
 
 // aliases

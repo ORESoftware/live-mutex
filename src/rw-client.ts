@@ -33,12 +33,12 @@ export const log = {
 import {RWStatus, EVCb} from "./shared-internal";
 import {LMXClientLockException} from "./exceptions";
 
-////////////////////////////////////////////////////////////////////////
 
 export class RWLockClient extends Client {
 
   constructor(o?: Partial<ClientOpts>, cb?: LMClientCallBack) {
     super(o, cb);
+    throw 'RWClient not yet fully implemented, TBD';
   }
 
   beginReadp(key: string, opts: any): Promise<any> {
