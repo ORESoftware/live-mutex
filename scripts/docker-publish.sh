@@ -14,6 +14,8 @@ version_tag="oresoftware/live-mutex-broker:$version";
 latest_tag='oresoftware/live-mutex-broker:latest'
 
 docker build -t  "$version_tag" .
+
+
 docker tag  "$latest_tag" "$version_tag"
 
 docker push "$version_tag"

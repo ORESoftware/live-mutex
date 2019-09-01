@@ -1,7 +1,22 @@
+'use strict';
 
+import * as util from "util";
+
+export type EVCb<T, E = any> = (err: E, val: T) => void
 
 export const forDebugging = {
-   previousTime : Date.now()
+  previousTime: Date.now()
+};
+
+export const inspectError = (err: any): string => {
+  return typeof err === 'string' ? err : util.inspect(err, {
+    showHidden: true,
+    depth: 5
+  });
+};
+
+export const joinToStr = (...args: any[]): string => {
+  return args.map(inspectError).join(' ');
 };
 
 

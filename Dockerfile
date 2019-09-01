@@ -2,13 +2,14 @@ FROM node:12.3.1-alpine
 
 ENV live_mutex_host "0.0.0.0"
 ENV live_mutex_port 6970
+ENV lmx_in_docker='yes'
+
 ENV FORCE_COLOR=1
 
 USER root
+RUN echo "user is: $USER"
 
 WORKDIR "/app"
-
-RUN npm set unsafe-perm true
 
 COPY package.json .
 COPY package-lock.json .

@@ -30,16 +30,18 @@ export const log = {
   }
 };
 
-import {RWStatus} from "./shared-internal";
-import {EVCb} from "./utils";
+import {RWStatus, EVCb} from "./shared-internal";
 import {LMXClientLockException} from "./exceptions";
 
-////////////////////////////////////////////////////////////////////////
 
 export class RWLockClient extends Client {
+  
+  readerCounts = <{ [key: string]: number }>{};
+  writeKeys = <{ [key: string]: true }>{}; // keeps track of whether a key has been registered as a write key
 
   constructor(o?: Partial<ClientOpts>, cb?: LMClientCallBack) {
     super(o, cb);
+    throw 'RWClient not yet fully implemented, TBD';
   }
 
   beginReadp(key: string, opts: any): Promise<any> {
@@ -139,7 +141,7 @@ export class RWLockClient extends Client {
     this.lock(key, opts, (err, val) => {
 
       if (err) {
-        return cb(err);
+        return cb(err, {});
       }
 
       const boundEndWrite = this.endWrite.bind(this, key);
@@ -191,7 +193,7 @@ export class RWLockClient extends Client {
     this.lock(key, opts, (err, unlock) => {
 
       if (err) {
-        return cb(err);
+        return cb(err, {});
       }
 
       const readers = unlock.readersCount;
@@ -212,16 +214,16 @@ export class RWLockClient extends Client {
 
         log.debug(chalk.magenta('readers is exactly 1.'));
 
-        return this.lock(writeKey, {rwStatus: RWStatus.LockingWriteKey}, err => {
+        return this.lock(writeKey, <any>{rwStatus: RWStatus.LockingWriteKey}, err => {
 
           if (err) {
-            return cb(err);
+            return cb(err, {});
           }
 
           unlock(err => {
 
             if (err) {
-              return cb(err);
+              return cb(err, {});
             }
 
             cb(err, boundEndRead);
@@ -233,7 +235,7 @@ export class RWLockClient extends Client {
       unlock(err => {
 
         if (err) {
-          return cb(err);
+          return cb(err, {});
         }
 
         cb(err, boundEndRead);
