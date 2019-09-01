@@ -257,7 +257,7 @@ If you want more than one lockholder to be able hold the lock for a certain key 
       
       const {id, key} = await c.acquire('foo');
       // do your thing here
-      return await c.release(key, id);
+      return await c.release(key, id);  // or just return w/o await, since await is redundant in the return statement
       
     }, err => {
       
@@ -350,7 +350,7 @@ You must either pass the lock id, or use force, to unlock a lock:
 ```js
  return client.ensure().then(c =>  {   // (c is the same object as client)
     return c.acquire('<key>').then(({key,id}) => {
-        return c.release('<key>', id);
+        return c.release(key, id);
      });
  });
 ```
@@ -360,7 +360,7 @@ You must either pass the lock id, or use force, to unlock a lock:
 ```js
  return client.ensure().then(c =>  {   // (c is the same object as client)
     return c.acquire('<key>').then(({key,id}) => {
-        return c.release('<key>', {force:true});
+        return c.release(key, {force:true});
      });
  });
 ```
@@ -370,7 +370,7 @@ You must either pass the lock id, or use force, to unlock a lock:
 ```js
  return client.ensure().then(c =>  {   // (c is the same object as client)
     return c.acquire('<key>').then(({key,id}) => {
-        return c.release('<key>');
+        return c.release(key);
      });
  });
 ```
@@ -477,7 +477,7 @@ To launch a broker process using Node.js:
 
 ```js
 
-const lmUtils = require('live-mutex/utils');
+const {lmUtils} = require('live-mutex');
 
 lmUtils.conditionallyLaunchSocketServer(opts, function(err){
 
