@@ -8,6 +8,7 @@ import ping = require('tcp-ping');
 
 //project
 import {Broker} from './broker';
+import {EVCb, inspectError} from "./shared-internal";
 const p = require.resolve('./launch-broker-child');
 
 const log = {
@@ -15,23 +16,6 @@ const log = {
   error: console.error.bind(console, 'lmx utils:')
 };
 
-export type EVCb<T> = (err: any, val?: T) => void
-
-//////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-export const once = function (ctx: any, fn: Function) {
-  let callable = true;
-  return function (err: any) {
-    if (callable) {
-      callable = false;
-      return fn.apply(ctx === 'that' ? this : ctx, arguments);
-    }
-    else if (err) {
-      log.error(err.stack || err.message || err);
-    }
-  }
-};
 
 export const launchSocketServer = function (opts: any, cb: EVCb<any>) {
   
@@ -41,7 +25,7 @@ export const launchSocketServer = function (opts: any, cb: EVCb<any>) {
   ping.probe(host, port, function (err, available) {
     
     if (err) {
-      return cb(err);
+      return cb(err, {});
     }
     
     if (available) {
@@ -76,7 +60,7 @@ export const launchBrokerInChildProcess = function (opts: any, cb: EVCb<any>) {
   ping.probe(host, port, function (err, available) {
     
     if (err) {
-      return cb(err)
+      return cb(err, {})
     }
     
     if (available) {

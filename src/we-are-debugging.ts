@@ -3,9 +3,6 @@
 //core
 const util = require('util');
 const execArgs = process.execArgv.slice(0);  //copy it
-
-//////////////////////////////////////////////////////////
-
 const inDebugMode = typeof global.v8debug === 'object';
 
 const expressions = [

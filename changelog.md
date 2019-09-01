@@ -3,6 +3,36 @@
 
 -------------------------------------------------------------
 
+## Sat Aug 31 17:11:42 PDT 2019
+
+* The typings will no longer accept primitive arguments to options objects. For example:
+
+    client.lock(key, true)
+    
+    it has to be:
+    
+    client.lock(key, {force:true})
+    
+    or for the short-run:
+    
+    client.lock(key, <any>true);
+    
+    in a 1.0.0 release, the primitive options will be removed altogether.
+
+
+*   The following methods are deprecated:
+
+    lockp(key: string, opts?: Partial<LMXClientLockOpts>): Promise<LMLockSuccessData> {
+      log.warn('lockp is deprecated because it is a confusing method name, use acquire/acquireLock instead.');
+      return this.acquire.apply(this, <any>arguments);
+    }
+    
+    unlockp(key: string, opts: Partial<LMXClientUnlockOpts>): Promise<LMUnlockSuccessData> {
+      log.warn('unlockp is deprecated because it is a confusing method name, use release/releaseLock instead.');
+      return this.release.apply(this, <any>arguments);
+    }
+
+
 ## Mon Aug 26 18:19:32 PDT 2019
 
 ### changed:

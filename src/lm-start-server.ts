@@ -1,16 +1,48 @@
 'use strict';
 
 import {Broker, log} from "./broker";
+import * as fs from 'fs';
 import chalk from "chalk";
 import util = require('util');
-let host = process.argv[3] || process.env.live_mutex_host || '0.0.0.0';
-let port = parseInt(process.argv[2] || process.env.live_mutex_port || '6970');
+import * as path from "path";
+import {inspectError} from "./shared-internal";
+
+const cp = require('child_process');
+
+let host = process.env.live_mutex_host || '0.0.0.0';
+let port = parseInt(process.env.live_mutex_port || '6970');
 const index = process.argv.indexOf('--json');
+const useUDS = process.env.use_uds === 'yes' || process.argv.indexOf('--use-uds') > 1;
 
-let v = {port,host} as any;
 
-if (index > 0) {
+// @ts-ignore
+let v = {port, host} as any;
 
+if (useUDS && process.env.lmx_in_docker === 'yes') {
+  v.udsPath = '/uds/uds.sock';
+  
+  try {
+    fs.mkdirSync('/uds');
+  }
+  catch (err) {
+    // ignore
+  }
+  
+}
+else if (useUDS) {
+  v.udsPath = path.resolve(process.env.HOME + '/.lmx/uds.sock');
+  
+  try {
+    fs.mkdirSync(path.resolve(process.env.HOME + '/.lmx'));
+  }
+  catch (err) {
+    // ignore
+  }
+}
+
+
+if (index > 1) {
+  
   try {
     v = JSON.parse(process.argv[index + 1]);
   }
@@ -18,27 +50,27 @@ if (index > 0) {
     log.error(chalk.magenta(`Could not parse your --json argument, try --json '{"port":3091}'.`));
     throw chalk.magentaBright(err.message);
   }
-
+  
   host = v.host = (v.host || host);
   port = v.port = (v.port || port);
 }
 
 if (!Number.isInteger(port)) {
   log.error(chalk.magenta('Live-mutex: port could not be parsed to integer from command line input.'));
-  log.error('Usage: lm_acquire_lock <key> <?port>');
+  log.error('Usage: lmx-start-server <key> <?port>');
   process.exit(1);
 }
 
 process.once('warning' as any, function (e: any) {
-  log.error('process warning:', chalk.magenta(util.inspect(e)));
+  log.error('process warning:', chalk.magenta(inspectError(e)));
 });
 
 process.once('unhandledRejection', function (e: any) {
-  log.error('unhandled-rejection:', chalk.magenta(util.inspect(e)));
+  log.error('unhandled-rejection:', chalk.magenta(inspectError(e)));
 });
 
 process.once('uncaughtException', function (e: any) {
-  log.error('uncaught-exception:', chalk.magenta(util.inspect(e)));
+  log.error('uncaught-exception:', chalk.magenta(inspectError(e)));
 });
 
 const b = new Broker(v);
@@ -51,10 +83,22 @@ b.emitter.on('warning', function () {
   log.warn(...arguments);
 });
 
-b.ensure().then(function (b) {
-  log.info(chalk.bold('Started server on port:'), chalk.cyan.bold(String(b.getPort())));
-})
-.catch(function (err) {
-  log.error('caught:', err && err.message || err);
-  process.exit(1);
+b.emitter.on('error', function () {
+  log.error(...arguments);
 });
+
+
+b.ensure().then(function (b) {
+   log.info(chalk.bold('LMX broker listening on:'), chalk.cyan.bold(String(b.getListeningInterface())));
+  
+   // const k = cp.spawn('ls', ['-a','/uds']);
+   //
+   // k.stdout.pipe(process.stdout);
+   // k.stderr.pipe(process.stderr);
+  
+  
+ })
+ .catch(function (err) {
+   log.error('broker launch error:', inspectError(err));
+   process.exit(1);
+ });

@@ -45,7 +45,6 @@ const acceptableCommands = <{
 };
 
 
-
 const prompt = chalk.blueBright(`(${host}:${port})`) + chalk.blueBright.bold(` lmx > `);
 
 s.once('connect', function () {

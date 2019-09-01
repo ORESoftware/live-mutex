@@ -35,6 +35,39 @@
 > Tested and proven on Node.js versions >= 8.0.0.
 >
 
+# Simple Working Examples:
+
+> See: https://github.com/ORESoftware/live-mutex-examples
+
+
+# Installation
+
+
+##### <i> For usage with Node.js libraries: </i>
+
+>
+>```$ npm install live-mutex```
+>
+>
+
+##### <i> For command line tools: </i>
+ 
+>
+>```$ npm install -g live-mutex```
+>
+>
+
+##### <i> Docker image for the broker: </i>
+
+>
+>  `$ docker pull oresoftware/live-mutex-broker:latest`
+>
+>  `$ docker run -d -p 6970:6970 oresoftware/live-mutex-broker:latest`
+> 
+
+<br>
+
+
 ## About
 
 * Written in TypeScript for maintainability and ease of use.
@@ -83,29 +116,7 @@ See: `docs/detailed-explanation.md` and `docs/about.md`
 <br>
 <br>
 
-# Installation
 
-##### <i> For command line tools: </i>
-
->
->```$ npm install -g live-mutex```
->
-
-##### <i> For usage with Node.js libraries: </i>
-
->
->```$ npm install live-mutex --save```
->
-
-##### <i> Docker image for the broker: </i>
-
->
->  `$ docker pull oresoftware/live-mutex-broker:latest`
->
->  `$ docker run -p 6970:6970 -it oresoftware/live-mutex-broker:latest`
-> 
-
-<br>
 
 # Basic Usage and Best Practices
 
@@ -137,6 +148,9 @@ Unix Domain Sockets are about 10-50% faster than TCP, depending on how well-tune
 
 ## Using shell / command line:
 
+<details>
+<summary>Example</summary>
+
 (First, make sure you install the library as a global package with NPM). 
 The real power of this library comes with usage with Node.js, but we can use this functionality at the command line too:
 
@@ -163,6 +177,7 @@ $ lmx set uds_path "$PWD/zoom"
 If `uds_path` is set, it will override host/port. You must use `$ lmx set a b`, to change settings. You can elect to use these environment variables
 in Node.js, by using `{env: true}` in your Node.js code.
 
+</details>
 
 <br>
 
@@ -204,25 +219,35 @@ If you want more than one lockholder to be able hold the lock for a certain key 
 
 ### Using the library with Promises (recommended usage)
 
-```js
-const opts = {port: '<port>' , host: '<host>'};
-// check to see if the websocket broker is already running, if not, launch one in this process
+<details>
 
-const client = new Client(opts);
-
-// calling ensure before each critical section means that we ensure we have a connected client
-// for shorter lived applications, calling ensure more than once is not as important
-
-return client.ensure().then(c =>  {   // (c is the same object as client)
- return c.acquire('<key>').then(({key,id}) => {
-    return c.release('<key>', id);
+ <summary>Example</summary>
+ 
+ ```js
+ const opts = {port: '<port>' , host: '<host>'};
+ // check to see if the websocket broker is already running, if not, launch one in this process
+ 
+ const client = new Client(opts);
+ 
+ // calling ensure before each critical section means that we ensure we have a connected client
+ // for shorter lived applications, calling ensure more than once is not as important
+ 
+ return client.ensure().then(c =>  {   // (c is the same object as client)
+  return c.acquire('<key>').then(({key,id}) => {
+     return c.release('<key>', id);
+  });
  });
-});
+ 
+ ```
 
-```
+</details>
+
 
 
 ### Using async/await
+
+<details>
+<summary>Example</summary>
 
 ```typescript
     const times = 10000;
@@ -248,6 +273,9 @@ return client.ensure().then(c =>  {   // (c is the same object as client)
     });
 
 ```
+
+</details>
+
 
 <br>
 
@@ -356,7 +384,10 @@ where you won't easily have access to the lock id from another process.
 
 ## Client constructor and client.lock() method options
 
-There are some important options. All options can be passed to the client constructor instead of the client lock method, which is more convenient and performant:
+<details>
+<summary>lock() method options</summary>
+There are some important options. 
+Most options can be passed to the client constructor instead of the client lock method, which is more convenient and performant:
 
 ```js
 const c = new Client({port: 3999, ttl: 11000, lockRequestTimeout: 2000, maxRetries: 5});
@@ -376,6 +407,7 @@ c.ensure().then(c => {
    return c.execUnlock(unlock);
 });
 ```
+</details>
 
 <br>
 
@@ -439,6 +471,8 @@ Non-binary semaphores are well-supported by live-mutex and are a primary feature
 
 ## Live-Mutex utils
 
+<details>
+<summary>Use lmx utils to your advantage</summary>
 To launch a broker process using Node.js:
 
 ```js
@@ -490,16 +524,21 @@ ping.probe(host, port, function (err, available) {
 
 ```
 
+</details>
+
 
 <br>
 
-### Live-Mutex supports Node.js core domains
+### Live-Mutex supports Node.js-core domains
 To see more, see: `docs/examples/domains.md`
 
 <br>
 
 ## Creating a simple client pool
 
+<details>
+
+<summary>Example</summary>
 In most cases, a single client is sufficient, and this is true many types of networked clients using async I/O.
 You almost certainly do not need more than one client.
 However, if you do some empirical test, and find a client pool might be beneficial/faster, etc. Try this:
@@ -518,7 +557,47 @@ exports.createPool = function(opts){
 }
 ```
 
+</details>
+
 
 ### Testing
 
 > Look at test/readme.md
+
+
+<br>
+
+
+## Using Docker + Unix Domain Sockets
+
+In short, you almost certainly can't do this, because apparently sockets cannot be shared between host and container.
+Meaning if your client is running on the host machine (or other container), but your broker is running in a container,
+it will likely not be possible, but that's ok, since you can just use TCP/ports.
+ 
+<details>
+ <summary>Example of an attempt</summary>
+ 
+ You almost certainly don't want to do this, as using UDS is for one machine only, and this technique only
+ works on Linux it does not work on MacOS (sharing sockets between host and container).
+ 
+ When running on a single machine, here's how you do use UDS with Docker:
+ 
+ ```bash
+ my_sock="$(pwd)/foo/uds.sock";
+ rm -f "$my_sock"
+ docker run -d -v "$(pwd)/foo":/uds 'oresoftware/live-mutex-broker:latest' --use-uds
+ 
+ ```
+ 
+ The above passed the `--use-uds` boolean flag to the launch process, which tells the broker to use UDS instead of listening on a port.
+ The -v option allows the host and container to share a portion of the filesystem. You should probably just delete the socket file
+ before starting the container, in case the file already exists.  '/uds/uds.sock' is the path in the container that points to the socket file,
+ it's a hardcoded fixed path.
+ 
+ When connecting to the broker with the Node.js client, you would use:
+ 
+ ```typescript
+  const client = new Client({udsPath: 'foo/uds.sock'});
+ ```
+
+</details>
