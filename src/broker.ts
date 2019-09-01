@@ -127,13 +127,11 @@ export interface UuidHash {
   [key: string]: boolean
 }
 
-export interface LockholdersType {
-  [key: string]: {
-    pid: number,
-    ws: net.Socket,
-    uuid: string
-  }
-}
+export type LockholdersType = Map<string, {
+  pid: number,
+  ws: net.Socket,
+  uuid: string
+}>
 
 export interface LockObj {
   // current number of lockholders for this lock/key is Object.keys(lockholders).length
@@ -836,7 +834,7 @@ export class Broker {
     return {
       readers: 0,
       max: max || 1,
-      lockholders: {},
+      lockholders: new Map(),
       lockholdersAllReleased: {},
       keepLocksAfterDeath,
       lockholderTimeouts: {},
@@ -919,7 +917,7 @@ export class Broker {
     // before we delete the lock object, let's try to find a new lock-holder
     
     if (data._uuid) {
-      delete lck.lockholders[data._uuid];
+      lck.lockholders.delete(data._uuid);
     }
     
     lck.keepLocksAfterDeath = null;
@@ -940,7 +938,7 @@ export class Broker {
       }
     }
     
-    const count = Object.keys(lck.lockholders).length;
+    const count = lck.lockholders.size;
     
     if (!n && count < 1) {
       // note: only delete lock if no client is remaining to claim it
@@ -968,8 +966,7 @@ export class Broker {
     }
     
     this.wsToKeys.get(ws)[key] = true;
-    
-    lck.lockholders[uuid] = {pid: n.pid, uuid, ws};
+    lck.lockholders.set(uuid, {pid: n.pid, uuid, ws});
     lck.keepLocksAfterDeath = n.keepLocksAfterDeath || false;
     let ln = lck.notify.length;
     
@@ -1018,7 +1015,7 @@ export class Broker {
       if (locks.has(key)) {
         
         const lckTemp: LockObj = locks.get(key);
-        delete lckTemp.lockholders[uuid];
+        lckTemp.lockholders.delete(uuid);
         const ln = lck.notify.length;
         const notifyList = lckTemp.notify;
         
@@ -1091,7 +1088,7 @@ export class Broker {
       }
       
       const notify = v.notify.getLength();
-      const count = Object.keys(v.lockholders).length;
+      const count = v.lockholders.size;
       
       if (count < 1 && notify < 1) {
         // we delete the lock object because it hasn't been used in a while
@@ -1122,11 +1119,15 @@ export class Broker {
     const max = data.max;  // max lockholders
     const beginRead = data.rwStatus === RWStatus.BeginRead;
     const endRead = data.rwStatus === RWStatus.EndRead;
-    const count = Object.keys(lck && lck.lockholders || {}).length;
+  
     const force = data.force;
     const retryCount = data.retryCount;
+  
+    if(lck){
+      const count = lck.lockholders.size;
+      log.debug(data.rwStatus, 'is contending for lock on key:', key, 'there is/are', count, 'lockholders.');
+    }
     
-    log.debug(data.rwStatus, 'is contending for lock on key:', key, 'there is/are', count, 'lockholders.');
     let ttl = data.ttl;
     
     if (ttl !== Infinity) {
@@ -1153,7 +1154,7 @@ export class Broker {
       }
       
       const ln = lck.notify.length;
-      const count = Object.keys(lck.lockholders).length;
+      const count = lck.lockholders.size;
       
       if (count >= lck.max) {
         
@@ -1202,8 +1203,7 @@ export class Broker {
       // lck exists and we are below the max amount of lockholders
       // so we can acquire the lock
       log.debug(data.rwStatus, 'has acquired lock on key:', key);
-      
-      lck.lockholders[uuid] = {ws, uuid, pid};
+      lck.lockholders.set(uuid, {ws, uuid, pid});
       clearTimeout(lck.to);
       
       if (beginRead) {
@@ -1278,7 +1278,7 @@ export class Broker {
       lckTemp.readers = Math.max(0, --lckTemp.readers);
     }
     
-    lckTemp.lockholders[uuid] = {ws, uuid, pid};
+    lckTemp.lockholders.set(uuid, {ws, uuid, pid});
     
     if (ttl !== Infinity) {
       lckTemp.to = setTimeout(() => {
@@ -1345,7 +1345,7 @@ export class Broker {
     
     let same = null;
     if (_uuid && lck) {
-      same = Boolean(lck.lockholders[_uuid]);
+      same = lck.lockholders.has(_uuid);
       log.debug('same is:', same);
     }
     else if (lck) {
@@ -1359,10 +1359,10 @@ export class Broker {
       delete lck.lockholderTimeouts[_uuid];
       
       if (force) {
-        for (const v of Object.keys(lck.lockholders)) {
-          lck.lockholdersAllReleased[v] = true;
+        for (const k of lck.lockholders.keys()) {
+          lck.lockholdersAllReleased[k] = true;
         }
-        lck.lockholders = {};
+        lck.lockholders = new Map();
       }
       
       if (uuid && ws) {
