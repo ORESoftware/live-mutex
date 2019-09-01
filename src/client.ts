@@ -34,8 +34,6 @@ export const log = {
   }
 };
 
-/////////////////////////////////////////////////////////////////////////
-
 import {weAreDebugging} from './we-are-debugging';
 import Timer = NodeJS.Timer;
 import {EventEmitter} from 'events';
@@ -51,8 +49,6 @@ import {inspectError} from "./shared-internal";
 if (weAreDebugging) {
   log.debug('lmx client is in debug mode. Timeouts are turned off.');
 }
-
-/////////////////////////////////////////////////////////////////////////
 
 export interface ValidConstructorOpts {
   [key: string]: string
@@ -124,11 +120,27 @@ export interface UuidBooleanHash {
 }
 
 export interface LMXClientLockOpts {
-
+  ttl?: number,
+  lockRequestTimeout?: number,
+  maxRetries?: number,
+  force?: boolean,
+  semaphore?: number,
+  max?: number,
+  retry?: boolean,
+  maxRetry?: number,
+  retryMax?: number,
+  _uuid?: string,
+  __maxRetries?: number,
+  __retryCount?: number
 }
 
 export interface LMXClientUnlockOpts {
-
+  force?: boolean,
+  _uuid?: string,
+  __retryCount?: number,
+  id?: string,
+  rwStatus?: string,
+  unlockRequestTimeout?: number
 }
 
 export interface LMLockSuccessData {
@@ -148,12 +160,9 @@ export interface LMUnlockSuccessData {
   id: string
 }
 
-export type EVCallback = (err?: any, val?: any) => void;
-
 export interface LMClientLockCallBack {
   (err: LMXClientLockException, v: LMLockSuccessData): void;
 }
-
 
 export interface LMClientUnlockCallBack {
   (err: null | LMXClientUnlockException, v: LMUnlockSuccessData): void,
@@ -195,10 +204,6 @@ export class Client {
   noDelay = true;
   socketFile = '';
   recovering = false;
-  readerCounts = <{ [key: string]: number }>{};
-  writeKeys = <{ [key: string]: true }>{}; // keeps track of whether a key has been registered as a write key
-  
-  ////////////////////////////////////////////////////////////////
   
   constructor(o?: Partial<ClientOpts>, cb?: LMClientCallBack) {
     
@@ -516,7 +521,7 @@ export class Client {
         };
         
         ws.setEncoding('utf8')
-        
+          
           .once('error', onFirstErr)
           .once('close', () => {
             this.emitter.emit('warning', 'lmx client stream "close" event occurred.');
@@ -671,7 +676,7 @@ export class Client {
     
   }
   
-  lockp(key: string, opts?: Partial<LMXClientLockOpts>): Promise<LMLockSuccessData> {
+  acquire(key: string, opts?: Partial<LMXClientLockOpts>): Promise<LMLockSuccessData> {
     return new Promise((resolve, reject) => {
       this.lock(key, opts, (err, val) => {
         err ? reject(err) : resolve(val);
@@ -679,7 +684,7 @@ export class Client {
     });
   }
   
-  unlockp(key: string, opts?: Partial<LMXClientUnlockOpts>): Promise<LMUnlockSuccessData> {
+  release(key: string, opts: Partial<LMXClientUnlockOpts>): Promise<LMUnlockSuccessData> {
     return new Promise((resolve, reject) => {
       this.unlock(key, opts, (err, val) => {
         err ? reject(err) : resolve(val);
@@ -687,20 +692,22 @@ export class Client {
     });
   }
   
-  acquire(key: string, opts?: Partial<LMXClientLockOpts>): Promise<LMLockSuccessData> {
-    return this.lockp.apply(this, <any>arguments);
+  lockp(key: string, opts?: Partial<LMXClientLockOpts>): Promise<LMLockSuccessData> {
+    log.warn('lockp is deprecated because it is a confusing method name, use aliases acquire/acquireLock instead.');
+    return this.acquire.apply(this, <any>arguments);
   }
   
-  release(key: string, opts?: Partial<LMXClientUnlockOpts>): Promise<LMUnlockSuccessData> {
-    return this.unlockp.apply(this, <any>arguments);
+  unlockp(key: string, opts: Partial<LMXClientUnlockOpts>): Promise<LMUnlockSuccessData> {
+    log.warn('unlockp is deprecated because it is a confusing method name, use aliases release/releaseLock instead.');
+    return this.release.apply(this, <any>arguments);
   }
   
-  acquireLock(key: string, opts?: Partial<LMXClientLockOpts>): Promise<LMLockSuccessData> {
-    return this.lockp.apply(this, <any>arguments);
+  acquireLock(key: string, opts?: boolean | number | Partial<LMXClientLockOpts>): Promise<LMLockSuccessData> {
+    return this.acquire.apply(this, <any>arguments);
   }
   
-  releaseLock(key: string, opts?: Partial<LMXClientUnlockOpts>): Promise<LMUnlockSuccessData> {
-    return this.unlockp.apply(this, <any>arguments);
+  releaseLock(key: string, opts: Partial<LMXClientUnlockOpts>): Promise<LMUnlockSuccessData> {
+    return this.release.apply(this, <any>arguments);
   }
   
   run(fn: LMLockSuccessData) {
@@ -777,7 +784,11 @@ export class Client {
     
   }
   
-  protected parseLockOpts(key: string, opts: any, cb?: any): [string, any, LMClientLockCallBack] {
+  protected parseLockOpts(
+    key: string,
+    opts: LMXClientLockOpts | LMClientLockCallBack,
+    cb?: LMClientLockCallBack
+  ): [string, LMXClientLockOpts, LMClientLockCallBack] {
     
     if (typeof opts === 'function') {
       cb = opts;
@@ -791,34 +802,9 @@ export class Client {
     }
     
     assert(typeof cb === 'function', 'Please use a callback as the last argument to the lock method.');
-    opts = opts || {} as Partial<ClientOpts>;
+    opts = opts || {} as LMXClientLockOpts;
     return [key, opts, cb];
     
-  }
-  
-  protected parseUnlockOpts(key: string, opts?: any, cb?: any): [string, any, LMClientUnlockCallBack] {
-    
-    if (typeof opts === 'function') {
-      cb = opts;
-      opts = {};
-    }
-    else if (typeof opts === 'boolean') {
-      opts = {force: opts};
-    }
-    else if (typeof opts === 'string') {
-      opts = {_uuid: opts};
-    }
-    
-    opts = opts || {};
-    
-    if (cb) {
-      assert(typeof cb === 'function', 'Please use a callback as the last argument to the unlock method.');
-    }
-    else {
-      cb = this.noop;
-    }
-    
-    return [key, opts, cb];
   }
   
   _simulateVersionMismatch() {
@@ -846,9 +832,8 @@ export class Client {
   // lock(key: string, cb: LMClientLockCallBack, z?: LMClientLockCallBack) : void;
   
   lock(key: string, cb: LMClientLockCallBack): void;
-  lock(key: string, opts: any, cb: LMClientLockCallBack): void;
-  
-  lock(key: string, opts: any, cb?: LMClientLockCallBack): void {
+  lock(key: string, opts: Partial<LMXClientLockOpts>, cb: LMClientLockCallBack): void;
+  lock(key: string, opts: Partial<LMXClientLockOpts> | LMClientLockCallBack, cb?: LMClientLockCallBack): void {
     
     try {
       [key, opts, cb] = this.parseLockOpts(key, opts, cb);
@@ -905,7 +890,7 @@ export class Client {
       }
       
       if ('retry' in opts) {
-        assert.equal(typeof opts.force, 'boolean', 'lmx usage error => ' +
+        assert.equal(typeof opts.retry, 'boolean', 'lmx usage error => ' +
           '"retry" option must be a boolean value. Coerce it on your side, for safety.');
         opts.__maxRetries = 0;
       }
@@ -1220,11 +1205,40 @@ export class Client {
     return this.host;
   }
   
-  unlock(key: string): void;
-  unlock(key: string, opts: any): void;
-  unlock(key: string, opts: any, cb: LMClientUnlockCallBack): void;
+  protected parseUnlockOpts(
+    key: string,
+    opts?: LMXClientUnlockOpts | LMClientUnlockCallBack,
+    cb?: LMClientUnlockCallBack
+  ): [string, LMXClientUnlockOpts, LMClientUnlockCallBack] {
+    
+    if (typeof opts === 'function') {
+      cb = opts;
+      opts = {};
+    }
+    else if (typeof opts === 'boolean') {
+      opts = {force: opts};
+    }
+    else if (typeof opts === 'string') {
+      opts = {_uuid: opts};
+    }
+    
+    opts = opts || {};
+    
+    if (cb) {
+      assert(typeof cb === 'function', 'Please use a callback as the last argument to the client unlock method.');
+    }
+    else {
+      cb = this.noop;
+    }
+    
+    return [key, opts, cb];
+  }
   
-  unlock(key: string, opts?: any | LMClientUnlockCallBack, cb?: LMClientUnlockCallBack) {
+  unlock(key: string): void;
+  unlock(key: string, opts: LMXClientUnlockOpts): void;
+  unlock(key: string, opts: LMXClientUnlockOpts, cb: LMClientUnlockCallBack): void;
+  
+  unlock(key: string, opts?: LMXClientUnlockOpts | LMClientUnlockCallBack, cb?: LMClientUnlockCallBack) {
     
     try {
       [key, opts, cb] = this.parseUnlockOpts(key, opts, cb);
@@ -1258,9 +1272,9 @@ export class Client {
       }
       
       if (opts['unlockRequestTimeout']) {
-        assert(Number.isInteger(opts.lockRequestTimeout),
+        assert(Number.isInteger(opts.unlockRequestTimeout),
           'lmx: Please pass an integer representing milliseconds as the value for "ttl".');
-        assert(opts.lockRequestTimeout >= 20 && opts.lockRequestTimeout <= 800000,
+        assert(opts.unlockRequestTimeout >= 20 && opts.unlockRequestTimeout <= 800000,
           'lmx: "ttl" for a lock needs to be integer between 3 and 800000 millis.');
       }
     }
@@ -1345,6 +1359,7 @@ export class Client {
       }
       
       if (data.unlocked === false) {
+        
         // data.error will most likely be defined as well
         // so this may never get hit
         
@@ -1368,7 +1383,7 @@ export class Client {
     let force: boolean = (opts.__retryCount > 0) || Boolean(opts.force);
     
     this.write({
-      _uuid: opts._uuid || opts.id || opts.lockUuid,
+      _uuid: opts._uuid,
       uuid: uuid,
       key: key,
       rwStatus,

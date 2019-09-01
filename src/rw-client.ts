@@ -35,6 +35,9 @@ import {LMXClientLockException} from "./exceptions";
 
 
 export class RWLockClient extends Client {
+  
+  readerCounts = <{ [key: string]: number }>{};
+  writeKeys = <{ [key: string]: true }>{}; // keeps track of whether a key has been registered as a write key
 
   constructor(o?: Partial<ClientOpts>, cb?: LMClientCallBack) {
     super(o, cb);
@@ -211,7 +214,7 @@ export class RWLockClient extends Client {
 
         log.debug(chalk.magenta('readers is exactly 1.'));
 
-        return this.lock(writeKey, {rwStatus: RWStatus.LockingWriteKey}, err => {
+        return this.lock(writeKey, <any>{rwStatus: RWStatus.LockingWriteKey}, err => {
 
           if (err) {
             return cb(err, {});

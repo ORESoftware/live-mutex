@@ -14,15 +14,18 @@ import {EVCb} from "./shared-internal";
 
 
 export const log = {
-  info: console.log.bind(console, chalk.gray.bold('[lmx client info]')),
-  warn: console.error.bind(console, chalk.magenta.bold('[lmx client warning]')),
-  error: console.error.bind(console, chalk.red.bold('[lmx client error]')),
+  info: console.log.bind(console, chalk.gray.bold('lmx client info:')),
+  warn: console.error.bind(console, chalk.magenta.bold('lmx client warning:')),
+  error: console.error.bind(console, chalk.red.bold('lmx client error:')),
   debug: function (...args: any[]) {
-    weAreDebugging && console.log('[lmx debugging]', ...args);
+    weAreDebugging && console.log('lmx debugging:', ...args);
   }
 };
 
 export class RWLockWritePrefClient extends Client {
+  
+  readerCounts = <{ [key: string]: number }>{};
+  writeKeys = <{ [key: string]: true }>{}; // keeps track of whether a key has been registered as a write key
 
   constructor(o?: Partial<ClientOpts>, cb?: LMClientCallBack) {
     super(o, cb);
