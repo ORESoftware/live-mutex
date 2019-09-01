@@ -993,7 +993,7 @@ export class Broker {
         // we set lck.lockholderTimeouts[uuid], so that when an unlock request for uuid comes into the broker
         // we know that it timed out already, and we know not to throw an error when the lock.uuid doesn't match
         lck.lockholderTimeouts[uuid] = true;
-        self.unlock({key, force: true, from: 'ttl expired for lock (3)'});
+        this.unlock({key, force: true, from: 'ttl expired for lock (3)'});
         
       }, ttl);
     }
