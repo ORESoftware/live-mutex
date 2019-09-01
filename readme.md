@@ -35,6 +35,39 @@
 > Tested and proven on Node.js versions >= 8.0.0.
 >
 
+# Simple Working Examples:
+
+> See: https://github.com/ORESoftware/live-mutex-examples
+
+
+# Installation
+
+
+##### <i> For usage with Node.js libraries: </i>
+
+>
+>```$ npm install live-mutex```
+>
+>
+
+##### <i> For command line tools: </i>
+ 
+>
+>```$ npm install -g live-mutex```
+>
+>
+
+##### <i> Docker image for the broker: </i>
+
+>
+>  `$ docker pull oresoftware/live-mutex-broker:latest`
+>
+>  `$ docker run -d -p 6970:6970 oresoftware/live-mutex-broker:latest`
+> 
+
+<br>
+
+
 ## About
 
 * Written in TypeScript for maintainability and ease of use.
@@ -83,29 +116,7 @@ See: `docs/detailed-explanation.md` and `docs/about.md`
 <br>
 <br>
 
-# Installation
 
-##### <i> For command line tools: </i>
-
->
->```$ npm install -g live-mutex```
->
-
-##### <i> For usage with Node.js libraries: </i>
-
->
->```$ npm install live-mutex --save```
->
-
-##### <i> Docker image for the broker: </i>
-
->
->  `$ docker pull oresoftware/live-mutex-broker:latest`
->
->  `$ docker run -d -p 6970:6970 oresoftware/live-mutex-broker:latest`
-> 
-
-<br>
 
 # Basic Usage and Best Practices
 
