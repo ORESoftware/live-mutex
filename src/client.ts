@@ -396,7 +396,7 @@ export class Client {
       }
       
       if (fn && to) {
-        this.emitter.emit('error', 'Function and timeout both existlmx implementation error.');
+        this.emitter.emit('error', 'lmx implementation error - resolution function and timeout both exist.');
       }
       
       if (to) {
@@ -451,8 +451,12 @@ export class Client {
       this.recovering = false;
       
       if (ws) {
-        ws.destroy();
-        ws.removeAllListeners();
+        try {
+          ws.destroy();
+        }
+        finally {
+          ws.removeAllListeners();
+        }
       }
       
       return connectPromise = new Promise((resolve, reject) => {
@@ -520,7 +524,7 @@ export class Client {
         };
         
         ws.setEncoding('utf8')
-          
+        
           .once('error', onFirstErr)
           .once('close', () => {
             this.emitter.emit('warning', 'lmx client stream "close" event occurred.');
