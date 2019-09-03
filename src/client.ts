@@ -40,7 +40,6 @@ import {EventEmitter} from 'events';
 import * as path from "path";
 import {LMXLockRequestError, LMXUnlockRequestError} from "./shared-internal";
 import {LMXClientLockException, LMXClientUnlockException} from "./exceptions";
-import {compareVersions} from "./compare-versions";
 import {EVCb} from "./shared-internal";
 import {LMXClientException} from "./exceptions";
 import {LMXClientError} from "./shared-internal";

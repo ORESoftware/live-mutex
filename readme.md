@@ -60,10 +60,12 @@
 ##### <i> Docker image for the broker: </i>
 
 >
->  `$ docker pull oresoftware/live-mutex-broker:latest`
+>```
+>   docker pull oresoftware/live-mutex-broker:latest
 >
->  `$ docker run -d -p 6970:6970 oresoftware/live-mutex-broker:latest`
-> 
+>   docker run -d -p 6970:6970 oresoftware/live-mutex-broker:latest
+>   docker run -d -p 6970:6970 oresoftware/live-mutex-broker:0.2.0  # or better, use the semver version of the client library, in this case 0.2.0
+>```
 
 <br>
 
