@@ -643,8 +643,13 @@ export class Broker {
       this.send(ws, {type: 'version-mismatch', versions: {clientVersion, brokerVersion}});
       ws.destroyTimeout = setTimeout(() => {
         // we delay destroy the connection, so that we can tell the client about a version mismatch
-        ws.destroy();
-        ws.removeAllListeners();
+        try {
+          ws.destroy();
+        }
+        finally {
+          ws.removeAllListeners();
+        }
+        
       }, 2000);
     }
     // return this.send(ws, {type:'broker-version', brokerVersion: brokerPackage.version});
@@ -1119,11 +1124,11 @@ export class Broker {
     const max = data.max;  // max lockholders
     const beginRead = data.rwStatus === RWStatus.BeginRead;
     const endRead = data.rwStatus === RWStatus.EndRead;
-  
+    
     const force = data.force;
     const retryCount = data.retryCount;
-  
-    if(lck){
+    
+    if (lck) {
       const count = lck.lockholders.size;
       log.debug(data.rwStatus, 'is contending for lock on key:', key, 'there is/are', count, 'lockholders.');
     }

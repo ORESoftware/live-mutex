@@ -64,7 +64,9 @@
 >   docker pull oresoftware/live-mutex-broker:latest
 >
 >   docker run -d -p 6970:6970 oresoftware/live-mutex-broker:latest
->   docker run -d -p 6970:6970 oresoftware/live-mutex-broker:0.2.0  # or better, use the semver version of the client library, in this case 0.2.0
+>   docker run -d -p 6970:6970 oresoftware/live-mutex-broker:0.2  # or better, use the major + minor semver version of the client library
+>
+>   so, a client version of 0.2.x maps to 0.2, and a client version of 0.3.x maps 0.3, etc.
 >```
 
 <br>
