@@ -61,12 +61,11 @@
 
 >
 >```
->   docker pull oresoftware/live-mutex-broker:latest
+>   docker pull 'oresoftware/live-mutex-broker:0.2'
 >
->   docker run -d -p 6970:6970 oresoftware/live-mutex-broker:latest
->   docker run -d -p 6970:6970 oresoftware/live-mutex-broker:0.2  # or better, use the major + minor semver version of the client library
+>   docker run --rm -d -p 6970:6970 --name lmx-broker 'oresoftware/live-mutex-broker:0.2'  # use the major + minor semver version of the client library
 >
->   so, a client version of 0.2.x maps to 0.2, and a client version of 0.3.x maps 0.3, etc.
+>   note: a client version of 0.2.x maps to docker image tag "0.2", and a client version of 1.3.x maps to image tag "1.3", etc.
 >```
 
 <br>
