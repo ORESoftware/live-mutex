@@ -98,7 +98,6 @@ b.ensure().then(b => {
    // k.stdout.pipe(process.stdout);
    // k.stderr.pipe(process.stderr);
   
-  
  })
  .catch(function (err) {
    log.error('broker launch error:', inspectError(err));
