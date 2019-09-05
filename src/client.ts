@@ -417,6 +417,8 @@ export class Client {
       
       if (data.acquired === true && data.type === 'lock') {
         
+        // this most likely occurs when a retry request gets sent before the previous lock request gets resolved
+        
         this.emitter.emit('warning', `Rejecting lock acquisition for key => "${data.key}".`);
         
         this.write({
@@ -591,6 +593,10 @@ export class Client {
   
   getConnectionInterface() {
     return this.socketFile || this.port;
+  }
+  
+  getConnectionInterfaceStr(){
+    return this.socketFile ? `socket-file: ${this.socketFile}` : `host:port '${this.getHost()}:${this.getPort()}'`
   }
   
   private _fireCallbacksPrematurely(originalErr: any) {
@@ -1060,7 +1066,7 @@ export class Client {
       }
       
       this.emitter.emit('warning',
-        `retrying lock request for key '${key}', on host:port '${this.getHost()}:${this.getPort()}', ` +
+        `retrying lock request for key '${key}', on ${this.getConnectionInterfaceStr()}, ` +
         `retry attempt # ${newRetryCount}`,
       );
       

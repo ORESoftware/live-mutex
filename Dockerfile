@@ -15,7 +15,7 @@ COPY package.json .
 COPY package-lock.json .
 COPY assets assets
 
-RUN npm i --production
+RUN npm i
 
 COPY . .
 
