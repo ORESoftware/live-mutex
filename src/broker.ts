@@ -605,6 +605,10 @@ export class Broker {
     return this.socketFile || this.port;
   }
   
+  getVersion(){
+    return brokerPackage.version;
+  }
+  
   getPort() {
     return this.port;
   }
