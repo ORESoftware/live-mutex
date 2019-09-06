@@ -221,21 +221,21 @@ export class Client {
       }
     }
     
-    if (opts['host']) {
+    if ('host' in opts && opts.host !== undefined) {
       assert(typeof opts.host === 'string', 'lmx: "host" option needs to be a string.');
     }
     
-    if (opts['port']) {
+    if ('port' in opts && opts.port !== undefined) {
       assert(Number.isInteger(opts.port), 'lmx: "port" option needs to be an integer.');
       assert(opts.port > 1024 && opts.port < 49152, 'lmx: "port" integer needs to be in range (1025-49151).');
     }
     
-    if (opts['listener']) {
+    if ('listener' in opts && opts.listener !== undefined) {
       assert(typeof opts.listener === 'function', 'lmx: listener option should be a function.');
       assert(typeof opts.key === 'string', 'lmx: You must pass in a key to use listener functionality.');
     }
     
-    if (opts['lockRetryMax']) {
+    if ('lockRetryMax' in opts && opts.lockRetryMax !== undefined) {
       assert(Number.isInteger(opts.lockRetryMax),
         'lmx: "lockRetryMax" option needs to be an integer.');
       assert(opts.lockRetryMax >= 0 && opts.lockRetryMax <= 100,
@@ -307,7 +307,6 @@ export class Client {
     
     let ws: net.Socket = <any>null;
     let connectPromise: Promise<any> = <any>null;
-    
     const self = this;
     
     this.emitter.on('warning', function () {
@@ -595,7 +594,7 @@ export class Client {
     return this.socketFile || this.port;
   }
   
-  getConnectionInterfaceStr(){
+  getConnectionInterfaceStr() {
     return this.socketFile ? `socket-file: ${this.socketFile}` : `host:port '${this.getHost()}:${this.getPort()}'`
   }
   
