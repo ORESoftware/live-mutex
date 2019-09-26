@@ -21,6 +21,8 @@ COPY . .
 
 ARG CACHEBUST=1
 
+ENV bunion_producer_level='WARN'
+
 ENTRYPOINT ["node", "dist/lm-start-server.js"]
 CMD []
 
