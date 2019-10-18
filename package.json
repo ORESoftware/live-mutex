@@ -32,7 +32,7 @@
   },
   "homepage": "https://github.com/ORESoftware/live-mutex#readme",
   "dependencies": {
-    "@oresoftware/json-stream-parser": "0.0.113",
+    "@oresoftware/json-stream-parser": "0.0.124",
     "@oresoftware/linked-queue": "0.1.106",
     "chalk": "^2.4.2",
     "tcp-ping": "^0.1.1",
