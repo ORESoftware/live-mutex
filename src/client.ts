@@ -40,7 +40,6 @@ import {EventEmitter} from 'events';
 import * as path from "path";
 import {LMXLockRequestError, LMXUnlockRequestError} from "./shared-internal";
 import {LMXClientLockException, LMXClientUnlockException} from "./exceptions";
-import {compareVersions} from "./compare-versions";
 import {EVCb} from "./shared-internal";
 import {LMXClientException} from "./exceptions";
 import {LMXClientError} from "./shared-internal";
@@ -222,21 +221,21 @@ export class Client {
       }
     }
     
-    if (opts['host']) {
+    if ('host' in opts && opts.host !== undefined) {
       assert(typeof opts.host === 'string', 'lmx: "host" option needs to be a string.');
     }
     
-    if (opts['port']) {
+    if ('port' in opts && opts.port !== undefined) {
       assert(Number.isInteger(opts.port), 'lmx: "port" option needs to be an integer.');
       assert(opts.port > 1024 && opts.port < 49152, 'lmx: "port" integer needs to be in range (1025-49151).');
     }
     
-    if (opts['listener']) {
+    if ('listener' in opts && opts.listener !== undefined) {
       assert(typeof opts.listener === 'function', 'lmx: listener option should be a function.');
       assert(typeof opts.key === 'string', 'lmx: You must pass in a key to use listener functionality.');
     }
     
-    if (opts['lockRetryMax']) {
+    if ('lockRetryMax' in opts && opts.lockRetryMax !== undefined) {
       assert(Number.isInteger(opts.lockRetryMax),
         'lmx: "lockRetryMax" option needs to be an integer.');
       assert(opts.lockRetryMax >= 0 && opts.lockRetryMax <= 100,
@@ -308,7 +307,6 @@ export class Client {
     
     let ws: net.Socket = <any>null;
     let connectPromise: Promise<any> = <any>null;
-    
     const self = this;
     
     this.emitter.on('warning', function () {
@@ -397,7 +395,7 @@ export class Client {
       }
       
       if (fn && to) {
-        this.emitter.emit('error', 'Function and timeout both existlmx implementation error.');
+        this.emitter.emit('error', 'lmx implementation error - resolution function and timeout both exist.');
       }
       
       if (to) {
@@ -417,6 +415,8 @@ export class Client {
         'no fn with that uuid in the resolutions hash => ' + util.inspect(data, {breakLength: Infinity}));
       
       if (data.acquired === true && data.type === 'lock') {
+        
+        // this most likely occurs when a retry request gets sent before the previous lock request gets resolved
         
         this.emitter.emit('warning', `Rejecting lock acquisition for key => "${data.key}".`);
         
@@ -452,8 +452,12 @@ export class Client {
       this.recovering = false;
       
       if (ws) {
-        ws.destroy();
-        ws.removeAllListeners();
+        try {
+          ws.destroy();
+        }
+        finally {
+          ws.removeAllListeners();
+        }
       }
       
       return connectPromise = new Promise((resolve, reject) => {
@@ -521,7 +525,7 @@ export class Client {
         };
         
         ws.setEncoding('utf8')
-          
+        
           .once('error', onFirstErr)
           .once('close', () => {
             this.emitter.emit('warning', 'lmx client stream "close" event occurred.');
@@ -588,6 +592,10 @@ export class Client {
   
   getConnectionInterface() {
     return this.socketFile || this.port;
+  }
+  
+  getConnectionInterfaceStr() {
+    return this.socketFile ? `socket-file: ${this.socketFile}` : `host:port '${this.getHost()}:${this.getPort()}'`
   }
   
   private _fireCallbacksPrematurely(originalErr: any) {
@@ -1057,7 +1065,7 @@ export class Client {
       }
       
       this.emitter.emit('warning',
-        `retrying lock request for key '${key}', on host:port '${this.getHost()}:${this.getPort()}', ` +
+        `retrying lock request for key '${key}', on ${this.getConnectionInterfaceStr()}, ` +
         `retry attempt # ${newRetryCount}`,
       );
       

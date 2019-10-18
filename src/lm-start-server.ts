@@ -88,14 +88,15 @@ b.emitter.on('error', function () {
 });
 
 
-b.ensure().then(function (b) {
+b.ensure().then(b => {
+  
+   log.info(chalk.bold('LMX broker version:'), chalk.blueBright(b.getVersion()));
    log.info(chalk.bold('LMX broker listening on:'), chalk.cyan.bold(String(b.getListeningInterface())));
   
    // const k = cp.spawn('ls', ['-a','/uds']);
    //
    // k.stdout.pipe(process.stdout);
    // k.stderr.pipe(process.stderr);
-  
   
  })
  .catch(function (err) {

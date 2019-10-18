@@ -15,11 +15,13 @@ COPY package.json .
 COPY package-lock.json .
 COPY assets assets
 
-RUN npm i --production
+RUN npm i
 
 COPY . .
 
 ARG CACHEBUST=1
+
+ENV bunion_producer_level='WARN'
 
 ENTRYPOINT ["node", "dist/lm-start-server.js"]
 CMD []
