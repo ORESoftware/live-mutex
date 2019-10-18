@@ -60,10 +60,13 @@
 ##### <i> Docker image for the broker: </i>
 
 >
->  `$ docker pull oresoftware/live-mutex-broker:latest`
+>```
+>   docker pull 'oresoftware/live-mutex-broker:0.2'
 >
->  `$ docker run -d -p 6970:6970 oresoftware/live-mutex-broker:latest`
-> 
+>   docker run --rm -d -p 6970:6970 --name lmx-broker 'oresoftware/live-mutex-broker:0.2.1'  # use the semver version of the client library
+>
+>   note: if the major or minor version differs between client and broker, an error will be thrown in the client process.
+>```
 
 <br>
 
@@ -116,6 +119,41 @@ See: `docs/detailed-explanation.md` and `docs/about.md`
 <br>
 <br>
 
+
+# Simple Example
+
+Locking down a particular route in an Express server:
+
+```typescript
+
+import {LMXClient} from 'live-mutex';
+const client = new LMXClient();
+const app = express();
+
+app.use((req,res,next) => {           
+   
+    if(req.url !== '/xyz'){
+      return next();
+    }
+   
+     // the lock will be automatically unlocked after 8 seconds
+    client.lock('foo', {ttl: 8000, retries: 2}, (err, unlock) => {
+    
+      if(err){
+        return next(err); 
+      }
+
+      res.once('finish', () => {
+        unlock();
+      });
+      
+      next();
+
+    });
+
+});
+
+```
 
 
 # Basic Usage and Best Practices
