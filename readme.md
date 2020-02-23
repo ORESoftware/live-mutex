@@ -46,14 +46,14 @@
 ##### <i> For usage with Node.js libraries: </i>
 
 >
->```$ npm install live-mutex```
+>```$ npm i live-mutex```
 >
 >
 
 ##### <i> For command line tools: </i>
  
 >
->```$ npm install -g live-mutex```
+>```$ npm i -g live-mutex```
 >
 >
 
@@ -61,11 +61,9 @@
 
 >
 >```
->   docker pull 'oresoftware/live-mutex-broker:0.2'
+>   docker pull 'oresoftware/live-mutex-broker:0.2.1'
+>   docker run --rm -d -p 6970:6970 --name lmx-broker 'oresoftware/live-mutex-broker:0.2.1'  
 >
->   docker run --rm -d -p 6970:6970 --name lmx-broker 'oresoftware/live-mutex-broker:0.2.1'  # use the semver version of the client library
->
->   note: if the major or minor version differs between client and broker, an error will be thrown in the client process.
 >```
 
 <br>
@@ -596,6 +594,11 @@ exports.createPool = function(opts){
 ```
 
 </details>
+
+
+### User notes
+
+* if the major or minor version differs between client and broker, an error will be thrown in the client process.
 
 
 ### Testing
