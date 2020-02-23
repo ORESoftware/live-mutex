@@ -108,6 +108,7 @@ s.once('connect', function () {
       case '4':
         console.log('\nYou pressed Ctrl-D. Bye!');
         process.exit(0);
+        // @ts-ignore
         break;
       
       case '12':
@@ -145,7 +146,6 @@ s.once('connect', function () {
         // console.log('here is is the char:', charAsAscii);
         process.stdout.write(str);
         currentLine += str || '';
-        break;
     }
   });
   
