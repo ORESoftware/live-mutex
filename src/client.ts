@@ -438,7 +438,7 @@ export class Client {
         }
       }
       
-      if (!this.recovering && (connectPromise && ws && ws.writable && self.isOpen)) {
+      if (!this.recovering && (connectPromise && ws && ws.writable)) {  // && self.isOpen
         return connectPromise.then((val) => {
             cb && cb.call(self, null, val);
             return val;
@@ -447,6 +447,9 @@ export class Client {
             cb && cb.call(self, err);
             return Promise.reject(err);
           });
+      }
+      else {
+        console.log(connectPromise, 'this.recovering:', this.recovering, 'writable:', ws && ws.writable, 'isOpen:', self.isOpen)
       }
       
       this.recovering = false;
@@ -525,7 +528,7 @@ export class Client {
         };
         
         ws.setEncoding('utf8')
-        
+          
           .once('error', onFirstErr)
           .once('close', () => {
             this.emitter.emit('warning', 'lmx client stream "close" event occurred.');
@@ -543,7 +546,7 @@ export class Client {
           .on('data', onData)
         
       })
-      // if the user passes a callback, we fire the callback here
+        // if the user passes a callback, we fire the callback here
         .then(val => {
             cb && cb.call(self, null, val);
             return val;
@@ -862,6 +865,17 @@ export class Client {
           null,
           LMXLockRequestError.ConnectionClosed,
           `Connection was closed (and/or a client connection error occurred.)`
+        ));
+      });
+    }
+  
+    if (this.recovering) {
+      return process.nextTick(() => {
+        this.fireLockCallbackWithError(cb, new LMXClientLockException(
+          key,
+          null,
+          LMXLockRequestError.ConnectionRecovering,
+          `Connection is recovering - reconection in progress.`
         ));
       });
     }
