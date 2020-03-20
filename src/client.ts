@@ -448,9 +448,6 @@ export class Client {
             return Promise.reject(err);
           });
       }
-      else {
-        console.log(connectPromise, 'this.recovering:', this.recovering, 'writable:', ws && ws.writable, 'isOpen:', self.isOpen)
-      }
       
       this.recovering = false;
       
