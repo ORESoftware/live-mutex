@@ -199,7 +199,7 @@ export class RWLockClient extends Client {
       const readers = unlock.readersCount;
 
       if (!Number.isInteger(readers)) {
-        return this.fireLockCallbackWithError(cb, new LMXClientLockException(
+        return this.fireLockCallbackWithError(cb, false, new LMXClientLockException(
           key,
           unlock.id,
           LMXLockRequestError.InternalError,

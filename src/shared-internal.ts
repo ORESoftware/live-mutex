@@ -2,7 +2,7 @@
 
 import * as util from "util";
 
-export type EVCb<T, E = any> = (err: E, val: T) => void
+export type EVCb<T, E = any> = (err: E, val?: T) => void
 
 export const forDebugging = {
   previousTime: Date.now()
@@ -26,6 +26,7 @@ export enum LMXClientError {
 }
 
 export enum LMXLockRequestError {
+  ConnectionRecovering = 'connection_is_recovering',
   GenericLockError = 'generic_lock_error',
   MaxRetries = 'max_retries',
   RequestTimeoutError = 'request_timeout',

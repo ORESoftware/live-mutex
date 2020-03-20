@@ -20,6 +20,8 @@ if (!(clientPackage.version && typeof clientPackage.version === 'string')) {
   throw new Error('Client NPM package did not have a top-level field that is a string.');
 }
 
+const PromiseSymbol = Symbol('is promise method');
+
 export const log = {
   info: console.log.bind(console, chalk.gray.bold('lmx info:')),
   warn: console.error.bind(console, chalk.magenta.bold('lmx warning:')),
@@ -121,6 +123,7 @@ export interface UuidBooleanHash {
 export interface LMXClientLockOpts {
   ttl?: number,
   lockRequestTimeout?: number,
+  [PromiseSymbol]? : boolean,
   maxRetries?: number,
   force?: boolean,
   semaphore?: number,
@@ -134,6 +137,7 @@ export interface LMXClientLockOpts {
 }
 
 export interface LMXClientUnlockOpts {
+  [PromiseSymbol]? : boolean,
   force?: boolean,
   _uuid?: string,
   __retryCount?: number,
@@ -438,7 +442,7 @@ export class Client {
         }
       }
       
-      if (!this.recovering && (connectPromise && ws && ws.writable && self.isOpen)) {
+      if (!this.recovering && (connectPromise && ws && ws.writable)) {  // && self.isOpen
         return connectPromise.then((val) => {
             cb && cb.call(self, null, val);
             return val;
@@ -525,7 +529,7 @@ export class Client {
         };
         
         ws.setEncoding('utf8')
-        
+          
           .once('error', onFirstErr)
           .once('close', () => {
             this.emitter.emit('warning', 'lmx client stream "close" event occurred.');
@@ -543,7 +547,7 @@ export class Client {
           .on('data', onData)
         
       })
-      // if the user passes a callback, we fire the callback here
+        // if the user passes a callback, we fire the callback here
         .then(val => {
             cb && cb.call(self, null, val);
             return val;
@@ -648,7 +652,7 @@ export class Client {
       delete this.timeouts[uuid];
       
       if (err) {
-        return this.fireCallbackWithError(cb, new LMXClientException(
+        return this.fireCallbackWithError(cb, false, new LMXClientException(
           key,
           null,
           LMXClientError.UnknownError,
@@ -685,7 +689,16 @@ export class Client {
   }
   
   acquire(key: string, opts?: Partial<LMXClientLockOpts>): Promise<LMLockSuccessData> {
+  
     return new Promise((resolve, reject) => {
+      try {
+        [key, opts] = this.preParseLockOptsForPromises(key, opts);
+      }
+      catch (err) {
+        return reject(err);
+      }
+  
+    
       this.lock(key, opts, (err, val) => {
         err ? reject(err) : resolve(val);
       });
@@ -693,7 +706,15 @@ export class Client {
   }
   
   release(key: string, opts: Partial<LMXClientUnlockOpts>): Promise<LMUnlockSuccessData> {
+
     return new Promise((resolve, reject) => {
+      try {
+        [key, opts] = this.preParseUnlockOptsForPromise(key, opts);
+      }
+      catch (err) {
+        return reject(err);
+      }
+      
       this.unlock(key, opts, (err, val) => {
         err ? reject(err) : resolve(val);
       });
@@ -741,28 +762,44 @@ export class Client {
     delete this.resolutions[uuid];
   }
   
-  protected fireUnlockCallbackWithError(cb: LMClientUnlockCallBack, err: LMXClientUnlockException) {
+  protected fireUnlockCallbackWithError(cb: LMClientUnlockCallBack, isNextTick: boolean, err: LMXClientUnlockException) {
     const uuid = err.id;
     const key = err.key; // unused
     this.cleanUp(uuid);
     this.emitter.emit('warning', err.message);
-    cb(err, <LMUnlockSuccessData>{}); // need to pass empty object in case the user uses an object destructure call
+    if(isNextTick){
+      process.nextTick(cb, err, <LMUnlockSuccessData>{}); // need to pass empty object in case the user uses an object destructure call
+    }
+    else{
+      cb(err, <LMUnlockSuccessData>{}); // need to pass empty object in case the user uses an object destructure call
+    }
+    
   }
   
-  protected fireLockCallbackWithError(cb: LMClientLockCallBack, err: LMXClientLockException) {
+  protected fireLockCallbackWithError(cb: LMClientLockCallBack, isNextTick: boolean, err: LMXClientLockException) {
     const uuid = err.id;
     const key = err.key;  // unused
     this.cleanUp(uuid);
     this.emitter.emit('warning', err.message);
-    cb(err, <LMLockSuccessData>{}); // need to pass empty object in case the user uses an object destructure call
+    if(isNextTick){
+      process.nextTick(cb, err, <LMLockSuccessData>{}); // need to pass empty object in case the user uses an object destructure call
+    }
+    else{
+      cb(err, <LMLockSuccessData>{}); // need to pass empty object in case the user uses an object destructure call
+    }
   }
   
-  protected fireCallbackWithError(cb: EVCb<any>, err: LMXClientException) {
+  protected fireCallbackWithError(cb: EVCb<any>, isNextTick: boolean, err: LMXClientException) {
     const uuid = err.id;
     const key = err.key;  // unused
     this.cleanUp(uuid);
     this.emitter.emit('warning', err.message);
-    cb(err, <any>{}); // need to pass empty object in case the user uses an object destructure call
+    if(isNextTick){
+      process.nextTick(cb, err, <any>{});  // need to pass empty object in case the user uses an object destructure call
+    }
+    else{
+      cb(err, <any>{}); // need to pass empty object in case the user uses an object destructure call
+    }
   }
   
   ls(cb: EVCb<any>): void;
@@ -790,6 +827,23 @@ export class Client {
       type: 'ls',
     });
     
+  }
+  
+  protected preParseLockOptsForPromises(
+    key: string,
+    opts: LMXClientLockOpts
+  ): [string, LMXClientLockOpts] {
+    
+    if (typeof opts === 'boolean') {
+      opts = {force: opts};
+    }
+    else if (typeof opts === 'number') {
+      opts = {ttl: opts};
+    }
+    
+    opts = opts || {};
+    opts[PromiseSymbol] = true;
+    return [key, opts];
   }
   
   protected parseLockOpts(
@@ -855,27 +909,6 @@ export class Client {
       throw err;
     }
     
-    if (!this.isOpen) {
-      return process.nextTick(() => {
-        this.fireLockCallbackWithError(cb, new LMXClientLockException(
-          key,
-          null,
-          LMXLockRequestError.ConnectionClosed,
-          `Connection was closed (and/or a client connection error occurred.)`
-        ));
-      });
-    }
-    
-    if (this.cannotContinue) {
-      return process.nextTick(() => {
-        this.fireLockCallbackWithError(cb, new LMXClientLockException(
-          key,
-          null,
-          LMXLockRequestError.CannotContinue,
-          `'Client cannot make any lock requests, most likely due to version mismatch between client and broker.'`
-        ));
-      });
-    }
     
     try {
       
@@ -1005,17 +1038,37 @@ export class Client {
     const retryCount = opts.__retryCount;
     const forceUnlock = opts.forceUnlock === true;
     
+    const isNextTick = !opts[PromiseSymbol] && retryCount < 1;
+    
     if (!this.isOpen) {
-      return this.fireLockCallbackWithError(cb, new LMXClientLockException(
+      return this.fireLockCallbackWithError(cb, isNextTick, new LMXClientLockException(
         key,
         uuid,
         LMXLockRequestError.ConnectionClosed,
         `Connection was closed (and/or a client connection error occurred.)`
       ));
     }
+  
+    if (this.recovering) {
+      return this.fireLockCallbackWithError(cb, isNextTick, new LMXClientLockException(
+        key,
+        null,
+        LMXLockRequestError.ConnectionRecovering,
+        `Connection is recovering - reconection in progress.`
+      ));
+    }
+  
+    if (this.cannotContinue) {
+      return this.fireLockCallbackWithError(cb, isNextTick, new LMXClientLockException(
+        key,
+        null,
+        LMXLockRequestError.CannotContinue,
+        `'Client cannot make any lock requests, most likely due to version mismatch between client and broker.'`
+      ));
+    }
     
     if (retryCount > maxRetries) {
-      return this.fireLockCallbackWithError(cb, new LMXClientLockException(
+      return this.fireLockCallbackWithError(cb, isNextTick, new LMXClientLockException(
         key,
         uuid,
         LMXLockRequestError.MaxRetries,
@@ -1041,7 +1094,7 @@ export class Client {
         this.timeouts[uuid] = true;
         this.write({uuid, key, type: 'lock-client-error'});
         
-        return this.fireLockCallbackWithError(cb, new LMXClientLockException(
+        return this.fireLockCallbackWithError(cb, false, new LMXClientLockException(
           key,
           uuid,
           LMXLockRequestError.ConnectionClosed,
@@ -1055,7 +1108,7 @@ export class Client {
         this.timeouts[uuid] = true;
         this.write({uuid, key, type: 'lock-client-timeout'});
         
-        return this.fireLockCallbackWithError(cb, new LMXClientLockException(
+        return this.fireLockCallbackWithError(cb, false, new LMXClientLockException(
           key,
           uuid,
           LMXLockRequestError.RequestTimeoutError,
@@ -1082,7 +1135,7 @@ export class Client {
       }
       
       if (err) {
-        return this.fireLockCallbackWithError(cb, new LMXClientLockException(
+        return this.fireLockCallbackWithError(cb, false, new LMXClientLockException(
           key,
           uuid,
           LMXLockRequestError.UnknownException,
@@ -1091,7 +1144,7 @@ export class Client {
       }
       
       if (!data) {
-        return this.fireLockCallbackWithError(cb, new LMXClientLockException(
+        return this.fireLockCallbackWithError(cb, false, new LMXClientLockException(
           key,
           uuid,
           LMXLockRequestError.InternalError,
@@ -1100,7 +1153,7 @@ export class Client {
       }
       
       if (data.uuid !== uuid) {
-        return this.fireLockCallbackWithError(cb, new LMXClientLockException(
+        return this.fireLockCallbackWithError(cb, false, new LMXClientLockException(
           key,
           uuid,
           LMXLockRequestError.InternalError,
@@ -1109,7 +1162,7 @@ export class Client {
       }
       
       if (String(key) !== String(data.key)) {
-        return this.fireLockCallbackWithError(cb, new LMXClientLockException(
+        return this.fireLockCallbackWithError(cb, false, new LMXClientLockException(
           key,
           uuid,
           LMXLockRequestError.InternalError,
@@ -1118,7 +1171,7 @@ export class Client {
       }
       
       if (data.error) {
-        return this.fireLockCallbackWithError(cb, new LMXClientLockException(
+        return this.fireLockCallbackWithError(cb, false, new LMXClientLockException(
           key,
           uuid,
           LMXLockRequestError.GenericLockError,
@@ -1160,7 +1213,7 @@ export class Client {
           
           this.giveups[uuid] = true;
           
-          this.fireLockCallbackWithError(cb, new LMXClientLockException(
+          this.fireLockCallbackWithError(cb, false, new LMXClientLockException(
             key,
             uuid,
             LMXLockRequestError.WaitOptionSetToFalse,
@@ -1172,7 +1225,7 @@ export class Client {
         return;
       }
       
-      this.fireLockCallbackWithError(cb, new LMXClientLockException(
+      this.fireLockCallbackWithError(cb, false, new LMXClientLockException(
         key,
         uuid,
         LMXLockRequestError.InternalError,
@@ -1211,6 +1264,24 @@ export class Client {
   
   getHost() {
     return this.host;
+  }
+  
+  
+  protected preParseUnlockOptsForPromise(
+    key: string,
+    opts?: string | boolean | LMXClientUnlockOpts,
+  ): [string, LMXClientUnlockOpts] {
+    
+    if (typeof opts === 'boolean') {
+      opts = {force: opts};
+    }
+    else if (typeof opts === 'string') {
+      opts = {_uuid: opts};
+    }
+    
+    opts = opts || {} ;
+    opts[PromiseSymbol] = true;
+    return [key, opts as any];
   }
   
   protected parseUnlockOpts(
@@ -1300,7 +1371,7 @@ export class Client {
       timedOut = true;
       this.timeouts[uuid] = true;
       
-      this.fireUnlockCallbackWithError(cb, new LMXClientUnlockException(
+      this.fireUnlockCallbackWithError(cb, false, new LMXClientUnlockException(
         key, uuid,
         LMXUnlockRequestError.BadOrMismatchedId,
         ` LMX Unlock request to unlock key => "${key}" timed out.`
@@ -1318,7 +1389,7 @@ export class Client {
       }
       
       if (err) {
-        return this.fireUnlockCallbackWithError(cb, new LMXClientUnlockException(
+        return this.fireUnlockCallbackWithError(cb, false, new LMXClientUnlockException(
           key,
           uuid,
           LMXUnlockRequestError.InternalError,
@@ -1327,7 +1398,7 @@ export class Client {
       }
       
       if (!data) {
-        return this.fireUnlockCallbackWithError(cb, new LMXClientUnlockException(
+        return this.fireUnlockCallbackWithError(cb, false, new LMXClientUnlockException(
           key,
           uuid,
           LMXUnlockRequestError.InternalError,
@@ -1336,7 +1407,7 @@ export class Client {
       }
       
       if (String(key) !== String(data.key)) {
-        return this.fireUnlockCallbackWithError(cb, new LMXClientUnlockException(
+        return this.fireUnlockCallbackWithError(cb, false, new LMXClientUnlockException(
           key,
           uuid,
           LMXUnlockRequestError.InternalError,
@@ -1345,7 +1416,7 @@ export class Client {
       }
       
       if (data.error) {
-        return this.fireUnlockCallbackWithError(cb, new LMXClientUnlockException(
+        return this.fireUnlockCallbackWithError(cb, false, new LMXClientUnlockException(
           key,
           uuid,
           LMXUnlockRequestError.GeneralUnlockError,
@@ -1371,7 +1442,7 @@ export class Client {
         // data.error will most likely be defined as well
         // so this may never get hit
         
-        return this.fireUnlockCallbackWithError(cb, new LMXClientUnlockException(
+        return this.fireUnlockCallbackWithError(cb, false, new LMXClientUnlockException(
           key,
           uuid,
           LMXUnlockRequestError.GeneralUnlockError,
@@ -1379,7 +1450,7 @@ export class Client {
         ));
       }
       
-      this.fireUnlockCallbackWithError(cb, new LMXClientUnlockException(
+      this.fireUnlockCallbackWithError(cb, false, new LMXClientUnlockException(
         key,
         uuid,
         LMXUnlockRequestError.GeneralUnlockError,
