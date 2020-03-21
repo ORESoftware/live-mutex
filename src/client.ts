@@ -12,8 +12,7 @@ import chalk from "chalk";
 //project
 import {createParser} from "./json-parser";
 import {forDebugging} from './shared-internal';
-
-const debugLog = process.argv.indexOf('--lmx-debug') > 0;
+import * as cu from './client-utils';
 const clientPackage = require('../package.json');
 
 if (!(clientPackage.version && typeof clientPackage.version === 'string')) {
@@ -21,21 +20,6 @@ if (!(clientPackage.version && typeof clientPackage.version === 'string')) {
 }
 
 const PromiseSymbol = Symbol('is promise method');
-
-export const log = {
-  info: console.log.bind(console, chalk.gray.bold('lmx info:')),
-  warn: console.error.bind(console, chalk.magenta.bold('lmx warning:')),
-  error: console.error.bind(console, chalk.red.bold('lmx error:')),
-  debug(...args: any[]) {
-    if (debugLog) {
-      let newTime = Date.now();
-      let elapsed = newTime - forDebugging.previousTime;
-      forDebugging.previousTime = newTime;
-      console.log(chalk.yellow.bold('lmx client debugging:'), 'elapsed millis:', `(${elapsed})`, ...args);
-    }
-  }
-};
-
 import {weAreDebugging} from './we-are-debugging';
 import Timer = NodeJS.Timer;
 import {EventEmitter} from 'events';
@@ -46,6 +30,7 @@ import {EVCb} from "./shared-internal";
 import {LMXClientException} from "./exceptions";
 import {LMXClientError} from "./shared-internal";
 import {inspectError} from "./shared-internal";
+import {log} from "./client-utils";
 
 if (weAreDebugging) {
   log.debug('lmx client is in debug mode. Timeouts are turned off.');
@@ -57,25 +42,26 @@ export interface ValidConstructorOpts {
 
 export const validConstructorOptions = <ValidConstructorOpts>{
   key: 'string',
-  listener: 'Function',
+  listener: 'function',
+  connectTimeout: 'integer (in millis)',
   host: 'string',
   port: 'integer',
-  ttl: 'integer in millis',
-  unlockRequestTimeout: 'integer in millis',
-  lockRequestTimeout: 'integer in millis',
+  ttl: 'integer (in millis)',
+  unlockRequestTimeout: 'integer (in millis)',
+  lockRequestTimeout: 'integer (in millis)',
   lockRetryMax: 'integer',
-  keepLocksAfterDeath: 'boolean',
-  keepLocksOnExit: 'boolean',
-  noDelay: 'boolean',
-  udsPath: 'string (absolute file path)'
+  keepLocksAfterDeath: 'boolean (if the client process exits, the broker keeps the relevant locks locked.)',
+  keepLocksOnExit: 'boolean ()',
+  noDelay: 'boolean (the tcp protocol "no delay" option)',
+  udsPath: 'string (an absolute file path)'
 };
 
 export const validLockOptions = {
   force: 'boolean',
   maxRetries: 'integer',
   maxRetry: 'integer',
-  ttl: 'integer in millis',
-  lockRequestTimeout: 'integer in millis',
+  ttl: 'integer (in millis)',
+  lockRequestTimeout: 'integer (in millis)',
   keepLocksAfterDeath: 'boolean',
   keepLocksOnExit: 'boolean'
 };
@@ -100,7 +86,8 @@ export interface ClientOpts {
   keepLocksAfterDeath: boolean,
   keepLocksOnExit: boolean,
   noDelay: boolean;
-  udsPath: string
+  udsPath: string;
+  connectTimeout?: number
 }
 
 export type EndReadCallback = (err?: any, val?: any) => void;
@@ -177,11 +164,14 @@ export interface LMClientUnlockCallBack {
   readersCount?: number | null
 }
 
+
+
 export class Client {
   
-  port: number;
-  host: string;
+  port = 6970;
+  host = 'localhost';
   listeners: Object;
+  connectTimeout = 3000;
   opts: Partial<ClientOpts>;
   ttl: number;
   noRecover: boolean;
@@ -212,10 +202,10 @@ export class Client {
     
     this.isOpen = false;
     const opts = this.opts = o || {};
-    assert(typeof opts === 'object', 'Bad arguments to lmx client constructor - options must be an object.');
+    assert.strict(typeof opts === 'object', 'Bad arguments to lmx client constructor - options must be an object.');
     
     if (cb) {
-      assert(typeof cb === 'function', 'optional second argument to lmx Client constructor must be a function.');
+      assert.strict(typeof cb === 'function', 'optional second argument to lmx Client constructor must be a function.');
     }
     
     for (const key of Object.keys(opts)) {
@@ -226,62 +216,76 @@ export class Client {
     }
     
     if ('host' in opts && opts.host !== undefined) {
-      assert(typeof opts.host === 'string', 'lmx: "host" option needs to be a string.');
+      assert.strict(typeof opts.host === 'string', 'lmx: "host" option needs to be a string.');
+      this.host = opts.host;
     }
     
     if ('port' in opts && opts.port !== undefined) {
-      assert(Number.isInteger(opts.port), 'lmx: "port" option needs to be an integer.');
-      assert(opts.port > 1024 && opts.port < 49152, 'lmx: "port" integer needs to be in range (1025-49151).');
+      assert.strict(Number.isInteger(opts.port),
+        cu.getClientErrorMessage(`the "port" option needs to be an integer.`));
+      assert.strict(opts.port > 1024 && opts.port < 49152,
+        cu.getClientErrorMessage('the "port" option needs to be an integer in the range (1025-49151).'));
+      this.port = opts.port;
     }
     
     if ('listener' in opts && opts.listener !== undefined) {
-      assert(typeof opts.listener === 'function', 'lmx: listener option should be a function.');
-      assert(typeof opts.key === 'string', 'lmx: You must pass in a key to use listener functionality.');
+      assert.strict(typeof opts.listener === 'function',
+        cu.getClientErrorMessage('the "listener" option should be a function.'));
+      assert.strict(typeof opts.key === 'string',
+        cu.getClientErrorMessage('you must pass in a key to use listener functionality.'));
+    }
+  
+    if ('connectTimeout' in opts && opts.connectTimeout !== undefined) {
+      assert.strict(Number.isInteger(opts.connectTimeout),
+        cu.getClientErrorMessage('the "connectTimeout" option must be an integer.'));
+      assert.strict(opts.connectTimeout > 10 && opts.connectTimeout < 20000,
+        cu.getClientErrorMessage('the "connectTimeout" option must be between 10 and 20000 ms.'));
+      this.connectTimeout = opts.connectTimeout;
     }
     
     if ('lockRetryMax' in opts && opts.lockRetryMax !== undefined) {
-      assert(Number.isInteger(opts.lockRetryMax),
-        'lmx: "lockRetryMax" option needs to be an integer.');
-      assert(opts.lockRetryMax >= 0 && opts.lockRetryMax <= 100,
-        'lmx: "lockRetryMax" integer needs to be in range (0-100).');
+      assert.strict(Number.isInteger(opts.lockRetryMax),
+        cu.getClientErrorMessage('the "lockRetryMax" option needs to be an integer.'));
+      assert.strict(opts.lockRetryMax >= 0 && opts.lockRetryMax <= 100,
+        cu.getClientErrorMessage('the "lockRetryMax" integer needs to be in range (0-100).'));
     }
     
     if (opts['retryMax']) {
-      assert(Number.isInteger(opts.retryMax),
-        'lmx: "retryMax" option needs to be an integer.');
-      assert(opts.retryMax >= 0 && opts.retryMax <= 100,
-        'lmx: "retryMax" integer needs to be in range (0-100).');
+      assert.strict(Number.isInteger(opts.retryMax),
+        cu.getClientErrorMessage('the "retryMax" option needs to be an integer.'));
+      assert.strict(opts.retryMax >= 0 && opts.retryMax <= 100,
+        cu.getClientErrorMessage('the "retryMax" integer needs to be in range (0-100).'));
     }
     
     if (opts['unlockRequestTimeout']) {
-      assert(Number.isInteger(opts.unlockRequestTimeout),
-        'lmx: "unlockRequestTimeout" option needs to be an integer (representing milliseconds).');
-      assert(opts.unlockRequestTimeout >= 20 && opts.unlockRequestTimeout <= 800000,
-        'lmx: "unlockRequestTimeout" needs to be integer between 20 and 800000 millis.');
+      assert.strict(Number.isInteger(opts.unlockRequestTimeout),
+        cu.getClientErrorMessage('the "unlockRequestTimeout" option needs to be an integer (representing milliseconds).'));
+      assert.strict(opts.unlockRequestTimeout >= 20 && opts.unlockRequestTimeout <= 800000,
+        cu.getClientErrorMessage('the "unlockRequestTimeout" needs to be integer between 20 and 800000 millis.'));
     }
     
     if (opts['lockRequestTimeout']) {
-      assert(Number.isInteger(opts.lockRequestTimeout),
-        'lmx: "lockRequestTimeout" option needs to be an integer (representing milliseconds).');
-      assert(opts.lockRequestTimeout >= 20 && opts.lockRequestTimeout <= 800000,
-        'lmx: "lockRequestTimeout" needs to be integer between 20 and 800000 millis.');
+      assert.strict(Number.isInteger(opts.lockRequestTimeout),
+        cu.getClientErrorMessage('the "lockRequestTimeout" option needs to be an integer (representing milliseconds).'));
+      assert.strict(opts.lockRequestTimeout >= 20 && opts.lockRequestTimeout <= 800000,
+        cu.getClientErrorMessage('the "lockRequestTimeout" needs to be integer between 20 and 800000 millis.'));
     }
     
     if (opts['ttl']) {
-      assert(Number.isInteger(opts.ttl),
-        'lmx: "ttl" option needs to be an integer (representing milliseconds).');
-      assert(opts.ttl >= 3 && opts.ttl <= 800000,
-        'lmx: "ttl" needs to be integer between 3 and 800000 millis.');
+      assert.strict(Number.isInteger(opts.ttl),
+        cu.getClientErrorMessage('the "ttl" option needs to be an integer (representing milliseconds).'));
+      assert.strict(opts.ttl >= 3 && opts.ttl <= 800000,
+        cu.getClientErrorMessage('the "ttl" needs to be integer between 3 and 800000 millis.'));
     }
     
     if ('keepLocksAfterDeath' in opts) {
-      assert(typeof opts.keepLocksAfterDeath === 'boolean',
-        'lmx: "keepLocksAfterDeath" option needs to be a boolean.');
+      assert.strict(typeof opts.keepLocksAfterDeath === 'boolean',
+        cu.getClientErrorMessage('the "keepLocksAfterDeath" option needs to be a boolean.'));
     }
     
     if ('keepLocksOnExit' in opts) {
-      assert(typeof opts.keepLocksOnExit === 'boolean',
-        'lmx: "keepLocksOnExit" option needs to be a boolean.');
+      assert.strict(typeof opts.keepLocksOnExit === 'boolean',
+        cu.getClientErrorMessage('the "keepLocksOnExit" option needs to be a boolean.'));
     }
     
     if (opts.ttl === null) {
@@ -289,21 +293,19 @@ export class Client {
     }
     
     if ('noDelay' in opts && opts['noDelay'] !== undefined) {
-      assert(typeof opts.noDelay === 'boolean',
+      assert.strict(typeof opts.noDelay === 'boolean',
         'lmx: "noDelay" option needs to be an integer => ' + opts.noDelay);
       this.noDelay = opts.noDelay;
     }
     
     if ('udsPath' in opts && opts['udsPath'] !== undefined) {
-      assert(typeof opts.udsPath === 'string', '"udsPath" option must be a string.');
-      assert(path.isAbsolute(opts.udsPath), '"udsPath" option must be an absolute path.');
+      assert.strict(typeof opts.udsPath === 'string', '"udsPath" option must be a string.');
+      assert.strict(path.isAbsolute(opts.udsPath), '"udsPath" option must be an absolute path.');
       this.socketFile = path.resolve(opts.udsPath);
     }
     
     this.keepLocksAfterDeath = Boolean(opts.keepLocksAfterDeath || opts.keepLocksOnExit);
     this.listeners = {};
-    this.host = opts.host || 'localhost';
-    this.port = opts.port || 6970;
     this.ttl = weAreDebugging ? 5000000 : (opts.ttl || 7050);
     this.unlockRequestTimeout = weAreDebugging ? 5000000 : (opts.unlockRequestTimeout || 8000);
     this.lockRequestTimeout = weAreDebugging ? 5000000 : (opts.lockRequestTimeout || 3000);
@@ -436,7 +438,7 @@ export class Client {
     this.ensure = this.connect = (cb?: (err: any, v?: Client) => void) => {
       
       if (cb) {
-        assert(typeof cb === 'function', 'Optional argument to ensure/connect must be a function.');
+        assert.strict(typeof cb === 'function', 'Optional argument to ensure/connect must be a function.');
         if (process.domain) {
           cb = process.domain.bind(cb);
         }
@@ -475,9 +477,13 @@ export class Client {
         
         const to = setTimeout(function () {
           reject('lmx client err: client connection timeout after 3000ms.');
-        }, 3000);
+        }, this.connectTimeout);
         
         const cnkt = self.socketFile ? [self.socketFile] : [self.port, self.host];
+        
+        if(self.socketFile && opts.port){
+          log.fatal('a "port" option was provided along with "socketFile" option, please pick one.');
+        }
         
         // @ts-ignore
         ws = net.createConnection(...cnkt, () => {
@@ -523,13 +529,12 @@ export class Client {
           }
           
           // create new connection
-          this.ensure().then(_ => {
+          this.ensure().then(() => {
             log.debug('new connection created, via recover routine.');
           });
         };
         
         ws.setEncoding('utf8')
-          
           .once('error', onFirstErr)
           .once('close', () => {
             this.emitter.emit('warning', 'lmx client stream "close" event occurred.');
@@ -863,7 +868,7 @@ export class Client {
       opts = {ttl: opts};
     }
     
-    assert(typeof cb === 'function', 'Please use a callback as the last argument to the lock method.');
+    assert.strict(typeof cb === 'function', 'Please use a callback as the last argument to the lock method.');
     opts = opts || {} as LMXClientLockOpts;
     return [key, opts, cb];
     
@@ -913,16 +918,16 @@ export class Client {
     try {
       
       assert.equal(typeof key, 'string', 'Key passed to lmx #lock needs to be a string.');
-      assert(typeof cb === 'function', 'callback function must be passed to Client lock() method; use lockp() or acquire() for promise API.');
+      assert.strict(typeof cb === 'function', 'callback function must be passed to Client lock() method; use lockp() or acquire() for promise API.');
       
       if ('max' in opts) {
-        assert(Number.isInteger(opts['max']), '"max" options property must be a positive integer.');
-        assert(opts['max'] > 0, '"max" options property must be a positive integer.');
+        assert.strict(Number.isInteger(opts['max']), '"max" options property must be a positive integer.');
+        assert.strict(opts['max'] > 0, '"max" options property must be a positive integer.');
       }
       
       if ('semaphore' in opts) {
-        assert(Number.isInteger(opts['semaphore']), '"semaphore" options property must be a positive integer.');
-        assert(opts['semaphore'] > 0, '"semaphore" options property must be a positive integer.');
+        assert.strict(Number.isInteger(opts['semaphore']), '"semaphore" options property must be a positive integer.');
+        assert.strict(opts['semaphore'] > 0, '"semaphore" options property must be a positive integer.');
       }
       
       if ('force' in opts) {
@@ -937,8 +942,8 @@ export class Client {
       }
       
       if ('maxRetries' in opts) {
-        assert(Number.isInteger(opts.maxRetries), '"maxRetries" option must be an integer.');
-        assert(opts.maxRetries >= 0 && opts.maxRetries <= 20,
+        assert.strict(Number.isInteger(opts.maxRetries), '"maxRetries" option must be an integer.');
+        assert.strict(opts.maxRetries >= 0 && opts.maxRetries <= 20,
           '"maxRetries" option must be an integer between 0 and 20 inclusive.');
         if ('__maxRetries' in opts) {
           assert.strictEqual(opts.__maxRetries, opts.maxRetries, 'maxRetries values do not match.');
@@ -947,8 +952,8 @@ export class Client {
       }
       
       if ('maxRetry' in opts) {
-        assert(Number.isInteger(opts.maxRetry), '"maxRetry" option must be an integer.');
-        assert(opts.maxRetry >= 0 && opts.maxRetry <= 20,
+        assert.strict(Number.isInteger(opts.maxRetry), '"maxRetry" option must be an integer.');
+        assert.strict(opts.maxRetry >= 0 && opts.maxRetry <= 20,
           '"maxRetry" option must be an integer between 0 and 20 inclusive.');
         if ('__maxRetries' in opts) {
           assert.strictEqual(opts.__maxRetries, opts.maxRetry, 'maxRetries values do not match.');
@@ -957,8 +962,8 @@ export class Client {
       }
       
       if ('retryMax' in opts) {
-        assert(Number.isInteger(opts.retryMax), '"retryMax" option must be an integer.');
-        assert(opts.retryMax >= 0 && opts.retryMax <= 20,
+        assert.strict(Number.isInteger(opts.retryMax), '"retryMax" option must be an integer.');
+        assert.strict(opts.retryMax >= 0 && opts.retryMax <= 20,
           '"retryMax" option must be an integer between 0 and 20 inclusive.');
         if ('__maxRetries' in opts) {
           assert.strictEqual(opts.__maxRetries, opts.retryMax, 'maxRetries values do not match.');
@@ -970,12 +975,12 @@ export class Client {
         opts.__maxRetries = this.lockRetryMax;
       }
       
-      assert(Number.isInteger(opts.__maxRetries), '__maxRetries value must be an integer.');
+      assert.strict(Number.isInteger(opts.__maxRetries), '__maxRetries value must be an integer.');
       
       if (opts['ttl']) {
-        assert(Number.isInteger(opts.ttl),
+        assert.strict(Number.isInteger(opts.ttl),
           'lmx usage error => Please pass an integer representing milliseconds as the value for "ttl".');
-        assert(opts.ttl >= 3 && opts.ttl <= 800000,
+        assert.strict(opts.ttl >= 3 && opts.ttl <= 800000,
           'lmx usage error => "ttl" for a lock needs to be integer between 3 and 800000 millis.');
       }
       
@@ -985,16 +990,16 @@ export class Client {
       }
       
       if (opts['lockRequestTimeout']) {
-        assert(Number.isInteger(opts.lockRequestTimeout),
+        assert.strict(Number.isInteger(opts.lockRequestTimeout),
           'lmx: Please pass an integer representing milliseconds as the value for "ttl".');
-        assert(opts.lockRequestTimeout >= 20 && opts.lockRequestTimeout <= 800000,
+        assert.strict(opts.lockRequestTimeout >= 20 && opts.lockRequestTimeout <= 800000,
           'lmx: "ttl" for a lock needs to be integer between 3 and 800000 millis.');
       }
       
       opts.__retryCount = opts.__retryCount || 0;
       
       if (opts.__retryCount > 0) {
-        assert(opts._uuid, 'lmx internal error: no _uuid past to retry call.');
+        assert.strict(opts._uuid, 'lmx internal error: no _uuid past to retry call.');
       }
       
     }
@@ -1304,7 +1309,7 @@ export class Client {
     opts = opts || {};
     
     if (cb) {
-      assert(typeof cb === 'function', 'Please use a callback as the last argument to the client unlock method.');
+      assert.strict(typeof cb === 'function', 'Please use a callback as the last argument to the client unlock method.');
     }
     else {
       cb = this.noop;
@@ -1351,9 +1356,9 @@ export class Client {
       }
       
       if (opts['unlockRequestTimeout']) {
-        assert(Number.isInteger(opts.unlockRequestTimeout),
+        assert.strict(Number.isInteger(opts.unlockRequestTimeout),
           'lmx: Please pass an integer representing milliseconds as the value for "ttl".');
-        assert(opts.unlockRequestTimeout >= 20 && opts.unlockRequestTimeout <= 800000,
+        assert.strict(opts.unlockRequestTimeout >= 20 && opts.unlockRequestTimeout <= 800000,
           'lmx: "ttl" for a lock needs to be integer between 3 and 800000 millis.');
       }
     }

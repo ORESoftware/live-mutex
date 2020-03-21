@@ -17,7 +17,7 @@ docker build -t "$version_tag" .
 
 echo "$version_tag"
 
-exit 0;
+#exit 0;
 
 docker push "$version_tag"
 

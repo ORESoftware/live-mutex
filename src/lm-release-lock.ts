@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 'use strict';
 
-import {Client, log, validConstructorOptions, validUnlockOptions} from "./client";
+import {Client, validConstructorOptions, validUnlockOptions} from "./client";
+import {log} from "./client-utils";
 import chalk from "chalk";
 const index = process.argv.indexOf('--json');
 

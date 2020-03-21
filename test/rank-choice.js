@@ -249,5 +249,5 @@ for (let i = 0; i < 1; i++) {  //10000
   const winner = findWinner2(ballots, candidateCount);
   // const winner = findWinner(ballots, {});
   console.log({winner});
-  assert(winner, 'no winner');
+  assert.strict(winner, 'no winner');
 }
