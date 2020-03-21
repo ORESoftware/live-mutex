@@ -173,7 +173,7 @@ export class RWLockClient extends Client {
       [key, opts, cb] = this.parseLockOpts(key, opts, cb);
     }
     catch (err) {
-      assert(typeof cb === 'function', 'Must include a callback to the beginRead method.');
+      assert.strict(typeof cb === 'function', 'Must include a callback to the beginRead method.');
       return process.nextTick(cb, err);
     }
 
@@ -183,8 +183,8 @@ export class RWLockClient extends Client {
     const writeKey = opts.writeKey;
 
     try {
-      assert(writeKey && typeof writeKey === 'string', '"writeKey" must be a string.');
-      assert(key !== writeKey, 'writeKey and readKey cannot be the same string.');
+      assert.strict(writeKey && typeof writeKey === 'string', '"writeKey" must be a string.');
+      assert.strict(key !== writeKey, 'writeKey and readKey cannot be the same string.');
     }
     catch (err) {
       return process.nextTick(cb, err);
@@ -260,8 +260,8 @@ export class RWLockClient extends Client {
     const writeKey = opts.writeKey;
 
     try {
-      assert(writeKey && typeof writeKey === 'string', '"writeKey" must be a string.');
-      assert(key !== writeKey, 'writeKey and readKey cannot be the same string.');
+      assert.strict(writeKey && typeof writeKey === 'string', '"writeKey" must be a string.');
+      assert.strict(key !== writeKey, 'writeKey and readKey cannot be the same string.');
     }
     catch (err) {
       return process.nextTick(cb, err);

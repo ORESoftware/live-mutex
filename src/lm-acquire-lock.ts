@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 'use strict';
 
-import {Client, log} from "./client";
+import {log} from "./client-utils";
+import {Client} from "./client";
 import chalk from "chalk";
 import util = require('util');
 const index = process.argv.indexOf('--json');

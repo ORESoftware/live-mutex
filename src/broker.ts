@@ -19,9 +19,9 @@ import {forDebugging} from './shared-internal';
 const debugLog = process.argv.indexOf('--lmx-debug') > 0 || process.env.lmx_debug === 'yes';
 
 export const log = {
-  info: console.log.bind(console, chalk.gray.bold('lmx info:')),
-  error: console.error.bind(console, chalk.red.bold('lmx error:')),
-  warn: console.error.bind(console, chalk.yellow.bold('lmx warning:')),
+  info: console.log.bind(console, chalk.gray.bold('lmx broker info:')),
+  error: console.error.bind(console, chalk.red.bold('lmx broker error:')),
+  warn: console.error.bind(console, chalk.yellow.bold('lmx broker warning:')),
   debug(...args: any[]) {
     if (debugLog) {
       let newTime = Date.now();
@@ -203,7 +203,7 @@ export class Broker {
     
     this.isOpen = false;
     const opts = this.opts = o || {};
-    assert(typeof opts === 'object', 'Options argument must be an object.');
+    assert.strict(typeof opts === 'object', 'Options argument must be an object.');
     
     for (const k of Object.keys(opts)) {
       if (!validConstructorOptions[k]) {
@@ -215,32 +215,32 @@ export class Broker {
     }
     
     if (opts['lockExpiresAfter']) {
-      assert(Number.isInteger(opts.lockExpiresAfter),
+      assert.strict(Number.isInteger(opts.lockExpiresAfter),
         'lmx broker: "expiresAfter" option needs to be an integer (milliseconds)');
-      assert(opts.lockExpiresAfter > 20 && opts.lockExpiresAfter < 4000000,
+      assert.strict(opts.lockExpiresAfter > 20 && opts.lockExpiresAfter < 4000000,
         'lmx broker: "expiresAfter" is not in range (20 to 4000000 ms).');
     }
     
     if (opts['timeoutToFindNewLockholder']) {
-      assert(Number.isInteger(opts.timeoutToFindNewLockholder),
+      assert.strict(Number.isInteger(opts.timeoutToFindNewLockholder),
         'lmx broker: "timeoutToFindNewLockholder" option needs to be an integer (milliseconds)');
-      assert(opts.timeoutToFindNewLockholder > 20 && opts.timeoutToFindNewLockholder < 4000000,
+      assert.strict(opts.timeoutToFindNewLockholder > 20 && opts.timeoutToFindNewLockholder < 4000000,
         'lmx broker: "timeoutToFindNewLockholder" is not in range (20 to 4000000 ms).');
     }
     
     if (opts['host']) {
-      assert(typeof opts.host === 'string', ' => "host" option needs to be a string.');
+      assert.strict(typeof opts.host === 'string', ' => "host" option needs to be a string.');
     }
     
     if (opts['port']) {
-      assert(Number.isInteger(opts.port),
+      assert.strict(Number.isInteger(opts.port),
         'lmx broker: "port" option needs to be an integer => ' + opts.port);
-      assert(opts.port > 1024 && opts.port < 49152,
+      assert.strict(opts.port > 1024 && opts.port < 49152,
         'lmx broker: "port" integer needs to be in range (1025-49151).');
     }
     
     if ('noDelay' in opts && opts['noDelay'] !== undefined) {
-      assert(typeof opts.noDelay === 'boolean',
+      assert.strict(typeof opts.noDelay === 'boolean',
         'lmx broker: "noDelay" option needs to be an integer => ' + opts.noDelay);
       this.noDelay = opts.noDelay;
     }
@@ -252,8 +252,8 @@ export class Broker {
     this.noListen = opts.noListen === true;
     
     if ('udsPath' in opts && opts['udsPath'] !== undefined) {
-      assert(typeof opts.udsPath === 'string', 'lmx broker "udsPath" option must be a string.');
-      assert(path.isAbsolute(path.resolve(opts.udsPath)), 'lmx broker "udsPath" option must be an absolute path.');
+      assert.strict(typeof opts.udsPath === 'string', 'lmx broker "udsPath" option must be a string.');
+      assert.strict(path.isAbsolute(path.resolve(opts.udsPath)), 'lmx broker "udsPath" option must be an absolute path.');
       this.socketFile = path.resolve(opts.udsPath);
     }
     
@@ -476,7 +476,11 @@ export class Broker {
       this.emitter.emit('warning', `"${event}" event has occurred.`);
       
       try{
-        fs.unlinkSync(this.socketFile)
+        if(this.socketFile){
+          fs.unlinkSync(this.socketFile);
+          log.info('socket file unlinked:', this.socketFile);
+        }
+        
       }
       catch(err){
         //ignore
