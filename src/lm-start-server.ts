@@ -18,31 +18,7 @@ const useUDS = process.env.use_uds === 'yes' || process.argv.indexOf('--use-uds'
 // @ts-ignore
 let v = {port, host} as any;
 
-if (useUDS && process.env.lmx_in_docker === 'yes') {
-  v.udsPath = '/uds/uds.sock';
-  
-  try {
-    fs.mkdirSync('/uds');
-  }
-  catch (err) {
-    // ignore
-  }
-  
-}
-else if (useUDS) {
-  v.udsPath = path.resolve(process.env.HOME + '/.lmx/uds.sock');
-  
-  try {
-    fs.mkdirSync(path.resolve(process.env.HOME + '/.lmx'));
-  }
-  catch (err) {
-    // ignore
-  }
-}
-
-
 if (index > 1) {
-  
   try {
     v = JSON.parse(process.argv[index + 1]);
   }
@@ -54,6 +30,30 @@ if (index > 1) {
   host = v.host = (v.host || host);
   port = v.port = (v.port || port);
 }
+
+if (useUDS || v.udsPath) {
+  v.udsPath = path.resolve(process.env.HOME + '/.lmx/uds.sock');
+  
+  try {
+    fs.mkdirSync(path.resolve(process.env.HOME + '/.lmx'), {recursive: true});
+  }
+  catch (err) {
+    log.error('Could not create .lmx dir in user home.');
+    log.error(err);
+    process.exit(1);
+  }
+  
+  try{
+    fs.unlinkSync(v.udsPath)
+  }
+  catch(err){
+     // ignore
+  }
+  
+}
+
+
+
 
 if (!Number.isInteger(port)) {
   log.error(chalk.magenta('Live-mutex: port could not be parsed to integer from command line input.'));

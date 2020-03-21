@@ -61,9 +61,9 @@
 
 >
 >```
->   docker pull 'oresoftware/live-mutex-broker:0.2.1'
->   docker run --rm -d -p 6970:6970 --name lmx-broker 'oresoftware/live-mutex-broker:0.2.1'  
->
+>   docker pull 'oresoftware/live-mutex-broker:0.2.24'
+>   docker run --rm -d -p 6970:6970 --name lmx-broker 'oresoftware/live-mutex-broker:0.2.24'  
+>   docker logs -f lmx-broker
 >```
 
 <br>
