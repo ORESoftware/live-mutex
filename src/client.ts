@@ -43,6 +43,7 @@ export interface ValidConstructorOpts {
 export const validConstructorOptions = <ValidConstructorOpts>{
   key: 'string',
   listener: 'function',
+  connectTimeout: 'integer (in millis)',
   host: 'string',
   port: 'integer',
   ttl: 'integer (in millis)',
