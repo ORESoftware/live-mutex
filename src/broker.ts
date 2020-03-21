@@ -253,7 +253,7 @@ export class Broker {
     
     if ('udsPath' in opts && opts['udsPath'] !== undefined) {
       assert(typeof opts.udsPath === 'string', 'lmx broker "udsPath" option must be a string.');
-      assert(path.isAbsolute(opts.udsPath), 'lmx broker "udsPath" option must be an absolute path.');
+      assert(path.isAbsolute(path.resolve(opts.udsPath)), 'lmx broker "udsPath" option must be an absolute path.');
       this.socketFile = path.resolve(opts.udsPath);
     }
     
@@ -474,6 +474,13 @@ export class Broker {
       
       sigEventCallable = false;
       this.emitter.emit('warning', `"${event}" event has occurred.`);
+      
+      try{
+        fs.unlinkSync(this.socketFile)
+      }
+      catch(err){
+        //ignore
+      }
       
       for (const c of this.connectedClients) {
         c.destroy();

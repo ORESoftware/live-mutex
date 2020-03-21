@@ -14,20 +14,31 @@ lmUtils.launchBrokerInChildProcess(conf, function () {
 
   client.ensure().then(function () {
 
-    const a = Array.apply(null, {length: 1000});
+    const locksRequestd = 100000;
+    const a = Array.apply(null, {length: locksRequestd});
     const start = Date.now();
 
     let i = 0;
+    let lockCount = 0;
 
-    async.each(a, function (val, cb) {
+    async.eachLimit(a, 1800, function (val, cb) {
 
       client.lock('foo', function (err, unlock) {
         if (err) {
           return cb(err);
         }
+        
+        lockCount++;
+        
+        if(lockCount > 1){
+          throw 'too many lockholders.'
+        }
 
         console.log('unlocking...' + i++);
-        unlock(cb);
+        unlock(err => {
+          lockCount--;
+          cb();
+        });
 
       });
 
@@ -37,7 +48,9 @@ lmUtils.launchBrokerInChildProcess(conf, function () {
         throw err;
       }
 
-      console.log(' => Time required for live-mutex => ', Date.now() - start);
+      const elapsed = Date.now() - start;
+      console.log(' => Time required for live-mutex => ', locksRequestd/elapsed);
+      console.log(' => Lock cycles per millisecond => ', elapsed);
       process.exit(0);
     });
 
