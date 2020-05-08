@@ -32,6 +32,8 @@ import {LMXClientError} from "./shared-internal";
 import {inspectError} from "./shared-internal";
 import {log} from "./client-utils";
 
+const alreadyUnlocked = Symbol('already.unlocked');
+
 if (weAreDebugging) {
   log.debug('lmx client is in debug mode. Timeouts are turned off.');
 }
