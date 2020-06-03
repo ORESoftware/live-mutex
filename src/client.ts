@@ -11,7 +11,6 @@ import chalk from "chalk";
 
 //project
 import {createParser} from "./json-parser";
-import {forDebugging} from './shared-internal';
 import * as cu from './client-utils';
 const clientPackage = require('../package.json');
 

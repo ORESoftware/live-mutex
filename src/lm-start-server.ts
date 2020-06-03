@@ -62,15 +62,21 @@ if (!Number.isInteger(port)) {
 }
 
 process.once('warning' as any, function (e: any) {
-  log.error('process warning:', chalk.magenta(inspectError(e)));
+  if(process.env.lmx_log_errors != 'nope') {
+    log.error('process warning:', chalk.magenta(inspectError(e)));
+  }
 });
 
 process.once('unhandledRejection', function (e: any) {
-  log.error('unhandled-rejection:', chalk.magenta(inspectError(e)));
+  if(process.env.lmx_log_errors != 'nope') {
+    log.error('unhandled-rejection:', chalk.magenta(inspectError(e)));
+  }
 });
 
 process.once('uncaughtException', function (e: any) {
-  log.error('uncaught-exception:', chalk.magenta(inspectError(e)));
+  if(process.env.lmx_log_errors != 'nope') {
+    log.error('uncaught-exception:', chalk.magenta(inspectError(e)));
+  }
 });
 
 const b = new Broker(v);
