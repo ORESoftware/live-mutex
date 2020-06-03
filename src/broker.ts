@@ -51,15 +51,18 @@ if (!(brokerPackage.version && typeof brokerPackage.version === 'string')) {
   throw new Error('Broker NPM package did not have a top-level field that is a string.');
 }
 
-process.on('uncaughtException', e => {
-  log.error('Uncaught Exception event occurred in Broker process:', inspectError(e));
+process.on('uncaughtException', (e: any) => {
+  if(process.env.lmx_log_errors != 'nope'){
+    log.error('Uncaught Exception event occurred in Broker process:', inspectError(e));
+  }
 });
 
-process.on('warning', function (e: any) {
-  log.debug('warning:', inspectError(e));
+process.on('warning',  (e: any) => {
+  if(process.env.lmx_log_errors != 'nope') {
+    log.debug('warning:', inspectError(e));
+  }
 });
 
-///////////////////////////////////////////////////////////////////
 
 export interface ValidConstructorOpts {
   [key: string]: string
