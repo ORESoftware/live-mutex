@@ -1474,6 +1474,107 @@ export class Client {
       type: 'unlock'
     });
   }
+
+  ping(cb?: EVCb<any>) : Promise<any>{
+    if (cb && typeof cb !== 'function') {
+      throw new Error('Optional callback must be a function.');
+    }
+
+    return new Promise((resolve, reject) => {
+      if (!this.isOpen) {
+         reject(new Error('Connection is not open. Call ensure() or connect() first.'));
+         return;
+      }
+
+      const uuid = UUID.v4();
+      const clientTimestamp = Date.now();
+
+      this.resolutions[uuid] = (err, data) => {
+        delete this.resolutions[uuid];
+
+        if (err) {
+          return reject( new Error(`Ping error: ${util.inspect(err)}`));
+        }
+
+        if (!data || data.type !== 'pong') {
+          return reject( new Error('Invalid ping response from server'));
+        }
+
+
+        resolve({
+              roundTripTime: Date.now() - clientTimestamp,
+              serverTime: data.serverTimestamp,
+              timestamp: data.timestamp
+            });
+      };
+
+      this.write({
+        uuid: uuid,
+        type: 'ping',
+        timestamp: clientTimestamp
+      });
+    })
+        .then(val => {
+          cb && cb(null, val);
+          return val;
+        }).catch(err => {
+          cb && cb(err);
+          return Promise.reject(err);
+        });
+  }
+
+  getSystemStats(cb?: EVCb<any>): Promise<any> {
+
+    if (cb && typeof cb !== 'function') {
+      throw new Error('Optional callback must be a function.');
+    }
+
+    return new Promise((resolve, reject) => {
+      if (!this.isOpen) {
+        return reject(new Error('Connection is not open. Call ensure() or connect() first.'));
+      }
+
+      const uuid = UUID.v4();
+
+      this.resolutions[uuid] = (err, data) => {
+        delete this.resolutions[uuid];
+
+        if (err) {
+          return reject(new Error(`System stats error: ${util.inspect(err)}`));
+        }
+
+        if (!data || data.type !== 'system-stats-response') {
+          return reject(new Error('Invalid system stats response from server'));
+        }
+
+        // Add client-side stats too
+        const clientStats = {
+          clientMemoryUsage: process.memoryUsage(),
+          clientUptime: process.uptime(),
+          clientPid: process.pid
+        };
+
+        const result = {
+          broker: data.stats,
+          client: clientStats,
+          receivedAt: Date.now()
+        };
+
+        resolve(result);
+      };
+
+      this.write({
+        uuid: uuid,
+        type: 'system-stats-request'
+      });
+    }).then(val => {
+      cb && cb(null, val);
+      return val;
+    }).catch(err => {
+      cb && cb(err);
+      return Promise.reject(err);
+    });
+  }
   
 }
 

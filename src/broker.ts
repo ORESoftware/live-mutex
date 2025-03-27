@@ -400,6 +400,14 @@ export class Broker {
       if (data.type === 'lock-info-request') {
         return self.retrieveLockInfo(data, ws);
       }
+
+      if (data.type === 'ping') {
+        return self.ping(data, ws);
+      }
+
+      if (data.type === 'system-stats-request') {
+        return self.getSystemStats(data, ws);
+      }
       
       this.emitter.emit('warning', `implementation error, bad data sent to broker => ${util.inspect(data)}`);
       
@@ -609,6 +617,45 @@ export class Broker {
   private once() {
     log.warn('warning:', 'use b.emitter.once() instead of b.once()');
     return this.emitter.once.apply(this.emitter, <any>arguments);
+  }
+
+  ping(data: any, ws: net.Socket) {
+    const uuid = data.uuid;
+    const timestamp = data.timestamp || Date.now();
+
+    this.send(ws, {
+      uuid: uuid,
+      type: 'pong',
+      timestamp: timestamp,
+      serverTimestamp: Date.now(),
+      ping: true
+    });
+  }
+
+  getSystemStats(data: any, ws: net.Socket) {
+    const uuid = data.uuid;
+
+    // Count all pending lock requests across all locks
+    let pendingRequests = 0;
+    this.locks.forEach(lock => {
+      pendingRequests += lock.notify.length || 0;
+    });
+
+    const stats = {
+      memoryUsage: process.memoryUsage(),
+      uptime: process.uptime(),
+      connectedClients: this.connectedClients.size,
+      totalLocks: this.locks.size,
+      pendingRequests: pendingRequests,
+      activeTimeouts: Object.keys(this.timeouts).length,
+      pid: process.pid
+    };
+
+    this.send(ws, {
+      uuid: uuid,
+      type: 'system-stats-response',
+      stats: stats
+    });
   }
   
   close(cb: (err: any) => void): void {
