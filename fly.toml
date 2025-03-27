@@ -5,10 +5,20 @@ primary_region = 'gru'
 
 [build]
 
+[deploy]
+  strategy = "immediate"
+  min_machines_running = 0
+  max_machines_running = 1
+
 # Remove the [http_service] section and replace with:
 [[services]]
   internal_port = 6970
   protocol = "tcp"
+
+[[services.tcp_checks]]
+  interval = "15s"
+  timeout = "2s"
+  grace_period = "30s"
 
 [[services.ports]]
   port = 6970

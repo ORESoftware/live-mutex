@@ -1071,7 +1071,7 @@ export class Client {
       ));
     }
     
-    if (retryCount > maxRetries) {
+    if (retryCount >= maxRetries) {
       return this.fireLockCallbackWithError(cb, isNextTick, new LMXClientLockException(
         key,
         uuid,
