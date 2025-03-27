@@ -222,7 +222,7 @@ export class Client {
     if ('port' in opts && opts.port !== undefined) {
       assert.strict(Number.isInteger(opts.port),
         cu.getClientErrorMessage(`the "port" option needs to be an integer.`));
-      assert.strict(opts.port > 1024 && opts.port < 49152,
+      assert.strict(opts.port >= 80 && opts.port < 49152,
         cu.getClientErrorMessage('the "port" option needs to be an integer in the range (1025-49151).'));
       this.port = opts.port;
     }
