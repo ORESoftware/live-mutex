@@ -1058,7 +1058,7 @@ export class Client {
         key,
         null,
         LMXLockRequestError.ConnectionRecovering,
-        `Connection is recovering - reconection in progress.`
+        `Connection is recovering - re-connection in progress.`
       ));
     }
   

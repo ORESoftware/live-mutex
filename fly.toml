@@ -1,0 +1,22 @@
+# fly.toml app configuration file generated for live-mutex on 2025-03-27T15:19:16-05:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'live-mutex'
+primary_region = 'gru'
+
+[build]
+
+[http_service]
+  internal_port = 6970
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ['app']
+
+[[vm]]
+  memory = '4gb'
+  cpu_kind = 'shared'
+  cpus = 4
