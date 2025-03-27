@@ -1,0 +1,19 @@
+# fly.toml app configuration file for live-mutex
+
+app = 'live-mutex'
+primary_region = 'gru'
+
+[build]
+
+# Remove the [http_service] section and replace with:
+[[services]]
+  internal_port = 6970
+  protocol = "tcp"
+
+[[services.ports]]
+  port = 6970
+
+[[vm]]
+  memory = '4gb'
+  cpu_kind = 'shared'
+  cpus = 4

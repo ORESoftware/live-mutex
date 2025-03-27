@@ -1,0 +1,166 @@
+Starting Live Mutex broker concurrency tests
+✓ Broker started on port 7777
+
+Test 1: Multiple clients competing for the same lock
+(node:67897) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(Use `node --trace-warnings ...` to show where the warning was created)
+  Created 10 clients
+  Client acquired lock, count: 1
+  Client acquired lock, count: 2
+  Client acquired lock, count: 3
+  Client acquired lock, count: 4
+  Client acquired lock, count: 5
+  Client acquired lock, count: 6
+  Client acquired lock, count: 7
+  Client acquired lock, count: 8
+  Client acquired lock, count: 9
+  Client acquired lock, count: 10
+✓ Test 1 passed: All 10 clients acquired and released the lock
+
+Test 2: Semaphore with multiple holders
+✓ Test 2 passed: Max concurrent holders: 3, limit was 3
+
+Test 3: Concurrent lock and unlock operations
+✓ Test 3 passed: 20 operations completed successfully
+
+Test 4: Lock expiration
+  First client acquired lock (will expire)
+  Waiting for lock to expire...
+lmx broker warning: No "warning" event handlers attached by end-user to the broker emitter, therefore logging these errors from library:
+lmx broker warning: lmx broker warning [2]: lock object timed out for key => "expiring-lock-test"
+lmx broker warning: Add a "warning" event listener to the lmx broker emitter to get rid of this message.
+  Second client acquired lock after expiration
+✓ Test 4 passed: Lock properly expired and was acquired by second client
+
+Test 5: Client disconnection
+  Disposable client acquired lock
+  Closing disposable client without unlocking
+lmx client warning: No "warning" event handler(s) attached by end-user to client.emitter, therefore logging these errors from LMX library:
+lmx client warning: lmx client stream "close" event occurred.
+lmx client warning: Add a "warning" event listener to the lmx client to get rid of this message.
+  Second client acquired lock after disconnection
+✓ Test 5 passed: Lock properly released after client disconnection
+
+Test 6: Forced unlocks
+  First client acquired lock
+lmx client warning: No "warning" event handler(s) attached by end-user to client.emitter, therefore logging these errors from LMX library:
+lmx client warning: lmx client lock request timed out after 3000 ms, 0 retries attempted to acquire lock for key "forced-unlock-test".
+lmx client warning: Add a "warning" event listener to the lmx client to get rid of this message.
+  Second client force-unlocked the lock
+  Second client acquired lock after force-unlock
+✓ Test 6 passed: Force unlock worked correctly
+
+Test 7: Rapid lock/unlock cycles
+  Completed 50 out of 50 lock/unlock cycles
+✓ Test 7 passed: Completed 50/50 rapid lock/unlock cycles
+
+✓ All tests completed successfully
+lmx client warning: No "warning" event handler(s) attached by end-user to client.emitter, therefore logging these errors from LMX library:
+lmx client warning: lmx client stream "close" event occurred.
+lmx client warning: Add a "warning" event listener to the lmx client to get rid of this message.
+lmx client warning: No "warning" event handler(s) attached by end-user to client.emitter, therefore logging these errors from LMX library:
+lmx client warning: lmx client stream "close" event occurred.
+lmx client warning: Add a "warning" event listener to the lmx client to get rid of this message.
+lmx client warning: No "warning" event handler(s) attached by end-user to client.emitter, therefore logging these errors from LMX library:
+lmx client warning: lmx client stream "close" event occurred.
+lmx client warning: Add a "warning" event listener to the lmx client to get rid of this message.
+lmx client warning: No "warning" event handler(s) attached by end-user to client.emitter, therefore logging these errors from LMX library:
+lmx client warning: lmx client stream "close" event occurred.
+lmx client warning: Add a "warning" event listener to the lmx client to get rid of this message.
+lmx client warning: No "warning" event handler(s) attached by end-user to client.emitter, therefore logging these errors from LMX library:
+lmx client warning: lmx client stream "close" event occurred.
+lmx client warning: Add a "warning" event listener to the lmx client to get rid of this message.
+lmx client warning: No "warning" event handler(s) attached by end-user to client.emitter, therefore logging these errors from LMX library:
+lmx client warning: lmx client stream "close" event occurred.
+lmx client warning: Add a "warning" event listener to the lmx client to get rid of this message.
+lmx client warning: No "warning" event handler(s) attached by end-user to client.emitter, therefore logging these errors from LMX library:
+lmx client warning: lmx client stream "close" event occurred.
+lmx client warning: Add a "warning" event listener to the lmx client to get rid of this message.
+lmx client warning: No "warning" event handler(s) attached by end-user to client.emitter, therefore logging these errors from LMX library:
+lmx client warning: lmx client stream "close" event occurred.
+lmx client warning: Add a "warning" event listener to the lmx client to get rid of this message.
+lmx client warning: No "warning" event handler(s) attached by end-user to client.emitter, therefore logging these errors from LMX library:
+lmx client warning: lmx client stream "close" event occurred.
+lmx client warning: Add a "warning" event listener to the lmx client to get rid of this message.
+lmx client warning: No "warning" event handler(s) attached by end-user to client.emitter, therefore logging these errors from LMX library:
+lmx client warning: lmx client stream "close" event occurred.
+lmx client warning: Add a "warning" event listener to the lmx client to get rid of this message.
+lmx client warning: No "warning" event handler(s) attached by end-user to client.emitter, therefore logging these errors from LMX library:
+lmx client warning: lmx client stream "close" event occurred.
+lmx client warning: Add a "warning" event listener to the lmx client to get rid of this message.
+lmx client warning: No "warning" event handler(s) attached by end-user to client.emitter, therefore logging these errors from LMX library:
+lmx client warning: lmx client stream "close" event occurred.
+lmx client warning: Add a "warning" event listener to the lmx client to get rid of this message.
+lmx client warning: No "warning" event handler(s) attached by end-user to client.emitter, therefore logging these errors from LMX library:
+lmx client warning: lmx client stream "close" event occurred.
+lmx client warning: Add a "warning" event listener to the lmx client to get rid of this message.
+lmx client warning: No "warning" event handler(s) attached by end-user to client.emitter, therefore logging these errors from LMX library:
+lmx client warning: lmx client stream "close" event occurred.
+lmx client warning: Add a "warning" event listener to the lmx client to get rid of this message.
+lmx client warning: No "warning" event handler(s) attached by end-user to client.emitter, therefore logging these errors from LMX library:
+lmx client warning: lmx client stream "close" event occurred.
+lmx client warning: Add a "warning" event listener to the lmx client to get rid of this message.
+lmx client warning: No "warning" event handler(s) attached by end-user to client.emitter, therefore logging these errors from LMX library:
+lmx client warning: lmx client stream "close" event occurred.
+lmx client warning: Add a "warning" event listener to the lmx client to get rid of this message.
+lmx client warning: No "warning" event handler(s) attached by end-user to client.emitter, therefore logging these errors from LMX library:
+lmx client warning: lmx client stream "close" event occurred.
+lmx client warning: Add a "warning" event listener to the lmx client to get rid of this message.
+lmx client warning: No "warning" event handler(s) attached by end-user to client.emitter, therefore logging these errors from LMX library:
+lmx client warning: lmx client stream "close" event occurred.
+lmx client warning: Add a "warning" event listener to the lmx client to get rid of this message.
+lmx client warning: No "warning" event handler(s) attached by end-user to client.emitter, therefore logging these errors from LMX library:
+lmx client warning: lmx client stream "close" event occurred.
+lmx client warning: Add a "warning" event listener to the lmx client to get rid of this message.
+lmx client warning: No "warning" event handler(s) attached by end-user to client.emitter, therefore logging these errors from LMX library:
+lmx client warning: lmx client stream "close" event occurred.
+lmx client warning: Add a "warning" event listener to the lmx client to get rid of this message.
+lmx client warning: No "warning" event handler(s) attached by end-user to client.emitter, therefore logging these errors from LMX library:
+lmx client warning: lmx client stream "close" event occurred.
+lmx client warning: Add a "warning" event listener to the lmx client to get rid of this message.
+lmx client warning: No "warning" event handler(s) attached by end-user to client.emitter, therefore logging these errors from LMX library:
+lmx client warning: lmx client stream "close" event occurred.
+lmx client warning: Add a "warning" event listener to the lmx client to get rid of this message.
+lmx client warning: No "warning" event handler(s) attached by end-user to client.emitter, therefore logging these errors from LMX library:
+lmx client warning: lmx client stream "close" event occurred.
+lmx client warning: Add a "warning" event listener to the lmx client to get rid of this message.
+lmx client warning: No "warning" event handler(s) attached by end-user to client.emitter, therefore logging these errors from LMX library:
+lmx client warning: lmx client stream "close" event occurred.
+lmx client warning: Add a "warning" event listener to the lmx client to get rid of this message.
+lmx client warning: No "warning" event handler(s) attached by end-user to client.emitter, therefore logging these errors from LMX library:
+lmx client warning: lmx client stream "close" event occurred.
+lmx client warning: Add a "warning" event listener to the lmx client to get rid of this message.
+lmx client warning: No "warning" event handler(s) attached by end-user to client.emitter, therefore logging these errors from LMX library:
+lmx client warning: lmx client stream "close" event occurred.
+lmx client warning: Add a "warning" event listener to the lmx client to get rid of this message.
+lmx client warning: No "warning" event handler(s) attached by end-user to client.emitter, therefore logging these errors from LMX library:
+lmx client warning: lmx client stream "close" event occurred.
+lmx client warning: Add a "warning" event listener to the lmx client to get rid of this message.
+lmx client warning: No "warning" event handler(s) attached by end-user to client.emitter, therefore logging these errors from LMX library:
+lmx client warning: lmx client stream "close" event occurred.
+lmx client warning: Add a "warning" event listener to the lmx client to get rid of this message.
+lmx client warning: No "warning" event handler(s) attached by end-user to client.emitter, therefore logging these errors from LMX library:
+lmx client warning: lmx client stream "close" event occurred.
+lmx client warning: Add a "warning" event listener to the lmx client to get rid of this message.
+lmx client warning: No "warning" event handler(s) attached by end-user to client.emitter, therefore logging these errors from LMX library:
+lmx client warning: lmx client stream "close" event occurred.
+lmx client warning: Add a "warning" event listener to the lmx client to get rid of this message.
+lmx client warning: No "warning" event handler(s) attached by end-user to client.emitter, therefore logging these errors from LMX library:
+lmx client warning: lmx client stream "close" event occurred.
+lmx client warning: Add a "warning" event listener to the lmx client to get rid of this message.
+lmx client warning: No "warning" event handler(s) attached by end-user to client.emitter, therefore logging these errors from LMX library:
+lmx client warning: lmx client stream "close" event occurred.
+lmx client warning: Add a "warning" event listener to the lmx client to get rid of this message.
+lmx client warning: No "warning" event handler(s) attached by end-user to client.emitter, therefore logging these errors from LMX library:
+lmx client warning: lmx client stream "close" event occurred.
+lmx client warning: Add a "warning" event listener to the lmx client to get rid of this message.
+lmx client warning: No "warning" event handler(s) attached by end-user to client.emitter, therefore logging these errors from LMX library:
+lmx client warning: lmx client stream "close" event occurred.
+lmx client warning: Add a "warning" event listener to the lmx client to get rid of this message.
+lmx client warning: No "warning" event handler(s) attached by end-user to client.emitter, therefore logging these errors from LMX library:
+lmx client warning: lmx client stream "close" event occurred.
+lmx client warning: Add a "warning" event listener to the lmx client to get rid of this message.
+✓ Broker closed
+lmx broker warning: No "warning" event handlers attached by end-user to the broker emitter, therefore logging these errors from library:
+lmx broker warning: "exit" event has occurred.
+lmx broker warning: Add a "warning" event listener to the lmx broker emitter to get rid of this message.

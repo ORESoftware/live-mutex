@@ -23,6 +23,8 @@ ARG CACHEBUST=1
 
 ENV bunion_producer_level='WARN'
 
+EXPOSE 6970:6970
+
 ENTRYPOINT ["node", "dist/lm-start-server.js"]
 CMD []
 
