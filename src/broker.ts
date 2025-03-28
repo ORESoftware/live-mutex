@@ -52,13 +52,13 @@ if (!(brokerPackage.version && typeof brokerPackage.version === 'string')) {
 }
 
 process.on('uncaughtException', (e: any) => {
-  if(process.env.lmx_log_errors != 'nope'){
+  if(process.env.lmx_log_errors !== 'nope'){
     log.error('Uncaught Exception event occurred in Broker process:', inspectError(e));
   }
 });
 
 process.on('warning',  (e: any) => {
-  if(process.env.lmx_log_errors != 'nope') {
+  if(process.env.lmx_log_errors !== 'nope') {
     log.debug('warning:', inspectError(e));
   }
 });
@@ -1179,7 +1179,7 @@ export class Broker {
       lck.timestampEmptied = null;
     }
     
-    if (++this.lockCounts > 29999) {
+    if (++this.lockCounts > 3) {
       // we look into cleaning up old locks every 30,000 lock requests
       this.cleanUpLocks();
     }
@@ -1301,11 +1301,28 @@ export class Broker {
           // we set lck.lockholderTimeouts[uuid], so that when an unlock request for uuid might come in to broker
           // we know that it timed out already, and we do not throw an error then
           
+          // if (this.locks.has(key)) {
+          //   this.locks.get(key).lockholderTimeouts[uuid] = true
+          // }
+          //
+          // this.unlock({key, force: true, from: 'ttl expired for lock (1)'});
+
           if (this.locks.has(key)) {
-            this.locks.get(key).lockholderTimeouts[uuid] = true
+            const lock = this.locks.get(key);
+            lock.lockholderTimeouts[uuid] = true;
+
+            // Only remove this specific lock holder
+            lock.lockholders.delete(uuid);
+
+            // If this is a semaphore (max > 1), don't force-unlock everything
+            if (lock.max > 1) {
+              // Try to grant the lock to the next waiting client instead
+              this.ensureNewLockHolder(lock, {key, _uuid: uuid});
+            } else {
+              // For exclusive locks, use the existing force unlock
+              this.unlock({key, force: true, from: 'ttl expired for lock'});
+            }
           }
-          
-          this.unlock({key, force: true, from: 'ttl expired for lock (1)'});
           
         }, ttl);
       }
