@@ -18,7 +18,8 @@ const REMOTE_PORT = 6970;
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 // Helper to create multiple clients
-const createClients = async (count: number, options = {}): Promise<Client[]> => {
+const
+    createClients = async (count: number, options = {}): Promise<Client[]> => {
     const clients: Client[] = [];
     const clientPromises = Array.from({ length: count }).map(async () => {
         const client = new Client({
