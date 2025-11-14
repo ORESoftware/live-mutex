@@ -249,6 +249,8 @@ export class RWLockWritePrefClient extends Client {
           log.debug(chalk.blue('acquireReadLock successfully acquired read lock on key:'), key);
           cb(err, boundRelease);
 
+        });
+
       });
 
     });
