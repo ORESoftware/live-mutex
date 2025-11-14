@@ -1537,6 +1537,7 @@ export class Broker {
         const uuid = data.uuid;
         const _uuid = data._uuid;
         const force = data.force;
+        const rwStatus = data.rwStatus;
         const lck = this.locks.get(key);
         const keepLocksAfterDeath = Boolean(data.keepLocksAfterDeath);
 
@@ -1631,7 +1632,11 @@ export class Broker {
                 });
             }
 
-            this.ensureNewLockHolder(lck, data);
+            // Don't call ensureNewLockHolder if this is an RW unlock operation
+            // that will be handled by setWriteFlagToFalse or decrementReaders
+            if (rwStatus !== RWStatus.UnlockingWriteKey && rwStatus !== RWStatus.EndRead) {
+                this.ensureNewLockHolder(lck, data);
+            }
             return;
         }
 

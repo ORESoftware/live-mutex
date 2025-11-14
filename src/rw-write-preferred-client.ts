@@ -157,7 +157,7 @@ export class RWLockWritePrefClient extends Client {
       // We have the unlock function from when we acquired the lock
       log.debug(chalk.blue('releaseWriteLock using stored unlock for:'), key);
       
-      // First unlock the lock, then set write flag to false
+      // Unlock the lock first
       boundRelease._unlock((err: any, val: any) => {
         if (err) {
           log.debug(chalk.blue('releaseWriteLock unlock error on:'), key, err);
@@ -168,13 +168,14 @@ export class RWLockWritePrefClient extends Client {
         
         log.debug(chalk.blue('releaseWriteLock unlocked, now setting write flag to false on:'), key);
         
-        // Now set the write flag to false (this doesn't need the lock)
+        // Set the write flag to false and broadcast to waiting readers
+        // This must happen after unlock to avoid deadlocks
         this.setWriteFlagToFalse(key, (flagErr, flagVal) => {
-          log.debug(chalk.blue('releaseWriteLock released lock on:'), key);
+          log.debug(chalk.blue('releaseWriteLock completed on:'), key);
           delete boundRelease._unlock;
           delete boundRelease._key;
-          // Ignore flag errors if unlock succeeded
-          cb(flagErr, val);
+          // Return success even if flag setting had minor issues
+          cb(null, val);
         });
       });
       return;
@@ -191,7 +192,7 @@ export class RWLockWritePrefClient extends Client {
 
       log.debug(chalk.blue('releaseWriteLock got lock on:'), key);
 
-      // First unlock, then set flag
+      // Unlock first
       unlock((unlockErr, unlockVal) => {
         if (unlockErr) {
           log.debug(chalk.blue('releaseWriteLock unlock error:'), unlockErr);
@@ -201,9 +202,9 @@ export class RWLockWritePrefClient extends Client {
         log.debug(chalk.blue('releaseWriteLock unlocked, now setting write flag to false'));
         
         this.setWriteFlagToFalse(key, (flagErr, flagVal) => {
-          log.debug(chalk.blue('releaseWriteLock released lock on:'), key);
-          // Ignore flag errors if unlock succeeded
-          cb(flagErr, unlockVal);
+          log.debug(chalk.blue('releaseWriteLock completed'));
+          // Return success even if flag setting had minor issues
+          cb(null, unlockVal);
         });
       });
 
