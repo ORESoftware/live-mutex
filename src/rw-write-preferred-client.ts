@@ -98,33 +98,16 @@ export class RWLockWritePrefClient extends Client {
   acquireWriteLock(key: string, opts: any, cb?: EVCb<any>) {
 
     try {
-      [key, opts, cb] = this.parseUnlockOpts(key, opts, cb);
+      [key, opts, cb] = this.parseLockOpts(key, opts, cb);
     }
     catch (err) {
       return process.nextTick(cb, err);
     }
 
     opts.max = 1;
-    
-    // Create a release function that will clear writer flag and release lock
-    // We'll store the unlock function on this object
-    const boundRelease: any = (releaseCb?: EVCb<any>) => {
-      // Use stored unlock if available
-      if (boundRelease._unlock) {
-        log.debug(chalk.blue('releaseWriteLock using stored unlock'));
-        this.setWriteFlagToFalse(key, (err: any, val: any) => {
-          if (err) {
-            return releaseCb && releaseCb(err);
-          }
-          boundRelease._unlock((unlockErr: any, unlockVal: any) => {
-            log.debug(chalk.blue('releaseWriteLock released lock'));
-            releaseCb && releaseCb(unlockErr, unlockVal);
-          });
-        });
-      } else {
-        // Fallback to normal release
-        this.releaseWriteLock(key, {}, releaseCb);
-      }
+    // Create a bound release function that will pass itself as the opts parameter
+    const boundRelease: any = (cb?: EVCb<any>) => {
+      return this.releaseWriteLock(key, boundRelease, cb);
     };
 
     this.lock(key, opts, (err, unlock) => {
@@ -135,20 +118,22 @@ export class RWLockWritePrefClient extends Client {
 
       log.debug(chalk.blue('acquireWriteLock got lock on:'), key);
 
-      // Set writer flag while holding the lock
       this.registerWriteFlagAndReadersCheck(key, {}, (err, val) => {
 
         if (err) {
-          // If setting writer flag fails, release the lock
-          unlock(() => {});
-          return cb(err, boundRelease);
+          // If there's an error, we need to unlock the lock we just acquired
+          unlock((unlockErr) => {
+            log.debug(chalk.blue('acquireWriteLock released lock due to error on:'), key);
+            return cb(err, boundRelease);
+          });
+          return;
         }
 
-        log.debug(chalk.blue('acquireWriteLock writer flag set, holding lock'));
-        
-        // DON'T release the lock here - hold it while writer is active
-        // Store the unlock function on the boundRelease so it can be used later
+        // Store the unlock function in the bound release function
         boundRelease._unlock = unlock;
+        boundRelease._key = key;
+        
+        log.debug(chalk.blue('acquireWriteLock successfully acquired write lock on:'), key);
         cb(err, boundRelease);
 
       });
@@ -166,47 +151,53 @@ export class RWLockWritePrefClient extends Client {
       return process.nextTick(cb, err);
     }
 
-    // Check if we have a stored unlock function from acquireWriteLock
-    // The cb parameter might be the boundRelease function with _unlock stored
-    const storedUnlock = (cb as any)._unlock;
-    
-    if (storedUnlock) {
-      // We already have the lock, just need to clear writer flag and release
-      log.debug(chalk.blue('releaseWriteLock clearing writer flag and releasing lock'));
+    // Check if opts is actually the bound release function with stored unlock
+    const boundRelease = (opts && typeof opts === 'object' && opts._unlock) ? opts : null;
+    if (boundRelease && boundRelease._unlock) {
+      // We have the unlock function from when we acquired the lock
+      log.debug(chalk.blue('releaseWriteLock using stored unlock for:'), key);
       
-      this.setWriteFlagToFalse(key, (err: any, val: any) => {
+      this.setWriteFlagToFalse(key, (err, val) => {
         if (err) {
-          return cb(err);
+          return cb(err, {});
         }
-        
-        storedUnlock((unlockErr: any, unlockVal: any) => {
-          log.debug(chalk.blue('releaseWriteLock released lock on key:'), key);
-          cb(unlockErr, unlockVal);
+
+        // Use the stored unlock function
+        boundRelease._unlock((err: any, val: any) => {
+          log.debug(chalk.blue('releaseWriteLock released lock on:'), key);
+          delete boundRelease._unlock;
+          delete boundRelease._key;
+          cb(err, val);
         });
       });
-    } else {
-      // Fallback: acquire lock first (shouldn't normally happen)
-      opts.max = 1;
-      
-      this.lock(key, opts, (err, unlock) => {
+      return;
+    }
+
+    // Fallback: acquire lock first, then release
+    opts.max = 1;
+
+    this.lock(key, opts, (err, unlock) => {
+
+      if (err) {
+        return cb(err, unlock);
+      }
+
+      log.debug(chalk.blue('releaseWriteLock got lock on:'), key);
+
+      this.setWriteFlagToFalse(key, (err, val) => {
+
         if (err) {
           return cb(err, unlock);
         }
 
-        log.debug(chalk.blue('releaseWriteLock got lock on:'), key);
-
-        this.setWriteFlagToFalse(key, (err, val) => {
-          if (err) {
-            return cb(err, unlock);
-          }
-
-          unlock((err, val) => {
-            log.debug(chalk.blue('releaseWriteLock released lock on key:'), key);
-            cb(err, val);
-          });
+        unlock((err, val) => {
+          log.debug(chalk.blue('releaseWriteLock released lock on:'), key);
+          cb(err, val);
         });
+
       });
-    }
+
+    });
 
   }
 
@@ -219,27 +210,12 @@ export class RWLockWritePrefClient extends Client {
       return process.nextTick(cb, err);
     }
 
-    // Create a release function that will decrement readers and release lock
-    const boundRelease: any = (releaseCb?: EVCb<any>) => {
-      // Use stored unlock if available
-      if (boundRelease._unlock) {
-        log.debug(chalk.blue('releaseReadLock using stored unlock'));
-        this.decrementReaders(key, (err: any, val: any) => {
-          if (err) {
-            return releaseCb && releaseCb(err);
-          }
-          boundRelease._unlock((unlockErr: any, unlockVal: any) => {
-            log.debug(chalk.blue('releaseReadLock released lock'));
-            releaseCb && releaseCb(unlockErr, unlockVal);
-          });
-        });
-      } else {
-        // Fallback to normal release
-        this.releaseReadLock(key, {}, releaseCb);
-      }
+    // Create a bound release function that will pass itself as the opts parameter
+    const boundRelease: any = (cb?: EVCb<any>) => {
+      return this.releaseReadLock(key, boundRelease, cb);
     };
 
-    // First check writer flag BEFORE acquiring lock
+    // First check writer flag BEFORE acquiring lock (critical fix)
     this.registerWriteFlagCheck(key, {}, (err, val) => {
 
       if (err) {
@@ -266,12 +242,12 @@ export class RWLockWritePrefClient extends Client {
             return cb(err, boundRelease);
           }
 
-          log.debug(chalk.magenta('acquireReadLock reader count incremented'));
-
-          // Store unlock function for release
+          // Store the unlock function in the bound release function
           boundRelease._unlock = unlock;
+          boundRelease._key = key;
+
+          log.debug(chalk.blue('acquireReadLock successfully acquired read lock on key:'), key);
           cb(err, boundRelease);
-        });
 
       });
 
@@ -288,47 +264,53 @@ export class RWLockWritePrefClient extends Client {
       return process.nextTick(cb, err);
     }
 
-    // Check if we have a stored unlock function from acquireReadLock
-    // The cb parameter might be the boundRelease function with _unlock stored
-    const storedUnlock = (cb as any)._unlock;
-    
-    if (storedUnlock) {
-      // We already have the lock, just decrement readers and release
-      log.debug(chalk.blue('releaseReadLock decrementing readers and releasing lock'));
+    // Check if opts is actually the bound release function with stored unlock
+    const boundRelease = (opts && typeof opts === 'object' && opts._unlock) ? opts : null;
+    if (boundRelease && boundRelease._unlock) {
+      // We have the unlock function from when we acquired the lock
+      log.debug(chalk.blue('releaseReadLock using stored unlock for key:'), key);
       
-      this.decrementReaders(key, (err: any, val: any) => {
+      this.decrementReaders(key, (err, val) => {
         if (err) {
-          return cb(err);
+          return cb(err, {});
         }
 
-        storedUnlock((unlockErr: any, unlockVal: any) => {
+        // Use the stored unlock function
+        boundRelease._unlock((err: any, val: any) => {
           log.debug(chalk.blue('releaseReadLock released lock on key:'), key);
-          cb(unlockErr, unlockVal);
+          delete boundRelease._unlock;
+          delete boundRelease._key;
+          cb(err, val);
         });
       });
-    } else {
-      // Fallback: acquire lock first (shouldn't normally happen)
-      opts.max = 1;
+      return;
+    }
 
-      this.lock(key, opts, (err, unlock) => {
+    // Fallback: acquire lock first, then release
+    opts.max = 1;
+
+    this.lock(key, opts, (err, unlock) => {
+
+      if (err) {
+        return cb(err, unlock);
+      }
+
+      log.debug(chalk.blue('releaseReadLock got lock on key:'), key);
+
+      this.decrementReaders(key, (err, val) => {
+
         if (err) {
           return cb(err, unlock);
         }
 
-        log.debug(chalk.blue('releaseReadLock got lock on key:'), key);
-
-        this.decrementReaders(key, (err, val) => {
-          if (err) {
-            return cb(err, unlock);
-          }
-
-          unlock((err, val) => {
-            log.debug(chalk.blue('releaseReadLock released lock on key:'), key);
-            cb(err, val);
-          });
+        unlock((err, val) => {
+          log.debug(chalk.blue('releaseReadLock released lock on key:'), key);
+          cb(err, val);
         });
+
       });
-    }
+
+    });
 
   }
 

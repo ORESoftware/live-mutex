@@ -736,6 +736,23 @@ export class Broker {
         const uuids = Object.keys(this.wsToUUIDs.get(ws) || {});
         this.wsToUUIDs.delete(ws);
 
+        // Clean up registered listeners for this connection
+        for (const key in this.registeredListeners) {
+            const listeners = this.registeredListeners[key];
+            if (listeners) {
+                // Remove listeners associated with this websocket
+                for (let i = listeners.length - 1; i >= 0; i--) {
+                    if (listeners[i].ws === ws) {
+                        listeners.splice(i, 1);
+                    }
+                }
+                // Remove empty arrays
+                if (listeners.length === 0) {
+                    delete this.registeredListeners[key];
+                }
+            }
+        }
+
         for (let [k, v] of this.locks) {
 
             const notify = v.notify;
@@ -745,10 +762,18 @@ export class Broker {
             }
 
             // Clear any timers associated with this websocket, before unlocking
-            for (const lockholder of v.lockholders.values()) {
-                if (lockholder.ws === ws && lockholder.timer) {
-                    clearTimeout(lockholder.timer);
+            const uuidsToRemove: string[] = [];
+            for (const [uuid, lockholder] of v.lockholders.entries()) {
+                if (lockholder.ws === ws) {
+                    if (lockholder.timer) {
+                        clearTimeout(lockholder.timer);
+                    }
+                    uuidsToRemove.push(uuid);
                 }
+            }
+            // Remove lockholders for this websocket
+            for (const uuid of uuidsToRemove) {
+                v.lockholders.delete(uuid);
             }
 
             if (v.isViaShell !== true) {
@@ -759,6 +784,12 @@ export class Broker {
                 this.unlock({force: true, key: k, from: 'client socket closed/ended/errored'}, ws);
             }
 
+        }
+
+        // Clear destroyTimeout if it exists
+        if (ws.destroyTimeout) {
+            clearTimeout(ws.destroyTimeout);
+            ws.destroyTimeout = null;
         }
 
     }
@@ -989,8 +1020,12 @@ export class Broker {
         const locks = this.locks;
         const notifyList = lck.notify;
 
-        // Remove previous lock holder if _uuid is provided
+        // Remove previous lock holder if _uuid is provided and clear its timer
         if (data._uuid) {
+            const lockholder = lck.lockholders.get(data._uuid);
+            if (lockholder && lockholder.timer) {
+                clearTimeout(lockholder.timer);
+            }
             lck.lockholders.delete(data._uuid);
         }
 
@@ -1013,6 +1048,12 @@ export class Broker {
         // continue granting locks
         while (notifyList.length > 0) { // Modified Condition
 
+            // Check capacity BEFORE dequeuing to avoid unnecessary work
+            if (lck.lockholders.size >= lck.max) {
+                // Semaphore is at capacity, can't grant more locks
+                break;
+            }
+
             let lqValue: LinkedQueueValue<NotifyObj>;
             let n: NotifyObj = <any>null;
 
@@ -1029,9 +1070,8 @@ export class Broker {
                 break;
             }
 
-            //Double check capacity immediately before granting
-            if (lck.lockholders.size >= lck.max) { //Modified Condition
-
+            // Double check capacity immediately before granting (race condition protection)
+            if (lck.lockholders.size >= lck.max) {
                 log.warn(`Semaphore reached max capacity of ${lck.max} for key "${key}" - can't grant more locks`);
 
                 // Put this client back in the notify queue
@@ -1100,7 +1140,10 @@ export class Broker {
                 acquired: true
             });
 
-            clearTimeout(this.timeouts[key]);
+            // Clear existing timeout for this key if it exists
+            if (this.timeouts[key]) {
+                clearTimeout(this.timeouts[key]);
+            }
 
             this.timeouts[key] = setTimeout(() => {
 
@@ -1118,8 +1161,13 @@ export class Broker {
                 if (locks.has(key)) {
 
                     const lckTemp: LockObj = locks.get(key);
+                    // Clear timer if lockholder still exists
+                    const lockholder = lckTemp.lockholders.get(uuid);
+                    if (lockholder && lockholder.timer) {
+                        clearTimeout(lockholder.timer);
+                    }
                     lckTemp.lockholders.delete(uuid);
-                    const ln = lck.notify.length;
+                    const ln = lckTemp.notify.length;
                     const notifyList = lckTemp.notify;
 
                     if (!self.rejected[n.uuid]) {
@@ -1490,23 +1538,15 @@ export class Broker {
 
             const ln = lck.notify.length;
 
-            // Get the lockholder's information
-            const lockholder = lck.lockholders.get(_uuid);
-
-            if (lockholder && lockholder.timer) {
-                clearTimeout(lockholder.timer);
-            }
-
-            // remove the lockholder, as the above if stmt checked it,
-            //so we don't need to check before deleting it again.
-            lck.lockholders.delete(_uuid);
-
-            // delete lck.lockholderTimeouts[_uuid];
-
             if (force) {
                 // If this is a semaphore lock and we're just targeting one lock holder,
                 // only remove that specific holder
                 if (_uuid && lck.max > 1) {
+                    // Get the lockholder's information before deleting
+                    const lockholder = lck.lockholders.get(_uuid);
+                    if (lockholder && lockholder.timer) {
+                        clearTimeout(lockholder.timer);
+                    }
                     // Just remove this specific lock holder
                     const removed = lck.lockholders.delete(_uuid);
                     if (removed) {
@@ -1515,11 +1555,25 @@ export class Broker {
                 } else {
                     // Traditional force behavior - remove all lock holders
                     for (const k of lck.lockholders.keys()) {
+                        const lockholder = lck.lockholders.get(k);
+                        if (lockholder && lockholder.timer) {
+                            clearTimeout(lockholder.timer);
+                        }
                         lck.lockholdersAllReleased[k] = true;
                     }
                     lck.lockholders = new Map();
                 }
+            } else {
+                // Normal unlock - remove the specific lockholder
+                const lockholder = lck.lockholders.get(_uuid);
+                if (lockholder && lockholder.timer) {
+                    clearTimeout(lockholder.timer);
+                }
+                // remove the lockholder
+                lck.lockholders.delete(_uuid);
             }
+
+            // delete lck.lockholderTimeouts[_uuid];
 
             if (uuid && ws) {
 
