@@ -41,6 +41,7 @@
   "devDependencies": {
     "@types/node": "^10.1.2",
     "@types/tcp-ping": "^0.1.0",
-    "@types/uuid": "^3.4.3"
+    "@types/uuid": "^3.4.3",
+    "typescript": "^5.9.3"
   }
 }

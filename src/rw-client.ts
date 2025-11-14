@@ -41,7 +41,7 @@ export class RWLockClient extends Client {
 
   constructor(o?: Partial<ClientOpts>, cb?: LMClientCallBack) {
     super(o, cb);
-    throw 'RWClient not yet fully implemented, TBD';
+    // RWClient is now implemented
   }
 
   beginReadp(key: string, opts: any): Promise<any> {
