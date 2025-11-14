@@ -41,7 +41,8 @@ export class RWLockClient extends Client {
 
   constructor(o?: Partial<ClientOpts>, cb?: LMClientCallBack) {
     super(o, cb);
-    // RWClient is now implemented
+    // RWClient implementation - read-preferring RW lock
+    // Note: This is a basic implementation and may need further refinement
   }
 
   beginReadp(key: string, opts: any): Promise<any> {

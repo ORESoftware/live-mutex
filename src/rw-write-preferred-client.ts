@@ -225,37 +225,42 @@ export class RWLockWritePrefClient extends Client {
     const boundRelease: any = (cb?: EVCb<any>) => {
       return this.releaseReadLock(key, boundRelease, cb);
     };
-    opts.max = 1;
 
-    this.lock(key, opts, (err, unlock) => {
+    // First check writer flag BEFORE acquiring lock (critical fix)
+    this.registerWriteFlagCheck(key, {}, (err, val) => {
 
       if (err) {
         return cb(err, boundRelease);
       }
 
+      log.debug(chalk.blue('acquireReadLock writer flag check passed, acquiring lock'));
 
-      log.debug(chalk.blue('acquireReadLock got lock on key:'), key);
+      // Now acquire the lock
+      opts.max = 1;
 
-      this.registerWriteFlagCheck(key, {}, (err, val) => {
+      this.lock(key, opts, (err, unlock) => {
 
         if (err) {
-          // If there's an error, we need to unlock the lock we just acquired
-          unlock((unlockErr) => {
-            log.debug(chalk.blue('acquireReadLock released lock due to error on key:'), key);
-            return cb(err, boundRelease);
-          });
-          return;
+          return cb(err, boundRelease);
         }
 
-        log.debug(chalk.magenta('client got register-write-flag-and-readers-check-success'));
+        log.debug(chalk.blue('acquireReadLock got lock on key:'), key);
 
+        // Increment readers count
+        this.incrementReaders(key, (err: any, val: any) => {
+          if (err) {
+            unlock(() => {});
+            return cb(err, boundRelease);
+          }
 
-        // Store the unlock function in the bound release function
-        boundRelease._unlock = unlock;
-        boundRelease._key = key;
+          // Store the unlock function in the bound release function
+          boundRelease._unlock = unlock;
+          boundRelease._key = key;
 
-        log.debug(chalk.blue('acquireReadLock successfully acquired read lock on key:'), key);
-        cb(err, boundRelease);
+          log.debug(chalk.blue('acquireReadLock successfully acquired read lock on key:'), key);
+          cb(err, boundRelease);
+
+        });
 
       });
 

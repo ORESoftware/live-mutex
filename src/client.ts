@@ -562,9 +562,8 @@ export class Client {
           });
     };
     
-    process.once('exit', () => {
-      ws && ws.destroy();
-    });
+    // Don't add process listeners per client instance to avoid memory leaks
+    // Connection cleanup is handled in close() and cleanupConnection methods
     
     this.endCurrentConnection = () => {
       return ws && ws.end();
@@ -572,7 +571,25 @@ export class Client {
     
     this.close = () => {
       this.noRecover = true;
-      return ws && ws.destroy();
+      // Clean up all timers to prevent memory leaks
+      for (const k of Object.keys(this.timers)) {
+        clearTimeout(this.timers[k]);
+      }
+      this.timers = {};
+      // Clean up all timeouts
+      this.timeouts = {};
+      // Clean up resolutions
+      this.resolutions = {};
+      // Clean up giveups
+      this.giveups = {};
+      // Remove all event listeners from emitter
+      this.emitter.removeAllListeners();
+      // Destroy socket and remove its listeners
+      if (ws) {
+        ws.removeAllListeners();
+        ws.destroy();
+      }
+      return ws;
     };
     
     this.createNewConnection = () => {

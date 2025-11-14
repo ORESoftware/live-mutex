@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import { Broker } from '../src/broker';
+import { Broker1 } from '../src/broker-1';
 import { Client } from '../src/client';
 
 /**
@@ -44,11 +44,11 @@ async function runAllTests() {
     console.log('Starting Live Mutex broker concurrency tests');
     const port = 7777;
     const allClients: Client[] = [];
-    let broker: Broker;
+    let broker: Broker1;
 
     try {
         // Start broker
-        broker = new Broker({
+        broker = new Broker1({
             port: port,
             lockExpiresAfter: 1000,    // Short expiry for testing
             timeoutToFindNewLockholder: 800
