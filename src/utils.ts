@@ -7,7 +7,7 @@ import * as cp from 'child_process';
 import ping = require('tcp-ping');
 
 //project
-import {Broker} from './broker';
+import {Broker1} from './broker-1';
 import {EVCb, inspectError} from "./shared-internal";
 const p = require.resolve('./launch-broker-child');
 
@@ -32,7 +32,7 @@ export const launchSocketServer = function (opts: any, cb: EVCb<any>) {
       return cb(null, 'available');
     }
     
-    return new Broker({host: host, port: port})
+    return new Broker1({host: host, port: port})
     .ensure(cb as any);
     
   });

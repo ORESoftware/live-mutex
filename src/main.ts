@@ -6,7 +6,7 @@ export {lmUtils};
 export {RWLockClient, RWLockReadPrefClient} from './rw-client';
 export {RWLockWritePrefClient} from './rw-write-preferred-client';
 export {Client, LMXClient, LvMtxClient} from './client';
-export {Broker, LMXBroker, LvMtxBroker} from './broker';
+export {Broker1, LMXBroker, LvMtxBroker} from './broker-1';
 
 export {LMXLockRequestError, LMXUnlockRequestError} from "./shared-internal";
 

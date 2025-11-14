@@ -1,6 +1,6 @@
 'use strict';
 
-import {Broker, log} from "./broker";
+import {Broker1, log} from "./broker-1";
 import * as fs from 'fs';
 import chalk from "chalk";
 import util = require('util');
@@ -79,7 +79,7 @@ process.once('uncaughtException', function (e: any) {
   }
 });
 
-const b = new Broker(v);
+const b = new Broker1(v);
 
 process.once('exit', function () {
   b.close(null);
