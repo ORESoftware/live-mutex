@@ -157,17 +157,24 @@ export class RWLockWritePrefClient extends Client {
       // We have the unlock function from when we acquired the lock
       log.debug(chalk.blue('releaseWriteLock using stored unlock for:'), key);
       
-      this.setWriteFlagToFalse(key, (err, val) => {
+      // First unlock the lock, then set write flag to false
+      boundRelease._unlock((err: any, val: any) => {
         if (err) {
-          return cb(err, {});
+          log.debug(chalk.blue('releaseWriteLock unlock error on:'), key, err);
+          delete boundRelease._unlock;
+          delete boundRelease._key;
+          return cb(err, val);
         }
-
-        // Use the stored unlock function
-        boundRelease._unlock((err: any, val: any) => {
+        
+        log.debug(chalk.blue('releaseWriteLock unlocked, now setting write flag to false on:'), key);
+        
+        // Now set the write flag to false (this doesn't need the lock)
+        this.setWriteFlagToFalse(key, (flagErr, flagVal) => {
           log.debug(chalk.blue('releaseWriteLock released lock on:'), key);
           delete boundRelease._unlock;
           delete boundRelease._key;
-          cb(err, val);
+          // Ignore flag errors if unlock succeeded
+          cb(flagErr, val);
         });
       });
       return;
@@ -184,17 +191,20 @@ export class RWLockWritePrefClient extends Client {
 
       log.debug(chalk.blue('releaseWriteLock got lock on:'), key);
 
-      this.setWriteFlagToFalse(key, (err, val) => {
-
-        if (err) {
-          return cb(err, unlock);
+      // First unlock, then set flag
+      unlock((unlockErr, unlockVal) => {
+        if (unlockErr) {
+          log.debug(chalk.blue('releaseWriteLock unlock error:'), unlockErr);
+          return cb(unlockErr, unlockVal);
         }
-
-        unlock((err, val) => {
+        
+        log.debug(chalk.blue('releaseWriteLock unlocked, now setting write flag to false'));
+        
+        this.setWriteFlagToFalse(key, (flagErr, flagVal) => {
           log.debug(chalk.blue('releaseWriteLock released lock on:'), key);
-          cb(err, val);
+          // Ignore flag errors if unlock succeeded
+          cb(flagErr, unlockVal);
         });
-
       });
 
     });
@@ -204,7 +214,7 @@ export class RWLockWritePrefClient extends Client {
   acquireReadLock(key: string, opts: any, cb: EVCb<any>) {
 
     try {
-      [key, opts, cb] = this.parseUnlockOpts(key, opts, cb);
+      [key, opts, cb] = this.parseLockOpts(key, opts, cb);
     }
     catch (err) {
       return process.nextTick(cb, err);
@@ -316,8 +326,18 @@ export class RWLockWritePrefClient extends Client {
     const uuid = UUID.v4();
 
     this.resolutions[uuid] = (err, val) => {
+      log.debug(chalk.magenta('client got register-write-flag-check response, type:', val?.type));
+      
+      // If we got a queued response, wait for the actual success response
+      if (val && val.type === 'register-write-flag-check-queued') {
+        log.debug(chalk.magenta('read request queued, waiting for writer to finish...'));
+        // Don't delete the resolution yet - we need to wait for the success response
+        // The broker will call the fn() which sends the success response
+        return;
+      }
+      
+      // This is the final success response
       delete this.resolutions[uuid];
-      log.debug(chalk.magenta('client got register-write-flag-check'));
       return cb(err, val);
     };
 
