@@ -208,38 +208,55 @@ export class RWLockClient extends Client {
         ));
       }
 
-      const boundEndRead = this.endRead.bind(this, key, {writeKey});
+      const boundEndRead: any = this.endRead.bind(this, key, {writeKey});
       boundEndRead.endRead = boundEndRead.unlock = boundEndRead.release = boundEndRead;
+      boundEndRead._unlock = unlock; // Store unlock function for endRead
+      boundEndRead._writeKey = writeKey; // Store writeKey for endRead
 
+      // If we're the first reader (readers === 1), we need to lock the writeKey
+      // to prevent writers from starting while we're reading
       if (readers === 1) {
 
-        log.debug(chalk.magenta('readers is exactly 1.'));
+        log.debug(chalk.magenta('readers is exactly 1, locking writeKey to prevent writers.'));
 
-        return this.lock(writeKey, <any>{rwStatus: RWStatus.LockingWriteKey}, err => {
+        // Lock the writeKey with force to ensure we get it even if a writer is waiting
+        this.lock(writeKey, <any>{rwStatus: RWStatus.LockingWriteKey, force: true}, err => {
 
           if (err) {
-            return cb(err, {});
+            // If we can't lock the writeKey, unlock the read lock and return error
+            return unlock((unlockErr) => {
+              cb(err, {});
+            });
           }
 
+          // Mark that we locked the writeKey
+          boundEndRead._lockedWriteKey = true;
+
+          // We have both locks now, unlock the read lock and return
           unlock(err => {
 
             if (err) {
+              // If unlock fails, try to unlock writeKey too
+              this.unlock(writeKey, {force: true}, () => {});
               return cb(err, {});
             }
 
-            cb(err, boundEndRead);
+            cb(null, boundEndRead);
           });
 
         });
+        return;
       }
 
+      // Not the first reader, just unlock and return
+      boundEndRead._lockedWriteKey = false;
       unlock(err => {
 
         if (err) {
           return cb(err, {});
         }
 
-        cb(err, boundEndRead);
+        cb(null, boundEndRead);
       });
 
     });
@@ -249,14 +266,11 @@ export class RWLockClient extends Client {
   endRead(key: string, opts: any, cb: EndReadCallback) {
 
     try {
-      [key, opts, cb] = this.parseLockOpts(key, opts, cb);
+      [key, opts, cb] = this.parseUnlockOpts(key, opts, cb);
     }
     catch (err) {
       return process.nextTick(cb, err);
     }
-
-    opts.rwStatus = RWStatus.EndRead;
-    opts.max = 1;
 
     const writeKey = opts.writeKey;
 
@@ -267,6 +281,54 @@ export class RWLockClient extends Client {
     catch (err) {
       return process.nextTick(cb, err);
     }
+
+    // Check if opts is actually the bound release function from beginRead
+    const boundEndRead = (opts && typeof opts === 'object' && opts._unlock) ? opts : null;
+    
+    if (boundEndRead && boundEndRead._unlock) {
+      // We have the unlock function from beginRead
+      opts.rwStatus = RWStatus.EndRead;
+      opts.max = 1;
+      
+      // Lock to decrement reader count
+      this.lock(key, opts, (err, v) => {
+        if (err) {
+          return cb(err);
+        }
+
+        const readers = v.readersCount;
+
+        if (!Number.isInteger(readers)) {
+          return cb('Implementation error, missing "readersCount".');
+        }
+
+        // Unlock the read lock (this decrements the reader count)
+        v.unlock((unlockErr) => {
+          if (unlockErr) {
+            return cb(unlockErr);
+          }
+
+          // If we locked the writeKey (we were the first reader) and we're now the last reader,
+          // unlock the writeKey
+          if (boundEndRead._lockedWriteKey && readers === 1) {
+            const writeKeyToUnlock = boundEndRead._writeKey || writeKey;
+            this.unlock(writeKeyToUnlock, {force: true, rwStatus: RWStatus.UnlockingWriteKey}, (writeUnlockErr) => {
+              if (writeUnlockErr) {
+                return cb(writeUnlockErr);
+              }
+              cb(null);
+            });
+          } else {
+            cb(null);
+          }
+        });
+      });
+      return;
+    }
+
+    // Fallback: acquire lock first, then release
+    opts.rwStatus = RWStatus.EndRead;
+    opts.max = 1;
 
     this.lock(key, opts, (err, v) => {
 
@@ -280,19 +342,23 @@ export class RWLockClient extends Client {
         return cb('Implementation error, missing "readersCount".');
       }
 
-      if (readers > 0) {
-        return v.unlock(cb);
-      }
-
-      // we use force, because this process might not own the writeKey lock
-      this.unlock(writeKey, {force: true, rwStatus: RWStatus.UnlockingWriteKey}, err => {
-
-        if (err) {
-          return cb(err);
+      // Unlock the read lock
+      v.unlock((unlockErr) => {
+        if (unlockErr) {
+          return cb(unlockErr);
         }
 
-        v.unlock(cb);
-
+        // If we were the last reader, unlock the writeKey
+        if (readers === 1) {
+          this.unlock(writeKey, {force: true, rwStatus: RWStatus.UnlockingWriteKey}, (writeUnlockErr) => {
+            if (writeUnlockErr) {
+              return cb(writeUnlockErr);
+            }
+            cb(null);
+          });
+        } else {
+          cb(null);
+        }
       });
 
     });

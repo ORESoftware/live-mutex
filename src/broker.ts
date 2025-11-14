@@ -350,6 +350,11 @@ export class Broker {
                 return self.registerWriteFlagCheck(data, ws);
             }
 
+            if (data.type === 'register-write-flag-check-queued') {
+                // This is a response type, not a request type - should not happen
+                return;
+            }
+
             if (data.type === 'register-write-flag-and-readers-check') {
                 return self.registerWriteFlagAndReadersCheck(data, ws);
             }
@@ -804,13 +809,19 @@ export class Broker {
         const uuid = data.uuid;
         const v = this.registeredListeners[key] = this.registeredListeners[key] || [];
 
-        log.debug('broadcasting for key:', key);
+        log.debug('broadcasting for key:', key, 'listeners:', v.length);
 
-        while (v.length > 0) {
+        // Process all listeners and clear the array to prevent infinite loops
+        const listenersToProcess = v.splice(0); // Remove all listeners at once
 
-            let p = v.pop();
-
-            p && p.fn && p.fn();
+        for (const p of listenersToProcess) {
+            if (p && p.fn) {
+                try {
+                    p.fn();
+                } catch (err) {
+                    log.error('Error in broadcast listener:', err);
+                }
+            }
 
             if (p && p.ws) {
                 this.send(p.ws, {
@@ -819,7 +830,6 @@ export class Broker {
                     type: 'broadcast-result'
                 });
             }
-
         }
 
         if (ws) {
@@ -867,8 +877,15 @@ export class Broker {
 
         log.debug('setting writer flag to false.');
         lck.writerFlag = false;
-        log.debug('broadcasting after setting writer flag to false.');
-        this.broadcast({key}, null);
+        
+        // Only broadcast if there are registered listeners waiting
+        const listeners = this.registeredListeners[key];
+        if (listeners && listeners.length > 0) {
+            log.debug('broadcasting after setting writer flag to false. Listeners:', listeners.length);
+            this.broadcast({key}, null);
+        } else {
+            log.debug('writer flag set to false but no listeners waiting, skipping broadcast.');
+        }
 
         this.send(ws, {uuid, key, type: 'write-flag-false-and-broadcast-success'});
 
@@ -884,12 +901,19 @@ export class Broker {
         }
 
         let lck = this.locks.get(key);
-        log.debug('decrementing readers.');
+        log.debug('decrementing readers. Current:', lck.readers);
         const r = lck.readers = Math.max(0, --lck.readers);
+        log.debug('decremented readers. New count:', r);
 
+        // Only broadcast if readers reached zero AND there are registered listeners waiting
         if (r < 1) {
-            log.debug('broadcasting because readers are zero.');
-            this.broadcast({key}, null);
+            const listeners = this.registeredListeners[key];
+            if (listeners && listeners.length > 0) {
+                log.debug('broadcasting because readers are zero and there are', listeners.length, 'listeners waiting.');
+                this.broadcast({key}, null);
+            } else {
+                log.debug('readers are zero but no listeners waiting, skipping broadcast.');
+            }
         }
 
         this.send(ws, {
@@ -969,12 +993,30 @@ export class Broker {
         const writerFlag = lck.writerFlag || false;
 
         if (writerFlag) {
-            return v.push({
+            // Writer flag is set, queue this read request to wait for writer to finish
+            v.push({
                 ws, key, uuid, fn: () => {
-                    console.log('incrementing readers in delayed fashion.');
+                    log.debug('incrementing readers in delayed fashion.');
                     lck.readers++;
+                    // Send response after incrementing
+                    this.send(ws, {
+                        writerFlag: false,
+                        readersCount: lck.readers,
+                        key,
+                        uuid,
+                        type: 'register-write-flag-success'
+                    });
                 }
             });
+            // Send initial response indicating we're queued
+            this.send(ws, {
+                writerFlag: true,
+                readersCount: readersCount,
+                key,
+                uuid,
+                type: 'register-write-flag-check-queued'
+            });
+            return;
         }
 
         log.debug('incrementing readers right after write flag check.');
@@ -1495,6 +1537,7 @@ export class Broker {
         const uuid = data.uuid;
         const _uuid = data._uuid;
         const force = data.force;
+        const rwStatus = data.rwStatus;
         const lck = this.locks.get(key);
         const keepLocksAfterDeath = Boolean(data.keepLocksAfterDeath);
 
@@ -1589,7 +1632,11 @@ export class Broker {
                 });
             }
 
-            this.ensureNewLockHolder(lck, data);
+            // Don't call ensureNewLockHolder if this is an RW unlock operation
+            // that will be handled by setWriteFlagToFalse or decrementReaders
+            if (rwStatus !== RWStatus.UnlockingWriteKey && rwStatus !== RWStatus.EndRead) {
+                this.ensureNewLockHolder(lck, data);
+            }
             return;
         }
 
