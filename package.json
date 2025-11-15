@@ -33,7 +33,7 @@
   "homepage": "https://github.com/ORESoftware/live-mutex#readme",
   "dependencies": {
     "@oresoftware/json-stream-parser": "0.0.124",
-    "@oresoftware/linked-queue": "0.1.106",
+    "@oresoftware/linked-queue": "2.1.128",
     "chalk": "^2.4.2",
     "tcp-ping": "^0.1.1",
     "uuid": "^3.3.2"
@@ -42,6 +42,8 @@
     "@types/node": "^10.1.2",
     "@types/tcp-ping": "^0.1.0",
     "@types/uuid": "^3.4.3",
+    "async": "^2.6.3",
+    "handlebars": "^4.1.1",
     "typescript": "^5.9.3"
   }
 }

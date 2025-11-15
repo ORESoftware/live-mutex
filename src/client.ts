@@ -177,7 +177,7 @@ export class Client {
   unlockRequestTimeout: number;
   lockRequestTimeout: number;
   lockRetryMax: number;
-  ws: net.Socket = <any>null;
+  ws: net.Socket | null = null;
   cannotContinue = false;
   timeouts: IUuidTimeoutBool;
   resolutions: IClientResolution;
@@ -310,8 +310,8 @@ export class Client {
     this.lockRequestTimeout = weAreDebugging ? 5000000 : (opts.lockRequestTimeout || 3000);
     this.lockRetryMax = opts.lockRetryMax || opts.maxRetries || opts.retryMax || 3;
     
-    let ws: net.Socket = <any>null;
-    let connectPromise: Promise<any> = <any>null;
+    let ws: net.Socket | null = null;
+    let connectPromise: Promise<Client> | null = null;
     const self = this;
     
     this.emitter.on('warning', function () {
@@ -465,9 +465,9 @@ export class Client {
         }
       }
       
-      return connectPromise = new Promise((resolve, reject) => {
+      return connectPromise = new Promise<Client>((resolve, reject) => {
         
-        const onFirstErr = (e: any) => {
+        const onFirstErr = (e: Error) => {
           this.noRecover = true;
           const err = 'lmx client error: ' + inspectError(e);
           this.emitter.emit('warning', err);
@@ -543,7 +543,7 @@ export class Client {
             this.emitter.emit('warning', 'lmx client stream "end" event occurred.');
             recover(null);
           })
-          .on('error', (e: any) => {
+          .on('error', (e: Error) => {
             this.emitter.emit('warning', 'lmx client stream "error" event occurred: ' + inspectError(e));
             recover(e);
           })
@@ -816,10 +816,10 @@ export class Client {
     this.cleanUp(uuid);
     this.emitter.emit('warning', err.message);
     if(isNextTick){
-      process.nextTick(cb, err, <any>{});  // need to pass empty object in case the user uses an object destructure call
+      process.nextTick(cb, err, {});  // need to pass empty object in case the user uses an object destructure call
     }
     else{
-      cb(err, <any>{}); // need to pass empty object in case the user uses an object destructure call
+      cb(err, {}); // need to pass empty object in case the user uses an object destructure call
     }
   }
   
@@ -1033,7 +1033,8 @@ export class Client {
     }
     
     if (process.domain) {
-      cb = process.domain.bind(cb as any);
+      // @ts-ignore - process.domain.bind changes function signature but preserves runtime behavior
+      cb = process.domain.bind(cb);
     }
     
     this.lockInternal(key, opts, cb);
@@ -1302,7 +1303,7 @@ export class Client {
     
     opts = opts || {} ;
     opts[PromiseSymbol] = true;
-    return [key, opts as any];
+    return [key, opts];
   }
   
   protected parseUnlockOpts(
@@ -1357,7 +1358,8 @@ export class Client {
     
     if (cb && cb !== this.noop) {
       if (process.domain) {
-        cb = process.domain.bind(cb as any);
+        // @ts-ignore - process.domain.bind changes function signature but preserves runtime behavior
+        cb = process.domain.bind(cb);
       }
     }
     

@@ -9,7 +9,7 @@ import * as fs from 'fs';
 //npm
 import chalk from "chalk";
 import {createParser} from "./json-parser";
-import {LinkedQueue, LinkedQueueValue} from '@oresoftware/linked-queue';
+import {LinkedQueue, LinkedQueueValue, IsVoid} from '@oresoftware/linked-queue';
 
 
 //project
@@ -998,11 +998,14 @@ export class Broker {
     
     const self = this;
     
-    let lqValue: LinkedQueueValue<NotifyObj>;
+    let lqValue: [string | typeof IsVoid, NotifyObj] | null = null;
     let n: NotifyObj = <any>null;
     
-    while (lqValue = notifyList.dequeue()) {
-      n = lqValue.value;
+    while (lqValue = notifyList.dequeue() as any) {
+      if (IsVoid.check(lqValue[0])) {
+        break;
+      }
+      n = lqValue[1];
       if (n.ws && n.ws.writable) {
         break;
       }
@@ -1091,7 +1094,7 @@ export class Broker {
         
         if (!self.rejected[n.uuid]) {
           if (!notifyList.contains(n.uuid)) {
-            notifyList.push(n.uuid, n);
+            notifyList.enqueue(n.uuid, n);
           }
         }
         
@@ -1240,7 +1243,7 @@ export class Broker {
           
           // because of the force option, we put it to the front of the line
           lck.notify.remove(uuid);
-          lck.notify.unshift(uuid, {ws, uuid, pid, ttl, keepLocksAfterDeath});
+          lck.notify.addToFront(uuid, {ws, uuid, pid, ttl, keepLocksAfterDeath});
           
         }
         else {
@@ -1250,10 +1253,10 @@ export class Broker {
           if (!alreadyAdded) {
             
             if (retryCount > 0) {
-              lck.notify.unshift(uuid, {ws, uuid, pid, ttl, keepLocksAfterDeath});
+              lck.notify.addToFront(uuid, {ws, uuid, pid, ttl, keepLocksAfterDeath});
             }
             else {
-              lck.notify.push(uuid, {ws, uuid, pid, ttl, keepLocksAfterDeath});
+              lck.notify.enqueue(uuid, {ws, uuid, pid, ttl, keepLocksAfterDeath});
             }
           }
         }

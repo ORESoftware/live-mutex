@@ -51,7 +51,7 @@ module.exports = Object.freeze({
 
   //integers
   verbosity: 5,
-  maxParallelProcesses: Math.max(6, numOfCPUs),           //maximum parallel processes running at one time, synonymous with --concurrency cmd line option
+  maxParallelProcesses: 1,           // Run tests serially to avoid port conflicts and ensure independent brokers
   resultsCapCount: 100,               // test results will be deleted if they are 101st oldest run
   resultsCapSize: 7000, // 3 gb's     // oldest test results will be deleted if the results dir expands beyond this size
 
