@@ -1387,6 +1387,9 @@ export class Broker {
 
             // lock object with given key exists
 
+            // Update max BEFORE checking count to handle cases where max is increased
+            // Always update if a valid max is provided (allows increasing max for RW locks)
+            const oldMax = lck.max;
             if (Number.isInteger(max)) {
                 lck.max = max;
             }
@@ -1399,7 +1402,9 @@ export class Broker {
             // because readers are tracked separately and we need to check before incrementing
             // For non-read operations, use lockholders.size
             const effectiveCount = beginRead ? (lck.readers + 1) : count;
-            const effectiveMax = lck.max;
+            
+            // Use the new max if we increased it, otherwise use current max
+            const effectiveMax = Number.isInteger(max) ? max : lck.max;
 
             // Strictly enforce max lock holders - prevent race conditions
             // For read operations, check if adding this reader would exceed max
@@ -1409,9 +1414,19 @@ export class Broker {
                 // Only warn if we actually exceed the limit due to a race condition
                 // Don't warn for write locks queuing behind readers (expected behavior)
                 // Don't warn for read locks at the limit (expected when max is reached)
+                // Don't warn if we just increased max to accommodate the current count
                 // Only warn if there's a real race condition causing us to exceed the limit
+                const maxWasIncreased = Number.isInteger(max) && max > oldMax;
+                // If max was increased, check if effectiveCount is within the NEW max value
+                // Otherwise, check against the current max
+                const countWithinNewMax = maxWasIncreased && effectiveCount <= max;
                 const isWriteLockQueuing = !beginRead && lck.readers > 0 && effectiveMax === 1;
-                if (effectiveCount > effectiveMax && !isWriteLockQueuing) {
+                
+                // Only warn if:
+                // 1. Count exceeds effectiveMax, AND
+                // 2. Not a write lock queuing behind readers, AND
+                // 3. We didn't just increase max to accommodate this count
+                if (effectiveCount > effectiveMax && !isWriteLockQueuing && !countWithinNewMax) {
                     log.warn(`Semaphore limit exceeded: ${effectiveCount} ${beginRead ? 'readers (after increment)' : 'lock holders'} exceeds max of ${effectiveMax} for key "${key}"`);
                 }
 
