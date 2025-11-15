@@ -618,6 +618,22 @@ export class Broker {
     return this.emitter.once.apply(this.emitter, args);
   }
 
+  /**
+   * Attach a callback to listen for warning events and output them
+   * @param callback Function that receives warning messages/errors
+   */
+  onWarning(callback: (...args: any[]) => void): void {
+    this.emitter.on('warning', callback);
+  }
+
+  /**
+   * Attach a callback to listen for error events and output them
+   * @param callback Function that receives error messages/errors
+   */
+  onError(callback: (...args: any[]) => void): void {
+    this.emitter.on('error', callback);
+  }
+
   ping(data: any, ws: net.Socket) {
     const uuid = data.uuid;
     const timestamp = data.timestamp || Date.now();

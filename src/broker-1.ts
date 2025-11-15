@@ -1381,6 +1381,9 @@ export class Broker1 {
 
             // lock object with given key exists
 
+            // Update max BEFORE checking count to handle cases where max is increased
+            // Always update if a valid max is provided (allows increasing max for RW locks)
+            const oldMax = lck.max;
             if (Number.isInteger(max)) {
                 lck.max = max;
             }
@@ -1389,10 +1392,21 @@ export class Broker1 {
             const count = lck.lockholders.size;
 
             // Strictly enforce max lock holders - prevent race conditions
+            // Only warn if count exceeds max AND we didn't just increase max to accommodate it
             if (count >= lck.max) {
 
-                if (count > lck.max) {
-                    log.warn(`Semaphore limit exceeded: ${count} lock holders exceeds max of ${lck.max} for key "${key}"`);
+                // Only warn if this is a real violation (count > max after update)
+                // Don't warn if we just increased max to accommodate the current count
+                // This prevents false warnings when max is increased for RW locks
+                const maxWasIncreased = Number.isInteger(max) && max > oldMax;
+                const effectiveMax = Number.isInteger(max) ? max : lck.max;
+                const countWithinNewMax = maxWasIncreased && count <= effectiveMax;
+                
+                // Only warn if:
+                // 1. Count exceeds the effective max (the new max if we increased it, otherwise current max), AND
+                // 2. We didn't just increase max to a value that accommodates the current count
+                if (count > effectiveMax && !countWithinNewMax) {
+                    log.warn(`Semaphore limit exceeded: ${count} lock holders exceeds max of ${effectiveMax} for key "${key}"`);
                 }
 
                 // Lock exists *and* already has a lockholder; adding ws to list of to be notified

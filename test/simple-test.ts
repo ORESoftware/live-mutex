@@ -1,6 +1,5 @@
 
 import {Client, Broker} from '../dist/main';
-import * as async from 'async';
 import * as assert from "assert";
 import * as domain from "domain";
 
@@ -45,28 +44,28 @@ Promise.all([
   d.run(function(){
 
 
-    async.series([
-
-      function(cb){
+    const series = [
+      function(cb: (err?: any, result?: any) => void){
 
         const c = Client.create();
-        c.ensure((err, c) => {
+        c.ensure((err, client) => {
 
           if (err) {
             return cb(err);
           }
 
-          debugger;
+          if (!client) {
+            return cb(new Error('Client is undefined'));
+          }
 
-          c.lock('z', function (err, v) {
+          client.lock('z', function (err, v) {
             if (err) {
               return cb(err);
             }
             console.log('the error:', err);
             console.log('the v:', v);
             console.log('the id:', v.id);
-            c.unlock('z', v.id, function (err, v) {
-              debugger;
+            client.unlock('z', {id: v.id}, function (err, v) {
               console.log(err,v);
                 cb(err, v);
             });
@@ -74,25 +73,19 @@ Promise.all([
 
         });
       },
-      function (cb) {
-
-        debugger;
+      function (cb: (err?: any, result?: any) => void) {
 
         const c = new Client();
         c.ensure().then(function () {
 
-          debugger;
-
           c.lock('z', function (err, {id}) {
 
-            debugger;
-
             if (err) return cb(err);
-            c.unlock('z', id, cb);
+            c.unlock('z', {id}, cb);
           });
         });
       },
-      function (cb) {
+      function (cb: (err?: any, result?: any) => void) {
 
         debugger;
 
@@ -103,33 +96,40 @@ Promise.all([
 
             debugger;
             if (err) return cb(err);
-            c.unlock('z', id, cb);
+            c.unlock('z', {id}, cb);
           });
 
         });
       },
-      function (cb) {
+      function (cb: (err?: any, result?: any) => void) {
 
          Client.create().ensure().then(c => {
 
-          debugger;
-
            c.lockp('z').then(function ({unlock}) {
 
-             debugger;
+        
             if (unlock.acquired !== true) {
               return Promise.reject('acquired was not true.');
             }
 
-            debugger;
 
             unlock(cb);
           });
         });
       }
+    ];
 
+    // Execute series sequentially
+    let index = 0;
+    function runNext(err?: any, result?: any) {
+      if (err || index >= series.length) {
+        return finalCallback(err);
+      }
+      series[index++](runNext);
+    }
+    runNext();
 
-    ], (err) => {
+    function finalCallback(err: any) {
 
       debugger;
 
@@ -138,7 +138,7 @@ Promise.all([
       }
 
       console.log('all done.');
-    });
+    }
     
   });
 

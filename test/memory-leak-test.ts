@@ -234,7 +234,7 @@ async function runRWOperation(client: RWLockWritePrefClient, key: string, isWrit
                     return resolve();
                 }
                 setTimeout(() => {
-                    release((releaseErr) => {
+                    release((releaseErr: any) => {
                         resolve();
                     });
                 }, 50 + Math.random() * 100);
@@ -245,7 +245,7 @@ async function runRWOperation(client: RWLockWritePrefClient, key: string, isWrit
                     return resolve();
                 }
                 setTimeout(() => {
-                    release((releaseErr) => {
+                    release((releaseErr: any) => {
                         resolve();
                     });
                 }, 50 + Math.random() * 100);

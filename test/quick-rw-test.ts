@@ -35,7 +35,7 @@ async function quickTest() {
             console.log('Write lock acquired');
             
             setTimeout(() => {
-                release((releaseErr) => {
+                release((releaseErr: any) => {
                     if (releaseErr) {
                         console.error('Write release error:', releaseErr);
                         return reject(releaseErr);
@@ -58,7 +58,7 @@ async function quickTest() {
             console.log('Read lock acquired');
             
             setTimeout(() => {
-                release((releaseErr) => {
+                release((releaseErr: any) => {
                     if (releaseErr) {
                         console.error('Read release error:', releaseErr);
                         return reject(releaseErr);
