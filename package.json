@@ -15,7 +15,7 @@
     "lmx": "assets/lmx.sh"
   },
   "scripts": {
-    "test": "./scripts/test.sh",
+    "test2": "./scripts/test.sh",
     "postinstall": "./assets/postinstall.sh"
   },
   "r2g": {
