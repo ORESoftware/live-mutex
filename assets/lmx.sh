@@ -33,19 +33,19 @@ elif [ "$cmd" = "ls" ]; then
 
 elif [ "$cmd" = "status" ]; then
 
-  lmx_status "$@"
+  lmx-status "$@"
 
-elif [ "$cmd" = "health-check" ]; then
+elif [ "$cmd" = "test" ]; then
 
-  lmx_health_check "$@"
+  lmx-test "$@"
 
 elif [ "$cmd" = "quick-start" ]; then
 
-  lmx_quick_start "$@"
+  lmx-quick-start "$@"
 
 else
 
-  echo "lmx: no subcommand was recognized. Possible subcommands: acquire, release, inspect, launch, start, ls, status, health-check, quick-start"
+  echo "lmx: no subcommand was recognized. Possible subcommands: acquire, release, inspect, launch, start, status, test, quick-start"
   exit 1;
 
 fi

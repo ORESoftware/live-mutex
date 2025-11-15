@@ -735,7 +735,7 @@ export class Client {
     });
   }
   
-  release(key: string, opts: Partial<LMXClientUnlockOpts>): Promise<LMUnlockSuccessData> {
+  release(key: string, opts?: string | boolean | Partial<LMXClientUnlockOpts>): Promise<LMUnlockSuccessData> {
 
     return new Promise((resolve, reject) => {
       try {

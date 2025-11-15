@@ -69,6 +69,7 @@ function runTest(testFile, testNumber, totalTests) {
     let killTimeoutId = null;
     let inactivityTimeoutId = null;
     let resolved = false;
+    let completionDetected = false;
     let outputBuffer = '';
     let errorBuffer = '';
     let lastOutputTime = Date.now();
@@ -133,7 +134,6 @@ function runTest(testFile, testNumber, totalTests) {
       resetInactivityTimer(); // Reset timer on ANY stdout output
       const text = data.toString();
       outputBuffer += text;
-      resetNoOutputTimeout(); // Reset timeout on any output
       // Write to parent stdout immediately for real-time viewing
       process.stdout.write(text);
       process.stdout.flush && process.stdout.flush();
@@ -174,7 +174,6 @@ function runTest(testFile, testNumber, totalTests) {
       resetInactivityTimer(); // Reset timer on ANY stderr output
       const text = data.toString();
       errorBuffer += text;
-      resetNoOutputTimeout(); // Reset timeout on any output
       // Write to parent stderr immediately
       process.stderr.write(text);
       process.stderr.flush && process.stderr.flush();

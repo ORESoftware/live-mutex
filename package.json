@@ -12,10 +12,10 @@
     "lmx_launch_broker": "assets/cli/start-server.js",
     "lmx_start_server": "assets/cli/start-server.js",
     "lmx_ls": "assets/cli/ls.js",
-    "lmx_status": "assets/cli/status.js",
-    "lmx_health_check": "assets/cli/health-check.js",
-    "lmx_quick_start": "assets/cli/quick-start.js",
-    "lmx": "assets/lmx.sh"
+    "lmx": "assets/lmx.sh",
+    "lmx-quick-start": "assets/cli/quick-start.ts",
+    "lmx-status": "assets/cli/status.ts",
+    "lmx-test": "assets/cli/test-connection.ts"
   },
   "scripts": {
     "compile": "tsc",
