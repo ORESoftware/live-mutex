@@ -30,10 +30,11 @@ function sleep(ms: number): Promise<void> {
 
 async function testBasicRWLock(): Promise<void> {
     console.log('\n=== Test 1: Basic Read-Write Lock ===');
-    const broker = new Broker({port: 6976});
+    const port = 8000 + Math.floor(Math.random() * 1000);
+    const broker = new Broker({port});
     await broker.ensure();
     
-    const client = new RWLockWritePrefClient({port: 6976});
+    const client = new RWLockWritePrefClient({port});
     await client.ensure();
     
     const tmpFile = createTempFile();
@@ -84,12 +85,13 @@ async function testBasicRWLock(): Promise<void> {
 
 async function testConcurrentReaders(): Promise<void> {
     console.log('\n=== Test 2: Concurrent Readers ===');
-    const broker = new Broker({port: 6977});
+    const port = 8000 + Math.floor(Math.random() * 1000);
+    const broker = new Broker({port});
     await broker.ensure();
     
     const clients: RWLockWritePrefClient[] = [];
     for (let i = 0; i < 5; i++) {
-        const client = new RWLockWritePrefClient({port: 6977});
+        const client = new RWLockWritePrefClient({port});
         await client.ensure();
         clients.push(client);
     }
@@ -131,12 +133,13 @@ async function testConcurrentReaders(): Promise<void> {
 
 async function testExclusiveWriter(): Promise<void> {
     console.log('\n=== Test 3: Exclusive Writer ===');
-    const broker = new Broker({port: 6978});
+    const port = 8000 + Math.floor(Math.random() * 1000);
+    const broker = new Broker({port});
     await broker.ensure();
     
     const clients: RWLockWritePrefClient[] = [];
     for (let i = 0; i < 3; i++) {
-        const client = new RWLockWritePrefClient({port: 6978});
+        const client = new RWLockWritePrefClient({port});
         await client.ensure();
         clients.push(client);
     }
@@ -193,13 +196,14 @@ async function testExclusiveWriter(): Promise<void> {
 
 async function testReaderWriterInteraction(): Promise<void> {
     console.log('\n=== Test 4: Reader-Writer Interaction ===');
-    const broker = new Broker({port: 6979});
+    const port = 8000 + Math.floor(Math.random() * 1000);
+    const broker = new Broker({port});
     await broker.ensure();
     
-    const readerClient = new RWLockWritePrefClient({port: 6979});
+    const readerClient = new RWLockWritePrefClient({port});
     await readerClient.ensure();
     
-    const writerClient = new RWLockWritePrefClient({port: 6979});
+    const writerClient = new RWLockWritePrefClient({port});
     await writerClient.ensure();
     
     const tmpFile = createTempFile();
@@ -270,12 +274,13 @@ async function testReaderWriterInteraction(): Promise<void> {
 
 async function testSemaphoreLogic(): Promise<void> {
     console.log('\n=== Test 5: Semaphore Logic ===');
-    const broker = new Broker({port: 6980});
+    const port = 8000 + Math.floor(Math.random() * 1000);
+    const broker = new Broker({port});
     await broker.ensure();
     
     const clients: Client[] = [];
     for (let i = 0; i < 10; i++) {
-        const client = new Client({port: 6980});
+        const client = new Client({port});
         await client.ensure();
         clients.push(client);
     }
@@ -350,12 +355,13 @@ async function testSemaphoreLogic(): Promise<void> {
 
 async function testSemaphoreStress(): Promise<void> {
     console.log('\n=== Test 6: Semaphore Stress Test ===');
-    const broker = new Broker({port: 6981});
+    const port = 8000 + Math.floor(Math.random() * 1000);
+    const broker = new Broker({port});
     await broker.ensure();
     
     const clients: Client[] = [];
     for (let i = 0; i < 20; i++) {
-        const client = new Client({port: 6981});
+        const client = new Client({port});
         await client.ensure();
         clients.push(client);
     }

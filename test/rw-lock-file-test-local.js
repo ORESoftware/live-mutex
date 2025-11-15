@@ -59,9 +59,10 @@ function sleep(ms) {
 }
 async function testBasicRWLock() {
     console.log('\n=== Test 1: Basic Read-Write Lock ===');
-    const broker = new main_1.Broker({ port: 6976 });
+    const port = 8000 + Math.floor(Math.random() * 1000);
+    const broker = new main_1.Broker({ port });
     await broker.ensure();
-    const client = new main_1.RWLockWritePrefClient({ port: 6976 });
+    const client = new main_1.RWLockWritePrefClient({ port });
     await client.ensure();
     const tmpFile = createTempFile();
     console.log('Using temp file:', tmpFile);
@@ -116,11 +117,12 @@ async function testBasicRWLock() {
 }
 async function testConcurrentReaders() {
     console.log('\n=== Test 2: Concurrent Readers ===');
-    const broker = new main_1.Broker({ port: 6977 });
+    const port = 8000 + Math.floor(Math.random() * 1000);
+    const broker = new main_1.Broker({ port });
     await broker.ensure();
     const clients = [];
     for (let i = 0; i < 5; i++) {
-        const client = new main_1.RWLockWritePrefClient({ port: 6977 });
+        const client = new main_1.RWLockWritePrefClient({ port });
         await client.ensure();
         clients.push(client);
     }
@@ -165,11 +167,12 @@ async function testConcurrentReaders() {
 }
 async function testExclusiveWriter() {
     console.log('\n=== Test 3: Exclusive Writer ===');
-    const broker = new main_1.Broker({ port: 6978 });
+    const port = 8000 + Math.floor(Math.random() * 1000);
+    const broker = new main_1.Broker({ port });
     await broker.ensure();
     const clients = [];
     for (let i = 0; i < 3; i++) {
-        const client = new main_1.RWLockWritePrefClient({ port: 6978 });
+        const client = new main_1.RWLockWritePrefClient({ port });
         await client.ensure();
         clients.push(client);
     }
@@ -226,11 +229,12 @@ async function testExclusiveWriter() {
 }
 async function testReaderWriterInteraction() {
     console.log('\n=== Test 4: Reader-Writer Interaction ===');
-    const broker = new main_1.Broker({ port: 6979 });
+    const port = 8000 + Math.floor(Math.random() * 1000);
+    const broker = new main_1.Broker({ port });
     await broker.ensure();
-    const readerClient = new main_1.RWLockWritePrefClient({ port: 6979 });
+    const readerClient = new main_1.RWLockWritePrefClient({ port });
     await readerClient.ensure();
-    const writerClient = new main_1.RWLockWritePrefClient({ port: 6979 });
+    const writerClient = new main_1.RWLockWritePrefClient({ port });
     await writerClient.ensure();
     const tmpFile = createTempFile();
     writeFile(tmpFile, 100);
@@ -300,11 +304,12 @@ async function testReaderWriterInteraction() {
 }
 async function testSemaphoreLogic() {
     console.log('\n=== Test 5: Semaphore Logic ===');
-    const broker = new main_1.Broker({ port: 6980 });
+    const port = 8000 + Math.floor(Math.random() * 1000);
+    const broker = new main_1.Broker({ port });
     await broker.ensure();
     const clients = [];
     for (let i = 0; i < 10; i++) {
-        const client = new main_1.Client({ port: 6980 });
+        const client = new main_1.Client({ port });
         await client.ensure();
         clients.push(client);
     }
@@ -372,11 +377,12 @@ async function testSemaphoreLogic() {
 }
 async function testSemaphoreStress() {
     console.log('\n=== Test 6: Semaphore Stress Test ===');
-    const broker = new main_1.Broker({ port: 6981 });
+    const port = 8000 + Math.floor(Math.random() * 1000);
+    const broker = new main_1.Broker({ port });
     await broker.ensure();
     const clients = [];
     for (let i = 0; i < 20; i++) {
-        const client = new main_1.Client({ port: 6981 });
+        const client = new main_1.Client({ port });
         await client.ensure();
         clients.push(client);
     }

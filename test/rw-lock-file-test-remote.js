@@ -41,8 +41,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const os = __importStar(require("os"));
-const broker_1 = require("../dist/broker");
-const rw_write_preferred_client_1 = require("../dist/rw-write-preferred-client");
+const main_1 = require("../dist/main");
 const PORT = 4444;
 const TEST_FILE = path.join(os.tmpdir(), 'lmx-rw-test.txt');
 const LOG_FILE = path.join(os.tmpdir(), 'lmx-rw-test.log');
@@ -219,13 +218,13 @@ async function runRWLockFileTest() {
     const clients = [];
     try {
         debug('Starting broker', { port: PORT });
-        broker = new broker_1.Broker({ port: PORT });
+        broker = new main_1.Broker({ port: PORT });
         await broker.ensure();
         debug('Broker started');
         // Create clients
         debug('Creating RW lock clients', { count: 5 });
         for (let i = 0; i < 5; i++) {
-            const client = new rw_write_preferred_client_1.RWLockWritePrefClient({ port: PORT });
+            const client = new main_1.RWLockWritePrefClient({ port: PORT });
             await client.ensure();
             clients.push(client);
         }
