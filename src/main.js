@@ -1,7 +1,7 @@
 'use strict';
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.r2gSmokeTest = exports.LMXUnlockRequestError = exports.LMXLockRequestError = exports.LvMtxBroker1 = exports.LMXBroker1 = exports.Broker1 = exports.LvMtxBroker = exports.LMXBroker = exports.Broker = exports.LvMtxClient = exports.LMXClient = exports.Client = exports.RWLockWritePrefClient = exports.RWLockReadPrefClient = exports.RWLockClient = exports.lmUtils = void 0;
-var lmUtils = require("./utils");
+const lmUtils = require("./utils");
 exports.lmUtils = lmUtils;
 var rw_client_1 = require("./rw-client");
 Object.defineProperty(exports, "RWLockClient", { enumerable: true, get: function () { return rw_client_1.RWLockClient; } });
@@ -23,7 +23,7 @@ Object.defineProperty(exports, "LvMtxBroker1", { enumerable: true, get: function
 var shared_internal_1 = require("./shared-internal");
 Object.defineProperty(exports, "LMXLockRequestError", { enumerable: true, get: function () { return shared_internal_1.LMXLockRequestError; } });
 Object.defineProperty(exports, "LMXUnlockRequestError", { enumerable: true, get: function () { return shared_internal_1.LMXUnlockRequestError; } });
-var r2gSmokeTest = function () {
+const r2gSmokeTest = function () {
     return true;
 };
 exports.r2gSmokeTest = r2gSmokeTest;

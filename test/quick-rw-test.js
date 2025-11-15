@@ -14,7 +14,6 @@ async function quickTest() {
     await client.ensure();
     console.log('Client ready');
     const key = 'test-key';
-    // Simple write lock test
     console.log('Testing write lock...');
     await new Promise((resolve, reject) => {
         client.acquireWriteLock(key, {}, (err, release) => {
@@ -35,7 +34,6 @@ async function quickTest() {
             }, 100);
         });
     });
-    // Simple read lock test
     console.log('Testing read lock...');
     await new Promise((resolve, reject) => {
         client.acquireReadLock(key, {}, (err, release) => {

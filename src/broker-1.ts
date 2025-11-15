@@ -706,6 +706,14 @@ export class Broker1 {
         this.emitter.on('warning', callback);
     }
 
+    /**
+     * Attach a callback to listen for error events and output them
+     * @param callback Function that receives error messages/errors
+     */
+    onError(callback: (...args: any[]) => void): void {
+        this.emitter.on('error', callback);
+    }
+
     abruptlyDestroyConnection(ws: LMXSocket) {
         log.error('Connection will be destroyed.');
         ws.destroy();

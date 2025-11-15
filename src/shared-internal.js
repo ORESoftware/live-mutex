@@ -1,22 +1,18 @@
 'use strict';
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.RWStatus = exports.LMXUnlockRequestError = exports.LMXLockRequestError = exports.LMXClientError = exports.joinToStr = exports.inspectError = exports.forDebugging = void 0;
-var util = require("util");
+const util = require("util");
 exports.forDebugging = {
     previousTime: Date.now()
 };
-var inspectError = function (err) {
+const inspectError = (err) => {
     return typeof err === 'string' ? err : util.inspect(err, {
         showHidden: true,
         depth: 5
     });
 };
 exports.inspectError = inspectError;
-var joinToStr = function () {
-    var args = [];
-    for (var _i = 0; _i < arguments.length; _i++) {
-        args[_i] = arguments[_i];
-    }
+const joinToStr = (...args) => {
     return args.map(exports.inspectError).join(' ');
 };
 exports.joinToStr = joinToStr;

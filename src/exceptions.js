@@ -1,9 +1,9 @@
 'use strict';
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.LMXClientUnlockException = exports.LMXClientLockException = exports.LMXClientException = void 0;
-var util = require("util");
-var LMXClientException = /** @class */ (function () {
-    function LMXClientException(key, id, code, message, originalError) {
+const util = require("util");
+class LMXClientException {
+    constructor(key, id, code, message, originalError) {
         this.id = id;
         this.key = key;
         this.code = code;
@@ -14,11 +14,10 @@ var LMXClientException = /** @class */ (function () {
         this.message = message;
         this.stack = message;
     }
-    return LMXClientException;
-}());
+}
 exports.LMXClientException = LMXClientException;
-var LMXClientLockException = /** @class */ (function () {
-    function LMXClientLockException(key, id, code, message) {
+class LMXClientLockException {
+    constructor(key, id, code, message) {
         this.id = id;
         this.key = key;
         this.code = code;
@@ -28,11 +27,10 @@ var LMXClientLockException = /** @class */ (function () {
         this.message = message;
         this.stack = message;
     }
-    return LMXClientLockException;
-}());
+}
 exports.LMXClientLockException = LMXClientLockException;
-var LMXClientUnlockException = /** @class */ (function () {
-    function LMXClientUnlockException(key, id, code, message) {
+class LMXClientUnlockException {
+    constructor(key, id, code, message) {
         this.id = id;
         this.key = key;
         this.code = code;
@@ -42,6 +40,5 @@ var LMXClientUnlockException = /** @class */ (function () {
         this.message = message;
         this.stack = message;
     }
-    return LMXClientUnlockException;
-}());
+}
 exports.LMXClientUnlockException = LMXClientUnlockException;

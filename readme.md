@@ -28,7 +28,11 @@
 
 # Live-Mutex / LMX  :lock: + :unlock:
 
+<<<<<<< HEAD
 > **📖 For detailed usage guide, see [docs/readme.md](./docs/readme.md)**
+=======
+> **📖 For detailed usage instructions, see [README-2.md](./README-2.md)**
+>>>>>>> 111df4ddf6ca756705f9e905054c7873e61cc6ce
 
 ### Disclaimer
 

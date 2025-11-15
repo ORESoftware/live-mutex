@@ -1,39 +1,27 @@
 'use strict';
-var __spreadArray = (this && this.__spreadArray) || function (to, from, pack) {
-    if (pack || arguments.length === 2) for (var i = 0, l = from.length, ar; i < l; i++) {
-        if (ar || !(i in from)) {
-            if (!ar) ar = Array.prototype.slice.call(from, 0, i);
-            ar[i] = from[i];
-        }
-    }
-    return to.concat(ar || Array.prototype.slice.call(from));
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.LvMtxClient = exports.LMXClient = exports.Client = exports.validUnlockOptions = exports.validLockOptions = exports.validConstructorOptions = void 0;
-//core
-var util = require("util");
-var assert = require("assert");
-var net = require("net");
-//npm
-var UUID = require("uuid");
-var chalk_1 = require("chalk");
-//project
-var json_parser_1 = require("./json-parser");
-var cu = require("./client-utils");
-var clientPackage = require('../package.json');
+const util = require("util");
+const assert = require("assert");
+const net = require("net");
+const UUID = require("uuid");
+const chalk_1 = require("chalk");
+const json_parser_1 = require("./json-parser");
+const cu = require("./client-utils");
+const clientPackage = require('../package.json');
 if (!(clientPackage.version && typeof clientPackage.version === 'string')) {
     throw new Error('Client NPM package did not have a top-level field that is a string.');
 }
-var PromiseSymbol = Symbol('is promise method');
-var we_are_debugging_1 = require("./we-are-debugging");
-var events_1 = require("events");
-var path = require("path");
-var shared_internal_1 = require("./shared-internal");
-var exceptions_1 = require("./exceptions");
-var exceptions_2 = require("./exceptions");
-var shared_internal_2 = require("./shared-internal");
-var shared_internal_3 = require("./shared-internal");
-var client_utils_1 = require("./client-utils");
+const PromiseSymbol = Symbol('is promise method');
+const we_are_debugging_1 = require("./we-are-debugging");
+const events_1 = require("events");
+const path = require("path");
+const shared_internal_1 = require("./shared-internal");
+const exceptions_1 = require("./exceptions");
+const exceptions_2 = require("./exceptions");
+const shared_internal_2 = require("./shared-internal");
+const shared_internal_3 = require("./shared-internal");
+const client_utils_1 = require("./client-utils");
 if (we_are_debugging_1.weAreDebugging) {
     client_utils_1.log.debug('lmx client is in debug mode. Timeouts are turned off.');
 }
@@ -66,9 +54,8 @@ exports.validUnlockOptions = {
     unlockRequestTimeout: 'integer',
     keepLocksAfterDeath: 'boolean'
 };
-var Client = /** @class */ (function () {
-    function Client(o, cb) {
-        var _this = this;
+class Client {
+    constructor(o, cb) {
         this.port = 6970;
         this.host = 'localhost';
         this.connectTimeout = 3000;
@@ -81,16 +68,15 @@ var Client = /** @class */ (function () {
         this.socketFile = '';
         this.recovering = false;
         this.isOpen = false;
-        var opts = this.opts = o || {};
+        const opts = this.opts = o || {};
         assert.strict(typeof opts === 'object', 'Bad arguments to lmx client constructor - options must be an object.');
         if (cb) {
             assert.strict(typeof cb === 'function', 'optional second argument to lmx Client constructor must be a function.');
         }
-        for (var _i = 0, _a = Object.keys(opts); _i < _a.length; _i++) {
-            var key = _a[_i];
+        for (const key of Object.keys(opts)) {
             if (!exports.validConstructorOptions[key]) {
                 throw new Error('An option passed to lmx Client constructor is ' +
-                    "not a recognized option => \"".concat(key, "\", \n valid options are: ") + util.inspect(exports.validConstructorOptions));
+                    `not a recognized option => "${key}", \n valid options are: ` + util.inspect(exports.validConstructorOptions));
             }
         }
         if ('host' in opts && opts.host !== undefined) {
@@ -98,7 +84,7 @@ var Client = /** @class */ (function () {
             this.host = opts.host;
         }
         if ('port' in opts && opts.port !== undefined) {
-            assert.strict(Number.isInteger(opts.port), cu.getClientErrorMessage("the \"port\" option needs to be an integer."));
+            assert.strict(Number.isInteger(opts.port), cu.getClientErrorMessage(`the "port" option needs to be an integer.`));
             assert.strict(opts.port >= 80 && opts.port < 49152, cu.getClientErrorMessage('the "port" option needs to be an integer in the range (1025-49151).'));
             this.port = opts.port;
         }
@@ -155,26 +141,26 @@ var Client = /** @class */ (function () {
         this.unlockRequestTimeout = we_are_debugging_1.weAreDebugging ? 5000000 : (opts.unlockRequestTimeout || 8000);
         this.lockRequestTimeout = we_are_debugging_1.weAreDebugging ? 5000000 : (opts.lockRequestTimeout || 3000);
         this.lockRetryMax = opts.lockRetryMax || opts.maxRetries || opts.retryMax || 3;
-        var ws = null;
-        var connectPromise = null;
-        var self = this;
+        let ws = null;
+        let connectPromise = null;
+        const self = this;
         this.emitter.on('warning', function () {
             if (self.emitter.listenerCount('warning') < 2) {
                 client_utils_1.log.warn('No "warning" event handler(s) attached by end-user to client.emitter, therefore logging these errors from LMX library:');
-                client_utils_1.log.warn.apply(client_utils_1.log, Array.from(arguments).map(function (v) { return (typeof v === 'string' ? v : util.inspect(v)); }));
+                client_utils_1.log.warn(...Array.from(arguments).map(v => (typeof v === 'string' ? v : util.inspect(v))));
                 client_utils_1.log.warn('Add a "warning" event listener to the lmx client to get rid of this message.');
             }
         });
-        this.write = function (data, cb) {
+        this.write = (data, cb) => {
             if (!ws) {
                 throw new Error('please call ensure()/connect() on this lmx client, before using the lock/unlock methods.');
             }
             if (!ws.writable) {
-                return _this.ensure(function (err, val) {
+                return this.ensure((err, val) => {
                     if (err) {
                         throw new Error('Could not reconnect.');
                     }
-                    _this.write(data, cb);
+                    this.write(data, cb);
                 });
             }
             data.max = data.max || null;
@@ -186,86 +172,83 @@ var Client = /** @class */ (function () {
                 data.keepLocksAfterDeath = Boolean(data.keepLocksAfterDeath);
             }
             else {
-                data.keepLocksAfterDeath = _this.keepLocksAfterDeath || false;
+                data.keepLocksAfterDeath = this.keepLocksAfterDeath || false;
             }
             ws.write(JSON.stringify(data) + '\n', 'utf8', cb);
         };
-        var onData = function (data) {
-            var uuid = data.uuid;
-            var _uuid = data._uuid;
+        const onData = (data) => {
+            const uuid = data.uuid;
+            const _uuid = data._uuid;
             if (!(data && typeof data === 'object')) {
-                return _this.emitter.emit('error', 'Internal error -> data was not an object.');
+                return this.emitter.emit('error', 'Internal error -> data was not an object.');
             }
             if (data.error) {
-                _this.emitter.emit('error', data.error);
+                this.emitter.emit('error', data.error);
             }
             if (data.warning) {
-                _this.emitter.emit('warning', data.warning);
+                this.emitter.emit('warning', data.warning);
             }
             if (data.type === 'version-mismatch') {
-                _this.emitter.emit('error', data);
+                this.emitter.emit('error', data);
                 client_utils_1.log.error(data);
-                _this.cannotContinue = true;
-                _this.write({ type: 'version-mismatch-confirmed' });
-                _this._fireCallbacksPrematurely(new Error('lmx version-match:' + util.inspect(data)));
+                this.cannotContinue = true;
+                this.write({ type: 'version-mismatch-confirmed' });
+                this._fireCallbacksPrematurely(new Error('lmx version-match:' + util.inspect(data)));
                 return;
             }
             if (!uuid) {
-                return _this.emitter.emit('warning', 'Potential lmx implementation error => message did not contain uuid =>' + util.inspect(data));
+                return this.emitter.emit('warning', 'Potential lmx implementation error => message did not contain uuid =>' + util.inspect(data));
             }
-            var fn = _this.resolutions[uuid];
-            var to = _this.timeouts[uuid];
-            // Debug logging for RW lock operations
+            const fn = this.resolutions[uuid];
+            const to = this.timeouts[uuid];
             if (data.type && (data.type.includes('readers') || data.type.includes('write-flag') || data.type.includes('register'))) {
-                client_utils_1.log.debug(chalk_1.default.yellow('[CLIENT] Received RW message'), { uuid: uuid, type: data.type, key: data.key, hasFn: !!fn, hasTimeout: !!to });
+                client_utils_1.log.debug(chalk_1.default.yellow('[CLIENT] Received RW message'), { uuid, type: data.type, key: data.key, hasFn: !!fn, hasTimeout: !!to });
             }
-            delete _this.timeouts[uuid];
-            // delete self.resolutions[uuid]; // don't do this here, the same resolution fn might need to be called more than once
-            if (_this.giveups[uuid]) {
-                client_utils_1.log.debug(chalk_1.default.yellow('[CLIENT] Request was given up'), { uuid: uuid, type: data.type });
-                clearTimeout(_this.timers[uuid]);
-                delete _this.giveups[uuid];
-                delete _this.resolutions[uuid];
+            delete this.timeouts[uuid];
+            if (this.giveups[uuid]) {
+                client_utils_1.log.debug(chalk_1.default.yellow('[CLIENT] Request was given up'), { uuid, type: data.type });
+                clearTimeout(this.timers[uuid]);
+                delete this.giveups[uuid];
+                delete this.resolutions[uuid];
                 return;
             }
             if (fn && to) {
-                _this.emitter.emit('error', 'lmx implementation error - resolution function and timeout both exist.');
+                this.emitter.emit('error', 'lmx implementation error - resolution function and timeout both exist.');
             }
             if (to) {
-                client_utils_1.log.debug(chalk_1.default.yellow('[CLIENT] Request timed out'), { uuid: uuid, type: data.type });
-                _this.emitter.emit('warning', 'Client side lock/unlock request timed-out.');
+                client_utils_1.log.debug(chalk_1.default.yellow('[CLIENT] Request timed out'), { uuid, type: data.type });
+                this.emitter.emit('warning', 'Client side lock/unlock request timed-out.');
                 if (data.acquired === true && data.type === 'lock') {
-                    self.write({ uuid: uuid, _uuid: _uuid, key: data.key, type: 'lock-received-rejected' });
+                    self.write({ uuid: uuid, _uuid, key: data.key, type: 'lock-received-rejected' });
                 }
                 return;
             }
             if (fn) {
-                client_utils_1.log.debug(chalk_1.default.cyan('onData: calling resolution function for uuid:'), uuid, 'type:', data === null || data === void 0 ? void 0 : data.type);
-                fn.call(_this, data.error, data);
+                client_utils_1.log.debug(chalk_1.default.cyan('onData: calling resolution function for uuid:'), uuid, 'type:', data?.type);
+                fn.call(this, data.error, data);
                 return;
             }
-            client_utils_1.log.debug(chalk_1.default.yellow('onData: no resolution function found for uuid:'), uuid, 'type:', data === null || data === void 0 ? void 0 : data.type);
-            _this.emitter.emit('warning', 'lmx implementation warning, ' +
+            client_utils_1.log.debug(chalk_1.default.yellow('onData: no resolution function found for uuid:'), uuid, 'type:', data?.type);
+            this.emitter.emit('warning', 'lmx implementation warning, ' +
                 'no fn with that uuid in the resolutions hash => ' + util.inspect(data, { breakLength: Infinity }));
             if (data.acquired === true && data.type === 'lock') {
-                // this most likely occurs when a retry request gets sent before the previous lock request gets resolved
-                _this.emitter.emit('warning', "Rejecting lock acquisition for key => \"".concat(data.key, "\"."));
-                _this.write({
+                this.emitter.emit('warning', `Rejecting lock acquisition for key => "${data.key}".`);
+                this.write({
                     uuid: uuid,
                     key: data.key,
                     type: 'lock-received-rejected'
                 });
             }
         };
-        this.ensure = this.connect = function (cb) {
+        this.ensure = this.connect = (cb) => {
             if (cb) {
                 assert.strict(typeof cb === 'function', 'Optional argument to ensure/connect must be a function.');
                 if (process.domain) {
                     cb = process.domain.bind(cb);
                 }
             }
-            if (!_this.recovering && (connectPromise && ws && ws.writable)) { // && self.isOpen
-                return connectPromise.then(function (val) {
+            if (!this.recovering && (connectPromise && ws && ws.writable)) {
+                return connectPromise.then((val) => {
                     cb && cb.call(self, null, val);
                     return val;
                 }, function (err) {
@@ -273,7 +256,7 @@ var Client = /** @class */ (function () {
                     return Promise.reject(err);
                 });
             }
-            _this.recovering = false;
+            this.recovering = false;
             if (ws) {
                 try {
                     ws.destroy();
@@ -282,149 +265,132 @@ var Client = /** @class */ (function () {
                     ws.removeAllListeners();
                 }
             }
-            return connectPromise = new Promise(function (resolve, reject) {
-                var onFirstErr = function (e) {
-                    _this.noRecover = true;
-                    var err = 'lmx client error: ' + (0, shared_internal_3.inspectError)(e);
-                    _this.emitter.emit('warning', err);
+            return connectPromise = new Promise((resolve, reject) => {
+                const onFirstErr = (e) => {
+                    this.noRecover = true;
+                    const err = 'lmx client error: ' + (0, shared_internal_3.inspectError)(e);
+                    this.emitter.emit('warning', err);
                     reject(err);
                 };
-                var to = setTimeout(function () {
+                const to = setTimeout(function () {
                     reject('lmx client err: client connection timeout after 3000ms.');
-                }, _this.connectTimeout);
-                var cnkt = self.socketFile ? [self.socketFile] : [self.port, self.host];
+                }, this.connectTimeout);
+                const cnkt = self.socketFile ? [self.socketFile] : [self.port, self.host];
                 if (self.socketFile && opts.port) {
                     client_utils_1.log.fatal('a "port" option was provided along with "socketFile" option, please pick one.');
                 }
-                // @ts-ignore
-                ws = net.createConnection.apply(net, __spreadArray(__spreadArray([], cnkt, false), [function () {
-                        self.isOpen = true;
-                        clearTimeout(to);
-                        ws.removeListener('error', onFirstErr);
-                        _this.write({ type: 'version', value: clientPackage.version });
-                        resolve(_this);
-                    }], false));
+                ws = net.createConnection(...cnkt, () => {
+                    self.isOpen = true;
+                    clearTimeout(to);
+                    ws.removeListener('error', onFirstErr);
+                    this.write({ type: 'version', value: clientPackage.version });
+                    resolve(this);
+                });
                 if (self.noDelay) {
                     ws.setNoDelay(true);
                 }
-                var called = false;
-                var recover = function (e) {
+                let called = false;
+                const recover = (e) => {
                     if (called) {
                         return;
                     }
                     called = true;
-                    if (_this.noRecover) {
+                    if (this.noRecover) {
                         return;
                     }
-                    _this.recovering = true;
-                    e && _this.emitter.emit('warning', 'lmx client error: ' + (0, shared_internal_3.inspectError)(e));
+                    this.recovering = true;
+                    e && this.emitter.emit('warning', 'lmx client error: ' + (0, shared_internal_3.inspectError)(e));
                     if (!ws.destroyed) {
                         ws.destroy();
                         ws.removeAllListeners();
                     }
-                    for (var _i = 0, _a = Object.entries(_this.resolutions); _i < _a.length; _i++) {
-                        var _b = _a[_i], k = _b[0], v = _b[1];
-                        _this.giveups[k] = true;
-                        clearTimeout(_this.timers[k]);
+                    for (const [k, v] of Object.entries(this.resolutions)) {
+                        this.giveups[k] = true;
+                        clearTimeout(this.timers[k]);
                         v('lmx connection ended/closed. ' +
                             'A new connection will be created but all locking requests' +
                             ' in-flight should get receive errors in the callbacks.', {});
                     }
-                    // create new connection
-                    _this.ensure().then(function () {
+                    this.ensure().then(() => {
                         client_utils_1.log.debug('new connection created, via recover routine.');
                     });
                 };
                 ws.setEncoding('utf8')
                     .once('error', onFirstErr)
-                    .once('close', function () {
-                    _this.emitter.emit('warning', 'lmx client stream "close" event occurred.');
+                    .once('close', () => {
+                    this.emitter.emit('warning', 'lmx client stream "close" event occurred.');
                     recover(null);
                 })
-                    .once('end', function () {
-                    _this.emitter.emit('warning', 'lmx client stream "end" event occurred.');
+                    .once('end', () => {
+                    this.emitter.emit('warning', 'lmx client stream "end" event occurred.');
                     recover(null);
                 })
-                    .on('error', function (e) {
-                    _this.emitter.emit('warning', 'lmx client stream "error" event occurred: ' + (0, shared_internal_3.inspectError)(e));
+                    .on('error', (e) => {
+                    this.emitter.emit('warning', 'lmx client stream "error" event occurred: ' + (0, shared_internal_3.inspectError)(e));
                     recover(e);
                 })
                     .pipe((0, json_parser_1.createParser)())
                     .on('data', onData);
             })
-                // if the user passes a callback, we fire the callback here
-                .then(function (val) {
+                .then(val => {
                 cb && cb.call(self, null, val);
                 return val;
-            }, function (err) {
+            }, err => {
                 cb && cb.call(self, err);
                 return Promise.reject(err);
             });
         };
-        // Don't add process listeners per client instance to avoid memory leaks
-        // Connection cleanup is handled in close() and cleanupConnection methods
-        this.endCurrentConnection = function () {
+        this.endCurrentConnection = () => {
             return ws && ws.end();
         };
-        this.close = function () {
-            _this.noRecover = true;
-            // Clean up all timers to prevent memory leaks
-            for (var _i = 0, _a = Object.keys(_this.timers); _i < _a.length; _i++) {
-                var k = _a[_i];
-                clearTimeout(_this.timers[k]);
+        this.close = () => {
+            this.noRecover = true;
+            for (const k of Object.keys(this.timers)) {
+                clearTimeout(this.timers[k]);
             }
-            _this.timers = {};
-            // Clean up all timeouts
-            _this.timeouts = {};
-            // Clean up resolutions
-            _this.resolutions = {};
-            // Clean up giveups
-            _this.giveups = {};
-            // Remove all event listeners from emitter
-            _this.emitter.removeAllListeners();
-            // Destroy socket and remove its listeners
+            this.timers = {};
+            this.timeouts = {};
+            this.resolutions = {};
+            this.giveups = {};
+            this.emitter.removeAllListeners();
             if (ws) {
                 ws.removeAllListeners();
                 ws.destroy();
             }
             return ws;
         };
-        this.createNewConnection = function () {
+        this.createNewConnection = () => {
             return ws && ws.destroy();
         };
         this.timeouts = {};
         this.resolutions = {};
         this.giveups = {};
         this.timers = {};
-        // if the user passes a callback, we call connect here
-        // on behalf of the user
         cb && this.connect(cb);
     }
     ;
-    Client.prototype.onSocketDestroy = function (err) {
+    onSocketDestroy(err) {
         client_utils_1.log.info('Socket destroy callback error:', err);
-    };
-    Client.create = function (opts) {
+    }
+    static create(opts) {
         return new Client(opts);
-    };
-    Client.prototype.getConnectionInterface = function () {
+    }
+    getConnectionInterface() {
         return this.socketFile || this.port;
-    };
-    Client.prototype.getConnectionInterfaceStr = function () {
-        return this.socketFile ? "socket-file: ".concat(this.socketFile) : "host:port '".concat(this.getHost(), ":").concat(this.getPort(), "'");
-    };
-    Client.prototype._fireCallbacksPrematurely = function (originalErr) {
-        for (var _i = 0, _a = Object.keys(this.timers); _i < _a.length; _i++) {
-            var k = _a[_i];
+    }
+    getConnectionInterfaceStr() {
+        return this.socketFile ? `socket-file: ${this.socketFile}` : `host:port '${this.getHost()}:${this.getPort()}'`;
+    }
+    _fireCallbacksPrematurely(originalErr) {
+        for (const k of Object.keys(this.timers)) {
             clearTimeout(this.timers[k]);
         }
         this.timers = {};
-        var err = new Error('Unknown error - firing resolution callbacks prematurely.');
-        for (var _b = 0, _c = Object.keys(this.resolutions); _b < _c.length; _b++) {
-            var k = _c[_b];
-            var fn = this.resolutions[k];
+        const err = new Error('Unknown error - firing resolution callbacks prematurely.');
+        for (let k of Object.keys(this.resolutions)) {
+            const fn = this.resolutions[k];
             delete this.resolutions[k];
-            var e = {
+            const e = {
                 message: err.message,
                 stack: err.stack,
                 forcePrematureCallback: true,
@@ -432,38 +398,37 @@ var Client = /** @class */ (function () {
             };
             fn.call(this, e, e);
         }
-    };
-    Client.prototype.setNoRecover = function () {
+    }
+    setNoRecover() {
         this.noRecover = true;
-    };
-    Client.prototype.requestLockInfo = function (key, opts, cb) {
-        var _this = this;
+    }
+    requestLockInfo(key, opts, cb) {
         assert.equal(typeof key, 'string', 'Key passed to lmx#lock needs to be a string.');
         if (typeof opts === 'function') {
             cb = opts;
             opts = {};
         }
         opts = opts || {};
-        var uuid = opts._uuid || UUID.v4();
-        this.resolutions[uuid] = function (err, data) {
-            clearTimeout(_this.timers[uuid]);
-            delete _this.timeouts[uuid];
+        const uuid = opts._uuid || UUID.v4();
+        this.resolutions[uuid] = (err, data) => {
+            clearTimeout(this.timers[uuid]);
+            delete this.timeouts[uuid];
             if (err) {
-                return _this.fireCallbackWithError(cb, false, new exceptions_2.LMXClientException(key, null, shared_internal_2.LMXClientError.UnknownError, err, "Unknown error - see included \"originalError\" object.)"));
+                return this.fireCallbackWithError(cb, false, new exceptions_2.LMXClientException(key, null, shared_internal_2.LMXClientError.UnknownError, err, `Unknown error - see included "originalError" object.)`));
             }
             if (String(key) !== String(data.key)) {
-                delete _this.resolutions[uuid];
+                delete this.resolutions[uuid];
                 throw new Error('lmx implementation error => bad key.');
             }
             if (data.error) {
-                _this.emitter.emit('warning', data.error);
+                this.emitter.emit('warning', data.error);
             }
             if ([data.acquired, data.retry].filter(Boolean).length > 1) {
                 throw new Error('lmx implementation error, both "acquired" and "retry" options provided, there can be only one.');
             }
             if (data.lockInfo === true) {
-                delete _this.resolutions[uuid];
-                cb(null, { data: data });
+                delete this.resolutions[uuid];
+                cb(null, { data });
             }
         };
         this.write({
@@ -471,107 +436,103 @@ var Client = /** @class */ (function () {
             key: key,
             type: 'lock-info-request',
         });
-    };
-    Client.prototype.acquire = function (key, opts) {
-        var _this = this;
-        return new Promise(function (resolve, reject) {
-            var _a;
+    }
+    acquire(key, opts) {
+        return new Promise((resolve, reject) => {
             try {
-                _a = _this.preParseLockOptsForPromises(key, opts), key = _a[0], opts = _a[1];
+                [key, opts] = this.preParseLockOptsForPromises(key, opts);
             }
             catch (err) {
                 return reject(err);
             }
-            _this.lock(key, opts, function (err, val) {
+            this.lock(key, opts, (err, val) => {
                 err ? reject(err) : resolve(val);
             });
         });
-    };
-    Client.prototype.release = function (key, opts) {
-        var _this = this;
-        return new Promise(function (resolve, reject) {
-            var _a;
+    }
+    release(key, opts) {
+        return new Promise((resolve, reject) => {
             try {
-                _a = _this.preParseUnlockOptsForPromise(key, opts), key = _a[0], opts = _a[1];
+                [key, opts] = this.preParseUnlockOptsForPromise(key, opts);
             }
             catch (err) {
                 return reject(err);
             }
-            _this.unlock(key, opts, function (err, val) {
+            this.unlock(key, opts, (err, val) => {
                 err ? reject(err) : resolve(val);
             });
         });
-    };
-    Client.prototype.lockp = function (key, opts) {
+    }
+    lockp(key, opts) {
         client_utils_1.log.warn('lockp is deprecated because it is a confusing method name, use aliases acquire/acquireLock instead.');
         return this.acquire.apply(this, arguments);
-    };
-    Client.prototype.unlockp = function (key, opts) {
+    }
+    unlockp(key, opts) {
         client_utils_1.log.warn('unlockp is deprecated because it is a confusing method name, use aliases release/releaseLock instead.');
         return this.release.apply(this, arguments);
-    };
-    Client.prototype.acquireLock = function (key, opts) {
+    }
+    acquireLock(key, opts) {
         return this.acquire.apply(this, arguments);
-    };
-    Client.prototype.releaseLock = function (key, opts) {
+    }
+    releaseLock(key, opts) {
         return this.release.apply(this, arguments);
-    };
-    Client.prototype.run = function (fn) {
-        return new Promise(function (resolve, reject) {
-            fn(function (err, val) {
+    }
+    run(fn) {
+        return new Promise((resolve, reject) => {
+            fn((err, val) => {
                 err ? reject(err) : resolve(val);
             });
         });
-    };
-    Client.prototype.runUnlock = function (fn) {
+    }
+    runUnlock(fn) {
         return this.run.apply(this, arguments);
-    };
-    Client.prototype.execUnlock = function (fn) {
+    }
+    execUnlock(fn) {
         return this.run.apply(this, arguments);
-    };
-    Client.prototype.cleanUp = function (uuid) {
+    }
+    cleanUp(uuid) {
         clearTimeout(this.timers[uuid]);
         delete this.timers[uuid];
         delete this.timeouts[uuid];
         delete this.resolutions[uuid];
-    };
-    Client.prototype.fireUnlockCallbackWithError = function (cb, isNextTick, err) {
-        var uuid = err.id;
-        var key = err.key; // unused
+    }
+    fireUnlockCallbackWithError(cb, isNextTick, err) {
+        const uuid = err.id;
+        const key = err.key;
         this.cleanUp(uuid);
         this.emitter.emit('warning', err.message);
         if (isNextTick) {
-            process.nextTick(cb, err, {}); // need to pass empty object in case the user uses an object destructure call
+            process.nextTick(cb, err, {});
         }
         else {
-            cb(err, {}); // need to pass empty object in case the user uses an object destructure call
+            cb(err, {});
         }
-    };
-    Client.prototype.fireLockCallbackWithError = function (cb, isNextTick, err) {
-        var uuid = err.id;
-        var key = err.key; // unused
+    }
+    fireLockCallbackWithError(cb, isNextTick, err) {
+        const uuid = err.id;
+        const key = err.key;
         this.cleanUp(uuid);
         this.emitter.emit('warning', err.message);
         if (isNextTick) {
-            process.nextTick(cb, err, {}); // need to pass empty object in case the user uses an object destructure call
+            process.nextTick(cb, err, {});
         }
         else {
-            cb(err, {}); // need to pass empty object in case the user uses an object destructure call
+            cb(err, {});
         }
-    };
-    Client.prototype.fireCallbackWithError = function (cb, isNextTick, err) {
-        var uuid = err.id;
-        var key = err.key; // unused
+    }
+    fireCallbackWithError(cb, isNextTick, err) {
+        const uuid = err.id;
+        const key = err.key;
         this.cleanUp(uuid);
         this.emitter.emit('warning', err.message);
         if (isNextTick) {
-            process.nextTick(cb, err, {}); // need to pass empty object in case the user uses an object destructure call
+            process.nextTick(cb, err, {});
         }
         else {
-            cb(err, {}); // need to pass empty object in case the user uses an object destructure call
+            cb(err, {});
         }
-    };
-    Client.prototype.ls = function (opts, cb) {
+    }
+    ls(opts, cb) {
         if (typeof opts === 'function') {
             cb = opts;
             opts = {};
@@ -580,15 +541,15 @@ var Client = /** @class */ (function () {
             throw new Error('Callback needs to be a function type.');
         }
         opts = opts || {};
-        var id = UUID.v4();
+        const id = UUID.v4();
         this.resolutions[id] = cb;
         this.write({
             keepLocksAfterDeath: opts.keepLocksAfterDeath,
             uuid: id,
             type: 'ls',
         });
-    };
-    Client.prototype.preParseLockOptsForPromises = function (key, opts) {
+    }
+    preParseLockOptsForPromises(key, opts) {
         if (typeof opts === 'boolean') {
             opts = { force: opts };
         }
@@ -598,8 +559,8 @@ var Client = /** @class */ (function () {
         opts = opts || {};
         opts[PromiseSymbol] = true;
         return [key, opts];
-    };
-    Client.prototype.parseLockOpts = function (key, opts, cb) {
+    }
+    parseLockOpts(key, opts, cb) {
         if (typeof opts === 'function') {
             cb = opts;
             opts = {};
@@ -613,29 +574,28 @@ var Client = /** @class */ (function () {
         assert.strict(typeof cb === 'function', 'Please use a callback as the last argument to the lock method.');
         opts = opts || {};
         return [key, opts, cb];
-    };
-    Client.prototype._simulateVersionMismatch = function () {
+    }
+    _simulateVersionMismatch() {
         this.write({
             type: 'simulate-version-mismatch',
         });
-    };
-    Client.prototype._invokeBrokerSideEndCall = function () {
+    }
+    _invokeBrokerSideEndCall() {
         this.write({
             type: 'end-connection-from-broker-for-testing-purposes'
         });
-    };
-    Client.prototype._invokeBrokerSideDestroyCall = function () {
+    }
+    _invokeBrokerSideDestroyCall() {
         this.write({
             type: 'destroy-connection-from-broker-for-testing-purposes'
         });
-    };
-    Client.prototype._makeClientSideError = function () {
+    }
+    _makeClientSideError() {
         this.close();
-    };
-    Client.prototype.lock = function (key, opts, cb) {
-        var _a;
+    }
+    lock(key, opts, cb) {
         try {
-            _a = this.parseLockOpts(key, opts, cb), key = _a[0], opts = _a[1], cb = _a[2];
+            [key, opts, cb] = this.parseLockOpts(key, opts, cb);
         }
         catch (err) {
             if (typeof cb === 'function') {
@@ -697,7 +657,6 @@ var Client = /** @class */ (function () {
                 assert.strict(opts.ttl >= 3 && opts.ttl <= 800000, 'lmx usage error => "ttl" for a lock needs to be integer between 3 and 800000 millis.');
             }
             if (opts['ttl'] === null) {
-                // allow ttl to be stringified, null or Infinity both mean there is no ttl
                 opts['ttl'] = Infinity;
             }
             if (opts['lockRequestTimeout']) {
@@ -717,91 +676,85 @@ var Client = /** @class */ (function () {
             throw err;
         }
         if (process.domain) {
-            // @ts-ignore - process.domain.bind changes function signature but preserves runtime behavior
             cb = process.domain.bind(cb);
         }
         this.lockInternal(key, opts, cb);
-    };
-    Client.prototype.on = function () {
+    }
+    on() {
         client_utils_1.log.warn('warning:', 'use c.emitter.on() instead of c.on()');
         return this.emitter.on.apply(this.emitter, arguments);
-    };
-    Client.prototype.once = function () {
+    }
+    once() {
         client_utils_1.log.warn('warning:', 'use c.emitter.once() instead of c.once()');
         return this.emitter.once.apply(this.emitter, arguments);
-    };
-    Client.prototype.lockInternal = function (key, opts, cb) {
-        var _this = this;
-        var uuid = opts._uuid = opts._uuid || UUID.v4();
-        var ttl = opts.ttl || this.ttl;
-        var lrt = opts.lockRequestTimeout || this.lockRequestTimeout;
-        var maxRetries = opts.__maxRetries;
-        var retryCount = opts.__retryCount;
-        var forceUnlock = opts.forceUnlock === true;
-        var isNextTick = !opts[PromiseSymbol] && retryCount < 1;
+    }
+    lockInternal(key, opts, cb) {
+        const uuid = opts._uuid = opts._uuid || UUID.v4();
+        const ttl = opts.ttl || this.ttl;
+        const lrt = opts.lockRequestTimeout || this.lockRequestTimeout;
+        const maxRetries = opts.__maxRetries;
+        const retryCount = opts.__retryCount;
+        const forceUnlock = opts.forceUnlock === true;
+        const isNextTick = !opts[PromiseSymbol] && retryCount < 1;
         if (!this.isOpen) {
-            return this.fireLockCallbackWithError(cb, isNextTick, new exceptions_1.LMXClientLockException(key, uuid, shared_internal_1.LMXLockRequestError.ConnectionClosed, "Connection was closed (and/or a client connection error occurred.)"));
+            return this.fireLockCallbackWithError(cb, isNextTick, new exceptions_1.LMXClientLockException(key, uuid, shared_internal_1.LMXLockRequestError.ConnectionClosed, `Connection was closed (and/or a client connection error occurred.)`));
         }
         if (this.recovering) {
-            return this.fireLockCallbackWithError(cb, isNextTick, new exceptions_1.LMXClientLockException(key, null, shared_internal_1.LMXLockRequestError.ConnectionRecovering, "Connection is recovering - re-connection in progress."));
+            return this.fireLockCallbackWithError(cb, isNextTick, new exceptions_1.LMXClientLockException(key, null, shared_internal_1.LMXLockRequestError.ConnectionRecovering, `Connection is recovering - re-connection in progress.`));
         }
         if (this.cannotContinue) {
-            return this.fireLockCallbackWithError(cb, isNextTick, new exceptions_1.LMXClientLockException(key, null, shared_internal_1.LMXLockRequestError.CannotContinue, "'Client cannot make any lock requests, most likely due to version mismatch between client and broker.'"));
+            return this.fireLockCallbackWithError(cb, isNextTick, new exceptions_1.LMXClientLockException(key, null, shared_internal_1.LMXLockRequestError.CannotContinue, `'Client cannot make any lock requests, most likely due to version mismatch between client and broker.'`));
         }
         if (retryCount >= maxRetries) {
-            return this.fireLockCallbackWithError(cb, isNextTick, new exceptions_1.LMXClientLockException(key, uuid, shared_internal_1.LMXLockRequestError.MaxRetries, "Maximum retries (".concat(maxRetries, ") attempted to acquire lock for key \"").concat(key, "\".")));
+            return this.fireLockCallbackWithError(cb, isNextTick, new exceptions_1.LMXClientLockException(key, uuid, shared_internal_1.LMXLockRequestError.MaxRetries, `Maximum retries (${maxRetries}) attempted to acquire lock for key "${key}".`));
         }
-        var rwStatus = opts.rwStatus || null;
-        var max = opts.max;
-        var timedOut = false;
-        this.timers[uuid] = setTimeout(function () {
+        const rwStatus = opts.rwStatus || null;
+        const max = opts.max;
+        let timedOut = false;
+        this.timers[uuid] = setTimeout(() => {
             timedOut = true;
-            delete _this.timers[uuid];
-            delete _this.resolutions[uuid];
-            var currentRetryCount = opts.__retryCount;
-            var newRetryCount = ++opts.__retryCount;
-            if (!_this.isOpen) {
-                _this.timeouts[uuid] = true;
-                _this.write({ uuid: uuid, key: key, type: 'lock-client-error' });
-                return _this.fireLockCallbackWithError(cb, false, new exceptions_1.LMXClientLockException(key, uuid, shared_internal_1.LMXLockRequestError.ConnectionClosed, "Connection was closed (and/or a client connection error occurred.)"));
+            delete this.timers[uuid];
+            delete this.resolutions[uuid];
+            const currentRetryCount = opts.__retryCount;
+            const newRetryCount = ++opts.__retryCount;
+            if (!this.isOpen) {
+                this.timeouts[uuid] = true;
+                this.write({ uuid, key, type: 'lock-client-error' });
+                return this.fireLockCallbackWithError(cb, false, new exceptions_1.LMXClientLockException(key, uuid, shared_internal_1.LMXLockRequestError.ConnectionClosed, `Connection was closed (and/or a client connection error occurred.)`));
             }
-            // noRetry
             if (newRetryCount >= maxRetries) {
-                _this.timeouts[uuid] = true;
-                _this.write({ uuid: uuid, key: key, type: 'lock-client-timeout' });
-                return _this.fireLockCallbackWithError(cb, false, new exceptions_1.LMXClientLockException(key, uuid, shared_internal_1.LMXLockRequestError.RequestTimeoutError, "lmx client lock request timed out after ".concat(lrt * opts.__retryCount, " ms, ") +
-                    "".concat(currentRetryCount, " retries attempted to acquire lock for key \"").concat(key, "\".")));
+                this.timeouts[uuid] = true;
+                this.write({ uuid, key, type: 'lock-client-timeout' });
+                return this.fireLockCallbackWithError(cb, false, new exceptions_1.LMXClientLockException(key, uuid, shared_internal_1.LMXLockRequestError.RequestTimeoutError, `lmx client lock request timed out after ${lrt * opts.__retryCount} ms, ` +
+                    `${currentRetryCount} retries attempted to acquire lock for key "${key}".`));
             }
-            _this.emitter.emit('warning', "retrying lock request for key '".concat(key, "', on ").concat(_this.getConnectionInterfaceStr(), ", ") +
-                "retry attempt # ".concat(newRetryCount));
-            // this has to be called synchronously,
-            // so we can get a new resolution callback on the books
-            _this.lockInternal(key, opts, cb);
+            this.emitter.emit('warning', `retrying lock request for key '${key}', on ${this.getConnectionInterfaceStr()}, ` +
+                `retry attempt # ${newRetryCount}`);
+            this.lockInternal(key, opts, cb);
         }, lrt);
-        this.resolutions[uuid] = function (err, data) {
+        this.resolutions[uuid] = (err, data) => {
             if (timedOut) {
                 return;
             }
             if (err) {
-                return _this.fireLockCallbackWithError(cb, false, new exceptions_1.LMXClientLockException(key, uuid, shared_internal_1.LMXLockRequestError.UnknownException, 'Unknown lmx client exception: ' + util.inspect(err)));
+                return this.fireLockCallbackWithError(cb, false, new exceptions_1.LMXClientLockException(key, uuid, shared_internal_1.LMXLockRequestError.UnknownException, 'Unknown lmx client exception: ' + util.inspect(err)));
             }
             if (!data) {
-                return _this.fireLockCallbackWithError(cb, false, new exceptions_1.LMXClientLockException(key, uuid, shared_internal_1.LMXLockRequestError.InternalError, 'LMX inernal error: no data received from broker in client lock resolution callback.'));
+                return this.fireLockCallbackWithError(cb, false, new exceptions_1.LMXClientLockException(key, uuid, shared_internal_1.LMXLockRequestError.InternalError, 'LMX inernal error: no data received from broker in client lock resolution callback.'));
             }
             if (data.uuid !== uuid) {
-                return _this.fireLockCallbackWithError(cb, false, new exceptions_1.LMXClientLockException(key, uuid, shared_internal_1.LMXLockRequestError.InternalError, "Internal lmx error, mismatch in uuids => '".concat(data.uuid, "', -> '").concat(uuid, "'.")));
+                return this.fireLockCallbackWithError(cb, false, new exceptions_1.LMXClientLockException(key, uuid, shared_internal_1.LMXLockRequestError.InternalError, `Internal lmx error, mismatch in uuids => '${data.uuid}', -> '${uuid}'.`));
             }
             if (String(key) !== String(data.key)) {
-                return _this.fireLockCallbackWithError(cb, false, new exceptions_1.LMXClientLockException(key, uuid, shared_internal_1.LMXLockRequestError.InternalError, "lmx internal error: bad key, [1] => '".concat(key, "', [2] => '").concat(data.key, "'.")));
+                return this.fireLockCallbackWithError(cb, false, new exceptions_1.LMXClientLockException(key, uuid, shared_internal_1.LMXLockRequestError.InternalError, `lmx internal error: bad key, [1] => '${key}', [2] => '${data.key}'.`));
             }
             if (data.error) {
-                return _this.fireLockCallbackWithError(cb, false, new exceptions_1.LMXClientLockException(key, uuid, shared_internal_1.LMXLockRequestError.GenericLockError, data.error));
+                return this.fireLockCallbackWithError(cb, false, new exceptions_1.LMXClientLockException(key, uuid, shared_internal_1.LMXLockRequestError.GenericLockError, data.error));
             }
             if (data.acquired === true) {
-                // lock was acquired for the given key, yippee
-                _this.cleanUp(uuid);
-                _this.write({ uuid: uuid, key: key, type: 'lock-received' }); // we let the broker know that we received the lock
-                var boundUnlock = _this.unlock.bind(_this, key, { _uuid: uuid, rwStatus: rwStatus, force: forceUnlock });
+                this.cleanUp(uuid);
+                this.write({ uuid, key, type: 'lock-received' });
+                const boundUnlock = this.unlock.bind(this, key, { _uuid: uuid, rwStatus, force: forceUnlock });
                 boundUnlock.acquired = true;
                 boundUnlock.readersCount = Number.isInteger(data.readersCount) ? data.readersCount : null;
                 boundUnlock.key = key;
@@ -810,59 +763,45 @@ var Client = /** @class */ (function () {
                 return cb(null, boundUnlock);
             }
             if (data.reelection === true) {
-                _this.cleanUp(uuid);
-                return _this.lockInternal(key, opts, cb);
+                this.cleanUp(uuid);
+                return this.lockInternal(key, opts, cb);
             }
             if (data.acquired === false) {
-                // if acquired is false, we will:
-                // 1. be waiting for acquired to be true
-                // 2. if the timeout occurs before 1, we will make a new request and put our request at the front of the queue
-                // however, if wait is false, we will do neither 1 or 2
                 if (opts.wait === false) {
-                    // when wait is false, user only wants to try once,
-                    // and doesn't even want to wait until the timeout elapses.
-                    // such that even if wait === false and maxRetries === 1,
-                    // we still wouldn't wait for the timeout to elapse
-                    _this.giveups[uuid] = true;
-                    _this.fireLockCallbackWithError(cb, false, new exceptions_1.LMXClientLockException(key, uuid, shared_internal_1.LMXLockRequestError.WaitOptionSetToFalse, 'Could not acquire lock on first attempt, and "wait" option is false.'));
+                    this.giveups[uuid] = true;
+                    this.fireLockCallbackWithError(cb, false, new exceptions_1.LMXClientLockException(key, uuid, shared_internal_1.LMXLockRequestError.WaitOptionSetToFalse, 'Could not acquire lock on first attempt, and "wait" option is false.'));
                 }
                 return;
             }
-            _this.fireLockCallbackWithError(cb, false, new exceptions_1.LMXClientLockException(key, uuid, shared_internal_1.LMXLockRequestError.InternalError, "Implementation error, please report, fallthrough in condition [1]"));
+            this.fireLockCallbackWithError(cb, false, new exceptions_1.LMXClientLockException(key, uuid, shared_internal_1.LMXLockRequestError.InternalError, `Implementation error, please report, fallthrough in condition [1]`));
         };
         {
-            var keepLocksAfterDeath = Boolean(opts.keepLocksAfterDeath || opts.keepLocksOnExit);
+            let keepLocksAfterDeath = Boolean(opts.keepLocksAfterDeath || opts.keepLocksOnExit);
             this.write({
-                keepLocksAfterDeath: keepLocksAfterDeath,
-                retryCount: retryCount,
+                keepLocksAfterDeath,
+                retryCount,
                 uuid: uuid,
                 key: key,
                 type: 'lock',
                 ttl: ttl,
-                rwStatus: rwStatus,
-                max: max
+                rwStatus,
+                max
             });
         }
-    };
-    Client.prototype.noop = function (err) {
-        // this is a no-operation, obviously
-        // no ref to this, so can't use "this" here
+    }
+    noop(err) {
         err && client_utils_1.log.error(err);
-    };
-    Client.prototype.getPort = function () {
+    }
+    getPort() {
         return this.port;
-    };
-    Client.prototype.getHost = function () {
+    }
+    getHost() {
         return this.host;
-    };
-    /**
-     * Attach a callback to listen for warning events and output them
-     * @param callback Function that receives warning messages/errors
-     */
-    Client.prototype.onWarning = function (callback) {
+    }
+    onWarning(callback) {
         this.emitter.on('warning', callback);
-    };
-    Client.prototype.preParseUnlockOptsForPromise = function (key, opts) {
+    }
+    preParseUnlockOptsForPromise(key, opts) {
         if (typeof opts === 'boolean') {
             opts = { force: opts };
         }
@@ -872,8 +811,8 @@ var Client = /** @class */ (function () {
         opts = opts || {};
         opts[PromiseSymbol] = true;
         return [key, opts];
-    };
-    Client.prototype.parseUnlockOpts = function (key, opts, cb) {
+    }
+    parseUnlockOpts(key, opts, cb) {
         if (typeof opts === 'function') {
             cb = opts;
             opts = {};
@@ -892,12 +831,10 @@ var Client = /** @class */ (function () {
             cb = this.noop;
         }
         return [key, opts, cb];
-    };
-    Client.prototype.unlock = function (key, opts, cb) {
-        var _a;
-        var _this = this;
+    }
+    unlock(key, opts, cb) {
         try {
-            _a = this.parseUnlockOpts(key, opts, cb), key = _a[0], opts = _a[1], cb = _a[2];
+            [key, opts, cb] = this.parseUnlockOpts(key, opts, cb);
         }
         catch (err) {
             if (typeof cb === 'function') {
@@ -911,7 +848,6 @@ var Client = /** @class */ (function () {
         }
         if (cb && cb !== this.noop) {
             if (process.domain) {
-                // @ts-ignore - process.domain.bind changes function signature but preserves runtime behavior
                 cb = process.domain.bind(cb);
             }
         }
@@ -930,84 +866,76 @@ var Client = /** @class */ (function () {
         catch (err) {
             return process.nextTick(cb, err, {});
         }
-        var uuid = UUID.v4();
-        var rwStatus = opts.rwStatus || null;
-        var urt = opts.unlockRequestTimeout || this.unlockRequestTimeout;
-        var timedOut = false;
-        this.timers[uuid] = setTimeout(function () {
+        const uuid = UUID.v4();
+        const rwStatus = opts.rwStatus || null;
+        const urt = opts.unlockRequestTimeout || this.unlockRequestTimeout;
+        let timedOut = false;
+        this.timers[uuid] = setTimeout(() => {
             timedOut = true;
-            _this.timeouts[uuid] = true;
-            _this.fireUnlockCallbackWithError(cb, false, new exceptions_1.LMXClientUnlockException(key, uuid, shared_internal_1.LMXUnlockRequestError.BadOrMismatchedId, " LMX Unlock request to unlock key => \"".concat(key, "\" timed out.")));
+            this.timeouts[uuid] = true;
+            this.fireUnlockCallbackWithError(cb, false, new exceptions_1.LMXClientUnlockException(key, uuid, shared_internal_1.LMXUnlockRequestError.BadOrMismatchedId, ` LMX Unlock request to unlock key => "${key}" timed out.`));
         }, urt);
-        this.resolutions[uuid] = function (err, data) {
-            client_utils_1.log.debug(chalk_1.default.cyan('unlock resolution called for key:'), key, 'uuid:', uuid, 'err:', err, 'data type:', data === null || data === void 0 ? void 0 : data.type, 'unlocked:', data === null || data === void 0 ? void 0 : data.unlocked);
-            delete _this.timeouts[uuid];
-            clearTimeout(_this.timers[uuid]);
+        this.resolutions[uuid] = (err, data) => {
+            client_utils_1.log.debug(chalk_1.default.cyan('unlock resolution called for key:'), key, 'uuid:', uuid, 'err:', err, 'data type:', data?.type, 'unlocked:', data?.unlocked);
+            delete this.timeouts[uuid];
+            clearTimeout(this.timers[uuid]);
             if (timedOut) {
                 client_utils_1.log.debug(chalk_1.default.cyan('unlock resolution: already timed out for key:'), key, 'uuid:', uuid);
                 return;
             }
             if (err) {
                 client_utils_1.log.debug(chalk_1.default.cyan('unlock resolution: error for key:'), key, 'uuid:', uuid, 'err:', err);
-                return _this.fireUnlockCallbackWithError(cb, false, new exceptions_1.LMXClientUnlockException(key, uuid, shared_internal_1.LMXUnlockRequestError.InternalError, 'LMX unknown/internal error: ' + util.inspect(err, { breakLength: Infinity })));
+                return this.fireUnlockCallbackWithError(cb, false, new exceptions_1.LMXClientUnlockException(key, uuid, shared_internal_1.LMXUnlockRequestError.InternalError, 'LMX unknown/internal error: ' + util.inspect(err, { breakLength: Infinity })));
             }
             if (!data) {
                 client_utils_1.log.debug(chalk_1.default.cyan('unlock resolution: missing data for key:'), key, 'uuid:', uuid);
-                return _this.fireUnlockCallbackWithError(cb, false, new exceptions_1.LMXClientUnlockException(key, uuid, shared_internal_1.LMXUnlockRequestError.InternalError, "lmx internal error: missing data in unlock resolution."));
+                return this.fireUnlockCallbackWithError(cb, false, new exceptions_1.LMXClientUnlockException(key, uuid, shared_internal_1.LMXUnlockRequestError.InternalError, `lmx internal error: missing data in unlock resolution.`));
             }
             if (String(key) !== String(data.key)) {
                 client_utils_1.log.debug(chalk_1.default.cyan('unlock resolution: key mismatch for key:'), key, 'uuid:', uuid, 'data.key:', data.key);
-                return _this.fireUnlockCallbackWithError(cb, false, new exceptions_1.LMXClientUnlockException(key, uuid, shared_internal_1.LMXUnlockRequestError.InternalError, "lmx implementation error, bad key => first key: ".concat(key, ", second key: ").concat(data.key)));
+                return this.fireUnlockCallbackWithError(cb, false, new exceptions_1.LMXClientUnlockException(key, uuid, shared_internal_1.LMXUnlockRequestError.InternalError, `lmx implementation error, bad key => first key: ${key}, second key: ${data.key}`));
             }
             if (data.error) {
                 client_utils_1.log.debug(chalk_1.default.cyan('unlock resolution: data.error for key:'), key, 'uuid:', uuid, 'error:', data.error);
-                return _this.fireUnlockCallbackWithError(cb, false, new exceptions_1.LMXClientUnlockException(key, uuid, shared_internal_1.LMXUnlockRequestError.GeneralUnlockError, 'lmx request error: ' + data.error));
+                return this.fireUnlockCallbackWithError(cb, false, new exceptions_1.LMXClientUnlockException(key, uuid, shared_internal_1.LMXUnlockRequestError.GeneralUnlockError, 'lmx request error: ' + data.error));
             }
             if (data.unlocked === true) {
                 client_utils_1.log.debug(chalk_1.default.cyan('unlock resolution: unlocked=true, calling cb for key:'), key, 'uuid:', uuid);
-                _this.cleanUp(uuid);
-                // this.write({
-                //   uuid: uuid,
-                //   key: key,
-                //   type: 'unlock-received'
-                // });
-                return cb(null, { id: uuid, key: key, unlocked: true });
+                this.cleanUp(uuid);
+                return cb(null, { id: uuid, key, unlocked: true });
             }
             if (data.unlocked === false) {
-                // data.error will most likely be defined as well
-                // so this may never get hit
-                return _this.fireUnlockCallbackWithError(cb, false, new exceptions_1.LMXClientUnlockException(key, uuid, shared_internal_1.LMXUnlockRequestError.GeneralUnlockError, data));
+                return this.fireUnlockCallbackWithError(cb, false, new exceptions_1.LMXClientUnlockException(key, uuid, shared_internal_1.LMXUnlockRequestError.GeneralUnlockError, data));
             }
-            _this.fireUnlockCallbackWithError(cb, false, new exceptions_1.LMXClientUnlockException(key, uuid, shared_internal_1.LMXUnlockRequestError.GeneralUnlockError, 'lmx internal/implementation error: fallthrough in unlock resolution routine.'));
+            this.fireUnlockCallbackWithError(cb, false, new exceptions_1.LMXClientUnlockException(key, uuid, shared_internal_1.LMXUnlockRequestError.GeneralUnlockError, 'lmx internal/implementation error: fallthrough in unlock resolution routine.'));
         };
-        var force = (opts.__retryCount > 0) || Boolean(opts.force);
+        let force = (opts.__retryCount > 0) || Boolean(opts.force);
         client_utils_1.log.debug(chalk_1.default.cyan('unlock: sending unlock request for key:'), key, 'uuid:', uuid, '_uuid:', opts._uuid, 'force:', force);
         this.write({
             _uuid: opts._uuid,
             uuid: uuid,
             key: key,
-            rwStatus: rwStatus,
+            rwStatus,
             force: force,
             type: 'unlock'
         });
         client_utils_1.log.debug(chalk_1.default.cyan('unlock: unlock request sent for key:'), key, 'uuid:', uuid);
-    };
-    Client.prototype.ping = function (cb) {
-        var _this = this;
+    }
+    ping(cb) {
         if (cb && typeof cb !== 'function') {
             throw new Error('Optional callback must be a function.');
         }
-        return new Promise(function (resolve, reject) {
-            if (!_this.isOpen) {
+        return new Promise((resolve, reject) => {
+            if (!this.isOpen) {
                 reject(new Error('Connection is not open. Call ensure() or connect() first.'));
                 return;
             }
-            var uuid = UUID.v4();
-            var clientTimestamp = Date.now();
-            _this.resolutions[uuid] = function (err, data) {
-                delete _this.resolutions[uuid];
+            const uuid = UUID.v4();
+            const clientTimestamp = Date.now();
+            this.resolutions[uuid] = (err, data) => {
+                delete this.resolutions[uuid];
                 if (err) {
-                    return reject(new Error("Ping error: ".concat(util.inspect(err))));
+                    return reject(new Error(`Ping error: ${util.inspect(err)}`));
                 }
                 if (!data || data.type !== 'pong') {
                     return reject(new Error('Invalid ping response from server'));
@@ -1018,67 +946,63 @@ var Client = /** @class */ (function () {
                     timestamp: data.timestamp
                 });
             };
-            _this.write({
+            this.write({
                 uuid: uuid,
                 type: 'ping',
                 timestamp: clientTimestamp
             });
         })
-            .then(function (val) {
+            .then(val => {
             cb && cb(null, val);
             return val;
-        }).catch(function (err) {
+        }).catch(err => {
             cb && cb(err);
             return Promise.reject(err);
         });
-    };
-    Client.prototype.getSystemStats = function (cb) {
-        var _this = this;
+    }
+    getSystemStats(cb) {
         if (cb && typeof cb !== 'function') {
             throw new Error('Optional callback must be a function.');
         }
-        return new Promise(function (resolve, reject) {
-            if (!_this.isOpen) {
+        return new Promise((resolve, reject) => {
+            if (!this.isOpen) {
                 return reject(new Error('Connection is not open. Call ensure() or connect() first.'));
             }
-            var uuid = UUID.v4();
-            _this.resolutions[uuid] = function (err, data) {
-                delete _this.resolutions[uuid];
+            const uuid = UUID.v4();
+            this.resolutions[uuid] = (err, data) => {
+                delete this.resolutions[uuid];
                 if (err) {
-                    return reject(new Error("System stats error: ".concat(util.inspect(err))));
+                    return reject(new Error(`System stats error: ${util.inspect(err)}`));
                 }
                 if (!data || data.type !== 'system-stats-response') {
                     return reject(new Error('Invalid system stats response from server'));
                 }
-                // Add client-side stats too
-                var clientStats = {
+                const clientStats = {
                     clientMemoryUsage: process.memoryUsage(),
                     clientUptime: process.uptime(),
                     clientPid: process.pid
                 };
-                var result = {
+                const result = {
                     broker: data.stats,
                     client: clientStats,
                     receivedAt: Date.now()
                 };
                 resolve(result);
             };
-            _this.write({
+            this.write({
                 uuid: uuid,
                 type: 'system-stats-request'
             });
-        }).then(function (val) {
+        }).then(val => {
             cb && cb(null, val);
             return val;
-        }).catch(function (err) {
+        }).catch(err => {
             cb && cb(err);
             return Promise.reject(err);
         });
-    };
-    return Client;
-}());
+    }
+}
 exports.Client = Client;
-// aliases
 exports.default = Client;
 exports.LMXClient = Client;
 exports.LvMtxClient = Client;

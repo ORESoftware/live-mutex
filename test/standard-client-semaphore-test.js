@@ -1,13 +1,6 @@
 #!/usr/bin/env node
 'use strict';
 Object.defineProperty(exports, "__esModule", { value: true });
-/**
- * Test Standard Client Semaphore Functionality
- * Tests that the standard Client (not RW client) properly handles semaphores
- * - Default max should be 1 (only one lockholder at a time)
- * - With max: 3, should allow 3 concurrent lockholders
- * - With max: 10, should allow 10 concurrent lockholders
- */
 const main_1 = require("../dist/main");
 const PORT = 3333;
 function log(message, data) {
@@ -24,8 +17,6 @@ async function test1_DefaultMaxIsOne(broker, clients) {
         let concurrentHolders = 0;
         let maxConcurrent = 0;
         const acquired = [];
-        // Have 5 clients try to acquire the same lock simultaneously
-        // With default max=1, only one should hold at a time
         const promises = clients.slice(0, 5).map((client, index) => new Promise((resolve) => {
             client.lock(key, {}, (err, unlock) => {
                 if (err) {
@@ -37,7 +28,6 @@ async function test1_DefaultMaxIsOne(broker, clients) {
                 maxConcurrent = Math.max(maxConcurrent, concurrentHolders);
                 acquired[index] = true;
                 log(`Client ${index} acquired lock (concurrent: ${concurrentHolders})`);
-                // Hold for a bit
                 setTimeout(() => {
                     concurrentHolders--;
                     unlock((unlockErr) => {
@@ -81,7 +71,6 @@ async function test2_SemaphoreMaxThree(broker, clients) {
         let concurrentHolders = 0;
         let maxConcurrent = 0;
         let completedCount = 0;
-        // Have 10 clients try to acquire the same semaphore lock
         const promises = clients.slice(0, 10).map((client, index) => new Promise((resolve) => {
             client.lock(key, { max: MAX_HOLDERS }, (err, unlock) => {
                 if (err) {
@@ -94,7 +83,6 @@ async function test2_SemaphoreMaxThree(broker, clients) {
                     log(`⚠️  Too many concurrent holders: ${concurrentHolders} > ${MAX_HOLDERS}`);
                 }
                 log(`Client ${index} acquired (concurrent: ${concurrentHolders}, max: ${maxConcurrent})`);
-                // Hold for a bit
                 setTimeout(() => {
                     concurrentHolders--;
                     completedCount++;
@@ -146,7 +134,6 @@ async function test3_SemaphoreMaxTen(broker, clients) {
         let concurrentHolders = 0;
         let maxConcurrent = 0;
         let completedCount = 0;
-        // Have 20 clients try to acquire the same semaphore lock
         const promises = clients.slice(0, 20).map((client, index) => new Promise((resolve) => {
             client.lock(key, { max: MAX_HOLDERS }, (err, unlock) => {
                 if (err) {
@@ -156,7 +143,6 @@ async function test3_SemaphoreMaxTen(broker, clients) {
                 concurrentHolders++;
                 maxConcurrent = Math.max(maxConcurrent, concurrentHolders);
                 log(`Client ${index} acquired (concurrent: ${concurrentHolders}, max: ${maxConcurrent})`);
-                // Hold for a bit
                 setTimeout(() => {
                     concurrentHolders--;
                     completedCount++;
@@ -206,7 +192,6 @@ async function runTests() {
     const clients = [];
     const results = [];
     try {
-        // Setup
         log('Starting broker', { port: PORT });
         broker = new main_1.Broker1({ port: PORT });
         await broker.ensure();
@@ -216,14 +201,12 @@ async function runTests() {
             await client.ensure();
             clients.push(client);
         }
-        // Run tests
         results.push(await test1_DefaultMaxIsOne(broker, clients));
         await delay(300);
         results.push(await test2_SemaphoreMaxThree(broker, clients));
         await delay(300);
         results.push(await test3_SemaphoreMaxTen(broker, clients));
         await delay(300);
-        // Summary
         console.log('\n=== Test Summary ===');
         const passed = results.filter(r => r.passed).length;
         const failed = results.filter(r => !r.passed);
@@ -247,14 +230,12 @@ async function runTests() {
         throw err;
     }
     finally {
-        // Cleanup
         log('Cleaning up...');
         for (const client of clients) {
             try {
                 client.close();
             }
             catch (e) {
-                // ignore
             }
         }
         if (broker) {

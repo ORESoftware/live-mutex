@@ -18,9 +18,16 @@
     "lmx-test": "assets/cli/test-connection.ts"
   },
   "scripts": {
+<<<<<<< HEAD
     "compile": "npx tsc",
     "compile:watch": "npx tsc --watch",
     "compile:tests": "npx tsc --noEmit --skipLibCheck test/**/*.ts assets/cli/*.ts",
+=======
+    "compile": "tsc",
+    "compile:test": "tsc --project tsconfig.test.json",
+    "compile:all": "npm run compile && npm run compile:test",
+    "compile:check": "tsc --noEmit",
+>>>>>>> 111df4ddf6ca756705f9e905054c7873e61cc6ce
     "test": "node scripts/run-tests.js",
     "test:old": "./scripts/test.sh",
     "postinstall": "./assets/postinstall.sh"

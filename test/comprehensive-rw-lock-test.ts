@@ -175,6 +175,7 @@ async function test3_SequentialWrites(broker: Broker1, clients: RWLockWritePrefC
                         release((releaseErr: any) => {
                             if (releaseErr) {
                                 return reject(releaseErr);
+                            }
                             resolve();
                         });
                     }, 50);
