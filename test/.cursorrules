@@ -1,0 +1,16 @@
+# Cursor Rules for Test Directory
+
+## Test Files
+
+- **ALWAYS use .ts (TypeScript) files for test scripts, NOT .js files**
+- When creating or modifying tests, use TypeScript (.ts) files
+- Prefer TypeScript for all new test files
+- Only use .js files if absolutely necessary for compatibility
+
+## Test Structure
+
+- Tests should run serially with independent brokers on unique ports
+- Each test should be isolated and not depend on other tests
+- Test timeouts should be handled gracefully
+- Use `LMX_TEST_PORT` environment variable for port assignment
+

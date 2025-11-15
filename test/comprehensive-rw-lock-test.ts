@@ -17,7 +17,7 @@ import * as os from 'os';
 import { Broker1 } from '../dist/broker-1';
 import { RWLockWritePrefClient } from '../dist/rw-write-preferred-client';
 
-const PORT = 3333;
+const PORT = process.env.LMX_TEST_PORT ? parseInt(process.env.LMX_TEST_PORT) : 3333;
 const TEST_FILE = path.join(os.tmpdir(), 'lmx-rw-comprehensive-test.txt');
 
 interface TestResult {
@@ -62,7 +62,7 @@ async function test1_ConcurrentReaders(broker: Broker1, clients: RWLockWritePref
         writeFile('TEST1');
         const key = 'test1-key';
         
-        const readers = [];
+        const readers: Promise<void>[] = [];
         for (let i = 0; i < 5; i++) {
             readers.push(
                 new Promise<void>((resolve, reject) => {
@@ -173,7 +173,8 @@ async function test3_SequentialWrites(broker: Broker1, clients: RWLockWritePrefC
                     log(`Write ${i}: ${before} -> ${after}`);
                     setTimeout(() => {
                         release((releaseErr: any) => {
-                            if (releaseErr) return reject(releaseErr);
+                            if (releaseErr) {
+                                return reject(releaseErr);
                             resolve();
                         });
                     }, 50);
@@ -202,15 +203,23 @@ async function test4_WritePreference(broker: Broker1, clients: RWLockWritePrefCl
         const order: string[] = [];
         
         // Start multiple readers
-        const readers = [];
+        const readers: Promise<void>[] = [];
         for (let i = 0; i < 3; i++) {
             readers.push(
-                new Promise<void>((resolve) => {
+                new Promise<void>((resolve, reject) => {
                     clients[i].acquireReadLock(key, {}, (err: any, release: any) => {
                         if (!err) {
                             order.push(`R${i}`);
                             setTimeout(() => {
-                                release(() => resolve());
+                                release((err: any) => {
+                                    if (err) {
+                                        // Handle release error if needed
+                                        console.warn('Release error:', err);
+                                        reject(err);
+                                        return;
+                                    }
+                                    resolve();
+                                });
                             }, 100);
                         } else {
                             resolve();
@@ -226,7 +235,7 @@ async function test4_WritePreference(broker: Broker1, clients: RWLockWritePrefCl
                 if (!err) {
                     order.push('W');
                     setTimeout(() => {
-                        release(() => {});
+                        release((err: any) => {});
                     }, 50);
                 }
             });
@@ -298,7 +307,12 @@ async function test5_StressTest(broker: Broker1, clients: RWLockWritePrefClient[
                                 if (!err) {
                                     const val = readFile();
                                     setTimeout(() => {
-                                        release(() => resolve());
+                                        release((err: any) => {
+                                            if (err) {
+                                                // Handle release error if needed
+                                            }
+                                            resolve();
+                                        });
                                     }, 20);
                                 } else {
                                     resolve();

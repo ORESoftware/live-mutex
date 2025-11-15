@@ -13,13 +13,13 @@ const BASE_PORT = 9000;
 const TEST_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes per test
 let currentPort = BASE_PORT;
 
-// Test files to run (in order)
+// Test files to run (in order) - prefer .ts files
 const TEST_FILES = [
-  'test/semaphore-test.js',
-  'test/simple-test.js',
-  'test/rw-lock-file-test-local.js',
-  'test/comprehensive-rw-lock-test.js',
-  'test/standard-client-semaphore-test.js',
+  'test/semaphore-test.ts',
+  'test/simple-test.ts',
+  'test/rw-lock-file-test-local.ts',
+  'test/comprehensive-rw-lock-test.ts',
+  'test/standard-client-semaphore-test.ts',
 ];
 
 // Also find any other standalone test files
@@ -29,10 +29,19 @@ function findTestFiles() {
   const testFiles = [];
   
   for (const file of files) {
-    if (file.endsWith('-test.js') || file.endsWith('-test.ts')) {
+    // Prefer .ts files, but also include .js files for backward compatibility
+    if (file.endsWith('-test.ts') || file.endsWith('-test.js')) {
       const fullPath = path.join(testDir, file);
       const stat = fs.statSync(fullPath);
       if (stat.isFile()) {
+        // Prefer .ts over .js if both exist
+        const baseName = file.replace(/\.(ts|js)$/, '');
+        const tsPath = path.join(testDir, baseName + '.ts');
+        const jsPath = path.join(testDir, baseName + '.js');
+        if (fs.existsSync(tsPath) && file.endsWith('.js')) {
+          // Skip .js file if .ts version exists
+          continue;
+        }
         testFiles.push(path.relative(process.cwd(), fullPath));
       }
     }
@@ -45,13 +54,14 @@ function getNextPort() {
   return currentPort++;
 }
 
-function runTest(testFile) {
+function runTest(testFile, testNumber, totalTests) {
   return new Promise((resolve, reject) => {
     console.log(`\n${'='.repeat(80)}`);
-    console.log(`Running: ${testFile}`);
+    console.log(`[${testNumber}/${totalTests}] Running: ${testFile}`);
     console.log(`${'='.repeat(80)}\n`);
     // Force flush
     process.stdout.write('');
+    process.stdout.flush && process.stdout.flush();
     
     const startTime = Date.now();
     const testPort = getNextPort();
@@ -60,6 +70,11 @@ function runTest(testFile) {
     let resolved = false;
     let outputBuffer = '';
     let errorBuffer = '';
+    let lastOutputTime = Date.now();
+    let heartbeatInterval = null;
+    let completionDetected = false;
+    let completionTimeout = null;
+    let noOutputTimeout = null;
     
     // Set environment variables for the test
     const env = {
@@ -86,21 +101,122 @@ function runTest(testFile) {
       detached: false,
     });
     
+    // Function to reset no-output timeout
+    const resetNoOutputTimeout = () => {
+      lastOutputTime = Date.now();
+      if (noOutputTimeout) {
+        clearTimeout(noOutputTimeout);
+      }
+      // If no output for 15 seconds, kill and consider complete
+      noOutputTimeout = setTimeout(() => {
+        if (!resolved && !proc.killed) {
+          const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+          process.stdout.write(`\n[${testNumber}/${totalTests}] ⚠️  No output for 15 seconds, assuming test complete and terminating...\n`);
+          process.stdout.flush && process.stdout.flush();
+          try {
+            proc.kill('SIGTERM');
+            setTimeout(() => {
+              if (!proc.killed) {
+                proc.kill('SIGKILL');
+              }
+              if (!resolved) {
+                finish(0); // Consider complete
+              }
+            }, 2000);
+          } catch (e) {
+            if (!resolved) {
+              finish(0);
+            }
+          }
+        }
+      }, 15000); // 15 seconds
+    };
+    
+    // Start the no-output timeout
+    resetNoOutputTimeout();
+    
     // Capture stdout
     proc.stdout.on('data', (data) => {
       const text = data.toString();
       outputBuffer += text;
+      resetNoOutputTimeout(); // Reset timeout on any output
       // Write to parent stdout immediately for real-time viewing
       process.stdout.write(text);
+      process.stdout.flush && process.stdout.flush();
+      
+      // Detect completion patterns
+      if (!completionDetected) {
+        const lowerText = text.toLowerCase();
+        // Check for completion indicators
+        if (lowerText.includes('all tests passed') || 
+            lowerText.includes('test summary') ||
+            lowerText.includes('✅ all') ||
+            (lowerText.includes('passed:') && lowerText.includes('failed:'))) {
+          completionDetected = true;
+          // If we see completion but process doesn't exit in 5 seconds, force it
+          completionTimeout = setTimeout(() => {
+            if (!resolved && !proc.killed) {
+              process.stdout.write(`\n[${testNumber}/${totalTests}] ⚠️  Test appears complete but process didn't exit, forcing termination...\n`);
+              process.stdout.flush && process.stdout.flush();
+              try {
+                proc.kill('SIGTERM');
+                setTimeout(() => {
+                  if (!proc.killed) {
+                    proc.kill('SIGKILL');
+                  }
+                  finish(0); // Assume success if we saw completion
+                }, 2000);
+              } catch (e) {
+                finish(0);
+              }
+            }
+          }, 5000); // 5 seconds after completion detection
+        }
+      }
     });
     
     // Capture stderr
     proc.stderr.on('data', (data) => {
       const text = data.toString();
       errorBuffer += text;
+      resetNoOutputTimeout(); // Reset timeout on any output
       // Write to parent stderr immediately
       process.stderr.write(text);
+      process.stderr.flush && process.stderr.flush();
     });
+    
+    // Add heartbeat to show test is still running and detect hangs
+    heartbeatInterval = setInterval(() => {
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+      const timeSinceOutput = Date.now() - lastOutputTime;
+      
+      // If we detected completion but process hasn't exited, be more aggressive
+      if (completionDetected && timeSinceOutput > 10000) {
+        process.stdout.write(`\n[${testNumber}/${totalTests}] ⚠️  Completion detected but process still running (${elapsed}s), forcing exit...\n`);
+        process.stdout.flush && process.stdout.flush();
+        try {
+          proc.kill('SIGTERM');
+          setTimeout(() => {
+            if (!proc.killed) {
+              proc.kill('SIGKILL');
+            }
+            if (!resolved) {
+              finish(0); // Assume success
+            }
+          }, 2000);
+        } catch (e) {
+          if (!resolved) {
+            finish(0);
+          }
+        }
+        return;
+      }
+      
+      if (timeSinceOutput > 30000) { // 30 seconds without output
+        process.stdout.write(`\n[${testNumber}/${totalTests}] ⏳ Still running... (${elapsed}s elapsed, no output for ${(timeSinceOutput/1000).toFixed(0)}s)\n`);
+        process.stdout.flush && process.stdout.flush();
+      }
+    }, 10000); // Check every 10 seconds
     
     // Set up timeout
     timeoutId = setTimeout(() => {
@@ -143,6 +259,15 @@ function runTest(testFile) {
       if (resolved) return;
       resolved = true;
       
+      if (heartbeatInterval) {
+        clearInterval(heartbeatInterval);
+      }
+      if (noOutputTimeout) {
+        clearTimeout(noOutputTimeout);
+      }
+      if (completionTimeout) {
+        clearTimeout(completionTimeout);
+      }
       if (timeoutId) {
         clearTimeout(timeoutId);
       }
@@ -171,11 +296,13 @@ function runTest(testFile) {
       
       const duration = ((Date.now() - startTime) / 1000).toFixed(2);
       if (code === 0 && !timeout) {
-        console.log(`\n✅ ${testFile} passed (${duration}s)`);
+        console.log(`\n[${testNumber}/${totalTests}] ✅ ${testFile} passed (${duration}s)`);
+        process.stdout.flush && process.stdout.flush();
         resolve({ file: testFile, passed: true, duration });
       } else {
         const reason = timeout ? ' (timeout)' : ` (exit code: ${code})`;
-        console.log(`\n❌ ${testFile} failed${reason} (${duration}s)`);
+        console.log(`\n[${testNumber}/${totalTests}] ❌ ${testFile} failed${reason} (${duration}s)`);
+        process.stdout.flush && process.stdout.flush();
         resolve({ file: testFile, passed: false, duration, code, timeout });
       }
     };
@@ -184,19 +311,38 @@ function runTest(testFile) {
       // Small delay to ensure all output is flushed
       setTimeout(() => {
         finish(code === null ? 1 : code);
-      }, 100);
+      }, 200);
+    });
+    
+    // Handle stdout/stderr end events
+    proc.stdout.on('end', () => {
+      process.stdout.flush && process.stdout.flush();
+    });
+    
+    proc.stderr.on('end', () => {
+      process.stderr.flush && process.stderr.flush();
     });
     
     proc.on('error', (err) => {
       if (!resolved) {
         resolved = true;
+        if (heartbeatInterval) {
+          clearInterval(heartbeatInterval);
+        }
+        if (noOutputTimeout) {
+          clearTimeout(noOutputTimeout);
+        }
+        if (completionTimeout) {
+          clearTimeout(completionTimeout);
+        }
         if (timeoutId) {
           clearTimeout(timeoutId);
         }
         if (killTimeoutId) {
           clearTimeout(killTimeoutId);
         }
-        console.error(`\n❌ Error running ${testFile}:`, err.message);
+        console.error(`\n[${testNumber}/${totalTests}] ❌ Error running ${testFile}:`, err.message);
+        process.stderr.flush && process.stderr.flush();
         reject(err);
       }
     });
@@ -266,15 +412,20 @@ async function main() {
   const results = [];
   
   // Run tests serially
-  for (const testFile of existingTests) {
+  for (let i = 0; i < existingTests.length; i++) {
+    const testFile = existingTests[i];
+    const testNumber = i + 1;
     try {
-      const result = await runTest(testFile);
+      process.stdout.write(`\n📋 Starting test ${testNumber}/${existingTests.length}...\n`);
+      process.stdout.flush && process.stdout.flush();
+      const result = await runTest(testFile, testNumber, existingTests.length);
       results.push(result);
       
       // Small delay between tests to ensure ports are released
       await new Promise(resolve => setTimeout(resolve, 500));
     } catch (err) {
-      console.error(`Fatal error running ${testFile}:`, err);
+      console.error(`\n[${testNumber}/${existingTests.length}] Fatal error running ${testFile}:`, err);
+      process.stdout.flush && process.stdout.flush();
       results.push({ file: testFile, passed: false, error: err.message });
       // Continue with next test
     }

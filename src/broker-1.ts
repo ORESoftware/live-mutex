@@ -977,12 +977,30 @@ export class Broker1 {
         const writerFlag = lck.writerFlag || false;
 
         if (writerFlag) {
-            return v.push({
+            // Writer flag is set, queue this read request to wait for writer to finish
+            v.push({
                 ws, key, uuid, fn: () => {
-                    console.log('incrementing readers in delayed fashion.');
+                    log.debug('incrementing readers in delayed fashion.');
                     lck.readers++;
+                    // Send response after incrementing
+                    this.send(ws, {
+                        writerFlag: false,
+                        readersCount: lck.readers,
+                        key,
+                        uuid,
+                        type: 'register-write-flag-success'
+                    });
                 }
             });
+            // Send initial response indicating we're queued
+            this.send(ws, {
+                writerFlag: true,
+                readersCount: readersCount,
+                key,
+                uuid,
+                type: 'register-write-flag-check-queued'
+            });
+            return;
         }
 
         log.debug('incrementing readers right after write flag check.');

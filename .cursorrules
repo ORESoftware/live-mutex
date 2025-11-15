@@ -19,6 +19,8 @@
 
 ## Testing
 
+- **ALWAYS use .ts (TypeScript) files for test scripts, NOT .js files**
+- When creating or modifying tests, use TypeScript (.ts) files
 - Tests should run serially with independent brokers on unique ports
 - Each test should be isolated and not depend on other tests
 - Test timeouts should be handled gracefully

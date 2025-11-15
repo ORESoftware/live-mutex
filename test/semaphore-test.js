@@ -62,7 +62,7 @@ function sleep(ms) {
 }
 async function testDefaultMaxOne() {
     console.log('\n=== Test 1: Default max=1 (Exclusive Lock) ===');
-    const port = 8000 + Math.floor(Math.random() * 1000);
+    const port = process.env.LMX_TEST_PORT ? parseInt(process.env.LMX_TEST_PORT) : (8000 + Math.floor(Math.random() * 1000));
     const broker = new main_1.Broker({ port });
     await broker.ensure();
     const clients = [];
@@ -139,7 +139,7 @@ async function testDefaultMaxOne() {
 }
 async function testSemaphoreMaxThree() {
     console.log('\n=== Test 2: Semaphore max=3 (3 Concurrent Holders) ===');
-    const port = 8000 + Math.floor(Math.random() * 1000);
+    const port = process.env.LMX_TEST_PORT ? parseInt(process.env.LMX_TEST_PORT) : (8000 + Math.floor(Math.random() * 1000));
     const broker = new main_1.Broker({ port });
     await broker.ensure();
     const clients = [];
@@ -219,7 +219,7 @@ async function testSemaphoreMaxThree() {
 }
 async function testSemaphoreMaxTen() {
     console.log('\n=== Test 3: Semaphore max=10 (10 Concurrent Holders) ===');
-    const port = 8000 + Math.floor(Math.random() * 1000);
+    const port = process.env.LMX_TEST_PORT ? parseInt(process.env.LMX_TEST_PORT) : (8000 + Math.floor(Math.random() * 1000));
     const broker = new main_1.Broker({ port });
     await broker.ensure();
     const clients = [];
@@ -303,7 +303,7 @@ async function testSemaphoreMaxTen() {
 }
 async function testSemaphoreStress() {
     console.log('\n=== Test 4: Semaphore Stress Test (max=5, 50 clients, 10 ops each) ===');
-    const port = 8000 + Math.floor(Math.random() * 1000);
+    const port = process.env.LMX_TEST_PORT ? parseInt(process.env.LMX_TEST_PORT) : (8000 + Math.floor(Math.random() * 1000));
     const broker = new main_1.Broker({ port });
     await broker.ensure();
     const clients = [];
@@ -389,7 +389,7 @@ async function testSemaphoreStress() {
 }
 async function testMixedMaxValues() {
     console.log('\n=== Test 5: Mixed Max Values (Different keys with different max) ===');
-    const port = 8000 + Math.floor(Math.random() * 1000);
+    const port = process.env.LMX_TEST_PORT ? parseInt(process.env.LMX_TEST_PORT) : (8000 + Math.floor(Math.random() * 1000));
     const broker = new main_1.Broker({ port });
     await broker.ensure();
     const clients = [];
@@ -522,13 +522,15 @@ async function runAllTests() {
     let failed = 0;
     for (const test of tests) {
         try {
+            console.log(`\nRunning test: ${test.name}...`);
             await test.fn();
             passed++;
+            console.log(`✅ ${test.name} completed`);
             await sleep(500); // Brief pause between tests
         }
         catch (err) {
             failed++;
-            console.error(`\nTest "${test.name}" failed:`, err.message);
+            console.error(`\n❌ Test "${test.name}" failed:`, err.message);
         }
     }
     console.log('\n========================================');
