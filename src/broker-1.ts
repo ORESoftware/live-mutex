@@ -698,6 +698,14 @@ export class Broker1 {
         return this.host;
     }
 
+    /**
+     * Attach a callback to listen for warning events and output them
+     * @param callback Function that receives warning messages/errors
+     */
+    onWarning(callback: (...args: any[]) => void): void {
+        this.emitter.on('warning', callback);
+    }
+
     abruptlyDestroyConnection(ws: LMXSocket) {
         log.error('Connection will be destroyed.');
         ws.destroy();

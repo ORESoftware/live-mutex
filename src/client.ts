@@ -1288,6 +1288,13 @@ export class Client {
     return this.host;
   }
   
+  /**
+   * Attach a callback to listen for warning events and output them
+   * @param callback Function that receives warning messages/errors
+   */
+  onWarning(callback: (...args: any[]) => void): void {
+    this.emitter.on('warning', callback);
+  }
   
   protected preParseUnlockOptsForPromise(
     key: string,

@@ -20,6 +20,12 @@ async function testComprehensive() {
     const broker = new Broker1({port});
     const client = new RWLockWritePrefClient({port});
     
+    // Capture broker logs
+    broker.onWarning((...args) => {
+        const msg = args.map(a => String(a)).join(' ');
+        process.stderr.write(`[BROKER] ${msg}\n`);
+    });
+    
     try {
         // Start broker and client
         console.log('1. Starting broker and client...');

@@ -50,17 +50,27 @@ function runTest(testFile) {
     console.log(`\n${'='.repeat(80)}`);
     console.log(`Running: ${testFile}`);
     console.log(`${'='.repeat(80)}\n`);
+    // Force flush
+    process.stdout.write('');
     
     const startTime = Date.now();
     const testPort = getNextPort();
     let timeoutId = null;
+    let killTimeoutId = null;
     let resolved = false;
+    let outputBuffer = '';
+    let errorBuffer = '';
     
     // Set environment variables for the test
     const env = {
       ...process.env,
       LMX_TEST_PORT: testPort.toString(),
       LMX_TEST_BASE_PORT: BASE_PORT.toString(),
+      // Enable log capture
+      LMX_CAPTURE_LOGS: '1',
+      // Ensure non-interactive mode
+      CI: 'true',
+      FORCE_COLOR: '0',
     };
     
     // Determine if it's TypeScript or JavaScript
@@ -68,10 +78,28 @@ function runTest(testFile) {
     const command = isTypeScript ? 'npx' : 'node';
     const args = isTypeScript ? ['ts-node', testFile] : [testFile];
     
+    // Use pipe instead of inherit for better control
     const proc = spawn(command, args, {
       env,
-      stdio: 'inherit',
+      stdio: ['ignore', 'pipe', 'pipe'],
       cwd: path.join(__dirname, '..'),
+      detached: false,
+    });
+    
+    // Capture stdout
+    proc.stdout.on('data', (data) => {
+      const text = data.toString();
+      outputBuffer += text;
+      // Write to parent stdout immediately for real-time viewing
+      process.stdout.write(text);
+    });
+    
+    // Capture stderr
+    proc.stderr.on('data', (data) => {
+      const text = data.toString();
+      errorBuffer += text;
+      // Write to parent stderr immediately
+      process.stderr.write(text);
     });
     
     // Set up timeout
@@ -79,14 +107,32 @@ function runTest(testFile) {
       if (!resolved) {
         resolved = true;
         console.error(`\n⏱️  ${testFile} timed out after ${TEST_TIMEOUT_MS / 1000}s`);
-        proc.kill('SIGTERM');
+        
+        // Try graceful shutdown first
+        try {
+          proc.kill('SIGTERM');
+        } catch (e) {
+          // ignore
+        }
         
         // Force kill after a grace period
-        setTimeout(() => {
-          if (proc.killed === false) {
-            proc.kill('SIGKILL');
+        killTimeoutId = setTimeout(() => {
+          try {
+            if (!proc.killed) {
+              proc.kill('SIGKILL');
+            }
+            // Also kill any child processes
+            if (proc.pid) {
+              try {
+                process.kill(-proc.pid, 'SIGKILL');
+              } catch (e) {
+                // ignore
+              }
+            }
+          } catch (e) {
+            // ignore
           }
-        }, 5000);
+        }, 3000);
         
         const duration = ((Date.now() - startTime) / 1000).toFixed(2);
         resolve({ file: testFile, passed: false, duration, timeout: true });
@@ -100,6 +146,28 @@ function runTest(testFile) {
       if (timeoutId) {
         clearTimeout(timeoutId);
       }
+      if (killTimeoutId) {
+        clearTimeout(killTimeoutId);
+      }
+      
+      // Ensure process is dead
+      try {
+        if (!proc.killed && proc.pid) {
+          try {
+            process.kill(proc.pid, 0); // Check if alive
+            proc.kill('SIGTERM');
+            setTimeout(() => {
+              if (!proc.killed) {
+                proc.kill('SIGKILL');
+              }
+            }, 1000);
+          } catch (e) {
+            // Process already dead
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
       
       const duration = ((Date.now() - startTime) / 1000).toFixed(2);
       if (code === 0 && !timeout) {
@@ -112,8 +180,11 @@ function runTest(testFile) {
       }
     };
     
-    proc.on('close', (code) => {
-      finish(code);
+    proc.on('close', (code, signal) => {
+      // Small delay to ensure all output is flushed
+      setTimeout(() => {
+        finish(code === null ? 1 : code);
+      }, 100);
     });
     
     proc.on('error', (err) => {
@@ -122,10 +193,32 @@ function runTest(testFile) {
         if (timeoutId) {
           clearTimeout(timeoutId);
         }
+        if (killTimeoutId) {
+          clearTimeout(killTimeoutId);
+        }
         console.error(`\n❌ Error running ${testFile}:`, err.message);
         reject(err);
       }
     });
+    
+    // Handle process exit to ensure cleanup
+    const cleanup = () => {
+      if (!resolved && proc && !proc.killed) {
+        try {
+          proc.kill('SIGTERM');
+          setTimeout(() => {
+            if (!proc.killed) {
+              proc.kill('SIGKILL');
+            }
+          }, 1000);
+        } catch (e) {
+          // ignore
+        }
+      }
+    };
+    
+    process.on('SIGINT', cleanup);
+    process.on('SIGTERM', cleanup);
   });
 }
 
@@ -137,10 +230,17 @@ async function main() {
   // Ensure dist is built
   try {
     console.log('Building TypeScript...');
-    execSync('npx tsc', { stdio: 'inherit', cwd: path.join(__dirname, '..') });
+    execSync('npx tsc', { 
+      stdio: 'pipe',
+      cwd: path.join(__dirname, '..'),
+      encoding: 'utf8',
+      maxBuffer: 10 * 1024 * 1024, // 10MB buffer
+    });
     console.log('✅ Build complete\n');
   } catch (err) {
     console.error('❌ Build failed:', err.message);
+    if (err.stdout) console.error('STDOUT:', err.stdout);
+    if (err.stderr) console.error('STDERR:', err.stderr);
     process.exit(1);
   }
   
