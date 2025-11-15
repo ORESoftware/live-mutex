@@ -35,6 +35,56 @@
 > Tested and proven on Node.js versions >= 8.0.0.
 >
 
+# Quick Start
+
+### Get Started in 30 Seconds
+
+```bash
+# Install globally for CLI tools
+npm i -g live-mutex
+
+# Check if broker is running
+lmx-quick-start check
+
+# Start a broker (if not running)
+lmx-quick-start start
+
+# In another terminal, test it
+lmx-quick-start test
+```
+
+### Using Docker
+
+```bash
+# Pull and run the broker
+docker pull oresoftware/live-mutex-broker:latest
+docker run -d -p 6970:6970 --name lmx-broker oresoftware/live-mutex-broker:latest
+
+# Test the connection
+lmx-quick-start test
+```
+
+### Programmatic Setup
+
+```typescript
+import {Broker1, Client} from 'live-mutex';
+
+// Start broker
+const broker = new Broker1({port: 6970, host: 'localhost'});
+await broker.ensure();
+
+// Create client and use
+const client = new Client({port: 6970, host: 'localhost'});
+await client.ensure();
+
+const {key, id} = await client.acquire('my-key');
+// ... do work ...
+await client.release(key, {id});
+```
+
+**For detailed usage, see [readme-2.md](./readme-2.md)**  
+**For broker migration guide, see [BROKER_MIGRATION.md](./BROKER_MIGRATION.md)**
+
 # Simple Working Examples:
 
 > See: https://github.com/ORESoftware/live-mutex-examples
@@ -61,8 +111,8 @@
 
 >
 >```
->   docker pull 'oresoftware/live-mutex-broker:0.2.24'
->   docker run --rm -d -p 6970:6970 --name lmx-broker 'oresoftware/live-mutex-broker:0.2.24'  
+>   docker pull oresoftware/live-mutex-broker:latest
+>   docker run --rm -d -p 6970:6970 --name lmx-broker oresoftware/live-mutex-broker:latest
 >   docker logs -f lmx-broker
 >```
 
@@ -192,14 +242,18 @@ The real power of this library comes with usage with Node.js, but we can use thi
 
 ```bash
 
-#  in shell 1, we launch a live-mutex server/broker
-$ lmx start            # 6970 is the default port
+# Quick start commands (recommended)
+$ lmx-quick-start check          # Check if broker is running
+$ lmx-quick-start start          # Start a broker
+$ lmx-quick-start test           # Test lock acquisition/release
+$ lmx status                     # Check broker status
 
-
-#  in shell 2, we acquire/release locks on key "foo"
-$ lmx acquire foo      # 6970 is the default port
-$ lmx release foo      # 6970 is the default port
-
+# Traditional commands
+$ lmx start                      # Start broker (6970 is the default port)
+$ lmx acquire foo                # Acquire lock on key "foo"
+$ lmx release foo                 # Release lock on key "foo"
+$ lmx inspect                    # Interactive broker inspection
+$ lmx ls                         # List active locks
 ```
 
 To set a port / host / uds-path in the current shell, use
@@ -212,6 +266,8 @@ $ lmx set uds_path "$PWD/zoom"
 
 If `uds_path` is set, it will override host/port. You must use `$ lmx set a b`, to change settings. You can elect to use these environment variables
 in Node.js, by using `{env: true}` in your Node.js code.
+
+**For more CLI commands and examples, see [readme-2.md](./readme-2.md)**
 
 </details>
 

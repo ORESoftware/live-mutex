@@ -31,9 +31,21 @@ elif [ "$cmd" = "ls" ]; then
 
   lmx_ls "$@"
 
+elif [ "$cmd" = "status" ]; then
+
+  lmx-status "$@"
+
+elif [ "$cmd" = "test" ]; then
+
+  lmx-test "$@"
+
+elif [ "$cmd" = "quick-start" ]; then
+
+  lmx-quick-start "$@"
+
 else
 
-  echo "lmx: no subcommand was recognized. Possible subcommands: acquire, release, inspect, launch, start"
+  echo "lmx: no subcommand was recognized. Possible subcommands: acquire, release, inspect, launch, start, status, test, quick-start"
   exit 1;
 
 fi
