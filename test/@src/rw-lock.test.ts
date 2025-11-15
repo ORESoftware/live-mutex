@@ -2,7 +2,7 @@
 
 import * as suman from 'suman';
 const {Test} = suman.init(module);
-import {RWLockClient, Broker} from '../../dist/main';
+import {RWLockClient, Broker1} from '../../dist/main';
 
 ///////////////////////////////////////////////////////////////
 
@@ -34,7 +34,7 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
     const brokerConf = Object.assign({}, conf, {noListen: process.env.lmx_broker_no_listen === 'yes'});
   
     return {
-      broker: new Broker(brokerConf).ensure().then(handleEvents)
+      broker: new Broker1(brokerConf).ensure().then(handleEvents)
     }
   });
 

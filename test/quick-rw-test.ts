@@ -5,7 +5,7 @@
 process.argv.push('--lmx-debug');
 process.env.lmx_debug = 'yes';
 
-import {Broker, RWLockWritePrefClient} from '../dist/main';
+import {Broker1, RWLockWritePrefClient} from '../dist/main';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -14,7 +14,7 @@ const port = 8000 + Math.floor(Math.random() * 100);
 console.log('Using port:', port);
 
 async function quickTest() {
-    const broker = new Broker({port});
+    const broker = new Broker1({port});
     await broker.ensure();
     console.log('Broker ready');
     

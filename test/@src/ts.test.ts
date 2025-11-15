@@ -3,7 +3,7 @@ import suman from 'suman';
 const Test = suman.init(module);
 
 // import the other way, just to be sure
-import {Client, Broker, lmUtils} from 'live-mutex';
+import {Client, Broker1, lmUtils} from 'live-mutex';
 
 /////////////////////////////////////////////////////////////////////
 
@@ -18,7 +18,7 @@ Test.create([function (b, inject, describe, before, it, $deps, $core) {
   
   inject(j => {
     const brokerConf = Object.assign({}, conf, {noListen: process.env.lmx_broker_no_listen === 'yes'});
-    j.register('broker', new Broker(brokerConf).ensure());
+    j.register('broker', new Broker1(brokerConf).ensure());
   });
   
   inject(j => {

@@ -7,7 +7,7 @@ const main_1 = require("../dist/main");
 const port = 8000 + Math.floor(Math.random() * 100);
 console.log('Using port:', port);
 async function quickTest() {
-    const broker = new main_1.Broker({ port });
+    const broker = new main_1.Broker1({ port });
     await broker.ensure();
     console.log('Broker ready');
     const client = new main_1.RWLockWritePrefClient({ port });

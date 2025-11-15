@@ -4,7 +4,7 @@ import suman = require('suman');
 const Test = suman.init(module);
 const async = require('async');
 import * as lmx from 'live-mutex';
-import {Client, Broker, LMXUnlockRequestError, LMXLockRequestError} from "live-mutex";
+import {Client, Broker1, LMXUnlockRequestError, LMXLockRequestError} from "live-mutex";
 
 ////////////////////////////////////////////////////////
 
@@ -35,7 +35,7 @@ Test.create((b, assert, before, describe, it, path, fs, inject, after) => {
 
   inject(j => {
       const brokerConf = Object.assign({}, conf, {noListen: process.env.lmx_broker_no_listen === 'yes'});
-    j.register('broker', new Broker(brokerConf).ensure().then(handleEvents));
+    j.register('broker', new Broker1(brokerConf).ensure().then(handleEvents));
   });
 
   inject(j => {
@@ -46,7 +46,7 @@ Test.create((b, assert, before, describe, it, path, fs, inject, after) => {
   describe('post', function (b) {
 
     const c = b.getInjectedValue('client') as Client;
-    const broker = b.getInjectedValue('broker') as Broker;
+    const broker = b.getInjectedValue('broker') as Broker1;
 
     after.cb(h => {
       console.log('closing broker...');
