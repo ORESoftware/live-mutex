@@ -55,12 +55,17 @@ function runTest(testFile) {
     const testPort = getNextPort();
     let timeoutId = null;
     let resolved = false;
+    let outputBuffer = '';
     
     // Set environment variables for the test
     const env = {
       ...process.env,
       LMX_TEST_PORT: testPort.toString(),
       LMX_TEST_BASE_PORT: BASE_PORT.toString(),
+      // Enable broker log capture if requested (default: true for better debugging)
+      LMX_CAPTURE_LOGS: process.env.LMX_CAPTURE_LOGS !== undefined ? process.env.LMX_CAPTURE_LOGS : 'true',
+      // Print logs as they happen (default: true)
+      LMX_CAPTURE_LOGS_PRINT: process.env.LMX_CAPTURE_LOGS_PRINT !== undefined ? process.env.LMX_CAPTURE_LOGS_PRINT : 'true',
     };
     
     // Determine if it's TypeScript or JavaScript
@@ -68,10 +73,34 @@ function runTest(testFile) {
     const command = isTypeScript ? 'npx' : 'node';
     const args = isTypeScript ? ['ts-node', testFile] : [testFile];
     
+    // Use 'pipe' instead of 'inherit' for better cursor agent compatibility
     const proc = spawn(command, args, {
       env,
-      stdio: 'inherit',
+      stdio: ['ignore', 'pipe', 'pipe'],
       cwd: path.join(__dirname, '..'),
+    });
+    
+    // Forward stdout
+    proc.stdout.on('data', (data) => {
+      const text = data.toString();
+      outputBuffer += text;
+      process.stdout.write(text);
+    });
+    
+    // Forward stderr
+    proc.stderr.on('data', (data) => {
+      const text = data.toString();
+      outputBuffer += text;
+      process.stderr.write(text);
+    });
+    
+    // Handle stream end events
+    proc.stdout.on('end', () => {
+      // Stream ended
+    });
+    
+    proc.stderr.on('end', () => {
+      // Stream ended
     });
     
     // Set up timeout
@@ -113,6 +142,10 @@ function runTest(testFile) {
     };
     
     proc.on('close', (code) => {
+      // Ensure all output is flushed before finishing
+      if (outputBuffer.trim()) {
+        // Output already written, just finish
+      }
       finish(code);
     });
     
@@ -124,6 +157,13 @@ function runTest(testFile) {
         }
         console.error(`\n❌ Error running ${testFile}:`, err.message);
         reject(err);
+      }
+    });
+    
+    // Handle process exit to ensure cleanup
+    proc.on('exit', (code) => {
+      if (!resolved) {
+        finish(code || 0);
       }
     });
   });
