@@ -1,32 +1,75 @@
 "use strict";
-exports.__esModule = true;
-var live_mutex_1 = require("live-mutex");
-var async = require("async");
-var domain = require("domain");
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+var __spreadArray = (this && this.__spreadArray) || function (to, from, pack) {
+    if (pack || arguments.length === 2) for (var i = 0, l = from.length, ar; i < l; i++) {
+        if (ar || !(i in from)) {
+            if (!ar) ar = Array.prototype.slice.call(from, 0, i);
+            ar[i] = from[i];
+        }
+    }
+    return to.concat(ar || Array.prototype.slice.call(from));
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+var main_1 = require("../dist/main");
+var async = __importStar(require("async"));
+var domain = __importStar(require("domain"));
+const testPort = process.env.LMX_TEST_PORT ? parseInt(process.env.LMX_TEST_PORT) : 6970;
 Promise.all([
-    new live_mutex_1.Broker().ensure(),
-    new live_mutex_1.Client().connect()
+    new main_1.Broker({ port: testPort }).ensure(),
+    new main_1.Client({ port: testPort }).connect()
 ])
     .then(function (_a) {
     var b = _a[0], c = _a[1];
     b.emitter.on('warning', function (v) {
         if (!String(v).match(/no lock with key/)) {
-            console.error.apply(console, ['broker warning:'].concat(arguments));
+            console.error.apply(console, __spreadArray(['broker warning:'], arguments, false));
         }
     });
     c.emitter.on('warning', function (v) {
         if (!String(v).match(/no lock with key/)) {
-            console.error.apply(console, ['client warning:'].concat(arguments));
+            console.error.apply(console, __spreadArray(['client warning:'], arguments, false));
         }
     });
     b.emitter.on('error', function (v) {
         if (!String(v).match(/no lock with key/)) {
-            console.error.apply(console, ['broker error:'].concat(arguments));
+            console.error.apply(console, __spreadArray(['broker error:'], arguments, false));
         }
     });
     c.emitter.on('error', function (v) {
         if (!String(v).match(/no lock with key/)) {
-            console.error.apply(console, ['client error:'].concat(arguments));
+            console.error.apply(console, __spreadArray(['client error:'], arguments, false));
         }
     });
     var d = domain.create();
@@ -37,7 +80,7 @@ Promise.all([
     d.run(function () {
         async.series([
             function (cb) {
-                var c = live_mutex_1.Client.create();
+                var c = main_1.Client.create();
                 c.ensure(function (err, c) {
                     if (err) {
                         return cb(err);
@@ -60,7 +103,7 @@ Promise.all([
             },
             function (cb) {
                 debugger;
-                var c = new live_mutex_1.Client();
+                var c = new main_1.Client();
                 c.ensure().then(function () {
                     debugger;
                     c.lock('z', function (err, _a) {
@@ -74,7 +117,7 @@ Promise.all([
             },
             function (cb) {
                 debugger;
-                var c = live_mutex_1.Client.create();
+                var c = main_1.Client.create();
                 c.ensure().then(function (c) {
                     c.lock('z', function (err, _a) {
                         var id = _a.id;
@@ -86,7 +129,7 @@ Promise.all([
                 });
             },
             function (cb) {
-                live_mutex_1.Client.create().ensure().then(function (c) {
+                main_1.Client.create().ensure().then(function (c) {
                     debugger;
                     c.lockp('z').then(function (_a) {
                         var unlock = _a.unlock;
@@ -103,8 +146,11 @@ Promise.all([
             debugger;
             if (err) {
                 console.error('final error:', err);
+                process.exit(1);
+            } else {
+                console.log('all done.');
+                process.exit(0);
             }
-            console.log('all done.');
         });
     });
 });

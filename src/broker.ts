@@ -817,21 +817,25 @@ export class Broker {
         const uuid = data.uuid;
         const v = this.registeredListeners[key] = this.registeredListeners[key] || [];
 
-        log.debug('broadcasting for key:', key, 'listeners:', v.length);
+        log.debug(chalk.yellow('[BROKER-BROADCAST] broadcasting for key:'), key, 'listeners:', v.length);
 
         // Process all listeners and clear the array to prevent infinite loops
         const listenersToProcess = v.splice(0); // Remove all listeners at once
 
+        log.debug(chalk.yellow('[BROKER-BROADCAST] processing'), listenersToProcess.length, 'listeners for key:', key);
         for (const p of listenersToProcess) {
             if (p && p.fn) {
                 try {
+                    log.debug(chalk.yellow('[BROKER-BROADCAST] calling listener fn for uuid:'), p.uuid);
                     p.fn();
+                    log.debug(chalk.yellow('[BROKER-BROADCAST] listener fn completed for uuid:'), p.uuid);
                 } catch (err) {
                     log.error('Error in broadcast listener:', err);
                 }
             }
 
             if (p && p.ws) {
+                log.debug(chalk.yellow('[BROKER-BROADCAST] sending broadcast-result to uuid:'), p.uuid);
                 this.send(p.ws, {
                     key: data.key,
                     uuid: p.uuid,
@@ -882,18 +886,13 @@ export class Broker {
         }
 
         let lck = this.locks.get(key);
+        const listenersCount = this.registeredListeners[key]?.length || 0;
 
+        log.debug(chalk.yellow('[BROKER-BROADCAST] setWriteFlagToFalseAndBroadcast'), {key, uuid, listenersCount, notifyQueue: lck.notify.length});
         log.debug('setting writer flag to false.');
         lck.writerFlag = false;
-        
-        // Only broadcast if there are registered listeners waiting
-        const listeners = this.registeredListeners[key];
-        if (listeners && listeners.length > 0) {
-            log.debug('broadcasting after setting writer flag to false. Listeners:', listeners.length);
-            this.broadcast({key}, null);
-        } else {
-            log.debug('writer flag set to false but no listeners waiting, skipping broadcast.');
-        }
+        log.debug('broadcasting after setting writer flag to false.');
+        this.broadcast({key}, null);
 
         this.send(ws, {uuid, key, type: 'write-flag-false-and-broadcast-success'});
 
@@ -1561,6 +1560,8 @@ export class Broker {
         const rwStatus = data.rwStatus;
         const lck = this.locks.get(key);
         const keepLocksAfterDeath = Boolean(data.keepLocksAfterDeath);
+        
+        log.debug(chalk.yellow('[BROKER-UNLOCK] unlock called'), {key, uuid, _uuid, force, hasLock: !!lck, lockholders: lck?.lockholders.size, notifyQueue: lck?.notify.length});
 
         if (ws && keepLocksAfterDeath !== true) {
             // we know for a fact that
@@ -1644,6 +1645,7 @@ export class Broker {
                 // if no uuid is defined, then unlock was called by something other than the client
                 // aka this library called unlock when there was a timeout
 
+                log.debug(chalk.yellow('[BROKER-UNLOCK] sending unlock success'), {key, uuid, lockRequestCount: ln, remainingLockholders: lck.lockholders.size, notifyQueue: lck.notify.length});
                 this.send(ws, {
                     uuid: uuid,
                     key: key,

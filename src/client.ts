@@ -389,10 +389,16 @@ export class Client {
       const fn = this.resolutions[uuid];
       const to = this.timeouts[uuid];
       
+      // Debug logging for RW lock operations
+      if (data.type && (data.type.includes('readers') || data.type.includes('write-flag') || data.type.includes('register'))) {
+        log.debug(chalk.yellow('[CLIENT] Received RW message'), {uuid, type: data.type, key: data.key, hasFn: !!fn, hasTimeout: !!to});
+      }
+      
       delete this.timeouts[uuid];
       // delete self.resolutions[uuid]; // don't do this here, the same resolution fn might need to be called more than once
       
       if (this.giveups[uuid]) {
+        log.debug(chalk.yellow('[CLIENT] Request was given up'), {uuid, type: data.type});
         clearTimeout(this.timers[uuid]);
         delete this.giveups[uuid];
         delete this.resolutions[uuid];
@@ -404,6 +410,7 @@ export class Client {
       }
       
       if (to) {
+        log.debug(chalk.yellow('[CLIENT] Request timed out'), {uuid, type: data.type});
         this.emitter.emit('warning', 'Client side lock/unlock request timed-out.');
         if (data.acquired === true && data.type === 'lock') {
           self.write({uuid: uuid, _uuid, key: data.key, type: 'lock-received-rejected'});

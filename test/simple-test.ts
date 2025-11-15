@@ -1,5 +1,5 @@
 
-import {Client, Broker} from 'live-mutex';
+import {Client, Broker} from '../dist/main';
 import * as async from 'async';
 import * as assert from "assert";
 import * as domain from "domain";

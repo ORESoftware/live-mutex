@@ -18,7 +18,10 @@ export const log = {
   warn: console.error.bind(console, chalk.magenta.bold('lmx client warning:')),
   error: console.error.bind(console, chalk.red.bold('lmx client error:')),
   debug: function (...args: any[]) {
-    weAreDebugging && console.log('lmx debugging:', ...args);
+    // Always log RW lock operations for debugging
+    if (weAreDebugging || process.env.LMX_DEBUG_RW === '1' || process.env.LMX_CAPTURE_LOGS === '1') {
+      console.log('lmx debugging:', ...args);
+    }
   }
 };
 
@@ -110,15 +113,20 @@ export class RWLockWritePrefClient extends Client {
       return this.releaseWriteLock(key, boundRelease, cb);
     };
 
+    log.debug(chalk.blue('[RW] acquireWriteLock acquiring base lock for key:'), key);
     this.lock(key, opts, (err, unlock) => {
+      log.debug(chalk.blue('[RW] acquireWriteLock base lock callback fired'), {key, err: !!err, hasUnlock: !!unlock});
 
       if (err) {
+        log.debug(chalk.red('[RW] acquireWriteLock base lock ERROR'), {key, err});
         return cb(err, boundRelease);
       }
 
       log.debug(chalk.blue('acquireWriteLock got lock on:'), key);
 
+      log.debug(chalk.blue('[RW] acquireWriteLock starting registerWriteFlagAndReadersCheck for key:'), key);
       this.registerWriteFlagAndReadersCheck(key, {}, (err, val) => {
+        log.debug(chalk.blue('[RW] acquireWriteLock registerWriteFlagAndReadersCheck callback fired'), {key, err: !!err, hasVal: !!val});
 
         if (err) {
           // If there's an error, we need to unlock the lock we just acquired
@@ -195,60 +203,35 @@ export class RWLockWritePrefClient extends Client {
 
     // Fallback: acquire lock first, then release
     opts.max = 1;
-    if (boundRelease && boundRelease._unlock) {
-      // We have the unlock function from when we acquired the lock
-      log.debug(chalk.blue('releaseWriteLock using stored unlock for:'), key);
-      
-      // Unlock the lock first
-      log.debug(chalk.blue('releaseWriteLock: calling _unlock for key:'), key);
-      boundRelease._unlock((err: any, val: any) => {
-        log.debug(chalk.blue('releaseWriteLock: _unlock callback called for key:'), key, 'err:', err, 'val unlocked:', val?.unlocked);
-        if (err) {
-          log.debug(chalk.blue('releaseWriteLock unlock error on:'), key, err);
-          delete boundRelease._unlock;
-          delete boundRelease._key;
-          return cb(err, val);
-        }
-        
-        log.debug(chalk.blue('releaseWriteLock unlocked, now setting write flag to false on:'), key);
-        
-        // Set the write flag to false and broadcast to waiting readers
-        // This must happen after unlock to avoid deadlocks
-        this.setWriteFlagToFalse(key, (flagErr, flagVal) => {
-          log.debug(chalk.blue('releaseWriteLock: setWriteFlagToFalse callback called for key:'), key, 'flagErr:', flagErr, 'flagVal type:', flagVal?.type);
-          log.debug(chalk.blue('releaseWriteLock completed on:'), key);
-          delete boundRelease._unlock;
-          delete boundRelease._key;
-          // Return success even if flag setting had minor issues
-          log.debug(chalk.blue('releaseWriteLock: calling final cb for key:'), key, 'cb type:', typeof cb);
-          cb(null, val);
-        });
-      });
-      return;
-    }
 
-    // Fallback: acquire lock first, then release
-    opts.max = 1;
-
+    const fallbackStart = Date.now();
+    log.debug(chalk.magenta('[RW-RELEASE] releaseWriteLock fallback path'), {key});
     this.lock(key, opts, (err, unlock) => {
 
       if (err) {
+        log.debug(chalk.magenta('[RW-RELEASE] releaseWriteLock fallback lock error'), {key, err});
         return cb(err, unlock);
       }
 
-      log.debug(chalk.blue('releaseWriteLock got lock on:'), key);
+      log.debug(chalk.magenta('[RW-RELEASE] releaseWriteLock got lock on:'), key);
 
       // Unlock first
+      const fallbackUnlockStart = Date.now();
       unlock((unlockErr, unlockVal) => {
+        const fallbackUnlockTime = Date.now() - fallbackUnlockStart;
+        log.debug(chalk.magenta('[RW-RELEASE] releaseWriteLock fallback unlock callback'), {key, err: !!unlockErr, fallbackUnlockTime});
         if (unlockErr) {
-          log.debug(chalk.blue('releaseWriteLock unlock error:'), unlockErr);
+          log.debug(chalk.magenta('[RW-RELEASE] releaseWriteLock fallback unlock error:'), unlockErr);
           return cb(unlockErr, unlockVal);
         }
         
-        log.debug(chalk.blue('releaseWriteLock unlocked, now setting write flag to false'));
+        log.debug(chalk.magenta('[RW-RELEASE] releaseWriteLock unlocked, now setting write flag to false'));
         
+        const fallbackFlagStart = Date.now();
         this.setWriteFlagToFalse(key, (flagErr, flagVal) => {
-          log.debug(chalk.blue('releaseWriteLock completed'));
+          const fallbackFlagTime = Date.now() - fallbackFlagStart;
+          const fallbackTotalTime = Date.now() - fallbackStart;
+          log.debug(chalk.magenta('[RW-RELEASE] releaseWriteLock fallback completed'), {key, fallbackFlagTime, fallbackTotalTime});
           // Return success even if flag setting had minor issues
           cb(null, unlockVal);
         });
@@ -281,9 +264,12 @@ export class RWLockWritePrefClient extends Client {
     };
 
     // First check writer flag BEFORE acquiring lock (critical fix)
+    log.debug(chalk.blue('[RW] acquireReadLock starting writer flag check for key:'), key);
     this.registerWriteFlagCheck(key, {}, (err, val) => {
+      log.debug(chalk.blue('[RW] acquireReadLock writer flag check callback fired'), {key, err: !!err, hasVal: !!val});
 
       if (err) {
+        log.debug(chalk.red('[RW] acquireReadLock writer flag check ERROR'), {key, err});
         return cb(err, boundRelease);
       }
 
@@ -390,22 +376,31 @@ export class RWLockWritePrefClient extends Client {
     // Fallback: acquire lock first, then release
     opts.max = 1;
 
+    const fallbackStart = Date.now();
+    log.debug(chalk.magenta('[RW-RELEASE] releaseReadLock fallback path'), {key});
     this.lock(key, opts, (err, unlock) => {
 
       if (err) {
+        log.debug(chalk.magenta('[RW-RELEASE] releaseReadLock fallback lock error'), {key, err});
         return cb(err, unlock);
       }
 
-      log.debug(chalk.blue('releaseReadLock got lock on key:'), key);
+      log.debug(chalk.magenta('[RW-RELEASE] releaseReadLock got lock on key:'), key);
 
+      const fallbackDecrementStart = Date.now();
       this.decrementReaders(key, (err, val) => {
+        const fallbackDecrementTime = Date.now() - fallbackDecrementStart;
+        log.debug(chalk.magenta('[RW-RELEASE] releaseReadLock fallback decrementReaders callback'), {key, err: !!err, fallbackDecrementTime});
 
         if (err) {
           return cb(err, unlock);
         }
 
+        const fallbackUnlockStart = Date.now();
         unlock((err, val) => {
-          log.debug(chalk.blue('releaseReadLock released lock on key:'), key);
+          const fallbackUnlockTime = Date.now() - fallbackUnlockStart;
+          const fallbackTotalTime = Date.now() - fallbackStart;
+          log.debug(chalk.magenta('[RW-RELEASE] releaseReadLock fallback completed'), {key, fallbackUnlockTime, fallbackTotalTime});
           cb(err, val);
         });
 
@@ -418,6 +413,7 @@ export class RWLockWritePrefClient extends Client {
   registerWriteFlagCheck(key: string, opts: any, cb: EVCb<any>) {
 
     const uuid = UUID.v4();
+    log.debug(chalk.cyan('[RW] registerWriteFlagCheck START'), {key, uuid});
 
     this.resolutions[uuid] = (err, val) => {
       log.debug(chalk.magenta('client got register-write-flag-check response, type:', val?.type, 'uuid:', uuid));
@@ -444,9 +440,11 @@ export class RWLockWritePrefClient extends Client {
       // This is the final success response (register-write-flag-success)
       log.debug(chalk.magenta('received final success response, calling callback'));
       delete this.resolutions[uuid];
+      log.debug(chalk.cyan('[RW] registerWriteFlagCheck CALLING CALLBACK'), {key, uuid});
       return cb(err, val);
     };
 
+    log.debug(chalk.cyan('[RW] registerWriteFlagCheck SENDING REQUEST'), {key, uuid});
     this.write({key, uuid, type: 'register-write-flag-check'});
 
   }
@@ -454,12 +452,16 @@ export class RWLockWritePrefClient extends Client {
   registerWriteFlagAndReadersCheck(key: string, opts: any, cb: EVCb<any>) {
 
     const uuid = UUID.v4();
+    log.debug(chalk.cyan('[RW] registerWriteFlagAndReadersCheck START'), {key, uuid});
 
     this.resolutions[uuid] = (err, val) => {
+      log.debug(chalk.cyan('[RW] registerWriteFlagAndReadersCheck RESPONSE'), {key, uuid, err: !!err, valType: val?.type, hasVal: !!val});
       delete this.resolutions[uuid];
+      log.debug(chalk.cyan('[RW] registerWriteFlagAndReadersCheck CALLING CALLBACK'), {key, uuid});
       cb(err, val);
     };
 
+    log.debug(chalk.cyan('[RW] registerWriteFlagAndReadersCheck SENDING REQUEST'), {key, uuid});
     this.write({
       key,
       uuid,
@@ -470,7 +472,13 @@ export class RWLockWritePrefClient extends Client {
 
   incrementReaders(key: any, cb: any) {
     const uuid = UUID.v4();
-    this.resolutions[uuid] = cb;
+    log.debug(chalk.cyan('[RW] incrementReaders START'), {key, uuid});
+    this.resolutions[uuid] = (err, val) => {
+      log.debug(chalk.cyan('[RW] incrementReaders RESPONSE'), {key, uuid, err: !!err, valType: val?.type, hasVal: !!val});
+      log.debug(chalk.cyan('[RW] incrementReaders CALLING CALLBACK'), {key, uuid});
+      cb(err, val);
+    };
+    log.debug(chalk.cyan('[RW] incrementReaders SENDING REQUEST'), {key, uuid});
     this.write({
       uuid,
       type: 'increment-readers',

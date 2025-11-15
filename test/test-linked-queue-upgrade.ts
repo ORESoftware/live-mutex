@@ -7,10 +7,10 @@
  * Tests the actual usage patterns from broker.ts
  */
 
-const {Broker1} = require('./dist/main');
-const assert = require('assert');
+import {Broker1} from '../dist/main';
+import * as assert from 'assert';
 
-async function testLinkedQueueUpgrade() {
+async function testLinkedQueueUpgrade(): Promise<void> {
     console.log('Testing linked-queue upgrade (2.1.128)...\n');
     
     const port = 8000 + Math.floor(Math.random() * 1000);
@@ -21,7 +21,7 @@ async function testLinkedQueueUpgrade() {
         console.log('1. Creating broker...');
         const broker = new Broker1({port});
         // Capture broker logs
-        broker.onWarning((...args) => {
+        broker.emitter.on('warning', (...args: any[]) => {
             const msg = args.map(a => String(a)).join(' ');
             process.stderr.write(`[BROKER] ${msg}\n`);
         });
@@ -36,9 +36,9 @@ async function testLinkedQueueUpgrade() {
         
         // Test 3: Close broker
         console.log('3. Closing broker...');
-        await new Promise((resolve) => {
-            broker.close((err) => {
-                if (err) throw err;
+        await new Promise<void>((resolve, reject) => {
+            broker.close((err: any) => {
+                if (err) return reject(err);
                 resolve();
             });
         });
@@ -47,7 +47,7 @@ async function testLinkedQueueUpgrade() {
         console.log('\n✅ All tests passed! Linked-queue upgrade (2.1.128) is working correctly.');
         process.exit(0);
         
-    } catch (err) {
+    } catch (err: any) {
         console.error('\n❌ Test failed:', err.message);
         console.error(err.stack);
         process.exit(1);
@@ -55,4 +55,3 @@ async function testLinkedQueueUpgrade() {
 }
 
 testLinkedQueueUpgrade();
-
