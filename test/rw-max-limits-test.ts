@@ -12,8 +12,7 @@
  * - No false negatives (warnings when limits are exceeded)
  */
 
-import { Broker1 } from '../dist/broker-1';
-import { RWLockWritePrefClient } from '../dist/rw-write-preferred-client';
+import { Broker1, RWLockWritePrefClient } from '../dist/main';
 
 const PORT = process.env.LMX_TEST_PORT ? parseInt(process.env.LMX_TEST_PORT) : 9999;
 

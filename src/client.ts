@@ -756,7 +756,7 @@ export class Client {
     return this.acquire.apply(this, <any>arguments);
   }
   
-  unlockp(key: string, opts: Partial<LMXClientUnlockOpts>): Promise<LMUnlockSuccessData> {
+  unlockp(key: string, opts?: string | boolean | Partial<LMXClientUnlockOpts>): Promise<LMUnlockSuccessData> {
     log.warn('unlockp is deprecated because it is a confusing method name, use aliases release/releaseLock instead.');
     return this.release.apply(this, <any>arguments);
   }
@@ -878,7 +878,7 @@ export class Client {
   
   protected parseLockOpts(
     key: string,
-    opts: LMXClientLockOpts | LMClientLockCallBack,
+    opts: number | boolean | LMXClientLockOpts | LMClientLockCallBack,
     cb?: LMClientLockCallBack
   ): [string, LMXClientLockOpts, LMClientLockCallBack] {
     
@@ -924,8 +924,9 @@ export class Client {
   // lock(key: string, cb: LMClientLockCallBack, z?: LMClientLockCallBack) : void;
   
   lock(key: string, cb: LMClientLockCallBack): void;
-  lock(key: string, opts: Partial<LMXClientLockOpts>, cb: LMClientLockCallBack): void;
-  lock(key: string, opts: Partial<LMXClientLockOpts> | LMClientLockCallBack, cb?: LMClientLockCallBack): void {
+  lock(key: string, ttl: number, cb: LMClientLockCallBack): void;
+  lock(key: string, opts: number | boolean | Partial<LMXClientLockOpts>, cb: LMClientLockCallBack): void;
+  lock(key: string, opts: number | boolean | Partial<LMXClientLockOpts> | LMClientLockCallBack, cb?: LMClientLockCallBack): void {
     
     try {
       [key, opts, cb] = this.parseLockOpts(key, opts, cb);
@@ -1332,7 +1333,7 @@ export class Client {
   
   protected parseUnlockOpts(
     key: string,
-    opts?: LMXClientUnlockOpts | LMClientUnlockCallBack,
+    opts?: string | boolean | LMXClientUnlockOpts | LMClientUnlockCallBack,
     cb?: LMClientUnlockCallBack
   ): [string, LMXClientUnlockOpts, LMClientUnlockCallBack] {
     
@@ -1360,10 +1361,12 @@ export class Client {
   }
   
   unlock(key: string): void;
-  unlock(key: string, opts: LMXClientUnlockOpts): void;
-  unlock(key: string, opts: LMXClientUnlockOpts, cb: LMClientUnlockCallBack): void;
+  unlock(key: string, cb: LMClientUnlockCallBack): void;
+  unlock(key: string, id: string, cb: LMClientUnlockCallBack): void;
+  unlock(key: string, opts: string | boolean | LMXClientUnlockOpts): void;
+  unlock(key: string, opts: string | boolean | LMXClientUnlockOpts, cb: LMClientUnlockCallBack): void;
   
-  unlock(key: string, opts?: LMXClientUnlockOpts | LMClientUnlockCallBack, cb?: LMClientUnlockCallBack) {
+  unlock(key: string, opts?: string | boolean | LMXClientUnlockOpts | LMClientUnlockCallBack, cb?: LMClientUnlockCallBack) {
     
     try {
       [key, opts, cb] = this.parseUnlockOpts(key, opts, cb);

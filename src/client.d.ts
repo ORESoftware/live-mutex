@@ -145,7 +145,7 @@ export declare class Client {
     acquire(key: string, opts?: Partial<LMXClientLockOpts>): Promise<LMLockSuccessData>;
     release(key: string, opts: Partial<LMXClientUnlockOpts>): Promise<LMUnlockSuccessData>;
     lockp(key: string, opts?: Partial<LMXClientLockOpts>): Promise<LMLockSuccessData>;
-    unlockp(key: string, opts: Partial<LMXClientUnlockOpts>): Promise<LMUnlockSuccessData>;
+    unlockp(key: string, opts?: string | boolean | Partial<LMXClientUnlockOpts>): Promise<LMUnlockSuccessData>;
     acquireLock(key: string, opts?: boolean | number | Partial<LMXClientLockOpts>): Promise<LMLockSuccessData>;
     releaseLock(key: string, opts: Partial<LMXClientUnlockOpts>): Promise<LMUnlockSuccessData>;
     run(fn: LMLockSuccessData): Promise<unknown>;
@@ -158,13 +158,13 @@ export declare class Client {
     ls(cb: EVCb<any>): void;
     ls(opts: any, cb?: EVCb<any>): void;
     protected preParseLockOptsForPromises(key: string, opts: LMXClientLockOpts): [string, LMXClientLockOpts];
-    protected parseLockOpts(key: string, opts: LMXClientLockOpts | LMClientLockCallBack, cb?: LMClientLockCallBack): [string, LMXClientLockOpts, LMClientLockCallBack];
+    protected parseLockOpts(key: string, opts: number | boolean | LMXClientLockOpts | LMClientLockCallBack, cb?: LMClientLockCallBack): [string, LMXClientLockOpts, LMClientLockCallBack];
     _simulateVersionMismatch(): void;
     _invokeBrokerSideEndCall(): void;
     _invokeBrokerSideDestroyCall(): void;
     _makeClientSideError(): void;
     lock(key: string, cb: LMClientLockCallBack): void;
-    lock(key: string, opts: Partial<LMXClientLockOpts>, cb: LMClientLockCallBack): void;
+    lock(key: string, opts: number | boolean | Partial<LMXClientLockOpts>, cb: LMClientLockCallBack): void;
     on(): any;
     once(): any;
     private lockInternal;
@@ -173,10 +173,10 @@ export declare class Client {
     getHost(): string;
     onWarning(callback: (...args: any[]) => void): void;
     protected preParseUnlockOptsForPromise(key: string, opts?: string | boolean | LMXClientUnlockOpts): [string, LMXClientUnlockOpts];
-    protected parseUnlockOpts(key: string, opts?: LMXClientUnlockOpts | LMClientUnlockCallBack, cb?: LMClientUnlockCallBack): [string, LMXClientUnlockOpts, LMClientUnlockCallBack];
+    protected parseUnlockOpts(key: string, opts?: string | boolean | LMXClientUnlockOpts | LMClientUnlockCallBack, cb?: LMClientUnlockCallBack): [string, LMXClientUnlockOpts, LMClientUnlockCallBack];
     unlock(key: string): void;
-    unlock(key: string, opts: LMXClientUnlockOpts): void;
-    unlock(key: string, opts: LMXClientUnlockOpts, cb: LMClientUnlockCallBack): void;
+    unlock(key: string, opts: string | boolean | LMXClientUnlockOpts): void;
+    unlock(key: string, opts: string | boolean | LMXClientUnlockOpts, cb: LMClientUnlockCallBack): void;
     ping(cb?: EVCb<any>): Promise<any>;
     getSystemStats(cb?: EVCb<any>): Promise<any>;
 }
