@@ -10,6 +10,7 @@ export {Broker, LMXBroker, LvMtxBroker} from './broker';
 export {Broker1, LMXBroker as LMXBroker1, LvMtxBroker as LvMtxBroker1} from './broker-1';
 
 export {LMXLockRequestError, LMXUnlockRequestError} from "./shared-internal";
+export {LMXClientException, LMXClientLockException, LMXClientUnlockException} from "./exceptions";
 
 export const r2gSmokeTest = function () {
   return true;

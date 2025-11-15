@@ -31,16 +31,15 @@ export class LMXClientException {
   
 }
 
-export class LMXClientLockException {
+export class LMXClientLockException extends Error {
 
   code: LMXLockRequestError;
-  message: string;
   key: string;
   id: string;
-  stack: string;
 
   constructor(key: string, id: string, code: LMXLockRequestError, message: string) {
-    
+    super(message);
+    this.name = 'LMXClientLockException';
     this.id = id;
     this.key = key;
     this.code = code;
@@ -50,20 +49,22 @@ export class LMXClientLockException {
     }
 
     this.message = message;
-    this.stack = message;
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, LMXClientLockException);
+    }
   }
 
 }
 
-export class LMXClientUnlockException {
+export class LMXClientUnlockException extends Error {
 
   code: LMXUnlockRequestError;
-  message: string;
   key: string;
   id: string;
-  stack: string;
 
   constructor(key: string, id: string, code: LMXUnlockRequestError, message: string) {
+    super(message);
+    this.name = 'LMXClientUnlockException';
     this.id = id;
     this.key = key;
     this.code = code;
@@ -73,7 +74,9 @@ export class LMXClientUnlockException {
     }
 
     this.message = message;
-    this.stack = message;
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, LMXClientUnlockException);
+    }
   }
 
 }
