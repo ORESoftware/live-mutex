@@ -10,7 +10,8 @@ const path = require('path');
 const fs = require('fs');
 
 const BASE_PORT = 9000;
-const TEST_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes per test
+const TEST_TIMEOUT_MS = 30 * 1000; // 30 seconds per test
+const INACTIVITY_TIMEOUT_MS = 30 * 1000; // 30 seconds of inactivity
 let currentPort = BASE_PORT;
 
 // Test files to run (in order) - prefer .ts files
@@ -73,7 +74,6 @@ function runTest(testFile, testNumber, totalTests) {
     let outputBuffer = '';
     let errorBuffer = '';
     let lastOutputTime = Date.now();
-    const INACTIVITY_TIMEOUT_MS = 15 * 1000; // 15 seconds
     
     // Set environment variables for the test
     const env = {
@@ -94,12 +94,22 @@ function runTest(testFile, testNumber, totalTests) {
     const args = isTypeScript ? ['ts-node', testFile] : [testFile];
     
     // Use pipe instead of inherit for better cursor agent compatibility
+    // Set detached: false but kill process group on exit
     const proc = spawn(command, args, {
       env,
       stdio: ['ignore', 'pipe', 'pipe'],
       cwd: path.join(__dirname, '..'),
       detached: false,
     });
+    
+    // Ensure we can kill the process group
+    if (proc.pid) {
+      try {
+        process.kill(-proc.pid, 0); // Test if we can signal the group
+      } catch (e) {
+        // Process group doesn't exist yet or we can't signal it - that's ok
+      }
+    }
     
     // Reset inactivity timer whenever we receive ANY output from stdout OR stderr
     const resetInactivityTimer = () => {
@@ -112,18 +122,7 @@ function runTest(testFile, testNumber, totalTests) {
           const timeSinceLastOutput = Date.now() - lastOutputTime;
           if (timeSinceLastOutput >= INACTIVITY_TIMEOUT_MS) {
             console.error(`\n⏱️  ${testFile} - No stdio output for ${INACTIVITY_TIMEOUT_MS / 1000}s, killing process`);
-            resolved = true;
-            try {
-              proc.kill('SIGTERM');
-              setTimeout(() => {
-                if (!proc.killed) {
-                  proc.kill('SIGKILL');
-                }
-              }, 2000);
-            } catch (e) {
-              // ignore
-            }
-            finish(1, false);
+            finish(1, true); // Mark as timeout
           }
         }
       }, INACTIVITY_TIMEOUT_MS);
@@ -243,16 +242,12 @@ function runTest(testFile, testNumber, totalTests) {
       }
     }, TEST_TIMEOUT_MS);
     
+    let completionTimeout = null;
+    
     const finish = (code, timeout = false) => {
       if (resolved) return;
       resolved = true;
       
-      if (heartbeatInterval) {
-        clearInterval(heartbeatInterval);
-      }
-      if (noOutputTimeout) {
-        clearTimeout(noOutputTimeout);
-      }
       if (completionTimeout) {
         clearTimeout(completionTimeout);
       }
@@ -266,24 +261,42 @@ function runTest(testFile, testNumber, totalTests) {
         clearTimeout(inactivityTimeoutId);
       }
       
-      // Only try to kill if it's a timeout situation
-      if (timeout) {
+      // Always ensure process is killed if still running
+      if (!proc.killed && proc.pid) {
         try {
-          if (!proc.killed && proc.pid) {
+          // Kill the process group to ensure all children die
+          process.kill(-proc.pid, 'SIGTERM');
+          setTimeout(() => {
+            if (!proc.killed && proc.pid) {
+              try {
+                process.kill(-proc.pid, 'SIGKILL');
+              } catch (e) {
+                // ignore
+              }
+            }
+            // Also kill the direct process
             try {
-              process.kill(proc.pid, 0); // Check if alive
+              if (!proc.killed) {
+                proc.kill('SIGKILL');
+              }
+            } catch (e) {
+              // ignore
+            }
+          }, 2000);
+        } catch (e) {
+          // Process group might not exist, try direct kill
+          try {
+            if (!proc.killed) {
               proc.kill('SIGTERM');
               setTimeout(() => {
                 if (!proc.killed) {
                   proc.kill('SIGKILL');
                 }
               }, 1000);
-            } catch (e) {
-              // Process already dead
             }
+          } catch (e2) {
+            // ignore
           }
-        } catch (e) {
-          // ignore
         }
       }
       
@@ -456,7 +469,7 @@ async function main() {
   
   const passed = results.filter(r => r.passed).length;
   const failed = results.filter(r => !r.passed).length;
-  const totalDuration = results.reduce((sum, r) => sum + (r.duration || 0), 0);
+  const totalDuration = results.reduce((sum, r) => sum + parseFloat(r.duration || 0), 0);
   
   console.log(`Total: ${results.length}`);
   console.log(`✅ Passed: ${passed}`);

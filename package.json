@@ -19,6 +19,7 @@
   },
   "scripts": {
     "compile": "tsc",
+    "compile:watch": "tsc --watch",
     "compile:test": "tsc --project tsconfig.test.json",
     "compile:all": "npm run compile && npm run compile:test",
     "compile:check": "tsc --noEmit",
