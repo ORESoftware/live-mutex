@@ -706,6 +706,14 @@ export class Broker1 {
         this.emitter.on('warning', callback);
     }
 
+    /**
+     * Attach a callback to listen for error events and output them
+     * @param callback Function that receives error messages
+     */
+    onError(callback: (...args: any[]) => void): void {
+        this.emitter.on('error', callback);
+    }
+
     abruptlyDestroyConnection(ws: LMXSocket) {
         log.error('Connection will be destroyed.');
         ws.destroy();
@@ -1380,11 +1388,26 @@ export class Broker1 {
             const ln = lck.notify.length;
             const count = lck.lockholders.size;
 
-            // Strictly enforce max lock holders - prevent race conditions
-            if (count >= lck.max) {
+            // For RW read locks, check readers count (accounting for the increment that will happen)
+            // because readers are tracked separately and we need to check before incrementing
+            // For non-read operations, use lockholders.size
+            // IMPORTANT: For read locks, we check readers count, not lockholders.size,
+            // because read locks share the same lockholders map but have separate reader tracking
+            const effectiveCount = beginRead ? (lck.readers + 1) : count;
+            const effectiveMax = lck.max;
 
-                if (count > lck.max) {
-                    log.warn(`Semaphore limit exceeded: ${count} lock holders exceeds max of ${lck.max} for key "${key}"`);
+            // Strictly enforce max lock holders - prevent race conditions
+            // For read operations, check if adding this reader would exceed max
+            // For non-read operations, check current lockholders count
+            if (effectiveCount >= effectiveMax) {
+
+                // Only warn if we actually exceed the limit due to a race condition
+                // Don't warn for write locks queuing behind readers (expected behavior)
+                // Don't warn for read locks at the limit (expected when max is reached)
+                // Only warn if there's a real race condition causing us to exceed the limit
+                const isWriteLockQueuing = !beginRead && lck.readers > 0 && effectiveMax === 1;
+                if (effectiveCount > effectiveMax && !isWriteLockQueuing) {
+                    log.warn(`Semaphore limit exceeded: ${effectiveCount} ${beginRead ? 'readers (after increment)' : 'lock holders'} exceeds max of ${effectiveMax} for key "${key}"`);
                 }
 
                 // Lock exists *and* already has a lockholder; adding ws to list of to be notified

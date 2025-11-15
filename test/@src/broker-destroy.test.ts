@@ -11,7 +11,7 @@ const Test = suman.init(module);
 import * as async from 'async';
 
 // import the other way, just to be sure
-import {Client, Broker1, lmUtils} from 'live-mutex';
+import {Client, Broker1, Broker, lmUtils} from 'live-mutex';
 
 /////////////////////////////////////////////////////////////////////
 

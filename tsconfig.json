@@ -5,17 +5,14 @@
     "outDir": "dist",
     "declaration": true,
     "baseUrl": ".",
-    "target": "es2020",
+    "target": "ESNext",
     "rootDir": "src",
     "module": "commonjs",
     "noImplicitAny": true,
     "removeComments": true,
     "allowUnreachableCode": false,
     "lib": [
-      "es2019",
-      "es2020",
-      "es2021",
-      "es2022"
+      "ESNext"
     ]
   },
   "compileOnSave": false,

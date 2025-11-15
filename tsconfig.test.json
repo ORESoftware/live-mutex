@@ -4,7 +4,15 @@
     "outDir": "dist/test",
     "rootDir": ".",
     "noEmit": false,
-    "noImplicitAny": false
+    "noImplicitAny": false,
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true,
+    "paths": {
+      "live-mutex": ["./src/main.ts"]
+    }
   },
   "include": [
     "test/**/*.ts",

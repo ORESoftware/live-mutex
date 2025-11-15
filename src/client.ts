@@ -1305,6 +1305,14 @@ export class Client {
     this.emitter.on('warning', callback);
   }
   
+  /**
+   * Attach a callback to listen for error events and output them
+   * @param callback Function that receives error messages
+   */
+  onError(callback: (...args: any[]) => void): void {
+    this.emitter.on('error', callback);
+  }
+  
   protected preParseUnlockOptsForPromise(
     key: string,
     opts?: string | boolean | LMXClientUnlockOpts,
