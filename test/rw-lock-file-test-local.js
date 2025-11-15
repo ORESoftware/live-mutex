@@ -1,47 +1,9 @@
 "use strict";
-/**
- * Read-Write Lock & Semaphore Test Suite (Local Version)
- * Tests RW locks and semaphores using temporary files
- */
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 Object.defineProperty(exports, "__esModule", { value: true });
-const fs = __importStar(require("fs"));
-const path = __importStar(require("path"));
-const os = __importStar(require("os"));
+const fs = require("fs");
+const path = require("path");
+const os = require("os");
 const main_1 = require("../dist/main");
-// Create a temporary file for testing
 function createTempFile() {
     const tmpDir = os.tmpdir();
     const tmpFile = path.join(tmpDir, `lmx-test-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.txt`);
@@ -67,7 +29,6 @@ async function testBasicRWLock() {
     const tmpFile = createTempFile();
     console.log('Using temp file:', tmpFile);
     try {
-        // Test write lock - should be exclusive
         await new Promise((resolve, reject) => {
             client.acquireWriteLock('test-key', {}, (err, release) => {
                 if (err)
@@ -84,7 +45,6 @@ async function testBasicRWLock() {
                 });
             });
         });
-        // Test read lock - should allow concurrent readers
         await new Promise((resolve, reject) => {
             client.acquireReadLock('test-key', {}, (err, release) => {
                 if (err)
@@ -130,7 +90,6 @@ async function testConcurrentReaders() {
     writeFile(tmpFile, 0);
     console.log('Using temp file:', tmpFile);
     try {
-        // All readers should be able to read simultaneously
         const readPromises = clients.map((client, index) => {
             return new Promise((resolve, reject) => {
                 client.acquireReadLock('read-key', {}, (err, release) => {
@@ -138,7 +97,6 @@ async function testConcurrentReaders() {
                         return reject(err);
                     const value = readFile(tmpFile);
                     console.log(`  Reader ${index} read value: ${value}`);
-                    // Simulate some reading time
                     setTimeout(() => {
                         release((releaseErr) => {
                             if (releaseErr)
@@ -180,7 +138,6 @@ async function testExclusiveWriter() {
     writeFile(tmpFile, 0);
     console.log('Using temp file:', tmpFile);
     try {
-        // Writers should be exclusive - only one at a time
         let writeCount = 0;
         const writePromises = clients.map((client, index) => {
             return new Promise((resolve, reject) => {
@@ -195,7 +152,6 @@ async function testExclusiveWriter() {
                     const newValue = currentValue + 1;
                     writeFile(tmpFile, newValue);
                     console.log(`  Writer ${index} wrote value: ${newValue}`);
-                    // Simulate some writing time
                     setTimeout(() => {
                         writeCount--;
                         release((releaseErr) => {
@@ -240,16 +196,13 @@ async function testReaderWriterInteraction() {
     writeFile(tmpFile, 100);
     console.log('Using temp file:', tmpFile);
     try {
-        // Start a reader
         const readerPromise = new Promise((resolve, reject) => {
             readerClient.acquireReadLock('rw-key', {}, (err, release) => {
                 if (err)
                     return reject(err);
                 console.log('  Reader acquired lock');
-                // Reader should be able to read
                 const value1 = readFile(tmpFile);
                 console.log(`  Reader read value: ${value1}`);
-                // Wait a bit, then try to write (should wait for reader to finish)
                 setTimeout(() => {
                     const value2 = readFile(tmpFile);
                     console.log(`  Reader read value again: ${value2}`);
@@ -262,8 +215,7 @@ async function testReaderWriterInteraction() {
                 }, 100);
             });
         });
-        // Start a writer (should wait for reader)
-        await sleep(20); // Give reader time to acquire
+        await sleep(20);
         const writerPromise = new Promise((resolve, reject) => {
             writerClient.acquireWriteLock('rw-key', {}, (err, release) => {
                 if (err)
@@ -332,10 +284,8 @@ async function testSemaphoreLogic() {
                         return reject(new Error(`Semaphore limit exceeded! Count: ${concurrentCount}, Max: ${maxHolders}`));
                     }
                     console.log(`  Client ${index} acquired semaphore (concurrent: ${concurrentCount})`);
-                    // Increment file value
                     const currentValue = readFile(tmpFile);
                     writeFile(tmpFile, currentValue + 1);
-                    // Simulate work
                     setTimeout(() => {
                         concurrentCount--;
                         unlock((unlockErr) => {
@@ -410,10 +360,8 @@ async function testSemaphoreStress() {
                             return reject(new Error(`Semaphore limit exceeded! Count: ${concurrentCount}, Max: ${maxHolders}`));
                         }
                         totalOperations++;
-                        // Increment file value
                         const currentValue = readFile(tmpFile);
                         writeFile(tmpFile, currentValue + 1);
-                        // Simulate work
                         setTimeout(() => {
                             concurrentCount--;
                             unlock((unlockErr) => {
@@ -471,7 +419,7 @@ async function runAllTests() {
         try {
             await test.fn();
             passed++;
-            await sleep(500); // Brief pause between tests
+            await sleep(500);
         }
         catch (err) {
             failed++;
@@ -493,7 +441,6 @@ async function runAllTests() {
         process.exit(1);
     }
 }
-// Run tests
 runAllTests().catch((err) => {
     console.error('Fatal error:', err);
     process.exit(1);

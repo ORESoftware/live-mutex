@@ -1,50 +1,9 @@
 "use strict";
-/**
- * Semaphore Test Suite
- * Tests the primary Client class semaphore functionality
- * - Default max=1 (exclusive lock)
- * - Custom max values (3, 10, etc.)
- * - Concurrent lockholders verification
- */
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 Object.defineProperty(exports, "__esModule", { value: true });
-const fs = __importStar(require("fs"));
-const path = __importStar(require("path"));
-const os = __importStar(require("os"));
+const fs = require("fs");
+const path = require("path");
+const os = require("os");
 const main_1 = require("../dist/main");
-// Create a temporary file for testing
 function createTempFile() {
     const tmpDir = os.tmpdir();
     const tmpFile = path.join(tmpDir, `lmx-semaphore-test-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.txt`);
@@ -62,7 +21,7 @@ function sleep(ms) {
 }
 async function testDefaultMaxOne() {
     console.log('\n=== Test 1: Default max=1 (Exclusive Lock) ===');
-    const port = process.env.LMX_TEST_PORT ? parseInt(process.env.LMX_TEST_PORT) : (8000 + Math.floor(Math.random() * 1000));
+    const port = 8000 + Math.floor(Math.random() * 1000);
     const broker = new main_1.Broker({ port });
     await broker.ensure();
     const clients = [];
@@ -81,22 +40,18 @@ async function testDefaultMaxOne() {
         let violations = 0;
         const promises = clients.map((client, index) => {
             return new Promise((resolve, reject) => {
-                // Don't specify max - should default to 1
                 client.lock('default-key', {}, (err, unlock) => {
                     if (err)
                         return reject(err);
                     concurrentCount++;
                     maxConcurrent = Math.max(maxConcurrent, concurrentCount);
-                    // With default max=1, we should never have more than 1 concurrent holder
                     if (concurrentCount > 1) {
                         violations++;
                         console.error(`  ⚠️  VIOLATION: ${concurrentCount} concurrent holders (expected max 1)`);
                     }
                     console.log(`  Client ${index} acquired lock (concurrent: ${concurrentCount})`);
-                    // Increment file value
                     const currentValue = readFile(tmpFile);
                     writeFile(tmpFile, currentValue + 1);
-                    // Hold lock for a bit
                     setTimeout(() => {
                         concurrentCount--;
                         unlock((unlockErr) => {
@@ -139,7 +94,7 @@ async function testDefaultMaxOne() {
 }
 async function testSemaphoreMaxThree() {
     console.log('\n=== Test 2: Semaphore max=3 (3 Concurrent Holders) ===');
-    const port = process.env.LMX_TEST_PORT ? parseInt(process.env.LMX_TEST_PORT) : (8000 + Math.floor(Math.random() * 1000));
+    const port = 8000 + Math.floor(Math.random() * 1000);
     const broker = new main_1.Broker({ port });
     await broker.ensure();
     const clients = [];
@@ -164,16 +119,13 @@ async function testSemaphoreMaxThree() {
                         return reject(err);
                     concurrentCount++;
                     maxConcurrent = Math.max(maxConcurrent, concurrentCount);
-                    // Should never exceed maxHolders
                     if (concurrentCount > maxHolders) {
                         violations++;
                         console.error(`  ⚠️  VIOLATION: ${concurrentCount} concurrent holders (max: ${maxHolders})`);
                     }
                     console.log(`  Client ${index} acquired semaphore (concurrent: ${concurrentCount}/${maxHolders})`);
-                    // Increment file value
                     const currentValue = readFile(tmpFile);
                     writeFile(tmpFile, currentValue + 1);
-                    // Hold lock for a bit
                     setTimeout(() => {
                         concurrentCount--;
                         unlock((unlockErr) => {
@@ -219,7 +171,7 @@ async function testSemaphoreMaxThree() {
 }
 async function testSemaphoreMaxTen() {
     console.log('\n=== Test 3: Semaphore max=10 (10 Concurrent Holders) ===');
-    const port = process.env.LMX_TEST_PORT ? parseInt(process.env.LMX_TEST_PORT) : (8000 + Math.floor(Math.random() * 1000));
+    const port = 8000 + Math.floor(Math.random() * 1000);
     const broker = new main_1.Broker({ port });
     await broker.ensure();
     const clients = [];
@@ -244,7 +196,6 @@ async function testSemaphoreMaxTen() {
                         return reject(err);
                     concurrentCount++;
                     maxConcurrent = Math.max(maxConcurrent, concurrentCount);
-                    // Should never exceed maxHolders
                     if (concurrentCount > maxHolders) {
                         violations++;
                         console.error(`  ⚠️  VIOLATION: ${concurrentCount} concurrent holders (max: ${maxHolders})`);
@@ -252,10 +203,8 @@ async function testSemaphoreMaxTen() {
                     if (index < 5 || index % 5 === 0) {
                         console.log(`  Client ${index} acquired semaphore (concurrent: ${concurrentCount}/${maxHolders})`);
                     }
-                    // Increment file value
                     const currentValue = readFile(tmpFile);
                     writeFile(tmpFile, currentValue + 1);
-                    // Hold lock for a bit
                     setTimeout(() => {
                         concurrentCount--;
                         unlock((unlockErr) => {
@@ -303,7 +252,7 @@ async function testSemaphoreMaxTen() {
 }
 async function testSemaphoreStress() {
     console.log('\n=== Test 4: Semaphore Stress Test (max=5, 50 clients, 10 ops each) ===');
-    const port = process.env.LMX_TEST_PORT ? parseInt(process.env.LMX_TEST_PORT) : (8000 + Math.floor(Math.random() * 1000));
+    const port = 8000 + Math.floor(Math.random() * 1000);
     const broker = new main_1.Broker({ port });
     await broker.ensure();
     const clients = [];
@@ -334,17 +283,14 @@ async function testSemaphoreStress() {
                         concurrentCount++;
                         maxConcurrent = Math.max(maxConcurrent, concurrentCount);
                         totalOperations++;
-                        // Should never exceed maxHolders
                         if (concurrentCount > maxHolders) {
                             violations++;
-                            if (violations <= 5) { // Only log first few violations
+                            if (violations <= 5) {
                                 console.error(`  ⚠️  VIOLATION #${violations}: ${concurrentCount} concurrent holders (max: ${maxHolders})`);
                             }
                         }
-                        // Increment file value
                         const currentValue = readFile(tmpFile);
                         writeFile(tmpFile, currentValue + 1);
-                        // Simulate work
                         setTimeout(() => {
                             concurrentCount--;
                             unlock((unlockErr) => {
@@ -389,7 +335,7 @@ async function testSemaphoreStress() {
 }
 async function testMixedMaxValues() {
     console.log('\n=== Test 5: Mixed Max Values (Different keys with different max) ===');
-    const port = process.env.LMX_TEST_PORT ? parseInt(process.env.LMX_TEST_PORT) : (8000 + Math.floor(Math.random() * 1000));
+    const port = 8000 + Math.floor(Math.random() * 1000);
     const broker = new main_1.Broker({ port });
     await broker.ensure();
     const clients = [];
@@ -411,7 +357,6 @@ async function testMixedMaxValues() {
         let concurrent2 = 0, maxConcurrent2 = 0;
         let concurrent3 = 0, maxConcurrent3 = 0;
         const promises = [];
-        // Key 1: default max=1
         for (let i = 0; i < 5; i++) {
             promises.push(new Promise((resolve, reject) => {
                 clients[i].lock('key1', {}, (err, unlock) => {
@@ -432,7 +377,6 @@ async function testMixedMaxValues() {
                 });
             }));
         }
-        // Key 2: max=3
         for (let i = 5; i < 10; i++) {
             promises.push(new Promise((resolve, reject) => {
                 clients[i].lock('key2', { max: 3 }, (err, unlock) => {
@@ -453,7 +397,6 @@ async function testMixedMaxValues() {
                 });
             }));
         }
-        // Key 3: max=5
         for (let i = 10; i < 15; i++) {
             promises.push(new Promise((resolve, reject) => {
                 clients[i].lock('key3', { max: 5 }, (err, unlock) => {
@@ -522,15 +465,13 @@ async function runAllTests() {
     let failed = 0;
     for (const test of tests) {
         try {
-            console.log(`\nRunning test: ${test.name}...`);
             await test.fn();
             passed++;
-            console.log(`✅ ${test.name} completed`);
-            await sleep(500); // Brief pause between tests
+            await sleep(500);
         }
         catch (err) {
             failed++;
-            console.error(`\n❌ Test "${test.name}" failed:`, err.message);
+            console.error(`\nTest "${test.name}" failed:`, err.message);
         }
     }
     console.log('\n========================================');
@@ -548,7 +489,6 @@ async function runAllTests() {
         process.exit(1);
     }
 }
-// Run tests
 runAllTests().catch((err) => {
     console.error('Fatal error:', err);
     process.exit(1);

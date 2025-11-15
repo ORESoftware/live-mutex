@@ -1,0 +1,90 @@
+'use strict';
+Object.defineProperty(exports, "__esModule", { value: true });
+const suman = require("suman");
+const { Test } = suman.init(module);
+const main_1 = require("../../dist/main");
+Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
+        const { Promise } = b.ioc;
+        const { chalk: colors } = $deps;
+        console.log('suman child id:', process.env.SUMAN_CHILD_ID);
+        const port = process.env.lmx_port ? parseInt(process.env.lmx_port) : (7000 + parseInt(process.env.SUMAN_CHILD_ID || '1'));
+        const conf = Object.freeze({ port });
+        const handleEvents = function (v) {
+            v.emitter.on('warning', w => {
+                console.error('warning:', w);
+            });
+            v.emitter.on('error', w => {
+                console.error('error:', w);
+            });
+            return v;
+        };
+        before(h => {
+            const brokerConf = Object.assign({}, conf, { noListen: process.env.lmx_broker_no_listen === 'yes' });
+            return new main_1.Broker1(brokerConf).start().then(handleEvents);
+        });
+        before('get client', h => {
+            return new main_1.Client(conf).ensure().then(function (c) {
+                h.supply.client = handleEvents(c);
+            });
+        });
+        describe('do all in parallel', { parallel: true }, b => {
+            describe('injected', function (b) {
+                it('locks/unlocks', t => {
+                    const c = t.supply.client;
+                    return c.lockp('a').then(function (v) {
+                        return c.unlockp('a', v.id);
+                    });
+                });
+            });
+            it('locks/unlocks', t => {
+                const c = t.supply.client;
+                return c.lockp('a').then(function (v) {
+                    return c.unlockp('a', v.id);
+                });
+            });
+            const makePromiseProvider = function (unlock) {
+                return function (input) {
+                    return new Promise(function (resolve, reject) {
+                        unlock(function (err, v) {
+                            err ? reject(err) : resolve(v);
+                        });
+                    });
+                };
+            };
+            it('locks/unlocks super special 1', t => {
+                const c = t.supply.client;
+                return c.lockp('foo').then(function (unlock) {
+                    return c.runUnlock(unlock);
+                });
+            });
+            it('locks/unlocks super special 2', async (t) => {
+                const c = t.supply.client;
+                const unlock = await c.acquire('foo');
+                return c.execUnlock(unlock);
+            });
+            it('locks/unlocks super special 2', async (t) => {
+                const c = t.supply.client;
+                const { unlock } = await c.acquire('foo');
+                return c.execUnlock(unlock);
+            });
+            it('locks/unlocks super special 2', async (t) => {
+                const c = t.supply.client;
+                const { unlock } = await c.lockp('foo');
+                const provider = makePromiseProvider(unlock);
+                const v = await Promise.resolve(123);
+                return provider(String(v));
+            });
+            it('locks/unlocks super special 3', t => {
+                const c = t.supply.client;
+                return c.lockp('foo').then(function ({ unlock }) {
+                    return new Promise((resolve, reject) => unlock((e, v) => e ? reject(e) : resolve(v)));
+                });
+            });
+            it('locks/unlocks', async (t) => {
+                const c = t.supply.client;
+                const { id } = await c.lockp('a');
+                await Promise.delay(100);
+                return c.unlockp('a', id);
+            });
+        });
+    }]);

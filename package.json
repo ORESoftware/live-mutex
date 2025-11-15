@@ -18,6 +18,10 @@
     "lmx": "assets/lmx.sh"
   },
   "scripts": {
+    "compile": "tsc",
+    "compile:test": "tsc --project tsconfig.test.json",
+    "compile:all": "npm run compile && npm run compile:test",
+    "compile:check": "tsc --noEmit",
     "test": "node scripts/run-tests.js",
     "test:old": "./scripts/test.sh",
     "postinstall": "./assets/postinstall.sh"

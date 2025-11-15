@@ -1,46 +1,8 @@
 "use strict";
-/**
- * Reader-Writer Lock File Test (Remote Version)
- * Tests RW locks by reading/writing to a file to verify correct ordering
- * Uses extensive debug logging to track operation order
- */
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 Object.defineProperty(exports, "__esModule", { value: true });
-const fs = __importStar(require("fs"));
-const path = __importStar(require("path"));
-const os = __importStar(require("os"));
+const fs = require("fs");
+const path = require("path");
+const os = require("os");
 const main_1 = require("../dist/main");
 const PORT = 4444;
 const TEST_FILE = path.join(os.tmpdir(), 'lmx-rw-test.txt');
@@ -49,16 +11,20 @@ const debugLog = [];
 let logCounter = 0;
 function debug(message, data = {}) {
     const timestamp = Date.now();
-    const entry = Object.assign({ id: ++logCounter, timestamp, time: new Date().toISOString(), message }, data);
+    const entry = {
+        id: ++logCounter,
+        timestamp,
+        time: new Date().toISOString(),
+        message,
+        ...data
+    };
     debugLog.push(entry);
     const logLine = `[${entry.time}] [${entry.id}] ${message}${Object.keys(data).length > 0 ? ' ' + JSON.stringify(data) : ''}`;
     console.log(logLine);
-    // Also write to log file
     try {
         fs.appendFileSync(LOG_FILE, logLine + '\n');
     }
     catch (err) {
-        // Ignore log file errors
     }
 }
 function delay(ms) {
@@ -94,7 +60,6 @@ async function readerOperation(client, readerId, key, expectedValue) {
                 acquireTime: `${acquireTime}ms`,
                 timestamp: Date.now()
             });
-            // Read the file
             const readStart = Date.now();
             const content = readFile();
             const readTime = Date.now() - readStart;
@@ -105,7 +70,6 @@ async function readerOperation(client, readerId, key, expectedValue) {
                 expectedValue,
                 matches: content === expectedValue
             });
-            // Verify we got expected value (or at least a valid value)
             if (expectedValue && content !== expectedValue && content !== '') {
                 debug(`⚠️  Reader ${readerId} got unexpected value`, {
                     readerId,
@@ -113,7 +77,6 @@ async function readerOperation(client, readerId, key, expectedValue) {
                     actual: content
                 });
             }
-            // Hold lock for a bit to simulate work
             setTimeout(() => {
                 release((releaseErr) => {
                     const releaseTime = Date.now() - startTime;
@@ -147,7 +110,6 @@ async function writerOperation(client, writerId, key, writeValue, expectedBefore
                 acquireTime: `${acquireTime}ms`,
                 timestamp: Date.now()
             });
-            // Read current value
             const currentValue = readFile();
             debug(`Writer ${writerId} read current value before write`, {
                 writerId,
@@ -162,7 +124,6 @@ async function writerOperation(client, writerId, key, writeValue, expectedBefore
                     actual: currentValue
                 });
             }
-            // Write new value
             const writeStart = Date.now();
             writeFile(writeValue);
             const writeTime = Date.now() - writeStart;
@@ -172,7 +133,6 @@ async function writerOperation(client, writerId, key, writeValue, expectedBefore
                 writeTime: `${writeTime}ms`,
                 previousValue: currentValue
             });
-            // Verify write succeeded
             const verifyValue = readFile();
             if (verifyValue !== writeValue) {
                 debug(`⚠️  Writer ${writerId} write verification failed`, {
@@ -181,7 +141,6 @@ async function writerOperation(client, writerId, key, writeValue, expectedBefore
                     actual: verifyValue
                 });
             }
-            // Hold lock for a bit
             setTimeout(() => {
                 release((releaseErr) => {
                     const releaseTime = Date.now() - startTime;
@@ -204,7 +163,6 @@ async function runRWLockFileTest() {
     console.log('=== Reader-Writer Lock File Test ===\n');
     console.log(`Test file: ${TEST_FILE}`);
     console.log(`Log file: ${LOG_FILE}\n`);
-    // Clean up old files
     try {
         if (fs.existsSync(TEST_FILE))
             fs.unlinkSync(TEST_FILE);
@@ -212,7 +170,6 @@ async function runRWLockFileTest() {
             fs.unlinkSync(LOG_FILE);
     }
     catch (err) {
-        // Ignore
     }
     let broker = null;
     const clients = [];
@@ -221,7 +178,6 @@ async function runRWLockFileTest() {
         broker = new main_1.Broker({ port: PORT });
         await broker.ensure();
         debug('Broker started');
-        // Create clients
         debug('Creating RW lock clients', { count: 5 });
         for (let i = 0; i < 5; i++) {
             const client = new main_1.RWLockWritePrefClient({ port: PORT });
@@ -229,10 +185,8 @@ async function runRWLockFileTest() {
             clients.push(client);
         }
         debug('All clients created', { clientCount: clients.length });
-        // Initialize file
         writeFile('INIT');
         debug('File initialized', { value: 'INIT' });
-        // Test 1: Multiple readers should be able to read simultaneously
         debug('\n=== Test 1: Multiple Concurrent Readers ===');
         const readers1 = [];
         for (let i = 0; i < 3; i++) {
@@ -244,11 +198,9 @@ async function runRWLockFileTest() {
             allReadSame: readerResults1.every(r => r.content === 'INIT')
         });
         await delay(100);
-        // Test 2: Writer should be exclusive (no readers during write)
         debug('\n=== Test 2: Writer Exclusive Access ===');
         const writer1 = writerOperation(clients[0], 'W1', 'test-key', 'WRITE-1', 'INIT');
         const readers2 = [];
-        // Start readers while writer is active
         for (let i = 0; i < 2; i++) {
             setTimeout(() => {
                 readers2.push(readerOperation(clients[i + 1], `R2-${i}`, 'test-key', 'WRITE-1'));
@@ -260,7 +212,6 @@ async function runRWLockFileTest() {
             readers: readers2.length
         });
         await delay(100);
-        // Test 3: Sequential writes should maintain order
         debug('\n=== Test 3: Sequential Writes ===');
         const write1 = writerOperation(clients[0], 'W2', 'test-key', 'WRITE-2', 'WRITE-1');
         const write2 = writerOperation(clients[1], 'W3', 'test-key', 'WRITE-3', 'WRITE-2');
@@ -273,19 +224,15 @@ async function runRWLockFileTest() {
             correct: finalValue === 'WRITE-4'
         });
         await delay(100);
-        // Test 4: Mixed readers and writers
         debug('\n=== Test 4: Mixed Readers and Writers ===');
         writeFile('MIXED-START');
         const mixedOps = [];
-        // Start with a writer
         mixedOps.push(writerOperation(clients[0], 'WM1', 'test-key', 'MIXED-1', 'MIXED-START'));
-        // Add readers that should wait for writer
         setTimeout(() => {
             for (let i = 0; i < 3; i++) {
                 mixedOps.push(readerOperation(clients[i + 1], `RM-${i}`, 'test-key', 'MIXED-1'));
             }
         }, 30);
-        // Add another writer that should wait
         setTimeout(() => {
             mixedOps.push(writerOperation(clients[4], 'WM2', 'test-key', 'MIXED-2', 'MIXED-1'));
         }, 60);
@@ -296,25 +243,21 @@ async function runRWLockFileTest() {
             correct: mixedFinal === 'MIXED-2'
         });
         await delay(100);
-        // Test 5: Stress test - many concurrent operations
         debug('\n=== Test 5: Stress Test - Many Concurrent Operations ===');
         writeFile('STRESS-0');
         let currentValue = 0;
         const stressOps = [];
         const stressStart = Date.now();
-        // Create 20 operations: 10 writers, 10 readers
         for (let i = 0; i < 20; i++) {
             const client = clients[i % clients.length];
-            const delayMs = i * 10; // Stagger starts
+            const delayMs = i * 10;
             setTimeout(() => {
                 if (i % 2 === 0) {
-                    // Writer
                     currentValue++;
                     const value = `STRESS-${currentValue}`;
                     stressOps.push(writerOperation(client, `WS-${i}`, 'test-key', value, null));
                 }
                 else {
-                    // Reader
                     stressOps.push(readerOperation(client, `RS-${i}`, 'test-key', null));
                 }
             }, delayMs);
@@ -328,7 +271,6 @@ async function runRWLockFileTest() {
             finalValue: stressFinal,
             expectedValue: `STRESS-${currentValue}`
         });
-        // Analyze results
         debug('\n=== Analysis ===');
         const operations = debugLog.filter(e => e.message.includes('acquired') ||
             e.message.includes('released') ||
@@ -341,7 +283,6 @@ async function runRWLockFileTest() {
                 message: e.message
             }))
         });
-        // Check for violations
         const violations = [];
         let currentWriter = null;
         const activeReaders = new Set();
@@ -377,7 +318,6 @@ async function runRWLockFileTest() {
             debug('✓ No violations detected', {});
             console.log('\n✅ Test PASSED: All operations followed correct ordering!');
         }
-        // Final file state
         const finalContent = readFile();
         debug('Final file state', { content: finalContent });
         console.log(`\n=== Test Complete ===`);
@@ -390,14 +330,12 @@ async function runRWLockFileTest() {
         throw error;
     }
     finally {
-        // Cleanup
         debug('Cleaning up', {});
         for (const client of clients) {
             try {
                 client.close();
             }
             catch (err) {
-                // Ignore
             }
         }
         if (broker) {
@@ -408,7 +346,6 @@ async function runRWLockFileTest() {
         debug('Cleanup complete', {});
     }
 }
-// Run the test
 runRWLockFileTest()
     .then(() => {
     console.log('\n✅ All tests completed');

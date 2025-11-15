@@ -28,6 +28,8 @@
 
 # Live-Mutex / LMX  :lock: + :unlock:
 
+> **📖 For detailed usage instructions, see [README-2.md](./README-2.md)**
+
 ### Disclaimer
 
 >
