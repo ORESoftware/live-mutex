@@ -12,7 +12,28 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
 
   console.log('suman child id:',process.env.SUMAN_CHILD_ID);
 
-  const port = process.env.lmx_port ? parseInt(process.env.lmx_port) : (7000 + parseInt(process.env.SUMAN_CHILD_ID || '1'));
+  // Get unique port for this test file to ensure independent broker
+  // When running serially, use a hash of the test file name for consistent port assignment
+  const getPortFromFile = () => {
+    try {
+      // Try to get the current file path from module
+      const filePath = require.resolve('./one.test.ts');
+      let hash = 0;
+      for (let i = 0; i < filePath.length; i++) {
+        hash = ((hash << 5) - hash) + filePath.charCodeAt(i);
+        hash = hash & hash;
+      }
+      return 7000 + (Math.abs(hash) % 3000);
+    } catch {
+      return 7001; // Fallback port
+    }
+  };
+  
+  const port = process.env.lmx_port 
+    ? parseInt(process.env.lmx_port) 
+    : (process.env.SUMAN_CHILD_ID 
+      ? (7000 + parseInt(process.env.SUMAN_CHILD_ID))
+      : getPortFromFile());
   const conf = Object.freeze({port});
 
   const handleEvents = function (v) {

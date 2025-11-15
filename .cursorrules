@@ -1,17 +1,24 @@
 # Cursor Rules for Live-Mutex Project
 
 ## Terminal Commands
-- NEVER pipe command output to `head` or `tail` - always show full output
+
+- **DO NOT** pipe command output to `head` or `tail` in terminal commands
+- Show full command output instead of truncating it
+- If output is too long, let the user see it all or use other methods to filter (like grep with specific patterns)
+- This ensures we see complete information and don't miss important details
 - When running tests or long-running commands, let them run to completion or show full output
 - Do not truncate output unless explicitly requested by the user
 
 ## Code Style
+
 - Prefer explicit types over `any` or `unknown`
 - Use proper TypeScript types for all function parameters and return values
+- Use proper TypeScript types instead of type assertions when feasible
+- Maintain type safety throughout the codebase
 - Fix linter errors immediately after making changes
 
 ## Testing
+
 - Tests should run serially with independent brokers on unique ports
 - Each test should be isolated and not depend on other tests
 - Test timeouts should be handled gracefully
-
