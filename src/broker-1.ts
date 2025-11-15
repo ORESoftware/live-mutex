@@ -9,7 +9,7 @@ import * as fs from 'fs';
 //npm
 import chalk from "chalk";
 import {createParser} from "./json-parser";
-import {LinkedQueue, LinkedQueueValue} from '@oresoftware/linked-queue';
+import {LinkedQueue, LinkedQueueValue, IsVoid} from '@oresoftware/linked-queue';
 
 
 //project
@@ -51,13 +51,13 @@ if (!(brokerPackage.version && typeof brokerPackage.version === 'string')) {
     throw new Error('Broker NPM package did not have a top-level field that is a string.');
 }
 
-process.on('uncaughtException', (e: any) => {
+process.on('uncaughtException', (e: Error) => {
     if (process.env.lmx_log_errors !== 'nope') {
         log.error('Uncaught Exception event occurred in Broker process:', inspectError(e));
     }
 });
 
-process.on('warning', (e: any) => {
+process.on('warning', (e: Error) => {
     if (process.env.lmx_log_errors !== 'nope') {
         log.debug('warning:', inspectError(e));
     }
@@ -89,7 +89,7 @@ export interface IBrokerOpts {
 }
 
 export type IBrokerOptsPartial = Partial<IBrokerOpts>
-export type IErrorFirstCB = (err: any, val?: any) => void;
+export type IErrorFirstCB = (err: Error | null, val?: unknown) => void;
 
 export interface BrokerSend {
     (ws: net.Socket, data: any, cb?: IErrorFirstCB): void;
@@ -103,7 +103,7 @@ export interface IUuidTimer {
     [key: string]: NodeJS.Timer
 }
 
-export type TBrokerCB = (err: any, val: Broker1) => void;
+export type TBrokerCB = (err: Error | null, val: Broker1) => void;
 export type TEnsure = (cb?: TBrokerCB) => Promise<Broker1>;
 
 export interface IBookkeepingHash {
@@ -278,7 +278,7 @@ export class Broker1 {
                 return cb && process.nextTick(cb);
             }
 
-            ws.write(JSON.stringify(data) + '\n', 'utf8', (err: any) => {
+            ws.write(JSON.stringify(data) + '\n', 'utf8', (err: Error | undefined) => {
                 if (err) {
                     this.emitter.emit('warning', 'socket is not writable [2].');
                     this.emitter.emit('warning', err);
@@ -456,7 +456,7 @@ export class Broker1 {
                 .on('data', (v: any) => {
                     onData(ws, v);
                 })
-                .once('error', (e: any) => {
+                .once('error', (e: Error) => {
                     self.send(ws, {
                             error: inspectError(e)
                         },
@@ -468,10 +468,7 @@ export class Broker1 {
 
         let sigEventCallable = true;
 
-        let sigEvent = (event: any) => (err: any) => {
-
-            err && this.emitter.emit('warning', err);
-
+        const handleShutdown = (event: string) => {
             if (!sigEventCallable) {
                 return;
             }
@@ -499,15 +496,15 @@ export class Broker1 {
 
         };
 
-        process.once('exit', sigEvent('exit'));
-        process.once('SIGINT', sigEvent('SIGINT'));
-        process.once('SIGTERM', sigEvent('SIGTERM'));
+        process.once('exit', () => handleShutdown('exit'));
+        process.once('SIGINT', () => handleShutdown('SIGINT'));
+        process.once('SIGTERM', () => handleShutdown('SIGTERM'));
 
-        wss.on('error', (err: any) => {
+        wss.on('error', (err: Error) => {
             this.emitter.emit('warning', 'lmx broker error' + inspectError(err));
         });
 
-        let brokerPromise: Promise<any>;
+        let brokerPromise: Promise<Broker1>;
 
         this.ensure = this.start = (cb?: TBrokerCB) => {
 
@@ -530,12 +527,12 @@ export class Broker1 {
                     });
             }
 
-            const onResolve = (val: any) => {
+            const onResolve = (val: Broker1) => {
                 cb && cb.call(self, null, val);
                 return val;
             };
 
-            const onRejected = (err: any) => {
+            const onRejected = (err: Error) => {
                 cb && cb.call(self, err, <Broker1>{});
                 return Promise.reject(err);
             };
@@ -555,10 +552,7 @@ export class Broker1 {
 
                 wss.once('error', reject);
 
-                let cnkt: any = self.socketFile ? [self.socketFile] : [self.port, self.host];
-
-                wss.listen(...cnkt, () => {
-
+                const listenCallback = () => {
                     if (self.socketFile) {
                         try {
                             fs.chmodSync(self.socketFile, '777');
@@ -572,7 +566,13 @@ export class Broker1 {
                     clearTimeout(to);
                     wss.removeListener('error', reject);
                     resolve(self);
-                });
+                };
+
+                if (self.socketFile) {
+                    wss.listen(self.socketFile, listenCallback);
+                } else {
+                    wss.listen(self.port, self.host, listenCallback);
+                }
 
             })
                 .then(
@@ -597,19 +597,19 @@ export class Broker1 {
         return new Broker1(opts);
     }
 
-    private emit() {
+    private emit(...args: Parameters<EventEmitter['emit']>) {
         log.warn('warning:', 'use b.emitter.emit() instead of b.emit()');
-        return this.emitter.emit.apply(this.emitter, <any>arguments);
+        return this.emitter.emit.apply(this.emitter, args);
     }
 
-    private on() {
+    private on(...args: Parameters<EventEmitter['on']>) {
         log.warn('warning:', 'use c.emitter.on() instead of c.on()');
-        return this.emitter.on.apply(this.emitter, arguments);
+        return this.emitter.on.apply(this.emitter, args);
     }
 
-    private once() {
+    private once(...args: Parameters<EventEmitter['once']>) {
         log.warn('warning:', 'use c.emitter.once() instead of c.once()');
-        return this.emitter.once.apply(this.emitter, arguments);
+        return this.emitter.once.apply(this.emitter, args);
     }
 
     ping(data: any, ws: net.Socket) {
@@ -1094,12 +1094,15 @@ export class Broker1 {
                 break;
             }
 
-            let lqValue: LinkedQueueValue<NotifyObj>;
+            let lqValue: [string, NotifyObj] | [typeof IsVoid] | undefined;
             let n: NotifyObj = <any>null;
 
             // Find the next valid waiter
-            while (lqValue = notifyList.dequeue()) {
-                n = lqValue.value;
+            while (lqValue = notifyList.dequeue() as [string, NotifyObj] | [typeof IsVoid] | undefined) {
+                if (IsVoid.check(lqValue[0])) {
+                    break;
+                }
+                n = (lqValue as [string, NotifyObj])[1];
                 if (n && n.ws && n.ws.writable) {
                     break;
                 }
@@ -1113,7 +1116,7 @@ export class Broker1 {
             // Triple-check capacity immediately before granting to prevent race conditions
             if (lck.lockholders.size >= lck.max) {
                 // Put this client back in the notify queue
-                notifyList.push(n.uuid, n);
+                notifyList.enqueue(n.uuid, n);
                 break;
             }
 
@@ -1169,8 +1172,18 @@ export class Broker1 {
                         if (!lockholder && !notifyList.contains(uuid)) {
                             // Reconstruct the notify object from the lockholder data if available
                             // Otherwise, just trigger re-election for waiting clients
-                            notifyList.deq(5).forEach(lqv => {
-                                const obj = lqv.value;
+                            notifyList.deq(5).forEach((lqv: [string, NotifyObj] | [typeof IsVoid] | { value: NotifyObj }) => {
+                                // deq returns [K, V] tuples from dequeue() (despite type definition saying LinkedQueueValue)
+                                let obj: NotifyObj;
+                                if (Array.isArray(lqv) && !IsVoid.check(lqv[0])) {
+                                    // It's a [K, V] tuple
+                                    obj = (lqv as [string, NotifyObj])[1];
+                                } else if (lqv && typeof lqv === 'object' && 'value' in lqv) {
+                                    // Fallback: might be LinkedQueueValue (though unlikely)
+                                    obj = (lqv as { value: NotifyObj }).value;
+                                } else {
+                                    return; // Skip invalid entries
+                                }
                                 self.send(obj.ws, {
                                     key: data.key,
                                     uuid: obj.uuid,
@@ -1183,8 +1196,18 @@ export class Broker1 {
                     }
 
                     // Trigger re-election for waiting clients
-                    notifyList.deq(5).forEach(lqv => {
-                        const obj = lqv.value;
+                    notifyList.deq(5).forEach((lqv: [string, NotifyObj] | [typeof IsVoid] | { value: NotifyObj }) => {
+                        // deq returns [K, V] tuples from dequeue() (despite type definition saying LinkedQueueValue)
+                        let obj: NotifyObj;
+                        if (Array.isArray(lqv) && !IsVoid.check(lqv[0])) {
+                            // It's a [K, V] tuple
+                            obj = (lqv as [string, NotifyObj])[1];
+                        } else if (lqv && typeof lqv === 'object' && 'value' in lqv) {
+                            // Fallback: might be LinkedQueueValue (though unlikely)
+                            obj = (lqv as { value: NotifyObj }).value;
+                        } else {
+                            return; // Skip invalid entries
+                        }
                         self.send(obj.ws, {
                             key: data.key,
                             uuid: obj.uuid,
@@ -1324,20 +1347,21 @@ export class Broker1 {
 
                     // because of the force option, we put it to the front of the line
                     lck.notify.remove(uuid);
-                    lck.notify.unshift(uuid, {ws, uuid, pid, ttl, keepLocksAfterDeath});
+                    lck.notify.addToFront(uuid, {ws, uuid, pid, ttl, keepLocksAfterDeath});
 
                 }
                 else {
 
-                    const alreadyAdded = lck.notify.get(uuid);
+                    const alreadyAddedResult = lck.notify.get(uuid) as [string, NotifyObj] | [typeof IsVoid] | undefined;
+                    const alreadyAdded = alreadyAddedResult && !IsVoid.check(alreadyAddedResult[0]);
 
                     if (!alreadyAdded) {
 
                         if (retryCount > 0) {
-                            lck.notify.unshift(uuid, {ws, uuid, pid, ttl, keepLocksAfterDeath});
+                            lck.notify.addToFront(uuid, {ws, uuid, pid, ttl, keepLocksAfterDeath});
                         }
                         else {
-                            lck.notify.push(uuid, {ws, uuid, pid, ttl, keepLocksAfterDeath});
+                            lck.notify.enqueue(uuid, {ws, uuid, pid, ttl, keepLocksAfterDeath});
                         }
                     }
                 }
