@@ -20,6 +20,11 @@ async function testLinkedQueueUpgrade() {
         // Test 1: Create broker and ensure it starts
         console.log('1. Creating broker...');
         const broker = new Broker1({port});
+        // Capture broker logs
+        broker.onWarning((...args) => {
+            const msg = args.map(a => String(a)).join(' ');
+            process.stderr.write(`[BROKER] ${msg}\n`);
+        });
         await broker.ensure();
         console.log('   ✓ Broker created and started');
         

@@ -412,10 +412,12 @@ export class Client {
       }
       
       if (fn) {
+        log.debug(chalk.cyan('onData: calling resolution function for uuid:'), uuid, 'type:', data?.type);
         fn.call(this, data.error, data);
         return;
       }
       
+      log.debug(chalk.yellow('onData: no resolution function found for uuid:'), uuid, 'type:', data?.type);
       this.emitter.emit('warning', 'lmx implementation warning, ' +
         'no fn with that uuid in the resolutions hash => ' + util.inspect(data, {breakLength: Infinity}));
       
@@ -1288,6 +1290,13 @@ export class Client {
     return this.host;
   }
   
+  /**
+   * Attach a callback to listen for warning events and output them
+   * @param callback Function that receives warning messages/errors
+   */
+  onWarning(callback: (...args: any[]) => void): void {
+    this.emitter.on('warning', callback);
+  }
   
   protected preParseUnlockOptsForPromise(
     key: string,
@@ -1404,14 +1413,18 @@ export class Client {
     
     this.resolutions[uuid] = (err, data) => {
       
+      log.debug(chalk.cyan('unlock resolution called for key:'), key, 'uuid:', uuid, 'err:', err, 'data type:', data?.type, 'unlocked:', data?.unlocked);
+      
       delete this.timeouts[uuid];
       clearTimeout(this.timers[uuid]);
       
       if (timedOut) {
+        log.debug(chalk.cyan('unlock resolution: already timed out for key:'), key, 'uuid:', uuid);
         return;
       }
       
       if (err) {
+        log.debug(chalk.cyan('unlock resolution: error for key:'), key, 'uuid:', uuid, 'err:', err);
         return this.fireUnlockCallbackWithError(cb, false, new LMXClientUnlockException(
           key,
           uuid,
@@ -1421,6 +1434,7 @@ export class Client {
       }
       
       if (!data) {
+        log.debug(chalk.cyan('unlock resolution: missing data for key:'), key, 'uuid:', uuid);
         return this.fireUnlockCallbackWithError(cb, false, new LMXClientUnlockException(
           key,
           uuid,
@@ -1430,6 +1444,7 @@ export class Client {
       }
       
       if (String(key) !== String(data.key)) {
+        log.debug(chalk.cyan('unlock resolution: key mismatch for key:'), key, 'uuid:', uuid, 'data.key:', data.key);
         return this.fireUnlockCallbackWithError(cb, false, new LMXClientUnlockException(
           key,
           uuid,
@@ -1439,6 +1454,7 @@ export class Client {
       }
       
       if (data.error) {
+        log.debug(chalk.cyan('unlock resolution: data.error for key:'), key, 'uuid:', uuid, 'error:', data.error);
         return this.fireUnlockCallbackWithError(cb, false, new LMXClientUnlockException(
           key,
           uuid,
@@ -1448,7 +1464,7 @@ export class Client {
       }
       
       if (data.unlocked === true) {
-        
+        log.debug(chalk.cyan('unlock resolution: unlocked=true, calling cb for key:'), key, 'uuid:', uuid);
         this.cleanUp(uuid);
         
         // this.write({
@@ -1484,6 +1500,7 @@ export class Client {
     
     let force: boolean = (opts.__retryCount > 0) || Boolean(opts.force);
     
+    log.debug(chalk.cyan('unlock: sending unlock request for key:'), key, 'uuid:', uuid, '_uuid:', opts._uuid, 'force:', force);
     this.write({
       _uuid: opts._uuid,
       uuid: uuid,
@@ -1492,6 +1509,7 @@ export class Client {
       force: force,
       type: 'unlock'
     });
+    log.debug(chalk.cyan('unlock: unlock request sent for key:'), key, 'uuid:', uuid);
   }
 
   ping(cb?: EVCb<any>) : Promise<any>{

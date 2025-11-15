@@ -144,6 +144,48 @@ export class RWLockWritePrefClient extends Client {
 
   releaseWriteLock(key: string, opts: any, cb: EVCb<any>) {
 
+    // Check if opts is actually the bound release function with stored unlock BEFORE parseUnlockOpts
+    // because parseUnlockOpts will treat a function as a callback and move it to cb
+    log.debug(chalk.blue('releaseWriteLock: BEFORE parseUnlockOpts - key:'), key, 'opts type:', typeof opts, 'has _unlock:', opts && (opts as any)._unlock ? 'yes' : 'no', 'cb type:', typeof cb);
+    const boundRelease = (opts && (typeof opts === 'object' || typeof opts === 'function') && (opts as any)._unlock) ? opts : null;
+    
+    // If we found boundRelease, we need to handle it specially
+    if (boundRelease && (boundRelease as any)._unlock) {
+      // We have the unlock function from when we acquired the lock
+      log.debug(chalk.blue('releaseWriteLock using stored unlock for:'), key);
+      
+      const unlockFn = (boundRelease as any)._unlock;
+      const realCb = cb || (() => {});
+      
+      // Unlock the lock first
+      log.debug(chalk.blue('releaseWriteLock: calling _unlock for key:'), key);
+      unlockFn((err: any, val: any) => {
+        log.debug(chalk.blue('releaseWriteLock: _unlock callback called for key:'), key, 'err:', err, 'val unlocked:', val?.unlocked);
+        if (err) {
+          log.debug(chalk.blue('releaseWriteLock unlock error on:'), key, err);
+          delete (boundRelease as any)._unlock;
+          delete (boundRelease as any)._key;
+          return realCb(err, val);
+        }
+        
+        log.debug(chalk.blue('releaseWriteLock unlocked, now setting write flag to false on:'), key);
+        
+        // Set the write flag to false and broadcast to waiting readers
+        // This must happen after unlock to avoid deadlocks
+        this.setWriteFlagToFalse(key, (flagErr, flagVal) => {
+          log.debug(chalk.blue('releaseWriteLock: setWriteFlagToFalse callback called for key:'), key, 'flagErr:', flagErr, 'flagVal type:', flagVal?.type);
+          log.debug(chalk.blue('releaseWriteLock completed on:'), key);
+          delete (boundRelease as any)._unlock;
+          delete (boundRelease as any)._key;
+          // Return success even if flag setting had minor issues
+          log.debug(chalk.blue('releaseWriteLock: calling final cb for key:'), key, 'cb type:', typeof realCb);
+          realCb(null, val);
+        });
+      });
+      return;
+    }
+
+    // Normal path: parse options
     try {
       [key, opts, cb] = this.parseUnlockOpts(key, opts, cb);
     }
@@ -151,14 +193,16 @@ export class RWLockWritePrefClient extends Client {
       return process.nextTick(cb, err);
     }
 
-    // Check if opts is actually the bound release function with stored unlock
-    const boundRelease = (opts && typeof opts === 'object' && opts._unlock) ? opts : null;
+    // Fallback: acquire lock first, then release
+    opts.max = 1;
     if (boundRelease && boundRelease._unlock) {
       // We have the unlock function from when we acquired the lock
       log.debug(chalk.blue('releaseWriteLock using stored unlock for:'), key);
       
       // Unlock the lock first
+      log.debug(chalk.blue('releaseWriteLock: calling _unlock for key:'), key);
       boundRelease._unlock((err: any, val: any) => {
+        log.debug(chalk.blue('releaseWriteLock: _unlock callback called for key:'), key, 'err:', err, 'val unlocked:', val?.unlocked);
         if (err) {
           log.debug(chalk.blue('releaseWriteLock unlock error on:'), key, err);
           delete boundRelease._unlock;
@@ -171,10 +215,12 @@ export class RWLockWritePrefClient extends Client {
         // Set the write flag to false and broadcast to waiting readers
         // This must happen after unlock to avoid deadlocks
         this.setWriteFlagToFalse(key, (flagErr, flagVal) => {
+          log.debug(chalk.blue('releaseWriteLock: setWriteFlagToFalse callback called for key:'), key, 'flagErr:', flagErr, 'flagVal type:', flagVal?.type);
           log.debug(chalk.blue('releaseWriteLock completed on:'), key);
           delete boundRelease._unlock;
           delete boundRelease._key;
           // Return success even if flag setting had minor issues
+          log.debug(chalk.blue('releaseWriteLock: calling final cb for key:'), key, 'cb type:', typeof cb);
           cb(null, val);
         });
       });
@@ -223,6 +269,14 @@ export class RWLockWritePrefClient extends Client {
 
     // Create a bound release function that will pass itself as the opts parameter
     const boundRelease: any = (cb?: EVCb<any>) => {
+      log.debug(chalk.blue('boundRelease function called for key:'), key, 'cb type:', typeof cb, 'has _unlock:', boundRelease._unlock ? 'yes' : 'no');
+      if (!boundRelease._unlock) {
+        log.error(chalk.red('boundRelease called but _unlock is missing for key:'), key);
+        if (typeof cb === 'function') {
+          return process.nextTick(cb, new Error('_unlock function missing from boundRelease'), {});
+        }
+        return;
+      }
       return this.releaseReadLock(key, boundRelease, cb);
     };
 
@@ -235,8 +289,12 @@ export class RWLockWritePrefClient extends Client {
 
       log.debug(chalk.blue('acquireReadLock writer flag check passed, acquiring lock'));
 
-      // Now acquire the lock
-      opts.max = 1;
+      // For read locks, allow multiple readers to coexist
+      // Use a high max value to allow concurrent readers
+      // The actual reader count is tracked separately via incrementReaders
+      if (!opts.max || opts.max === 1) {
+        opts.max = 1000; // Allow up to 1000 concurrent readers
+      }
 
       this.lock(key, opts, (err, unlock) => {
 
@@ -270,33 +328,63 @@ export class RWLockWritePrefClient extends Client {
 
   releaseReadLock(key: string, opts: any, cb: EVCb<any>) {
 
+    // Check if opts is actually the bound release function BEFORE parseUnlockOpts
+    // because parseUnlockOpts will treat a function as a callback and move it to cb
+    log.debug(chalk.blue('releaseReadLock: BEFORE parseUnlockOpts - key:'), key, 'opts type:', typeof opts, 'has _unlock:', opts && (opts as any)._unlock ? 'yes' : 'no', 'cb type:', typeof cb);
+    const boundRelease = (opts && (typeof opts === 'object' || typeof opts === 'function') && (opts as any)._unlock) ? opts : null;
+    
+    // If we found boundRelease, we need to handle it specially
+    // because parseUnlockOpts will treat it as a callback
+    if (boundRelease && (boundRelease as any)._unlock) {
+      // boundRelease is the function itself, and cb is the actual callback
+      // We need to extract the real callback
+      const realCb = (typeof cb === 'function') ? cb : (boundRelease as any);
+      const unlockFn = (boundRelease as any)._unlock; // Store it before it might get deleted
+      log.debug(chalk.blue('releaseReadLock: found boundRelease, using stored unlock for key:'), key, 'unlockFn type:', typeof unlockFn);
+      
+      if (!unlockFn || typeof unlockFn !== 'function') {
+        log.error(chalk.red('releaseReadLock: _unlock is not a function for key:'), key, 'type:', typeof unlockFn);
+        return realCb(new Error('_unlock is not a function'), {});
+      }
+      
+      log.debug(chalk.blue('releaseReadLock: calling decrementReaders for key:'), key);
+      this.decrementReaders(key, (err, val) => {
+        log.debug(chalk.blue('releaseReadLock: decrementReaders callback called for key:'), key, 'err:', err, 'val type:', val?.type);
+        if (err) {
+          log.debug(chalk.blue('releaseReadLock: decrementReaders error, calling cb with error'));
+          return realCb(err, {});
+        }
+
+        log.debug(chalk.blue('releaseReadLock: calling _unlock for key:'), key, '_unlock type:', typeof unlockFn);
+        // Use the stored unlock function (we stored it earlier to avoid deletion issues)
+        try {
+          unlockFn((err: any, val: any) => {
+            log.debug(chalk.blue('releaseReadLock: _unlock callback called for key:'), key, 'err:', err, 'val unlocked:', val?.unlocked);
+            log.debug(chalk.blue('releaseReadLock released lock on key:'), key);
+            // Only delete after successful unlock
+            if ((boundRelease as any)._unlock) {
+              delete (boundRelease as any)._unlock;
+            }
+            if ((boundRelease as any)._key) {
+              delete (boundRelease as any)._key;
+            }
+            log.debug(chalk.blue('releaseReadLock: calling final cb for key:'), key, 'cb type:', typeof realCb);
+            realCb(err, val);
+          });
+        } catch (e) {
+          log.error(chalk.red('releaseReadLock: exception calling _unlock for key:'), key, e);
+          return realCb(e as any, {});
+        }
+      });
+      return;
+    }
+    
+    // Normal path: parse options
     try {
       [key, opts, cb] = this.parseUnlockOpts(key, opts, cb);
     }
     catch (err) {
       return process.nextTick(cb, err);
-    }
-
-    // Check if opts is actually the bound release function with stored unlock
-    const boundRelease = (opts && typeof opts === 'object' && opts._unlock) ? opts : null;
-    if (boundRelease && boundRelease._unlock) {
-      // We have the unlock function from when we acquired the lock
-      log.debug(chalk.blue('releaseReadLock using stored unlock for key:'), key);
-      
-      this.decrementReaders(key, (err, val) => {
-        if (err) {
-          return cb(err, {});
-        }
-
-        // Use the stored unlock function
-        boundRelease._unlock((err: any, val: any) => {
-          log.debug(chalk.blue('releaseReadLock released lock on key:'), key);
-          delete boundRelease._unlock;
-          delete boundRelease._key;
-          cb(err, val);
-        });
-      });
-      return;
     }
 
     // Fallback: acquire lock first, then release
@@ -332,7 +420,7 @@ export class RWLockWritePrefClient extends Client {
     const uuid = UUID.v4();
 
     this.resolutions[uuid] = (err, val) => {
-      log.debug(chalk.magenta('client got register-write-flag-check response, type:', val?.type));
+      log.debug(chalk.magenta('client got register-write-flag-check response, type:', val?.type, 'uuid:', uuid));
       
       // If we got a queued response, wait for the actual success response
       if (val && val.type === 'register-write-flag-check-queued') {
@@ -342,7 +430,19 @@ export class RWLockWritePrefClient extends Client {
         return;
       }
       
-      // This is the final success response
+      // Ignore broadcast-result messages - they're just notifications
+      if (val && val.type === 'broadcast-result') {
+        log.debug(chalk.magenta('ignoring broadcast-result, still waiting for register-write-flag-success'));
+        return;
+      }
+
+      if (val && val.type !== 'register-write-flag-success') {
+        log.debug(chalk.magenta('unexpected broadcast-result, still waiting for register-write-flag-success'), {val});
+        return;
+      }
+      
+      // This is the final success response (register-write-flag-success)
+      log.debug(chalk.magenta('received final success response, calling callback'));
       delete this.resolutions[uuid];
       return cb(err, val);
     };
@@ -380,7 +480,11 @@ export class RWLockWritePrefClient extends Client {
 
   decrementReaders(key: string, cb: EVCb<any>) {
     const uuid = UUID.v4();
-    this.resolutions[uuid] = cb;
+    log.debug(chalk.magenta('decrementReaders: sending request for key:'), key, 'uuid:', uuid);
+    this.resolutions[uuid] = (err, val) => {
+      log.debug(chalk.magenta('decrementReaders: received response for key:'), key, 'uuid:', uuid, 'type:', val?.type);
+      cb(err, val);
+    };
     this.write({
       uuid,
       type: 'decrement-readers',
@@ -390,7 +494,11 @@ export class RWLockWritePrefClient extends Client {
 
   setWriteFlagToFalse(key: string, cb: EVCb<any>) {
     const uuid = UUID.v4();
-    this.resolutions[uuid] = cb;
+    log.debug(chalk.magenta('setWriteFlagToFalse: sending request for key:'), key, 'uuid:', uuid);
+    this.resolutions[uuid] = (err, val) => {
+      log.debug(chalk.magenta('setWriteFlagToFalse: received response for key:'), key, 'uuid:', uuid, 'type:', val?.type, 'err:', err);
+      cb(err, val);
+    };
     this.write({
       uuid,
       type: 'set-write-flag-false-and-broadcast',

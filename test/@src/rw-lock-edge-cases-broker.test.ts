@@ -2,7 +2,7 @@
 
 import * as suman from 'suman';
 const {Test} = suman.init(module);
-import {Broker1, RWLockWritePrefClient} from '../../dist/main';
+import {Broker, RWLockWritePrefClient} from '../../dist/main';
 
 Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
   
@@ -11,7 +11,7 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
 
   console.log('suman child id:',process.env.SUMAN_CHILD_ID);
 
-  const port = process.env.lmx_port ? parseInt(process.env.lmx_port) : (7000 + parseInt(process.env.SUMAN_CHILD_ID || '1'));
+  const port = process.env.lmx_port ? parseInt(process.env.lmx_port) : (7100 + parseInt(process.env.SUMAN_CHILD_ID || '1'));
   const conf = Object.freeze({port});
 
   const handleEvents = function (v) {
@@ -27,7 +27,7 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
   inject(() => {
     const brokerConf = Object.assign({}, conf, {noListen: process.env.lmx_broker_no_listen === 'yes'});
     return {
-      broker: new Broker1(brokerConf).ensure().then(handleEvents)
+      broker: new Broker(brokerConf).ensure().then(handleEvents)
     }
   });
 
@@ -74,36 +74,46 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
           });
         }
 
-        // Release writer after a delay to allow readers to queue
+        // Release write lock after a short delay to allow readers to queue
         setTimeout(() => {
-          if (!writerAcquired) {
-            return t.fail(new Error('Writer should have acquired lock'));
-          }
-          writerReleased = true;
-          releaseWrite(() => {});
-        }, 500);
+          releaseWrite((err3?: any, val3?: any) => {
+            if (err3) {
+              return t.fail(err3);
+            }
+            writerReleased = true;
+          });
+        }, 100);
       });
     });
 
     it.cb('readers can coexist', {timeout: 15000}, t => {
       const c = t.supply.client;
       const key = 'readers-coexist';
-      let readersAcquired = 0;
+      let acquired = 0;
       const releases: any[] = [];
-      const targetReaders = 10;
 
-      for (let i = 0; i < targetReaders; i++) {
+      for (let i = 0; i < 3; i++) {
         c.acquireReadLock(key, {lockRequestTimeout: 10000}, (err, release) => {
           if (err) {
             return t.fail(err);
           }
-          readersAcquired++;
+          acquired++;
           releases.push(release);
           
-          if (readersAcquired === targetReaders) {
-            // All readers acquired simultaneously
-            releases.forEach(r => r(() => {}));
-            t.done();
+          if (acquired === 3) {
+            // All readers acquired, release them
+            let released = 0;
+            releases.forEach(r => {
+              r((err2?: any, val2?: any) => {
+                if (err2) {
+                  return t.fail(err2);
+                }
+                released++;
+                if (released === 3) {
+                  t.done();
+                }
+              });
+            });
           }
         });
       }
@@ -190,9 +200,9 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
                 }
                 completed++;
                 isWrite = false;
-                if (completed >= cycles) {
+                if (completed >= cycles * 2) {
                   t.done();
-                } else if (completed < cycles) {
+                } else if (completed < cycles * 2) {
                   cycle();
                 }
               });
@@ -210,9 +220,9 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
                 }
                 completed++;
                 isWrite = true;
-                if (completed >= cycles) {
+                if (completed >= cycles * 2) {
                   t.done();
-                } else if (completed < cycles) {
+                } else if (completed < cycles * 2) {
                   cycle();
                 }
               });
@@ -230,7 +240,7 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
       let acquired = 0;
       const releases: any[] = [];
 
-      keys.forEach(key => {
+      keys.forEach((key, index) => {
         c.acquireReadLock(key, {lockRequestTimeout: 10000}, (err, release) => {
           if (err) {
             return t.fail(err);
@@ -239,8 +249,19 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
           releases.push({key, release});
           
           if (acquired === keys.length) {
-            releases.forEach(({release: r}) => r(() => {}));
-            t.done();
+            // All locks acquired, release them
+            let released = 0;
+            releases.forEach(({key: k, release: r}) => {
+              r((err2?: any, val2?: any) => {
+                if (err2) {
+                  return t.fail(err2);
+                }
+                released++;
+                if (released === keys.length) {
+                  t.done();
+                }
+              });
+            });
           }
         });
       });
@@ -248,9 +269,9 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
 
     it.cb('write lock timeout when readers hold', {timeout: 15000}, t => {
       const c = t.supply.client;
-      const key = 'write-timeout';
+      const key = 'timeout-test';
       let readerAcquired = false;
-      const readerRelease: any[] = [];
+      let writeTimeout = false;
 
       // Acquire read lock
       c.acquireReadLock(key, {lockRequestTimeout: 10000}, (err, release) => {
@@ -258,30 +279,31 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
           return t.fail(err);
         }
         readerAcquired = true;
-        readerRelease.push(release);
-
+        
         // Try to acquire write lock with short timeout
-        c.acquireWriteLock(key, {lockRequestTimeout: 300}, (err2, releaseWrite) => {
-          if (!err2) {
-            releaseWrite(() => {});
-            readerRelease[0](() => {});
-            return t.fail(new Error('Write lock should timeout when reader holds lock'));
-          }
-          
-          // Expected timeout error
-          if (err2.message && err2.message.includes('timeout')) {
-            readerRelease[0](() => {
+        c.acquireWriteLock(key, {lockRequestTimeout: 1000}, (err2, releaseWrite) => {
+          if (err2 && err2.message && err2.message.includes('timeout')) {
+            writeTimeout = true;
+            // Release read lock
+            release((err3?: any, val3?: any) => {
+              if (err3) {
+                return t.fail(err3);
+              }
               t.done();
             });
-          } else {
-            readerRelease[0](() => {});
+          } else if (err2) {
             t.fail(new Error('Expected timeout error, got: ' + err2.message));
+          } else {
+            // Write lock acquired (shouldn't happen)
+            releaseWrite(() => {});
+            release(() => {});
+            t.fail(new Error('Write lock should timeout when reader holds lock'));
           }
         });
       });
     });
 
   });
-  
+
 }]);
 

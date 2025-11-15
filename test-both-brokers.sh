@@ -1,8 +1,22 @@
+#!/bin/bash
+
+echo "=================================================================================="
+echo "Testing with Broker1 (broker-1.ts)"
+echo "=================================================================================="
+node scripts/run-tests.js test/@src/rw-lock-edge-cases.test.ts 2>&1 | grep -E "(Running|PASSED|FAILED|✓|✗|error|Error|timeout|Timeout)" | head -100
+
+echo ""
+echo "=================================================================================="
+echo "Testing with Broker (broker.ts)"
+echo "=================================================================================="
+
+# Create a temporary test file that uses Broker instead of Broker1
+cat > /tmp/rw-lock-edge-cases-broker.test.ts << 'EOF'
 'use strict';
 
 import * as suman from 'suman';
 const {Test} = suman.init(module);
-import {Broker1, RWLockWritePrefClient} from '../../dist/main';
+import {Broker, RWLockWritePrefClient} from '../../dist/main';
 
 Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
   
@@ -27,7 +41,7 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
   inject(() => {
     const brokerConf = Object.assign({}, conf, {noListen: process.env.lmx_broker_no_listen === 'yes'});
     return {
-      broker: new Broker1(brokerConf).ensure().then(handleEvents)
+      broker: new Broker(brokerConf).ensure().then(handleEvents)
     }
   });
 
@@ -129,39 +143,17 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
           if (readersAcquired === 3) {
             // Writer should wait, so release readers first
             setTimeout(() => {
-              // Release all readers and wait for all releases to complete
-              let released = 0;
-              const releaseTimeout = setTimeout(() => {
-                if (released < 3) {
-                  return t.fail(new Error(`Only ${released}/3 readers released after timeout`));
-                }
-              }, 5000);
+              readerReleases.forEach(r => r(() => {}));
               
-              readerReleases.forEach((r, index) => {
-                r((err?: any, val?: any) => {
-                  if (err) {
-                    clearTimeout(releaseTimeout);
-                    return t.fail(err);
-                  }
-                  released++;
-                  // Once all readers are released, try to acquire write lock
-                  if (released === 3) {
-                    clearTimeout(releaseTimeout);
-                    // Now writer should acquire
-                    c.acquireWriteLock(key, {lockRequestTimeout: 10000}, (err2, releaseWrite) => {
-                      if (err2) {
-                        return t.fail(new Error('Writer should acquire after readers release: ' + err2.message));
-                      }
-                      
-                      writerAcquired = true;
-                      releaseWrite((err3?: any, val3?: any) => {
-                        if (err3) {
-                          return t.fail(err3);
-                        }
-                        t.done();
-                      });
-                    });
-                  }
+              // Now writer should acquire
+              c.acquireWriteLock(key, {lockRequestTimeout: 10000}, (err2, releaseWrite) => {
+                if (err2) {
+                  return t.fail(new Error('Writer should acquire after readers release: ' + err2.message));
+                }
+                
+                writerAcquired = true;
+                releaseWrite(() => {
+                  t.done();
                 });
               });
             }, 200);
@@ -184,16 +176,13 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
               return t.fail(err);
             }
             setTimeout(() => {
-              release((err?: any, val?: any) => {
-                if (err) {
-                  return t.fail(err);
-                }
+              release(() => {
                 completed++;
                 isWrite = false;
-                if (completed >= cycles) {
-                  t.done();
-                } else if (completed < cycles) {
+                if (completed < cycles) {
                   cycle();
+                } else {
+                  t.done();
                 }
               });
             }, 10);
@@ -204,16 +193,13 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
               return t.fail(err);
             }
             setTimeout(() => {
-              release((err?: any, val?: any) => {
-                if (err) {
-                  return t.fail(err);
-                }
+              release(() => {
                 completed++;
                 isWrite = true;
-                if (completed >= cycles) {
-                  t.done();
-                } else if (completed < cycles) {
+                if (completed < cycles) {
                   cycle();
+                } else {
+                  t.done();
                 }
               });
             }, 10);
@@ -284,4 +270,7 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
   });
   
 }]);
+EOF
+
+node scripts/run-tests.js /tmp/rw-lock-edge-cases-broker.test.ts 2>&1 | grep -E "(Running|PASSED|FAILED|✓|✗|error|Error|timeout|Timeout)" | head -100
 

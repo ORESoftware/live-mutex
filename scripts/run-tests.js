@@ -50,12 +50,19 @@ function runTest(testFile) {
     console.log(`\n${'='.repeat(80)}`);
     console.log(`Running: ${testFile}`);
     console.log(`${'='.repeat(80)}\n`);
+    // Force flush
+    process.stdout.write('');
     
     const startTime = Date.now();
     const testPort = getNextPort();
     let timeoutId = null;
+    let killTimeoutId = null;
+    let inactivityTimeoutId = null;
     let resolved = false;
     let outputBuffer = '';
+    let errorBuffer = '';
+    let lastOutputTime = Date.now();
+    const INACTIVITY_TIMEOUT_MS = 15 * 1000; // 15 seconds
     
     // Set environment variables for the test
     const env = {
@@ -64,8 +71,10 @@ function runTest(testFile) {
       LMX_TEST_BASE_PORT: BASE_PORT.toString(),
       // Enable broker log capture if requested (default: true for better debugging)
       LMX_CAPTURE_LOGS: process.env.LMX_CAPTURE_LOGS !== undefined ? process.env.LMX_CAPTURE_LOGS : 'true',
-      // Print logs as they happen (default: true)
-      LMX_CAPTURE_LOGS_PRINT: process.env.LMX_CAPTURE_LOGS_PRINT !== undefined ? process.env.LMX_CAPTURE_LOGS_PRINT : 'true',
+      // Logs are always printed to stderr when capture is enabled (for inactivity detection)
+      // Ensure non-interactive mode
+      CI: 'true',
+      FORCE_COLOR: '0',
     };
     
     // Determine if it's TypeScript or JavaScript
@@ -73,34 +82,85 @@ function runTest(testFile) {
     const command = isTypeScript ? 'npx' : 'node';
     const args = isTypeScript ? ['ts-node', testFile] : [testFile];
     
-    // Use 'pipe' instead of 'inherit' for better cursor agent compatibility
+    // Use pipe instead of inherit for better cursor agent compatibility
     const proc = spawn(command, args, {
       env,
       stdio: ['ignore', 'pipe', 'pipe'],
       cwd: path.join(__dirname, '..'),
+      detached: false,
     });
     
-    // Forward stdout
+    // Reset inactivity timer whenever we receive ANY output from stdout OR stderr
+    const resetInactivityTimer = () => {
+      lastOutputTime = Date.now();
+      if (inactivityTimeoutId) {
+        clearTimeout(inactivityTimeoutId);
+      }
+      inactivityTimeoutId = setTimeout(() => {
+        if (!resolved) {
+          const timeSinceLastOutput = Date.now() - lastOutputTime;
+          if (timeSinceLastOutput >= INACTIVITY_TIMEOUT_MS) {
+            console.error(`\n⏱️  ${testFile} - No stdio output for ${INACTIVITY_TIMEOUT_MS / 1000}s, killing process`);
+            resolved = true;
+            try {
+              proc.kill('SIGTERM');
+              setTimeout(() => {
+                if (!proc.killed) {
+                  proc.kill('SIGKILL');
+                }
+              }, 2000);
+            } catch (e) {
+              // ignore
+            }
+            finish(1, false);
+          }
+        }
+      }, INACTIVITY_TIMEOUT_MS);
+    };
+    
+    // Capture and forward stdout - ANY output resets inactivity timer
     proc.stdout.on('data', (data) => {
+      resetInactivityTimer(); // Reset timer on ANY stdout output
       const text = data.toString();
       outputBuffer += text;
+      // Write to parent stdout immediately for real-time viewing
       process.stdout.write(text);
     });
     
-    // Forward stderr
+    // Capture and forward stderr - ANY output resets inactivity timer
     proc.stderr.on('data', (data) => {
+      resetInactivityTimer(); // Reset timer on ANY stderr output
       const text = data.toString();
-      outputBuffer += text;
+      errorBuffer += text;
+      // Write to parent stderr immediately
       process.stderr.write(text);
     });
     
-    // Handle stream end events
+    // Start inactivity timer
+    resetInactivityTimer();
+    
+    // Handle stream end events - ensure we don't miss any data
     proc.stdout.on('end', () => {
-      // Stream ended
+      // Stream ended - all data has been read
     });
     
     proc.stderr.on('end', () => {
-      // Stream ended
+      // Stream ended - all data has been read
+    });
+    
+    // Handle stream errors
+    proc.stdout.on('error', (err) => {
+      // Ignore EPIPE errors (stream closed)
+      if (err.code !== 'EPIPE') {
+        console.error(`Stdout error for ${testFile}:`, err.message);
+      }
+    });
+    
+    proc.stderr.on('error', (err) => {
+      // Ignore EPIPE errors (stream closed)
+      if (err.code !== 'EPIPE') {
+        console.error(`Stderr error for ${testFile}:`, err.message);
+      }
     });
     
     // Set up timeout
@@ -108,14 +168,32 @@ function runTest(testFile) {
       if (!resolved) {
         resolved = true;
         console.error(`\n⏱️  ${testFile} timed out after ${TEST_TIMEOUT_MS / 1000}s`);
-        proc.kill('SIGTERM');
+        
+        // Try graceful shutdown first
+        try {
+          proc.kill('SIGTERM');
+        } catch (e) {
+          // ignore
+        }
         
         // Force kill after a grace period
-        setTimeout(() => {
-          if (proc.killed === false) {
-            proc.kill('SIGKILL');
+        killTimeoutId = setTimeout(() => {
+          try {
+            if (!proc.killed) {
+              proc.kill('SIGKILL');
+            }
+            // Also kill any child processes
+            if (proc.pid) {
+              try {
+                process.kill(-proc.pid, 'SIGKILL');
+              } catch (e) {
+                // ignore
+              }
+            }
+          } catch (e) {
+            // ignore
           }
-        }, 5000);
+        }, 3000);
         
         const duration = ((Date.now() - startTime) / 1000).toFixed(2);
         resolve({ file: testFile, passed: false, duration, timeout: true });
@@ -129,6 +207,33 @@ function runTest(testFile) {
       if (timeoutId) {
         clearTimeout(timeoutId);
       }
+      if (killTimeoutId) {
+        clearTimeout(killTimeoutId);
+      }
+      if (inactivityTimeoutId) {
+        clearTimeout(inactivityTimeoutId);
+      }
+      
+      // Only try to kill if it's a timeout situation
+      if (timeout) {
+        try {
+          if (!proc.killed && proc.pid) {
+            try {
+              process.kill(proc.pid, 0); // Check if alive
+              proc.kill('SIGTERM');
+              setTimeout(() => {
+                if (!proc.killed) {
+                  proc.kill('SIGKILL');
+                }
+              }, 1000);
+            } catch (e) {
+              // Process already dead
+            }
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
       
       const duration = ((Date.now() - startTime) / 1000).toFixed(2);
       if (code === 0 && !timeout) {
@@ -141,12 +246,46 @@ function runTest(testFile) {
       }
     };
     
-    proc.on('close', (code) => {
-      // Ensure all output is flushed before finishing
-      if (outputBuffer.trim()) {
-        // Output already written, just finish
+    // Handle process completion
+    // 'exit' fires when the process exits (even if streams are still open)
+    // 'close' fires when stdio streams are closed (after process exits)
+    let exitHandled = false;
+    let closeHandled = false;
+    
+    // Handle exit first - this fires when the process actually exits
+    proc.on('exit', (code, signal) => {
+      if (exitHandled) return;
+      exitHandled = true;
+      
+      // Clear inactivity timer since process exited
+      if (inactivityTimeoutId) {
+        clearTimeout(inactivityTimeoutId);
+        inactivityTimeoutId = null;
       }
-      finish(code);
+      
+      // Process has exited, finish immediately
+      // Don't wait for close - if process.exit() was called, we're done
+      if (!resolved) {
+        finish(code || 0);
+      }
+    });
+    
+    // Handle close as backup (should fire after exit, but sometimes exit doesn't fire if streams keep process alive)
+    proc.on('close', (code, signal) => {
+      if (closeHandled) return;
+      closeHandled = true;
+      
+      // Clear inactivity timer since process closed
+      if (inactivityTimeoutId) {
+        clearTimeout(inactivityTimeoutId);
+        inactivityTimeoutId = null;
+      }
+      
+      // Only handle if exit hasn't fired (process might be kept alive by open handles)
+      if (!exitHandled && !resolved) {
+        exitHandled = true;
+        finish(code === null ? 1 : (code || 0));
+      }
     });
     
     proc.on('error', (err) => {
@@ -155,17 +294,31 @@ function runTest(testFile) {
         if (timeoutId) {
           clearTimeout(timeoutId);
         }
+        if (killTimeoutId) {
+          clearTimeout(killTimeoutId);
+        }
         console.error(`\n❌ Error running ${testFile}:`, err.message);
         reject(err);
       }
     });
     
-    // Handle process exit to ensure cleanup
-    proc.on('exit', (code) => {
-      if (!resolved) {
-        finish(code || 0);
+    const cleanup = () => {
+      if (!resolved && proc && !proc.killed) {
+        try {
+          proc.kill('SIGTERM');
+          setTimeout(() => {
+            if (!proc.killed) {
+              proc.kill('SIGKILL');
+            }
+          }, 1000);
+        } catch (e) {
+          // ignore
+        }
       }
-    });
+    };
+    
+    process.on('SIGINT', cleanup);
+    process.on('SIGTERM', cleanup);
   });
 }
 
@@ -177,10 +330,17 @@ async function main() {
   // Ensure dist is built
   try {
     console.log('Building TypeScript...');
-    execSync('npx tsc', { stdio: 'inherit', cwd: path.join(__dirname, '..') });
+    execSync('npx tsc', { 
+      stdio: 'pipe',
+      cwd: path.join(__dirname, '..'),
+      encoding: 'utf8',
+      maxBuffer: 10 * 1024 * 1024, // 10MB buffer
+    });
     console.log('✅ Build complete\n');
   } catch (err) {
     console.error('❌ Build failed:', err.message);
+    if (err.stdout) console.error('STDOUT:', err.stdout);
+    if (err.stderr) console.error('STDERR:', err.stderr);
     process.exit(1);
   }
   

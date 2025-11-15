@@ -624,6 +624,14 @@ export class Broker {
         return this.emitter.once.apply(this.emitter, args);
     }
 
+    /**
+     * Attach a callback to listen for warning events and output them
+     * @param callback Function that receives warning messages/errors
+     */
+    onWarning(callback: (...args: any[]) => void): void {
+        this.emitter.on('warning', callback);
+    }
+
     ping(data: any, ws: net.Socket) {
         const uuid = data.uuid;
         const timestamp = data.timestamp || Date.now();
@@ -1019,9 +1027,9 @@ export class Broker {
             return;
         }
 
-        log.debug('incrementing readers right after write flag check.');
-
-        lck.readers++;
+        log.debug('registerWriteFlagCheck: no writer flag, allowing read to proceed for key:', key, 'current readers:', lck.readers);
+        // NOTE: Do NOT increment readers here - incrementReaders will be called separately after lock acquisition
+        // This prevents double-counting readers
 
         this.send(ws, {
             writerFlag,

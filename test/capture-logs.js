@@ -1,7 +1,12 @@
+#!/usr/bin/env node
+
 /**
  * Utility to capture broker and client logs for testing
- * Usage: const { captureBrokerLogs, captureClientLogs } = require('./capture-logs');
+ * Uses the new onWarning() method for clean log capture
+ * Usage: const { attachToBroker, attachToClient, attachToRWClient } = require('./capture-logs');
  */
+
+'use strict';
 
 const logs = [];
 let captureEnabled = process.env.LMX_CAPTURE_LOGS === 'true' || process.env.LMX_CAPTURE_LOGS === '1';
@@ -32,7 +37,7 @@ function printCapturedLogs() {
   console.log('='.repeat(80));
   logs.forEach(log => {
     const prefix = log.type === 'error' ? '❌' : log.type === 'warning' ? '⚠️' : 'ℹ️';
-    const sourceLabel = log.source === 'broker' ? '[BROKER]' : '[CLIENT]';
+    const sourceLabel = log.source === 'broker' ? '[BROKER]' : log.source === 'client' ? '[CLIENT]' : '[RW-CLIENT]';
     console.log(`${prefix} ${sourceLabel} ${log.message}`);
   });
   console.log('='.repeat(80) + '\n');
@@ -48,80 +53,96 @@ function addLog(type, source, message) {
     timestamp: Date.now(),
   });
   
-  // Also print to console if enabled
-  if (process.env.LMX_CAPTURE_LOGS_PRINT === 'true' || process.env.LMX_CAPTURE_LOGS_PRINT === '1') {
-    const prefix = type === 'error' ? '❌' : type === 'warning' ? '⚠️' : 'ℹ️';
-    const sourceLabel = source === 'broker' ? '[BROKER]' : '[CLIENT]';
-    console.log(`${prefix} ${sourceLabel} ${message}`);
+  // Always write to stderr to ensure inactivity timeout can detect activity
+  // This ensures the test runner knows the process is still alive
+  const prefix = type === 'error' ? '❌' : type === 'warning' ? '⚠️' : 'ℹ️';
+  const sourceLabel = source === 'broker' ? '[BROKER]' : source === 'client' ? '[CLIENT]' : '[RW-CLIENT]';
+  process.stderr.write(`${prefix} ${sourceLabel} ${message}\n`);
+}
+
+/**
+ * Helper to attach warning listener using the clean onWarning() method
+ */
+function attachWarningListener(instance, type) {
+  if (instance && typeof instance.onWarning === 'function') {
+    instance.onWarning(function(...args) {
+      const parts = args.map(arg => {
+        if (arg instanceof Error) {
+          return arg.message + (arg.stack ? '\n' + arg.stack : '');
+        }
+        return String(arg);
+      });
+      const message = parts.join(' ');
+      
+      // Add to logs
+      addLog('warning', type.toLowerCase(), message);
+    });
+  } else if (instance && instance.emitter) {
+    // Fallback to emitter if onWarning not available
+    instance.emitter.on('warning', (...args) => {
+      const message = args.map(arg => 
+        typeof arg === 'string' ? arg : (arg instanceof Error ? arg.message : JSON.stringify(arg))
+      ).join(' ');
+      addLog('warning', type.toLowerCase(), message);
+    });
+    
+    instance.emitter.on('error', (...args) => {
+      const message = args.map(arg => 
+        typeof arg === 'string' ? arg : (arg instanceof Error ? arg.message : JSON.stringify(arg))
+      ).join(' ');
+      addLog('error', type.toLowerCase(), message);
+    });
   }
 }
 
 /**
- * Attach log capture listeners to a broker instance
- * Note: Broker already has a default warning listener, so we add ours without removing it
+ * Attach log capture to a broker instance using onWarning()
  */
+function attachToBroker(broker) {
+  attachWarningListener(broker, 'broker');
+}
+
+/**
+ * Attach log capture to a client instance using onWarning()
+ */
+function attachToClient(client) {
+  attachWarningListener(client, 'client');
+}
+
+/**
+ * Attach log capture to an RW client instance using onWarning()
+ */
+function attachToRWClient(client) {
+  attachWarningListener(client, 'rw-client');
+}
+
+// Legacy function names for backward compatibility
 function captureBrokerLogs(broker) {
-  if (!broker || !broker.emitter) {
-    return;
-  }
-  
-  // Add our capture listeners (don't remove existing ones - broker has its own default listener)
-  broker.emitter.on('warning', (...args) => {
-    const message = args.map(arg => 
-      typeof arg === 'string' ? arg : (arg instanceof Error ? arg.message : JSON.stringify(arg))
-    ).join(' ');
-    addLog('warning', 'broker', message);
-  });
-  
-  broker.emitter.on('error', (...args) => {
-    const message = args.map(arg => 
-      typeof arg === 'string' ? arg : (arg instanceof Error ? arg.message : JSON.stringify(arg))
-    ).join(' ');
-    addLog('error', 'broker', message);
-  });
+  attachToBroker(broker);
 }
 
-/**
- * Attach log capture listeners to a client instance
- * Note: Client already has a default warning listener, so we add ours without removing it
- */
 function captureClientLogs(client) {
-  if (!client || !client.emitter) {
-    return;
-  }
-  
-  // Add our capture listeners (don't remove existing ones - client has its own default listener)
-  client.emitter.on('warning', (...args) => {
-    const message = args.map(arg => 
-      typeof arg === 'string' ? arg : (arg instanceof Error ? arg.message : JSON.stringify(arg))
-    ).join(' ');
-    addLog('warning', 'client', message);
-  });
-  
-  client.emitter.on('error', (...args) => {
-    const message = args.map(arg => 
-      typeof arg === 'string' ? arg : (arg instanceof Error ? arg.message : JSON.stringify(arg))
-    ).join(' ');
-    addLog('error', 'client', message);
-  });
+  attachToClient(client);
 }
 
-/**
- * Attach log capture to both broker and client
- */
 function captureLogs(broker, client) {
-  if (broker) captureBrokerLogs(broker);
-  if (client) captureClientLogs(client);
+  if (broker) attachToBroker(broker);
+  if (client) attachToClient(client);
 }
 
 module.exports = {
+  // New API using onWarning()
+  attachToBroker,
+  attachToClient,
+  attachToRWClient,
+  // Legacy API for backward compatibility
+  captureBrokerLogs,
+  captureClientLogs,
+  captureLogs,
+  // Utility functions
   enableLogCapture,
   disableLogCapture,
   getCapturedLogs,
   clearCapturedLogs,
   printCapturedLogs,
-  captureBrokerLogs,
-  captureClientLogs,
-  captureLogs,
 };
-
