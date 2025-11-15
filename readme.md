@@ -115,6 +115,11 @@ await client.release(key, {id});
 >   docker run --rm -d -p 6970:6970 --name lmx-broker oresoftware/live-mutex-broker:latest
 >   docker logs -f lmx-broker
 >```
+>
+> Or use the quick-start guide:
+>```
+>   $ lmx quick-start
+>```
 
 <br>
 
@@ -271,6 +276,29 @@ in Node.js, by using `{env: true}` in your Node.js code.
 
 </details>
 
+### New CLI Tools
+
+Live-Mutex now includes additional CLI tools to help you get started:
+
+- **`lmx quick-start`** - Interactive guide showing how to get started with Live-Mutex
+- **`lmx status [port] [host]`** - Check if a broker is running and accessible
+- **`lmx health-check [port] [host]`** - Run a health check by acquiring and releasing a test lock
+
+Example:
+```bash
+# Get started quickly
+$ lmx quick-start
+
+# Check broker status
+$ lmx status
+$ lmx status 6970 localhost
+
+# Run health check
+$ lmx health-check
+```
+
+For detailed usage information, see [README-2.md](./README-2.md).
+
 <br>
 
 # Using Node.js
@@ -278,12 +306,17 @@ in Node.js, by using `{env: true}` in your Node.js code.
 ## Importing the library using Node.js
 
 ```js
-// alternatively you can import all of these directly
-import {Client, Broker} from 'live-mutex';
+// Recommended: Use Broker1 (actively maintained)
+import {Client, Broker1} from 'live-mutex';
+
+// Legacy: Broker is still available but will be deprecated
+import {Broker} from 'live-mutex';
 
 // aliases of the above;
-import {LMXClient, LMXBroker} from 'live-mutex';
+import {LMXClient, LMXBroker1} from 'live-mutex';
 ```
+
+> **Note**: `Broker1` is the recommended broker implementation. `Broker` is legacy and will be deprecated. See [BROKER-COMPARISON.md](./BROKER-COMPARISON.md) for details and [MIGRATION-GUIDE.md](./MIGRATION-GUIDE.md) for migration instructions.
 
 <br>
 
@@ -661,6 +694,20 @@ exports.createPool = function(opts){
 
 > Look at test/readme.md
 
+<br>
+
+## Documentation
+
+- **[README-2.md](./README-2.md)** - Comprehensive usage guide with examples and best practices
+- **[BROKER-COMPARISON.md](./BROKER-COMPARISON.md)** - Differences between Broker and Broker1
+- **[MIGRATION-GUIDE.md](./MIGRATION-GUIDE.md)** - Guide for migrating from Broker to Broker1
+
+### Quick Links
+
+- **Getting Started**: Run `lmx quick-start` or see [README-2.md](./README-2.md)
+- **CLI Tools**: See the "New CLI Tools" section above
+- **Docker**: See [README-2.md](./README-2.md#docker-usage) for Docker examples
+- **Broker vs Broker1**: See [BROKER-COMPARISON.md](./BROKER-COMPARISON.md)
 
 <br>
 
