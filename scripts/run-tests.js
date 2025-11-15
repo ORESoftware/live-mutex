@@ -469,7 +469,7 @@ async function main() {
   
   const passed = results.filter(r => r.passed).length;
   const failed = results.filter(r => !r.passed).length;
-  const totalDuration = results.reduce((sum, r) => sum + (r.duration || 0), 0);
+  const totalDuration = results.reduce((sum, r) => sum + parseFloat(r.duration || 0), 0);
   
   console.log(`Total: ${results.length}`);
   console.log(`✅ Passed: ${passed}`);
