@@ -314,7 +314,7 @@ async function test5_StressTest(broker: Broker1, clients: RWLockWritePrefClient[
                 // Writer - every 3rd operation (7 writers total)
                 writeCount++;
                 operations.push(
-                    new Promise<void>((resolve) => {
+                    new Promise<void>((resolve, reject) => {
                         // Add small delay to stagger operations
                         setTimeout(() => {
                             client.acquireWriteLock(key, { lockRequestTimeout: 30000 }, (err: any, release: any) => {
