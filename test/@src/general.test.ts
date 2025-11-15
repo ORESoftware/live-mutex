@@ -4,7 +4,7 @@ import * as suman from 'suman';
 
 const {Test} = suman.init(module);
 import async = require('async');
-import {Broker, Client} from '../../dist/main';
+import {Broker1, Client} from '../../dist/main';
 
 //@ts-ignore
 Test.create(['Promise', function (b, it, inject, describe, before, $deps, path) {
@@ -27,7 +27,7 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps, path) 
   inject(() => {
     // const brokerConf = Object.assign({}, conf, {noListen: process.env.lmx_broker_no_listen === 'yes'});
     return {
-      broker: new Broker(conf).ensure().then(handleEvents)
+      broker: new Broker1(conf).ensure().then(handleEvents)
     }
   });
   

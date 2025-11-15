@@ -2,7 +2,7 @@
 
 import suman = require('suman');
 const Test = suman.init(module);
-import {Client, lmUtils, Broker} from 'live-mutex';
+import {Client, lmUtils, Broker1} from 'live-mutex';
 
 /////////////////////////////////////////////////////////
 
@@ -17,7 +17,7 @@ Test.create({mode: 'series'}, ['Client', 'lmUtils', 'Promise', function (b, asse
 
   before(function () {
     const brokerConf = Object.assign({}, conf, {noListen: process.env.lmx_broker_no_listen === 'yes'});
-    return new Broker(brokerConf).start();
+    return new Broker1(brokerConf).start();
   });
 
   it.cb('yes - 1', {timeout: 3900}, t => {

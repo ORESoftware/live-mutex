@@ -2,7 +2,7 @@
 
 import * as suman from 'suman';
 const {Test} = suman.init(module);
-import {Broker, Client} from '../../dist/main';
+import {Broker1, Client} from '../../dist/main';
 
 //@ts-ignore
 Test.create(['Promise', function (b, it, inject, describe, before, $deps, path) {
@@ -29,7 +29,7 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps, path) 
 
   inject(() => {
     return {
-      broker: new Broker(conf).ensure().then(handleEvents)
+      broker: new Broker1(conf).ensure().then(handleEvents)
     }
   });
 

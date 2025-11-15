@@ -4,7 +4,7 @@ import suman = require('suman');
 const Test = suman.init(module);
 const async = require('async');
 import {Client} from "../../dist/client";
-import {Broker} from "../../dist/broker";
+import {Broker1} from "../../dist/broker-1";
 
 // @ts-ignore
 Test.create(['lmUtils', (b, assert, before, describe, it, path, fs, inject, after) => {
@@ -39,7 +39,7 @@ Test.create(['lmUtils', (b, assert, before, describe, it, path, fs, inject, afte
 
   inject(j => {
     const brokerConf = Object.assign({}, conf, {noListen});
-    j.register('broker', new Broker(brokerConf).ensure().then(handleEvents));
+    j.register('broker', new Broker1(brokerConf).ensure().then(handleEvents));
   });
 
   inject(j => {
@@ -57,7 +57,7 @@ Test.create(['lmUtils', (b, assert, before, describe, it, path, fs, inject, afte
   describe('post', function (b) {
 
     const client = b.getInjectedValue('client') as Client;
-    const broker = b.getInjectedValue('broker') as Broker;
+    const broker = b.getInjectedValue('broker') as Broker1;
 
     after.cb(h => {
       console.log('closing broker...');

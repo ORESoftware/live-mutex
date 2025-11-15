@@ -3,7 +3,7 @@
 import suman = require('suman');
 const Test = suman.init(module);
 const async = require('async');
-import {Broker} from "../../dist/broker";
+import {Broker1} from "../../dist/broker-1";
 import * as path from "path";
 import * as fs from 'fs';
 import cp = require('child_process');
@@ -36,7 +36,7 @@ Test.create(['lmUtils', (b, assert, before, describe, it, path, inject, after) =
 
   inject(j => {
     const brokerConf = Object.assign({}, conf, {noListen: process.env.lmx_broker_no_listen === 'yes'});
-    j.register('broker', new Broker(brokerConf).ensure().then(handleEvents));
+    j.register('broker', new Broker1(brokerConf).ensure().then(handleEvents));
   });
 
   before.cb(h => {
@@ -49,7 +49,7 @@ Test.create(['lmUtils', (b, assert, before, describe, it, path, inject, after) =
 
   describe('post', function (b) {
 
-    const broker = b.getInjectedValue('broker') as Broker;
+    const broker = b.getInjectedValue('broker') as Broker1;
 
     after.cb(h => {
       console.log('closing broker...');
