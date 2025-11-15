@@ -1,0 +1,15 @@
+# Cursor Rules for live-mutex
+
+## Terminal Commands
+
+- **DO NOT** pipe command output to `head` or `tail` in terminal commands
+- Show full command output instead of truncating it
+- If output is too long, let the user see it all or use other methods to filter (like grep with specific patterns)
+- This ensures we see complete information and don't miss important details
+
+## Code Style
+
+- Prefer explicit types over `any` when possible
+- Use proper TypeScript types instead of type assertions when feasible
+- Maintain type safety throughout the codebase
+
