@@ -20,7 +20,7 @@
   "scripts": {
     "compile": "npx tsc",
     "compile:watch": "npx tsc --watch",
-    "compile:tests": "npx tsc --noEmit test/**/*.ts assets/cli/*.ts",
+    "compile:tests": "npx tsc --noEmit --skipLibCheck test/**/*.ts assets/cli/*.ts",
     "test": "node scripts/run-tests.js",
     "test:old": "./scripts/test.sh",
     "postinstall": "./assets/postinstall.sh"

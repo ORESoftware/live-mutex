@@ -1,6 +1,6 @@
 # Live-Mutex Usage Guide
 
-This is a practical usage guide for Live-Mutex. For general information, see [README.md](./README.md).
+This is a practical usage guide for Live-Mutex. For general information, see [readme.md](../readme.md).
 
 ## Quick Start
 
@@ -337,7 +337,7 @@ lmUtils.conditionallyLaunchSocketServer({port: 6970}, (err) => {
 
 ## See Also
 
-- [README.md](./README.md) - General information and rationale
-- [BROKER-COMPARISON.md](./BROKER-COMPARISON.md) - Broker vs Broker1 differences
-- [MIGRATION-GUIDE.md](./MIGRATION-GUIDE.md) - Migration guide for developers
+- [readme.md](../readme.md) - General information and rationale
+- [BROKER-COMPARISON.md](../BROKER-COMPARISON.md) - Broker vs Broker1 differences
+- [MIGRATION-GUIDE.md](../MIGRATION-GUIDE.md) - Migration guide for developers
 
