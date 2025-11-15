@@ -278,6 +278,7 @@ export class RWLockWritePrefClient extends Client {
       // For read locks, default to 10 concurrent readers (write locks default to 1)
       // Only set max if user hasn't explicitly set it
       // If user explicitly sets max (e.g., max=1 or max=5), honor that value
+      // The actual reader count is tracked separately via incrementReaders
       if (opts.max === undefined || opts.max === null) {
         opts.max = 10; // Default: allow up to 10 concurrent readers
       }

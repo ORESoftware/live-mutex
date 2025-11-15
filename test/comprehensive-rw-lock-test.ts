@@ -56,6 +56,40 @@ function appendToFile(content: string): void {
     fs.appendFileSync(TEST_FILE, content, 'utf8');
 }
 
+/**
+ * Check if an error is a release timeout error (non-fatal)
+ * Timeout errors have code 'bad_or_mismatched_id' and message containing "timed out"
+ */
+function isReleaseTimeoutError(err: any): boolean {
+    if (!err) return false;
+    // Timeout errors have code 'bad_or_mismatched_id' and message containing "timed out"
+    return err.code === 'bad_or_mismatched_id' && 
+           err.message && 
+           typeof err.message === 'string' && 
+           err.message.toLowerCase().includes('timed out');
+}
+
+/**
+ * Helper to handle release errors - log but don't fail on timeouts
+ * Returns true if it's a real error (should reject), false if timeout (non-fatal)
+ * @param releaseErr The error from the release callback
+ * @param operation Operation name for error messages (e.g., 'releaseWriteLock', 'releaseReadLock')
+ */
+function handleReleaseError(releaseErr: any, operation: string = 'release'): boolean {
+    if (releaseErr) {
+        if (isReleaseTimeoutError(releaseErr)) {
+            // Timeout is not a real error - lock may have already been released
+            console.warn(`${operation} timeout (non-fatal):`, releaseErr.message);
+            return false; // Not a real error
+        } else {
+            // Real error - log it
+            console.error(`${operation} error:`, releaseErr);
+            return true; // Real error, should reject
+        }
+    }
+    return false; // No error
+}
+
 async function test1_ConcurrentReaders(broker: Broker1, clients: RWLockWritePrefClient[]): Promise<TestResult> {
     log('Test 1: Multiple Concurrent Readers');
     try {
@@ -74,14 +108,8 @@ async function test1_ConcurrentReaders(broker: Broker1, clients: RWLockWritePref
                         }
                         setTimeout(() => {
                             release((releaseErr: any) => {
-                                if (releaseErr) {
-                                    // Check if it's a timeout error (expected, not a real error)
-                                    const isTimeout = releaseErr?.message?.toLowerCase().includes('timeout') || 
-                                                     releaseErr?.message?.toLowerCase().includes('timed out') ||
-                                                     releaseErr?.code === 'ETIMEDOUT';
-                                    if (!isTimeout) {
-                                        console.error('releaseReadLock error:', releaseErr);
-                                    }
+                                if (handleReleaseError(releaseErr, 'releaseReadLock')) {
+                                    return reject(releaseErr);
                                 }
                                 resolve();
                             });
@@ -139,16 +167,12 @@ async function test2_WriterExclusive(broker: Broker1, clients: RWLockWritePrefCl
                     writerReleaseTime = Date.now();
                     writerReleased = true;
                     release((releaseErr: any) => {
-                        if (releaseErr) {
-                            // Check if it's a timeout error (expected, not a real error)
-                            const isTimeout = releaseErr?.message?.toLowerCase().includes('timeout') || 
-                                             releaseErr?.message?.toLowerCase().includes('timed out') ||
-                                             releaseErr?.code === 'ETIMEDOUT';
-                            if (!isTimeout) {
-                                console.error('releaseWriteLock error:', releaseErr);
-                            }
+                        if (handleReleaseError(releaseErr, 'releaseWriteLock')) {
+                            return reject(releaseErr);
                         }
-                        log('Writer released');
+                        if (!releaseErr) {
+                            log('Writer released');
+                        }
                         resolve();
                     });
                 }, 300);
@@ -189,14 +213,8 @@ async function test3_SequentialWrites(broker: Broker1, clients: RWLockWritePrefC
                     log(`Write ${i}: ${before} -> ${after}`);
                     setTimeout(() => {
                         release((releaseErr: any) => {
-                            if (releaseErr) {
-                                // Check if it's a timeout error (expected, not a real error)
-                                const isTimeout = releaseErr?.message?.toLowerCase().includes('timeout') || 
-                                                 releaseErr?.message?.toLowerCase().includes('timed out') ||
-                                                 releaseErr?.code === 'ETIMEDOUT';
-                                if (!isTimeout) {
-                                    console.error('releaseWriteLock error:', releaseErr);
-                                }
+                            if (handleReleaseError(releaseErr, 'releaseWriteLock')) {
+                                return reject(releaseErr);
                             }
                             resolve();
                         });
@@ -311,14 +329,8 @@ async function test5_StressTest(broker: Broker1, clients: RWLockWritePrefClient[
                                 completedWrites++;
                                 setTimeout(() => {
                                     release((releaseErr: any) => {
-                                        if (releaseErr) {
-                                            // Check if it's a timeout error (expected, not a real error)
-                                            const isTimeout = releaseErr?.message?.toLowerCase().includes('timeout') || 
-                                                             releaseErr?.message?.toLowerCase().includes('timed out') ||
-                                                             releaseErr?.code === 'ETIMEDOUT';
-                                            if (!isTimeout) {
-                                                console.error(`Write ${opIndex} releaseWriteLock error:`, releaseErr);
-                                            }
+                                        if (handleReleaseError(releaseErr, 'releaseWriteLock')) {
+                                            return reject(releaseErr);
                                         }
                                         resolve();
                                     });
@@ -389,14 +401,8 @@ async function test6_FileConsistency(broker: Broker1, clients: RWLockWritePrefCl
                     expected.push(`LINE-${i}`);
                     setTimeout(() => {
                         release((releaseErr: any) => {
-                            if (releaseErr) {
-                                // Check if it's a timeout error (expected, not a real error)
-                                const isTimeout = releaseErr?.message?.toLowerCase().includes('timeout') || 
-                                                 releaseErr?.message?.toLowerCase().includes('timed out') ||
-                                                 releaseErr?.code === 'ETIMEDOUT';
-                                if (!isTimeout) {
-                                    console.error('releaseWriteLock error:', releaseErr);
-                                }
+                            if (handleReleaseError(releaseErr, 'releaseWriteLock')) {
+                                return reject(releaseErr);
                             }
                             resolve();
                         });
