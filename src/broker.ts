@@ -680,7 +680,26 @@ export class Broker {
     }
 
     close(cb: (err: any) => void): void {
-        this.wss.close(cb);
+        // Clean up Unix domain socket file if it exists
+        if (this.socketFile) {
+            try {
+                if (fs.existsSync(this.socketFile)) {
+                    fs.unlinkSync(this.socketFile);
+                    log.info('socket file unlinked:', this.socketFile);
+                }
+            } catch (err) {
+                // ignore errors during cleanup
+            }
+        }
+        
+        // Close the server (works for both TCP and Unix domain sockets)
+        if (this.wss) {
+            this.wss.close((err: any) => {
+                if (cb) cb(err);
+            });
+        } else {
+            if (cb) cb(null);
+        }
     }
 
     getListeningInterface() {
