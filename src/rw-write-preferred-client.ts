@@ -275,12 +275,13 @@ export class RWLockWritePrefClient extends Client {
 
       log.debug(chalk.blue('acquireReadLock writer flag check passed, acquiring lock'));
 
-      // For read locks, allow multiple readers to coexist
-      // Use a high max value to allow concurrent readers
-      // The actual reader count is tracked separately via incrementReaders
-      if (!opts.max || opts.max === 1) {
-        opts.max = 1000; // Allow up to 1000 concurrent readers
+      // For read locks, default to 10 concurrent readers (write locks default to 1)
+      // Only set max if user hasn't explicitly set it
+      // If user explicitly sets max (e.g., max=1 or max=5), honor that value
+      if (opts.max === undefined || opts.max === null) {
+        opts.max = 10; // Default: allow up to 10 concurrent readers
       }
+      // User's explicit max value (including max=1) will be honored by the broker
 
       this.lock(key, opts, (err, unlock) => {
 

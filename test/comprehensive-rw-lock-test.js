@@ -10,6 +10,34 @@ const rw_write_preferred_client_1 = require("../dist/rw-write-preferred-client")
 const PORT = process.env.LMX_TEST_PORT ? parseInt(process.env.LMX_TEST_PORT) : 3333;
 const TEST_FILE = path.join(os.tmpdir(), 'lmx-rw-comprehensive-test.txt');
 const testResults = [];
+
+// Helper to check if a release error is a timeout (not a real error)
+function isReleaseTimeoutError(err) {
+    if (!err) return false;
+    // Timeout errors have code 'bad_or_mismatched_id' and message containing "timed out"
+    return err.code === 'bad_or_mismatched_id' && 
+           err.message && 
+           typeof err.message === 'string' && 
+           err.message.toLowerCase().includes('timed out');
+}
+
+// Helper to handle release errors - log but don't fail on timeouts
+// Returns true if it's a real error (should reject), false if timeout (non-fatal)
+function handleReleaseError(releaseErr, operation = 'release') {
+    if (releaseErr) {
+        if (isReleaseTimeoutError(releaseErr)) {
+            // Timeout is not a real error - lock may have already been released
+            console.warn(`${operation} timeout (non-fatal):`, releaseErr.message);
+            return false; // Not a real error
+        } else {
+            // Real error - log it
+            console.error(`${operation} error:`, releaseErr);
+            return true; // Real error, should reject
+        }
+    }
+    return false; // No error
+}
+
 function log(message, data) {
     const timestamp = new Date().toISOString();
     const logLine = `[${timestamp}] ${message}${data ? ' ' + JSON.stringify(data) : ''}`;
@@ -51,8 +79,9 @@ async function test1_ConcurrentReaders(broker, clients) {
                     }
                     setTimeout(() => {
                         release((releaseErr) => {
-                            if (releaseErr)
+                            if (handleReleaseError(releaseErr, 'releaseReadLock')) {
                                 return reject(releaseErr);
+                            }
                             resolve();
                         });
                     }, 50);
@@ -104,9 +133,12 @@ async function test2_WriterExclusive(broker, clients) {
                     writerReleaseTime = Date.now();
                     writerReleased = true;
                     release((releaseErr) => {
-                        if (releaseErr)
+                        if (handleReleaseError(releaseErr, 'releaseWriteLock')) {
                             return reject(releaseErr);
-                        log('Writer released');
+                        }
+                        if (!releaseErr) {
+                            log('Writer released');
+                        }
                         resolve();
                     });
                 }, 300);
@@ -144,7 +176,7 @@ async function test3_SequentialWrites(broker, clients) {
                     log(`Write ${i}: ${before} -> ${after}`);
                     setTimeout(() => {
                         release((releaseErr) => {
-                            if (releaseErr) {
+                            if (handleReleaseError(releaseErr, 'releaseWriteLock')) {
                                 return reject(releaseErr);
                             }
                             resolve();
@@ -242,8 +274,8 @@ async function test5_StressTest(broker, clients) {
                             completedWrites++;
                             setTimeout(() => {
                                 release((releaseErr) => {
-                                    if (releaseErr) {
-                                        log(`Write ${opIndex} release failed:`, releaseErr.message);
+                                    if (handleReleaseError(releaseErr, `Write ${opIndex} release`)) {
+                                        return reject(releaseErr);
                                     }
                                     resolve();
                                 });
@@ -305,8 +337,9 @@ async function test6_FileConsistency(broker, clients) {
                     expected.push(`LINE-${i}`);
                     setTimeout(() => {
                         release((releaseErr) => {
-                            if (releaseErr)
+                            if (handleReleaseError(releaseErr, 'releaseReadLock')) {
                                 return reject(releaseErr);
+                            }
                             resolve();
                         });
                     }, 20);

@@ -179,7 +179,13 @@ export class RWLockClient extends Client {
     }
 
     opts.rwStatus = RWStatus.BeginRead;
-    opts.max = 1;
+    // For read locks, default to 10 concurrent readers (write locks default to 1)
+    // Only set max if user hasn't explicitly set it
+    // If user explicitly sets max (e.g., max=1 or max=5), honor that value
+    if (opts.max === undefined || opts.max === null) {
+      opts.max = 10; // Default: allow up to 10 concurrent readers
+    }
+    // User's explicit max value (including max=1) will be honored by the broker
     opts.force = false; // we want writers to have some chance to swoop in
     const writeKey = opts.writeKey;
 
