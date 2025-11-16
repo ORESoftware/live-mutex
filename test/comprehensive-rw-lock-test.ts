@@ -157,7 +157,12 @@ async function test2_WriterExclusive(broker: Broker1, clients: RWLockWritePrefCl
                             } else {
                                 log('Reader acquired after writer released (correct)');
                             }
-                            readRelease(() => {});
+                            readRelease((readReleaseErr: any) => {
+                                if (handleReleaseError(readReleaseErr, 'releaseReadLock')) {
+                                    // Real error, but we're not in a promise context here
+                                    console.error('Read release error in test2:', readReleaseErr);
+                                }
+                            });
                         }
                     });
                 }, 50);
@@ -251,12 +256,9 @@ async function test4_WritePreference(broker: Broker1, clients: RWLockWritePrefCl
                         if (!err) {
                             order.push(`R${i}`);
                             setTimeout(() => {
-                                release((err: any) => {
-                                    if (err) {
-                                        // Handle release error if needed
-                                        console.warn('Release error:', err);
-                                        reject(err);
-                                        return;
+                                release((releaseErr: any) => {
+                                    if (handleReleaseError(releaseErr, 'releaseReadLock')) {
+                                        return reject(releaseErr);
                                     }
                                     resolve();
                                 });
@@ -275,7 +277,12 @@ async function test4_WritePreference(broker: Broker1, clients: RWLockWritePrefCl
                 if (!err) {
                     order.push('W');
                     setTimeout(() => {
-                        release((err: any) => {});
+                        release((releaseErr: any) => {
+                            if (handleReleaseError(releaseErr, 'releaseWriteLock')) {
+                                // Real error, but we're not in a promise context here
+                                console.error('Write release error in test4:', releaseErr);
+                            }
+                        });
                     }, 50);
                 }
             });
@@ -341,15 +348,15 @@ async function test5_StressTest(broker: Broker1, clients: RWLockWritePrefClient[
             } else {
                 // Reader
                 operations.push(
-                    new Promise<void>((resolve) => {
+                    new Promise<void>((resolve, reject) => {
                         setTimeout(() => {
                             client.acquireReadLock(key, { lockRequestTimeout: 30000 }, (err: any, release: any) => {
                                 if (!err) {
                                     const val = readFile();
                                     setTimeout(() => {
-                                        release((err: any) => {
-                                            if (err) {
-                                                // Handle release error if needed
+                                        release((releaseErr: any) => {
+                                            if (handleReleaseError(releaseErr, 'releaseReadLock')) {
+                                                return reject(releaseErr);
                                             }
                                             resolve();
                                         });

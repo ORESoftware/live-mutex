@@ -3,11 +3,10 @@
 import {Broker1, log} from "./broker-1";
 import * as fs from 'fs';
 import chalk from "chalk";
-import util = require('util');
+import * as util from 'util';
 import * as path from "path";
 import {inspectError} from "./shared-internal";
-
-const cp = require('child_process');
+import * as cp from 'child_process';
 
 let host = process.env.live_mutex_host || '0.0.0.0';
 let port = parseInt(process.env.live_mutex_port || '6970');

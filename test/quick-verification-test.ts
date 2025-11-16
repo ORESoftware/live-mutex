@@ -130,6 +130,7 @@ async function runQuickVerification() {
     console.log('  ✅ Cleanup complete\n');
     
     console.log('✅ All verification tests passed!');
+    process.exit(0);
 }
 
 runQuickVerification().catch(err => {
