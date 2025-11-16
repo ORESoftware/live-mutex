@@ -15,6 +15,9 @@ test/.suman/.meta
 *.tgz
 *.DS_Store
 
+# Don't commit compiled JS files in src/ - they should only be in dist/
+src/**/*.js
+
 ### files
 yarn.lock
 

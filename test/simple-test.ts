@@ -4,9 +4,12 @@ import * as async from 'async';
 import * as assert from "assert";
 import * as domain from "domain";
 
+// Use random port to avoid conflicts with other tests
+const port = 8000 + Math.floor(Math.random() * 1000);
+
 Promise.all([
-  new Broker().ensure(),
-  new Client().connect()
+  new Broker({port}).ensure(),
+  new Client({port}).connect()
 ])
 .then(function ([b, c]) {
 
@@ -49,23 +52,27 @@ Promise.all([
 
       function(cb){
 
-        const c = Client.create();
-        c.ensure((err, c) => {
+        const c = Client.create({port});
+        c.ensure((err, client) => {
 
           if (err) {
             return cb(err);
           }
 
+          if (!client) {
+            return cb(new Error('Client ensure returned undefined'));
+          }
+
           debugger;
 
-          c.lock('z', function (err, v) {
+          client.lock('z', function (err, v) {
             if (err) {
               return cb(err);
             }
             console.log('the error:', err);
             console.log('the v:', v);
             console.log('the id:', v.id);
-            c.unlock('z', v.id, function (err, v) {
+            client.unlock('z', v.id, function (err, v) {
               debugger;
               console.log(err,v);
                 cb(err, v);
@@ -78,7 +85,7 @@ Promise.all([
 
         debugger;
 
-        const c = new Client();
+        const c = new Client({port});
         c.ensure().then(function () {
 
           debugger;
@@ -96,7 +103,7 @@ Promise.all([
 
         debugger;
 
-        const c = Client.create();
+        const c = Client.create({port});
 
         c.ensure().then(c => {
           c.lock('z', function (err, {id}) {
@@ -110,7 +117,7 @@ Promise.all([
       },
       function (cb) {
 
-         Client.create().ensure().then(c => {
+         Client.create({port}).ensure().then(c => {
 
           debugger;
 
@@ -123,7 +130,9 @@ Promise.all([
 
             debugger;
 
-            unlock(cb);
+            unlock((err, result) => {
+              cb(err, result);
+            });
           });
         });
       }
@@ -133,11 +142,30 @@ Promise.all([
 
       debugger;
 
-      if(err){
-        console.error('final error:',err);
-      }
-
-      console.log('all done.');
+      // Cleanup: close client and broker
+      const cleanup = () => {
+        try {
+          c.close();
+        } catch (e) {
+          // Ignore cleanup errors
+        }
+        
+        b.close((closeErr) => {
+          if (closeErr) {
+            console.error('Broker close error:', closeErr);
+          }
+          
+          if(err){
+            console.error('final error:',err);
+            process.exit(1);
+          } else {
+            console.log('all done.');
+            process.exit(0);
+          }
+        });
+      };
+      
+      cleanup();
     });
     
   });

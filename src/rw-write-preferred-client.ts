@@ -114,6 +114,8 @@ export class RWLockWritePrefClient extends Client {
     };
 
     log.debug(chalk.blue('[RW] acquireWriteLock acquiring base lock for key:'), key);
+    // Set maxWrite to explicitly separate write lock limits from read lock limits
+    opts.maxWrite = opts.maxWrite !== undefined ? opts.maxWrite : opts.max;
     this.lock(key, opts, (err, unlock) => {
       log.debug(chalk.blue('[RW] acquireWriteLock base lock callback fired'), {key, err: !!err, hasUnlock: !!unlock});
 
@@ -282,6 +284,8 @@ export class RWLockWritePrefClient extends Client {
       if (opts.max === undefined || opts.max === null) {
         opts.max = 10; // Default: allow up to 10 concurrent readers
       }
+      // Set maxRead to explicitly separate read lock limits from write lock limits
+      opts.maxRead = opts.maxRead !== undefined ? opts.maxRead : opts.max;
       // User's explicit max value (including max=1) will be honored by the broker
 
       this.lock(key, opts, (err, unlock) => {

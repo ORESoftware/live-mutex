@@ -110,8 +110,15 @@ async function testDefaultMaxOne(): Promise<void> {
         console.error('❌ Default max=1 test failed:', err.message);
         throw err;
     } finally {
-        await new Promise<void>(resolve => broker.close(resolve));
-        clients.forEach(c => c.close());
+        // Close all clients first
+        clients.forEach(c => {
+            try { c.close(); } catch (e) {}
+        });
+        // Close broker with timeout
+        await Promise.race([
+            new Promise<void>(resolve => broker.close(resolve)),
+            new Promise<void>(resolve => setTimeout(resolve, 2000))
+        ]);
         try { fs.unlinkSync(tmpFile); } catch (e) {}
     }
 }
@@ -199,8 +206,15 @@ async function testSemaphoreMaxThree(): Promise<void> {
         console.error('❌ Semaphore max=3 test failed:', err.message);
         throw err;
     } finally {
-        await new Promise<void>(resolve => broker.close(resolve));
-        clients.forEach(c => c.close());
+        // Close all clients first
+        clients.forEach(c => {
+            try { c.close(); } catch (e) {}
+        });
+        // Close broker with timeout
+        await Promise.race([
+            new Promise<void>(resolve => broker.close(resolve)),
+            new Promise<void>(resolve => setTimeout(resolve, 2000))
+        ]);
         try { fs.unlinkSync(tmpFile); } catch (e) {}
     }
 }
@@ -292,8 +306,15 @@ async function testSemaphoreMaxTen(): Promise<void> {
         console.error('❌ Semaphore max=10 test failed:', err.message);
         throw err;
     } finally {
-        await new Promise<void>(resolve => broker.close(resolve));
-        clients.forEach(c => c.close());
+        // Close all clients first
+        clients.forEach(c => {
+            try { c.close(); } catch (e) {}
+        });
+        // Close broker with timeout
+        await Promise.race([
+            new Promise<void>(resolve => broker.close(resolve)),
+            new Promise<void>(resolve => setTimeout(resolve, 2000))
+        ]);
         try { fs.unlinkSync(tmpFile); } catch (e) {}
     }
 }
@@ -386,8 +407,15 @@ async function testSemaphoreStress(): Promise<void> {
         console.error('❌ Semaphore stress test failed:', err.message);
         throw err;
     } finally {
-        await new Promise<void>(resolve => broker.close(resolve));
-        clients.forEach(c => c.close());
+        // Close all clients first
+        clients.forEach(c => {
+            try { c.close(); } catch (e) {}
+        });
+        // Close broker with timeout
+        await Promise.race([
+            new Promise<void>(resolve => broker.close(resolve)),
+            new Promise<void>(resolve => setTimeout(resolve, 2000))
+        ]);
         try { fs.unlinkSync(tmpFile); } catch (e) {}
     }
 }
@@ -552,16 +580,19 @@ async function runAllTests(): Promise<void> {
     
     if (failed === 0) {
         console.log('✅ All semaphore tests passed!');
-        process.exit(0);
     } else {
         console.error(`❌ ${failed} test(s) failed!`);
-        process.exit(1);
     }
+    
+    // Force exit after a brief delay to ensure cleanup completes
+    setTimeout(() => {
+        process.exit(failed === 0 ? 0 : 1);
+    }, 500);
 }
 
 // Run tests
 runAllTests().catch((err: any) => {
     console.error('Fatal error:', err);
-    process.exit(1);
+    setTimeout(() => process.exit(1), 500);
 });
 

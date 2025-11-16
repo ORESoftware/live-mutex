@@ -114,6 +114,8 @@ export interface LMXClientLockOpts {
   force?: boolean,
   semaphore?: number,
   max?: number,
+  maxRead?: number, // max concurrent readers (for RW locks)
+  maxWrite?: number, // max concurrent writers (for RW locks)
   retry?: boolean,
   maxRetry?: number,
   retryMax?: number,
@@ -338,6 +340,13 @@ export class Client {
       }
       
       data.max = data.max || null;
+      // Forward maxRead and maxWrite if provided (for RW locks)
+      if (data.maxRead !== undefined) {
+        data.maxRead = data.maxRead;
+      }
+      if (data.maxWrite !== undefined) {
+        data.maxWrite = data.maxWrite;
+      }
       data.pid = process.pid;
       
       if (data.ttl === Infinity) {
