@@ -23,7 +23,7 @@ flowchart TD
     StartTimer --> SendSuccess1[Broker: Send success:<br/>acquired=true]
     SendSuccess1 --> ClientSuccess1[Client: receive success]
     ClientSuccess1 --> ReturnUnlock[Client: Return unlock function]
-    ReturnUnlock --> End1[Lock acquired]
+    ReturnUnlock --> End[Lock acquired]
     
     CheckLockExists -->|Yes| CheckCount{Current holders<br/>< max?}
     CheckCount -->|Yes| AddHolder
@@ -63,12 +63,11 @@ flowchart TD
     
     CheckQueue -->|Yes| NotifyNext[Broker: Notify next client<br/>in queue]
     NotifyNext --> GrantLock[Broker: Grant lock to<br/>next client]
-    GrantLock --> SendSuccess1[Broker: Send success:<br/>acquired=true to next client]
-    SendSuccess1 --> SendUnlockSuccess[Broker: Send success:<br/>unlocked=true to releasing client]
+    GrantLock --> SendSuccessNext[Broker: Send success:<br/>acquired=true to next client]
+    SendSuccessNext --> SendUnlockSuccess[Broker: Send success:<br/>unlocked=true to releasing client]
     SendUnlockSuccess --> ClientDone2[Client: Unlock complete]
     
     CheckQueue -->|No| MarkEmptied[Broker: Mark lock as emptied]
     MarkEmptied --> SendUnlockSuccess2[Broker: Send success:<br/>unlocked=true]
     SendUnlockSuccess2 --> ClientDone3[Client: Unlock complete]
 ```
-

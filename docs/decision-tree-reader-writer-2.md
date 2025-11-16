@@ -120,8 +120,8 @@ flowchart TD
     
     CheckQueue -->|Yes| NotifyNext[Broker: Notify next client<br/>in queue]
     NotifyNext --> GrantLock[Broker: Grant lock to<br/>next client]
-    GrantLock --> SendSuccess1[Broker: Send success:<br/>acquired=true to next client]
-    SendSuccess1 --> SendUnlockSuccess[Broker: Send success:<br/>unlocked=true to releasing client]
+    GrantLock --> SendSuccessNext[Broker: Send success:<br/>acquired=true to next client]
+    SendSuccessNext --> SendUnlockSuccess[Broker: Send success:<br/>unlocked=true to releasing client]
     SendUnlockSuccess --> ClientSuccess1[Client: receive success]
     ClientSuccess1 --> End1[Write lock released]
     
@@ -129,4 +129,3 @@ flowchart TD
     SendUnlockSuccess2 --> ClientSuccess2[Client: receive success]
     ClientSuccess2 --> End2[Write lock released]
 ```
-

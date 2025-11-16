@@ -13,8 +13,8 @@ flowchart TD
     BrokerCheck --> WriteFlagSet{Write flag<br/>set?}
     WriteFlagSet -->|Yes| QueueRead[Broker: Queue read request<br/>in registeredListeners]
     QueueRead --> SendQueued[Broker: Send register-write-flag-check-queued]
-    SendQueued --> WaitForBroadcast[Client: Wait for broadcast<br/>from writer release]
-    WaitForBroadcast --> WriterDone[Broker: Writer releases,<br/>sets flag=false, broadcasts]
+    SendQueued --> WaitForWriter[Client: Wait for writer to finish]
+    WaitForWriter --> WriterDone[Broker: Writer releases,<br/>sets flag=false, broadcasts]
     WriterDone --> IncrementReadersQueued[Broker: Increment readers<br/>in queued callback]
     IncrementReadersQueued --> SendSuccessQueued[Broker: Send register-write-flag-success]
     SendSuccessQueued --> AcquireLockQueued[Client: Proceed to acquire lock]
@@ -109,24 +109,15 @@ flowchart TD
     BroadcastIfListeners -->|Yes| Broadcast1[Broker: Broadcast to<br/>waiting writers]
     BroadcastIfListeners -->|No| NoBroadcast[Broker: Skip broadcast]
     
-    Broadcast1 --> UnlockBase1[Client: Unlock base lock]
-    NoBroadcast --> UnlockBase2[Client: Unlock base lock]
+    Broadcast1 --> UnlockBase[Client: Unlock base lock]
+    NoBroadcast --> UnlockBase
     
     CheckReadersZero -->|No| Noop1[No operation: Other readers still active]
-    Noop1 --> UnlockBase3[Client: Unlock base lock]
+    Noop1 --> UnlockBase
     
-    UnlockBase1 --> RemoveLockholder1[Broker: Remove lockholder]
-    UnlockBase2 --> RemoveLockholder2[Broker: Remove lockholder]
-    UnlockBase3 --> RemoveLockholder3[Broker: Remove lockholder]
-    RemoveLockholder1 --> SendSuccess1[Broker: Send success:<br/>unlocked=true]
-    RemoveLockholder2 --> SendSuccess2[Broker: Send success:<br/>unlocked=true]
-    RemoveLockholder3 --> SendSuccess3[Broker: Send success:<br/>unlocked=true]
-    SendSuccess1 --> ClientSuccess1[Client: receive success]
-    SendSuccess2 --> ClientSuccess2[Client: receive success]
-    SendSuccess3 --> ClientSuccess3[Client: receive success]
-    ClientSuccess1 --> End[Read lock released]
-    ClientSuccess2 --> End
-    ClientSuccess3 --> End
+    UnlockBase --> RemoveLockholder[Broker: Remove lockholder]
+    RemoveLockholder --> SendUnlockSuccess[Broker: Send success:<br/>unlocked=true]
+    SendUnlockSuccess --> ClientReadReleased[Client: Read lock released]
 ```
 
 ## Release Write Lock Flow
@@ -138,8 +129,8 @@ flowchart TD
     CheckBoundRelease -->|No| AcquireLock[Client: Acquire lock first]
     AcquireLock --> UnlockBaseWrite
     
-    UnlockBaseWrite --> BrokerUnlock[Broker: Remove write lockholder]
-    BrokerUnlock --> SetFlagFalse[Client: Call setWriteFlagToFalse]
+    UnlockBaseWrite --> RemoveWriteLockholder[Broker: Remove write lockholder]
+    RemoveWriteLockholder --> SetFlagFalse[Client: Call setWriteFlagToFalse]
     SetFlagFalse --> BrokerSetFalse[Broker: Set writerFlag=false]
     BrokerSetFalse --> Broadcast2[Broker: Broadcast to waiting readers]
     Broadcast2 --> NotifyReaders[Broker: Notify queued readers<br/>via callbacks]
@@ -147,13 +138,10 @@ flowchart TD
     
     CheckQueue -->|Yes| NotifyNextWriter[Broker: Notify next writer<br/>in queue]
     NotifyNextWriter --> GrantLock[Broker: Grant lock to<br/>next writer]
-    GrantLock --> SendSuccess1[Broker: Send success:<br/>acquired=true to next writer]
-    SendSuccess1 --> SendUnlockSuccess1[Broker: Send success:<br/>unlocked=true to releasing client]
-    SendUnlockSuccess1 --> ClientSuccess1[Client: receive success]
-    ClientSuccess1 --> End1[Write lock released]
+    GrantLock --> SendSuccessWriter[Broker: Send success:<br/>acquired=true to next writer]
+    SendSuccessWriter --> SendUnlockSuccess[Broker: Send success:<br/>unlocked=true to releasing client]
+    SendUnlockSuccess --> ClientWriteReleased[Client: Write lock released]
     
     CheckQueue -->|No| SendUnlockSuccess2[Broker: Send success:<br/>unlocked=true]
-    SendUnlockSuccess2 --> ClientSuccess2[Client: receive success]
-    ClientSuccess2 --> End2[Write lock released]
+    SendUnlockSuccess2 --> ClientWriteReleased
 ```
-

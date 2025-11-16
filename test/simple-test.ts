@@ -63,7 +63,7 @@ Promise.all([
             return cb(new Error('Client ensure returned undefined'));
           }
 
-          debugger;
+          
 
           client.lock('z', function (err, v) {
             if (err) {
@@ -73,7 +73,7 @@ Promise.all([
             console.log('the v:', v);
             console.log('the id:', v.id);
             client.unlock('z', v.id, function (err, v) {
-              debugger;
+              
               console.log(err,v);
                 cb(err, v);
             });
@@ -83,16 +83,16 @@ Promise.all([
       },
       function (cb) {
 
-        debugger;
+        
 
         const c = new Client({port});
         c.ensure().then(function () {
 
-          debugger;
+          
 
           c.lock('z', function (err, {id}) {
 
-            debugger;
+            
 
             if (err) return cb(err);
             c.unlock('z', id, cb);
@@ -101,14 +101,14 @@ Promise.all([
       },
       function (cb) {
 
-        debugger;
+        
 
         const c = Client.create({port});
 
         c.ensure().then(c => {
           c.lock('z', function (err, {id}) {
 
-            debugger;
+            
             if (err) return cb(err);
             c.unlock('z', id, cb);
           });
@@ -119,16 +119,16 @@ Promise.all([
 
          Client.create({port}).ensure().then(c => {
 
-          debugger;
+          
 
            c.lockp('z').then(function ({unlock}) {
 
-             debugger;
+             
             if (unlock.acquired !== true) {
               return Promise.reject('acquired was not true.');
             }
 
-            debugger;
+            
 
             unlock((err, result) => {
               cb(err, result);
@@ -140,7 +140,7 @@ Promise.all([
 
     ], (err) => {
 
-      debugger;
+      
 
       // Cleanup: close client and broker
       const cleanup = () => {
