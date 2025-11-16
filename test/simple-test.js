@@ -41,7 +41,7 @@ Promise.all([
                     if (err) {
                         return cb(err);
                     }
-                    debugger;
+                    
                     c.lock('z', function (err, v) {
                         if (err) {
                             return cb(err);
@@ -50,7 +50,7 @@ Promise.all([
                         console.log('the v:', v);
                         console.log('the id:', v.id);
                         c.unlock('z', v.id, function (err, v) {
-                            debugger;
+                            
                             console.log(err, v);
                             cb(err, v);
                         });
@@ -58,12 +58,12 @@ Promise.all([
                 });
             },
             function (cb) {
-                debugger;
+                
                 const c = new main_1.Client();
                 c.ensure().then(function () {
-                    debugger;
+                    
                     c.lock('z', function (err, { id }) {
-                        debugger;
+                        
                         if (err)
                             return cb(err);
                         c.unlock('z', id, cb);
@@ -71,11 +71,11 @@ Promise.all([
                 });
             },
             function (cb) {
-                debugger;
+                
                 const c = main_1.Client.create();
                 c.ensure().then(c => {
                     c.lock('z', function (err, { id }) {
-                        debugger;
+                        
                         if (err)
                             return cb(err);
                         c.unlock('z', id, cb);
@@ -84,19 +84,19 @@ Promise.all([
             },
             function (cb) {
                 main_1.Client.create().ensure().then(c => {
-                    debugger;
+                    
                     c.lockp('z').then(function ({ unlock }) {
-                        debugger;
+                        
                         if (unlock.acquired !== true) {
                             return Promise.reject('acquired was not true.');
                         }
-                        debugger;
+                        
                         unlock(cb);
                     });
                 });
             }
         ], (err) => {
-            debugger;
+            
             if (err) {
                 console.error('final error:', err);
             }
