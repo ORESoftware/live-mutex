@@ -8,9 +8,7 @@
  */
 
 import * as assert from 'assert';
-import { Broker1 } from '../dist/broker-1';
-import { Client } from '../dist/client';
-import { RWLockWritePrefClient } from '../dist/rw-write-preferred-client';
+import { Broker1, Client, RWLockWritePrefClient } from '../dist/main';
 
 interface MemorySnapshot {
     heapUsed: number;
@@ -234,7 +232,7 @@ async function runRWOperation(client: RWLockWritePrefClient, key: string, isWrit
                     return resolve();
                 }
                 setTimeout(() => {
-                    release((releaseErr) => {
+                    release((releaseErr: any) => {
                         resolve();
                     });
                 }, 50 + Math.random() * 100);
@@ -245,7 +243,7 @@ async function runRWOperation(client: RWLockWritePrefClient, key: string, isWrit
                     return resolve();
                 }
                 setTimeout(() => {
-                    release((releaseErr) => {
+                    release((releaseErr: any) => {
                         resolve();
                     });
                 }, 50 + Math.random() * 100);

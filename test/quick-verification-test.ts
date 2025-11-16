@@ -24,7 +24,7 @@ async function runQuickVerification() {
     console.log('\nTest 2: Starting broker and client');
     const broker = new Broker1({port: PORT});
     await new Promise<void>((resolve, reject) => {
-        broker.ensure((err) => {
+        broker.ensure((err: any) => {
             if (err) return reject(err);
             resolve();
         });
@@ -33,7 +33,7 @@ async function runQuickVerification() {
     
     const client = new Client({port: PORT});
     await new Promise<void>((resolve, reject) => {
-        client.ensure((err) => {
+        client.ensure((err: any) => {
             if (err) return reject(err);
             resolve();
         });
@@ -43,10 +43,10 @@ async function runQuickVerification() {
     // Test 3: Lock with callback only
     console.log('\nTest 3: lock(key, callback)');
     await new Promise<void>((resolve, reject) => {
-        client.lock('test-key-1', (err, result) => {
+        client.lock('test-key-1', (err: any, result: any) => {
             if (err) return reject(err);
             console.log('  ✅ Lock acquired, id:', result.id);
-            client.unlock('test-key-1', result.id, (unlockErr) => {
+            client.unlock('test-key-1', result.id, (unlockErr: any) => {
                 if (unlockErr) return reject(unlockErr);
                 console.log('  ✅ Unlock with string id works');
                 resolve();
@@ -58,7 +58,7 @@ async function runQuickVerification() {
     console.log('\nTest 4: lock(key, ttl, callback) - legacy signature');
     await new Promise<void>((resolve, reject) => {
         // @ts-ignore - testing legacy signature
-        client.lock('test-key-2', 1000, (err, result) => {
+        client.lock('test-key-2', 1000, (err: any, result: any) => {
             if (err) return reject(err);
             console.log('  ✅ Lock with number ttl works');
             client.unlock('test-key-2', result.id, resolve);
@@ -68,7 +68,7 @@ async function runQuickVerification() {
     // Test 5: Lock with options
     console.log('\nTest 5: lock(key, options, callback)');
     await new Promise<void>((resolve, reject) => {
-        client.lock('test-key-3', {ttl: 5000}, (err, result) => {
+        client.lock('test-key-3', {ttl: 5000}, (err: any, result: any) => {
             if (err) return reject(err);
             console.log('  ✅ Lock with options works');
             client.unlock('test-key-3', result.id, resolve);
@@ -78,10 +78,10 @@ async function runQuickVerification() {
     // Test 6: Unlock with string id
     console.log('\nTest 6: unlock(key, id, callback)');
     await new Promise<void>((resolve, reject) => {
-        client.lock('test-key-4', (err, result) => {
+        client.lock('test-key-4', (err: any, result: any) => {
             if (err) return reject(err);
             const lockId = result.id;
-            client.unlock('test-key-4', lockId, (unlockErr) => {
+            client.unlock('test-key-4', lockId, (unlockErr: any) => {
                 if (unlockErr) return reject(unlockErr);
                 console.log('  ✅ Unlock with string id works');
                 resolve();
@@ -92,9 +92,9 @@ async function runQuickVerification() {
     // Test 7: Unlock with options object
     console.log('\nTest 7: unlock(key, {id}, callback)');
     await new Promise<void>((resolve, reject) => {
-        client.lock('test-key-5', (err, result) => {
+        client.lock('test-key-5', (err: any, result: any) => {
             if (err) return reject(err);
-            client.unlock('test-key-5', {id: result.id}, (unlockErr) => {
+            client.unlock('test-key-5', {id: result.id}, (unlockErr: any) => {
                 if (unlockErr) return reject(unlockErr);
                 console.log('  ✅ Unlock with options object works');
                 resolve();
