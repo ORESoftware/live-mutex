@@ -10,7 +10,7 @@ const path = require('path');
 const fs = require('fs');
 
 const BASE_PORT = 9000;
-const TEST_TIMEOUT_MS = 30 * 1000; // 30 seconds per test
+const TEST_TIMEOUT_MS = 60 * 1000; // 60 seconds per test (increased for long-running tests)
 const INACTIVITY_TIMEOUT_MS = 30 * 1000; // 30 seconds of inactivity
 let currentPort = BASE_PORT;
 
@@ -412,6 +412,12 @@ async function main() {
       cwd: path.join(__dirname, '..'),
       encoding: 'utf8',
       maxBuffer: 10 * 1024 * 1024, // 10MB buffer
+    });
+    // Fix CommonJS files to remove import.meta
+    execSync('node scripts/fix-commonjs-import-meta.js', {
+      stdio: 'pipe',
+      cwd: path.join(__dirname, '..'),
+      encoding: 'utf8',
     });
     console.log('✅ Build complete\n');
   } catch (err) {

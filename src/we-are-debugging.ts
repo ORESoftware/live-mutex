@@ -1,7 +1,7 @@
 'use strict';
 
 //core
-const util = require('util');
+import * as util from 'util';
 const execArgs = process.execArgv.slice(0);  //copy it
 const inDebugMode = typeof global.v8debug === 'object';
 

@@ -45,7 +45,7 @@ if (weAreDebugging) {
   log.error('Broker is in debug mode. Timeouts are turned off.');
 }
 
-const brokerPackage = require('../package.json');
+import { packageJsonData as brokerPackage } from './package-json-loader';
 
 if (!(brokerPackage.version && typeof brokerPackage.version === 'string')) {
   throw new Error('Broker NPM package did not have a top-level field that is a string.');

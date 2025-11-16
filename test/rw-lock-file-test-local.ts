@@ -476,16 +476,17 @@ async function runAllTests(): Promise<void> {
     
     if (failed === 0) {
         console.log('✅ All tests passed!');
-        process.exit(0);
+        // Exit immediately - cleanup should already be done in finally blocks
+        setImmediate(() => process.exit(0));
     } else {
         console.error(`❌ ${failed} test(s) failed!`);
-        process.exit(1);
+        setImmediate(() => process.exit(1));
     }
 }
 
 // Run tests
 runAllTests().catch((err: any) => {
     console.error('Fatal error:', err);
-    process.exit(1);
+    setImmediate(() => process.exit(1));
 });
 

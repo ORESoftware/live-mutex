@@ -4,7 +4,7 @@
 import * as util from 'util';
 import * as assert from 'assert';
 import * as net from 'net';
-import readline = require('readline');
+import * as readline from 'readline';
 
 //npm
 import chalk from 'chalk';

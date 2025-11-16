@@ -13,7 +13,10 @@
     "allowUnreachableCode": false,
     "lib": [
       "ESNext"
-    ]
+    ],
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true
   },
   "compileOnSave": false,
   "include": [

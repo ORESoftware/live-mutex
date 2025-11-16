@@ -5,7 +5,7 @@ import * as assert from 'assert';
 
 //npm
 import chalk from "chalk";
-import UUID = require('uuid');
+import * as UUID from 'uuid';
 
 //project
 import {Client, ClientOpts, LMClientCallBack, LMClientUnlockCallBack} from "./client";

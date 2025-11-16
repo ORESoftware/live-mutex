@@ -6,13 +6,13 @@ import * as assert from 'assert';
 import * as net from 'net';
 
 //npm
-import UUID = require('uuid');
+import * as UUID from 'uuid';
 import chalk from "chalk";
 
 //project
 import {createParser} from "./json-parser";
 import * as cu from './client-utils';
-const clientPackage = require('../package.json');
+import { packageJsonData as clientPackage } from './package-json-loader';
 
 if (!(clientPackage.version && typeof clientPackage.version === 'string')) {
   throw new Error('Client NPM package did not have a top-level field that is a string.');

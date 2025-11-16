@@ -45,7 +45,7 @@ if (weAreDebugging) {
     log.error('Broker is in debug mode. Timeouts are turned off.');
 }
 
-const brokerPackage = require('../package.json');
+import { packageJsonData as brokerPackage } from './package-json-loader';
 
 if (!(brokerPackage.version && typeof brokerPackage.version === 'string')) {
     throw new Error('Broker NPM package did not have a top-level field that is a string.');
@@ -140,7 +140,9 @@ export type LockholdersType = Map<string, {
 export interface LockObj {
     // current number of lockholders for this lock/key is Object.keys(lockholders).length
     readers?: number;
-    max: number, // max number of lockholders
+    max: number, // max number of lockholders (for normal locks) or current effective max (for RW locks)
+    maxRead?: number, // max number of concurrent readers (RW locks only, default: 10)
+    maxWrite?: number, // max number of concurrent writers (RW locks only, default: 1, always 1 for exclusive)
     lockholderTimeouts: UuidHash,
     lockholdersAllReleased: UuidHash,
     lockholders: LockholdersType,  // uuid(s) that hold the lock
@@ -992,7 +994,8 @@ export class Broker1 {
 
         return {
             readers: 0,
-            max: max || 1,
+            max: max || 1, // default max for normal locks
+            // maxRead and maxWrite are only set for RW locks, not initialized here
             lockholders: new Map(),
             lockholdersAllReleased: {},
             keepLocksAfterDeath,
@@ -1164,7 +1167,16 @@ export class Broker1 {
         // Use a more defensive check to prevent race conditions
         while (notifyList.length > 0) {
             // Double-check capacity before granting to prevent exceeding max
-            if (lck.lockholders.size >= lck.max) {
+            // For normal locks: use max
+            // For RW locks: use the maximum of maxRead and maxWrite
+            const maxCapacity1 = (lck.maxRead !== undefined || lck.maxWrite !== undefined)
+                ? Math.max(
+                    lck.maxRead !== undefined ? lck.maxRead : 0,
+                    lck.maxWrite !== undefined ? lck.maxWrite : 0,
+                    lck.max || 1
+                )
+                : lck.max || 1;
+            if (lck.lockholders.size >= maxCapacity1) {
                 break;
             }
 
@@ -1188,7 +1200,16 @@ export class Broker1 {
             }
 
             // Triple-check capacity immediately before granting to prevent race conditions
-            if (lck.lockholders.size >= lck.max) {
+            // For normal locks: use max
+            // For RW locks: use the maximum of maxRead and maxWrite
+            const maxCapacity2 = (lck.maxRead !== undefined || lck.maxWrite !== undefined)
+                ? Math.max(
+                    lck.maxRead !== undefined ? lck.maxRead : 0,
+                    lck.maxWrite !== undefined ? lck.maxWrite : 0,
+                    lck.max || 1
+                )
+                : lck.max || 1;
+            if (lck.lockholders.size >= maxCapacity2) {
                 // Put this client back in the notify queue
                 notifyList.enqueue(n.uuid, n);
                 break;
@@ -1399,15 +1420,36 @@ export class Broker1 {
 
             // lock object with given key exists
 
-            // Update max BEFORE checking count to handle cases where max is increased
-            // Always update if a valid max is provided (allows increasing max for RW locks)
-            const oldMax = lck.max;
-            if (Number.isInteger(max)) {
-                lck.max = max;
-            }
-
             const ln = lck.notify.length;
             const count = lck.lockholders.size;
+            const beginRead = data.rwStatus === RWStatus.BeginRead;
+            const beginWrite = data.rwStatus === RWStatus.BeginWrite;
+
+            // Update max based on operation type
+            // For RW read operations: update maxRead (default: 10)
+            // For RW write operations: update maxWrite (default: 1, always 1 for exclusive)
+            // For normal lock operations: update max only
+            if (beginRead) {
+                // RW read lock - initialize/update maxRead
+                // Always ensure maxRead is set - default to 10 if not provided
+                if (lck.maxRead === undefined) {
+                    // First read lock for this key - use provided max or default to 10
+                    lck.maxRead = Number.isInteger(max) ? max : 10;
+                } else if (Number.isInteger(max)) {
+                    // Update maxRead if max is explicitly provided
+                    lck.maxRead = max;
+                }
+                // Note: Don't update lck.max here - it may be 1 from a previous write lock
+                // effectiveMax will use maxRead for read operations, not max
+            } else if (beginWrite) {
+                // RW write lock - use maxWrite (always 1 for exclusive)
+                lck.maxWrite = 1;
+                // Also update max field for consistency
+                lck.max = 1;
+            } else if (Number.isInteger(max)) {
+                // Normal lock operation - only update max (not maxRead/maxWrite)
+                lck.max = max;
+            }
 
             // For RW read locks, check readers count (accounting for the increment that will happen)
             // because readers are tracked separately and we need to check before incrementing
@@ -1416,8 +1458,26 @@ export class Broker1 {
             // because read locks share the same lockholders map but have separate reader tracking
             const effectiveCount = beginRead ? (lck.readers + 1) : count;
             
-            // Use the new max if we increased it, otherwise use current max
-            const effectiveMax = Number.isInteger(max) ? max : lck.max;
+            // Use the appropriate max based on operation type
+            // For RW read operations: use maxRead (should always be set now)
+            // For RW write operations: use maxWrite (should always be set now)
+            // For normal lock operations: use max only
+            let effectiveMax: number;
+            if (beginRead) {
+                // RW read lock - use maxRead (must be initialized above)
+                // Defensive: if somehow maxRead is still undefined, default to 10
+                if (lck.maxRead === undefined) {
+                    log.warn(`maxRead was undefined for read lock on key "${key}", defaulting to 10`);
+                    lck.maxRead = 10;
+                }
+                effectiveMax = lck.maxRead;
+            } else if (beginWrite) {
+                // RW write lock - use maxWrite (always 1 for exclusive)
+                effectiveMax = lck.maxWrite !== undefined ? lck.maxWrite : 1;
+            } else {
+                // Normal lock - use max only
+                effectiveMax = Number.isInteger(max) ? max : lck.max;
+            }
 
             // Strictly enforce max lock holders - prevent race conditions
             // For read operations, check if adding this reader would exceed max
@@ -1427,19 +1487,13 @@ export class Broker1 {
                 // Only warn if we actually exceed the limit due to a race condition
                 // Don't warn for write locks queuing behind readers (expected behavior)
                 // Don't warn for read locks at the limit (expected when max is reached)
-                // Don't warn if we just increased max to accommodate the current count
-                // Only warn if there's a real race condition causing us to exceed the limit
-                const maxWasIncreased = Number.isInteger(max) && max > oldMax;
-                // If max was increased, check if effectiveCount is within the NEW max value
-                // Otherwise, check against the current max
-                const countWithinNewMax = maxWasIncreased && effectiveCount <= max;
-                const isWriteLockQueuing = !beginRead && lck.readers > 0 && effectiveMax === 1;
+                // With separate maxRead/maxWrite, we can properly distinguish between read and write limits
+                const isWriteLockQueuing = beginWrite && lck.readers > 0 && effectiveMax === 1;
                 
                 // Only warn if:
                 // 1. Count exceeds effectiveMax, AND
-                // 2. Not a write lock queuing behind readers, AND
-                // 3. We didn't just increase max to accommodate this count
-                if (effectiveCount > effectiveMax && !isWriteLockQueuing && !countWithinNewMax) {
+                // 2. Not a write lock queuing behind readers (expected behavior)
+                if (effectiveCount > effectiveMax && !isWriteLockQueuing) {
                     log.warn(`Semaphore limit exceeded: ${effectiveCount} ${beginRead ? 'readers (after increment)' : 'lock holders'} exceeds max of ${effectiveMax} for key "${key}"`);
                 }
 
