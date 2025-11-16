@@ -4,7 +4,7 @@
 import {log} from "./client-utils";
 import {Client} from "./client";
 import chalk from "chalk";
-import util = require('util');
+import * as util from 'util';
 const index = process.argv.indexOf('--json');
 let v = null as any;
 

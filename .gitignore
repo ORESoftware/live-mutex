@@ -14,6 +14,8 @@ test/.suman/.meta
 *.log
 *.tgz
 *.DS_Store
+src/*.js
+src/*.d.ts
 
 # Don't commit compiled JS files in src/ - they should only be in dist/
 src/**/*.js
