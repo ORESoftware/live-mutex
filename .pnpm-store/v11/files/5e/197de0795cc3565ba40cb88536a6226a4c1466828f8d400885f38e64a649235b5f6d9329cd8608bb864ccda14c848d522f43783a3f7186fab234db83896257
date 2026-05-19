@@ -1,0 +1,30 @@
+'use strict';
+Object.defineProperty(exports, "__esModule", { value: true });
+const assert = require("assert");
+let mcProxy = function (target) {
+    const mirrorCache = {};
+    return new Proxy(target, {
+        set(target, property, value, receiver) {
+            if (mirrorCache[property]) {
+                throw new Error(`property '${property}' has already been set.`);
+            }
+            mirrorCache[property] = true;
+            Object.defineProperty(target, property, {
+                enumerable: true,
+                writable: true,
+                value: (value && typeof value === 'object') ? mcProxy(value) : value
+            });
+            return true;
+        }
+    });
+};
+exports.create = function (val) {
+    if (arguments.length > 0) {
+        assert(typeof val === 'object', 'value passed to McProxy#create must be a non-null object.');
+    }
+    return mcProxy(val || {});
+};
+exports.default = exports.create;
+exports.r2gSmokeTest = function () {
+    return true;
+};

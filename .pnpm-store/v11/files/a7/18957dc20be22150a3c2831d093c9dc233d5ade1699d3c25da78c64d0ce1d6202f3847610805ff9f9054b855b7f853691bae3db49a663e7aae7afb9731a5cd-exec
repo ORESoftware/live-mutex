@@ -1,0 +1,50 @@
+{
+  "_id": "suman-events@0.0.117",
+  "_location": "/suman-events",
+  "_phantomChildren": {},
+  "_requiredBy": [
+    "#EXISTING"
+  ],
+  "author": {
+    "name": "Olegzandr VD"
+  },
+  "bugs": {
+    "url": "https://github.com/sumanjs/suman-events/issues"
+  },
+  "dependencies": {
+    "chalk": "^2.4.1",
+    "suman-browser-polyfills": "latest"
+  },
+  "description": "Shared event names for SumanJS ecosystem",
+  "devDependencies": {
+    "@types/core-js": "^0.9.46",
+    "@types/node": "^10.1.2"
+  },
+  "gitHead": "0af34b4c376be623790d80b4f3b52795300bba2a",
+  "homepage": "https://github.com/sumanjs/suman-events#readme",
+  "keywords": [
+    "suman",
+    "sumanjs",
+    "test",
+    "testing",
+    "bdd",
+    "tdd",
+    "mocha",
+    "ava"
+  ],
+  "license": "MIT",
+  "main": "dist/index.js",
+  "name": "suman-events",
+  "optionalDependencies": {},
+  "readmeFilename": "README.md",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sumanjs/suman-events.git"
+  },
+  "scripts": {
+    "test": "./scripts/test.sh"
+  },
+  "types": "dist/index.d.ts",
+  "typings": "dist/index.d.ts",
+  "version": "0.0.120"
+}

@@ -1,0 +1,12 @@
+declare class IterableWMapFilter<T> {
+    vals: T[];
+    operations: Iterator<T>[];
+    constructor(intialVals: T[]);
+    add(v: any): void;
+    map(fn: (val: number) => any): IterableWMapFilter<T>;
+    filter(fn: (val: number) => any): IterableWMapFilter<T>;
+    private next;
+    [Symbol.iterator](): this;
+}
+declare const v: IterableWMapFilter<number>;
+declare const z: IterableWMapFilter<number>;

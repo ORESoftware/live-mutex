@@ -1,0 +1,58 @@
+'use strict';
+Object.defineProperty(exports, "__esModule", { value: true });
+const stream = require("stream");
+const assert = require("assert");
+exports.r2gSmokeTest = function () {
+    return true;
+};
+exports.pt = (pre, o) => {
+    return new PrependTransform(pre, o);
+};
+exports.default = exports.pt;
+class PrependTransform extends stream.Transform {
+    constructor(pre, o) {
+        super({ objectMode: true });
+        this.lastLineData = '';
+        this.pre = '';
+        const opts = o || {};
+        assert(pre && typeof pre === 'string', `prepend-transform usage error -> first arg must be a string.`);
+        assert(opts && typeof opts === 'object', `prepend-transform usage error -> 'options' arg must be an object.`);
+        this.pre = pre;
+        this.opts = opts;
+    }
+    _transform(chunk, encoding, cb) {
+        let data = String(chunk);
+        if (this.lastLineData) {
+            data = this.lastLineData + data;
+        }
+        const lines = data.split('\n');
+        this.lastLineData = lines.splice(lines.length - 1, 1)[0];
+        const pre = this.pre;
+        if (this.opts.omitWhitespace) {
+            for (let l of lines) {
+                if (/[^ ]/.test(l)) {
+                    this.push(pre + l + '\n');
+                }
+            }
+            return cb();
+        }
+        for (let l of lines) {
+            this.push(pre + l + '\n');
+        }
+        cb();
+    }
+    _flush(cb) {
+        if (!this.lastLineData) {
+            return cb();
+        }
+        if (this.opts.omitWhitespace && /[^ ]/.test(this.lastLineData)) {
+            this.push(this.pre + this.lastLineData + '\n');
+        }
+        else {
+            this.push(this.pre + this.lastLineData + '\n');
+        }
+        this.lastLineData = '';
+        cb();
+    }
+}
+exports.PrependTransform = PrependTransform;

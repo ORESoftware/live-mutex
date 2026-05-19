@@ -1,0 +1,56 @@
+{
+  "_id": "json-stdio@0.0.1006",
+  "_location": "/json-stdio",
+  "_phantomChildren": {},
+  "_requiredBy": [
+    "#EXISTING"
+  ],
+  "author": {
+    "name": "Olegzandr VD"
+  },
+  "bugs": {
+    "url": "https://github.com/ORESoftware/json-stdio/issues"
+  },
+  "bin": {
+    "stdio": "cli/stdio.js",
+    "json_stdio": "cli/stdio.js",
+    "json_stdio_parse": "cli/parse.js"
+  },
+  "dependencies": {
+    "@oresoftware/json-stream-parser": "0.0.123",
+    "@oresoftware/safe-stringify": "0.0.111"
+  },
+  "description": "Write JSON to stdout, encoded for parsing by other processes",
+  "devDependencies": {
+    "@types/node": "^12.7.4"
+  },
+  "gitHead": "982fbec2a2e1aafa0170ca2721eb590f294ffe11",
+  "homepage": "https://github.com/ORESoftware/json-stdio#readme",
+  "keywords": [
+    "json",
+    "stdout",
+    "unix",
+    "text",
+    "nodejs",
+    "npm"
+  ],
+  "license": "MIT",
+  "name": "json-stdio",
+  "optionalDependencies": {},
+  "readmeFilename": "readme.md",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ORESoftware/json-stdio.git"
+  },
+  "scripts": {
+    "test": "suman test",
+    "tsc": "tsc"
+  },
+  "main": "dist/main.js",
+  "types": "dist/main.d.ts",
+  "typings": "dist/main.d.ts",
+  "version": "0.1.112",
+  "r2g": {
+    "test": "node .r2g/tests/smoke-test.js"
+  }
+}

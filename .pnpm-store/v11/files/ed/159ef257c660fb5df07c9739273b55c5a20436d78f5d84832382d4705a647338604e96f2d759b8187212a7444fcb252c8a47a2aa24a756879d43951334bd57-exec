@@ -1,0 +1,32 @@
+{
+  "name": "siamese",
+  "version": "3.0.0",
+  "description": "Promisifies JSON parse and stringify + makes them idempotent like we wish they would be.",
+  "main": "dist/main.js",
+  "typings": "dist/main.d.ts",
+  "types": "dist/main.d.ts",
+  "scripts": {
+    "test": "echo noop",
+    "tsc": "tsc"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/the1mills/siamese.git"
+  },
+  "keywords": [
+    "promises",
+    "JSON",
+    "idempotent",
+    "IJSON",
+    "idempotent-json"
+  ],
+  "author": "Olegzandr VD",
+  "license": "MIT",
+  "dependencies": {
+    "@oresoftware/safe-stringify": "0.0.108"
+  },
+  "devDependencies": {
+    "@types/core-js": "^0.9.43",
+    "@types/node": "^8.0.53"
+  }
+}

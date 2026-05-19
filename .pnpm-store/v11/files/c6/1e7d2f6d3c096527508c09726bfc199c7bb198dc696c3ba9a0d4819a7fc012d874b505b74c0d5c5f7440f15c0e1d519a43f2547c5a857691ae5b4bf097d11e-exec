@@ -1,0 +1,35 @@
+{
+  "name": "freeze-existing-props",
+  "version": "0.0.1005",
+  "description": "Freeze existing props on an object",
+  "main": "dist/index.js",
+  "typings": "dist/index.d.ts",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "test": "suman test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ORESoftware/freeze-existing-props.git"
+  },
+  "keywords": [
+    "suman",
+    "testing",
+    "freeze",
+    "writable",
+    "es6",
+    "next",
+    "javascript",
+    "nodejs",
+    "node.js"
+  ],
+  "author": "Olegzandr VD",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/ORESoftware/freeze-existing-props/issues"
+  },
+  "homepage": "https://github.com/ORESoftware/freeze-existing-props#readme",
+  "devDependencies": {
+    "@types/node": "latest"
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "name": "@oresoftware/linked-queue",
+  "version": "2.2.13",
+  "description": "Synchronous queue implementation with constant/linear time operations.",
+  "main": "./dist/linked-queue.js",
+  "module": "./dist/esm/linked-queue.js",
+  "types": "./dist/linked-queue.d.ts",
+  "typings": "./dist/linked-queue.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/linked-queue.d.ts",
+      "import": "./dist/esm/linked-queue.js",
+      "require": "./dist/linked-queue.js",
+      "default": "./dist/linked-queue.js"
+    }
+  },
+  "files": [
+    "dist",
+    "readme.md",
+    "license.md"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc && tsc -p tsconfig.esm.json",
+    "test": "suman test/src --force-match"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ORESoftware/linked-queue.git"
+  },
+  "keywords": [
+    "linked",
+    "queue",
+    "doubly",
+    "linked",
+    "linear",
+    "constant"
+  ],
+  "author": "Olegzandr VD",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/ORESoftware/linked-queue/issues"
+  },
+  "homepage": "https://github.com/ORESoftware/linked-queue#readme",
+  "dependencies": {
+    "chalk": "^2.4.2"
+  },
+  "devDependencies": {
+    "@types/node": "^12.6.1",
+    "suman": "^1.1.51244",
+    "typescript": "^5.9.3",
+    "uuid": "^3.2.1"
+  },
+  "r2g": {
+    "test": "echo noop"
+  }
+}

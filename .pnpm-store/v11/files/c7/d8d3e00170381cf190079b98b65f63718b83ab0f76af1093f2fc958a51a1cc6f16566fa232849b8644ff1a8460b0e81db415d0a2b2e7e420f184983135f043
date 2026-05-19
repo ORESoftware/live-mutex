@@ -1,0 +1,6 @@
+import { JSONParser } from '@oresoftware/json-stream-parser';
+export interface IParsedObject {
+    [index: string]: any;
+}
+export declare const createParser: () => JSONParser;
+export default createParser;

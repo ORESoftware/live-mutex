@@ -1,0 +1,2 @@
+import { IPseudoError } from "suman-types/dts/global";
+export declare const makeGracefulExit: (suman: import("./suman").Suman) => ($errs: any[] | Error | IPseudoError, cb: Function) => any;

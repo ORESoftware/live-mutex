@@ -1,0 +1,139 @@
+'use strict';
+Object.defineProperty(exports, "__esModule", { value: true });
+const process = require('suman-browser-polyfills/modules/process');
+const global = require('suman-browser-polyfills/modules/global');
+const domain = require("domain");
+const chalk = require("chalk");
+const async = require("async");
+const suman_utils_1 = require("suman-utils");
+const helpers = require('../test-suite-helpers/handle-promise-generator');
+const general_1 = require("./general");
+const all_hook_param_1 = require("../test-suite-params/all-hook/all-hook-param");
+const suman_constants_1 = require("../config/suman-constants");
+const _suman = global.__suman = (global.__suman || {});
+exports.runAfterAlways = function (suman, cb) {
+    const allDescribeBlocks = suman.allDescribeBlocks;
+    _suman.afterAlwaysEngaged = true;
+    process.on('uncaughtException', function (e) {
+        debugger;
+        _suman.log.error('There was an uncaught exception, however, we are currently processing after.always blocks, ' +
+            'so this exception will be ignored. => \n', chalk.magenta(suman_utils_1.default.getCleanErrStr(e)));
+    });
+    process.on('unhandledRejection', function (e) {
+        debugger;
+        _suman.log.error('There was an unhandled rejection, however, we are currently processing after.always blocks, ' +
+            'so this exception will be ignored. => \n', chalk.magenta(suman_utils_1.default.getCleanErrStr(e)));
+    });
+    if (_suman.afterAlwaysHasBeenRegistered) {
+        _suman.log.error(chalk.cyan('At least one after.always hook has been registered for test with name:'), '\n\t\t', chalk.magenta.bold('"' + suman.desc + '"'));
+        _suman.log.error(chalk.yellow('We are currently running after.always hooks. Any uncaught errors ' +
+            'will be ignored as best as possible.'));
+    }
+    async.eachSeries(allDescribeBlocks, function (block, cb) {
+        block.mergeAfters();
+        const aftersAlways = block.getAfters().filter(function (anAfter) {
+            return anAfter.always;
+        });
+        async.eachSeries(aftersAlways, function (anAfter, cb) {
+            const timerObj = {
+                timer: setTimeout(onTimeout, _suman.weAreDebugging ? 5000000 : anAfter.timeout)
+            };
+            const assertCount = {
+                num: 0
+            };
+            const d = domain.create();
+            d._sumanBeforeOrAfter = true;
+            d._sumanBeforeOrAfterDesc = anAfter.desc || '(unknown)';
+            const fini = function (err, someBool) {
+                err && console.error(' Error (this error was ignored by Suman) => ', err.stack || err);
+                clearTimeout(timerObj.timer);
+                process.nextTick(cb, null);
+            };
+            let dError = false;
+            const handleError = function (err) {
+                const stk = err ? (err.stack || err) : new Error('Suman error placeholder').stack;
+                const formatedStk = String(stk).split('\n').map(item => '\t' + item).join('\n');
+                if (!dError) {
+                    dError = true;
+                    _suman.writeTestError(' => Suman non-fatal error => Normally fatal error in hook, but "fatal" option for the hook ' +
+                        'is set to false => \n' + formatedStk);
+                    fini(err, false);
+                }
+                else {
+                    _suman.writeTestError(' => Suman error => Error in hook => \n' + formatedStk);
+                }
+            };
+            d.on('error', handleError);
+            const fnStr = anAfter.fn.toString();
+            function onTimeout() {
+                fini(general_1.cloneError(anAfter.warningErr, suman_constants_1.constants.warnings.HOOK_TIMED_OUT_ERROR), true);
+            }
+            process.nextTick(function () {
+                d.run(function () {
+                    let warn = false;
+                    if (fnStr.indexOf('Promise') > 0 || fnStr.indexOf('async') === 0) {
+                        warn = true;
+                    }
+                    const isGeneratorFn = suman_utils_1.default.isGeneratorFn(anAfter.fn);
+                    function timeout(val) {
+                        clearTimeout(timerObj.timer);
+                        timerObj.timer = setTimeout(onTimeout, _suman.weAreDebugging ? 5000000 : val);
+                    }
+                    function handleNonCallbackMode(err) {
+                        err = err ? ('Also, you have this error => ' + err.stack || err) : '';
+                        handleError(new Error('Callback mode for this test-case/hook is not enabled, use .cb to enabled it.\n' + err));
+                    }
+                    const t = new all_hook_param_1.AllHookParam(anAfter, assertCount, handleError, fini, timerObj);
+                    fini.thot = t;
+                    t.timeout = timeout;
+                    t.fatal = function fatal(err) {
+                        err = err || new Error('Suman placeholder error since this function was not explicitly passed an error object as first argument.');
+                        fini(err, false);
+                    };
+                    let arg;
+                    if (isGeneratorFn) {
+                        const handleGenerator = helpers.makeHandleGenerator(fini);
+                        arg = t;
+                        handleGenerator(anAfter.fn, arg, anAfter.ctx);
+                    }
+                    else if (anAfter.cb) {
+                        t.callbackMode = true;
+                        const d = function done(err) {
+                            if (!t.callbackMode) {
+                                handleNonCallbackMode(err);
+                            }
+                            else {
+                                fini(err, false);
+                            }
+                        };
+                        t.done = function done(err) {
+                            if (!t.callbackMode) {
+                                handleNonCallbackMode(err);
+                            }
+                            else {
+                                fini(err, false);
+                            }
+                        };
+                        t.ctn = function ctn(err) {
+                            if (!t.callbackMode) {
+                                handleNonCallbackMode(err);
+                            }
+                            else {
+                                fini(null, false);
+                            }
+                        };
+                        arg = Object.setPrototypeOf(d, t);
+                        if (anAfter.fn.call(anAfter.ctx, arg)) {
+                            _suman.writeTestError(general_1.cloneError(anAfter.warningErr, suman_constants_1.constants.warnings.RETURNED_VAL_DESPITE_CALLBACK_MODE, true).stack);
+                        }
+                    }
+                    else {
+                        const handlePotentialPromise = helpers.handleReturnVal(fini, fnStr);
+                        arg = t;
+                        handlePotentialPromise(anAfter.fn.call(anAfter.ctx, arg), warn);
+                    }
+                });
+            });
+        }, cb);
+    }, cb);
+};

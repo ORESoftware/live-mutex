@@ -1,0 +1,31 @@
+{
+  "name": "pragmatik",
+  "version": "0.0.413",
+  "description": "Parse arguments correctly for variadic functions",
+  "main": "dist/index.js",
+  "typings": "dist/index.d.ts",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "test": "./scripts/test.sh"
+  },
+  "keywords": [
+    "arguments",
+    "variadic",
+    "varargs",
+    "nodejs",
+    "dynamic"
+  ],
+  "author": "Olegzandr Denman",
+  "license": "MIT",
+  "dependencies": {
+    "chalk": "^2.4.1",
+    "log-prepend": "latest"
+  },
+  "devDependencies": {
+    "@types/async": "^2.0.38",
+    "@types/core-js": "^0.9.35",
+    "@types/lodash": "^4.14.50",
+    "@types/node": "^7.0.0",
+    "node-check-fast": "latest"
+  }
+}

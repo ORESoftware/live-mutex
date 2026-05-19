@@ -1,0 +1,31 @@
+{
+  "name": "log-prepend",
+  "version": "0.0.1010",
+  "description": "Prepend a string to each line of console output",
+  "main": "dist/index.js",
+  "typings": "dist/index.d.ts",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "test": "suman test/logs.js --force-match"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ORESoftware/log-prepend.git"
+  },
+  "keywords": [
+    "prepend",
+    "transform",
+    "stdout",
+    "stderr"
+  ],
+  "author": "Olegzandr VD",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ORESoftware/log-prepend/issues"
+  },
+  "homepage": "https://github.com/ORESoftware/log-prepend#readme",
+  "devDependencies": {
+    "@types/core-js": "^0.9.43",
+    "@types/node": "^8.0.26"
+  }
+}

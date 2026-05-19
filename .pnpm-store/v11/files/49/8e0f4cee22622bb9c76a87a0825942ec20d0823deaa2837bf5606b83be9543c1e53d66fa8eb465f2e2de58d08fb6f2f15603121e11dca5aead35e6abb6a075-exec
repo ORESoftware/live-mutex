@@ -1,0 +1,41 @@
+{
+  "name": "vamoot",
+  "version": "0.0.107",
+  "description": "Vamoot creates simple immutable objects",
+  "main": "dist/index.js",
+  "typings": "dist/index.d.ts",
+  "types": "dist/index.d.ts",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "suman"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ORESoftware/vamoot.git"
+  },
+  "keywords": [
+    "suman",
+    "test",
+    "testing",
+    "immutable",
+    "immutability",
+    "nodejs",
+    "npm",
+    "sumanjs"
+  ],
+  "author": "Olegzandr VD",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/ORESoftware/vamoot/issues"
+  },
+  "homepage": "https://github.com/ORESoftware/vamoot#readme",
+  "devDependencies": {
+    "@types/core-js": "^0.9.42",
+    "@types/node": "^8.0.14"
+  },
+  "dependencies": {
+    "freeze-existing-props": "latest"
+  }
+}

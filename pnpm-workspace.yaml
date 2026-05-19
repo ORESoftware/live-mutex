@@ -1,0 +1,3 @@
+allowBuilds:
+  '@oresoftware/safe-stringify': set this to true or false
+  suman: set this to true or false

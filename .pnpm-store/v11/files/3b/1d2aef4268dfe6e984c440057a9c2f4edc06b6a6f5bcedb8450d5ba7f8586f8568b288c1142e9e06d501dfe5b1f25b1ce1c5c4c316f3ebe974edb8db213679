@@ -1,0 +1,41 @@
+'use strict';
+Object.defineProperty(exports, "__esModule", { value: true });
+const util = require("util");
+const safe = require("@oresoftware/safe-stringify");
+const log = {
+    info: console.log.bind(console, 'siamese lib:'),
+    error: console.error.bind(console, 'siamese lib:')
+};
+exports.r2gSmokeTest = () => {
+    return true;
+};
+exports.parse = (obj) => {
+    return Promise.resolve(obj).then(o => {
+        if (typeof o !== 'string') {
+            log.error('warning: looks like you have called JSON.parse on an object that was already parsed => ' + util.inspect(o));
+            return o;
+        }
+        let ret = JSON.parse(o);
+        if (ret && ret['@stringified'] === true) {
+            ret = ret['value'];
+        }
+        return ret;
+    });
+};
+exports.stringify = (obj) => {
+    return Promise.resolve(obj).then(o => {
+        if (typeof o === 'string') {
+            if (String(o).indexOf('{"@stringified"') === 0) {
+                return o;
+            }
+        }
+        if (o && o['@stringified'] === true && ('value' in o)) {
+            if (o.value === undefined) {
+                o.value = null;
+            }
+            log.error('warning: object you wish to stringify using the siamese library already has a top-level "@stringified" property.');
+            return safe.stringify(o);
+        }
+        return safe.stringify({ '@stringified': true, 'value': o });
+    });
+};

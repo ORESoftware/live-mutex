@@ -1,0 +1,75 @@
+import * as util from 'util';
+export declare const r2gSmokeTest: () => boolean;
+export interface LinkedQueueValue<V, K> {
+    after?: LinkedQueueValue<V, K>;
+    before?: LinkedQueueValue<V, K>;
+    value: V;
+    key: any;
+}
+export type IteratorFunction<T, V> = (val: [T, V], index: number) => V;
+declare const IsVoidVal: unique symbol;
+export declare const IsVoid: {
+    check: (v: any) => boolean;
+};
+export declare class LinkedQueue<V, K = any> {
+    private lookup;
+    private head;
+    private tail;
+    static IsVoid(v: any): boolean;
+    checkIfVoid(v: any): boolean;
+    getComputedProperties(): {
+        size: number;
+    };
+    toJSON(): {
+        size: number;
+    };
+    [util.inspect.custom](): {
+        size: number;
+    };
+    get size(): number;
+    get length(): number;
+    getLength(): number;
+    getSize(): number;
+    iterator(): this;
+    getIterator(): this;
+    [Symbol.iterator](): Iterator<[K, V]>;
+    reverseIterator(): {
+        [Symbol.iterator]: () => Iterator<[K, V]>;
+    };
+    private processItem;
+    asyncIterator(): AsyncGenerator<[K, V], void, unknown>;
+    asyncReverseIterator(): AsyncGenerator<[K, V], void, unknown>;
+    dequeueIterator(): {
+        [Symbol.iterator](): Iterator<[K, V]>;
+    };
+    getRandomKey(): K;
+    getRandomItem(): [K, V] | [typeof IsVoidVal];
+    remove(k: K): [K, V] | [typeof IsVoidVal];
+    contains(k: K): boolean;
+    get(k: K): ([K, V] | [typeof IsVoidVal]);
+    peek(): [K, V] | [typeof IsVoidVal];
+    getOrderedList(): Array<[K, V]>;
+    map(fn: IteratorFunction<V, any>, ctx?: any): Array<any>;
+    filter(fn: IteratorFunction<V, boolean>, ctx?: any): [K, V][];
+    insertInFrontOf(): void;
+    insertBehind(): void;
+    insertAtIndex(k: K, v: V): void;
+    first(): ([K, V] | [typeof IsVoidVal]);
+    last(): ([K, V] | [typeof IsVoidVal]);
+    getReverseOrderedList(): [K, V][];
+    removeAll(): void;
+    clear(): void;
+    push(k?: any, val?: any): void;
+    addToFront(k: K, obj?: V): void;
+    enq(k?: any, val?: any): void;
+    enqueue(k: any, val?: any): void;
+    forEach(fn: IteratorFunction<V, void>, ctx?: any): this;
+    dequeueEach(fn: IteratorFunction<V, void>, ctx?: any): this;
+    deq(n?: number): [K, V] | [typeof IsVoidVal] | LinkedQueueValue<V, K>[];
+    dequeue(): [K, V] | [typeof IsVoidVal];
+    shift(): [K, V] | [typeof IsVoidVal];
+    unshift(k: K, obj?: V): void;
+    pop(): ([K, V] | [typeof IsVoidVal]);
+    removeLast(): ([K, V] | [typeof IsVoidVal]);
+}
+export {};

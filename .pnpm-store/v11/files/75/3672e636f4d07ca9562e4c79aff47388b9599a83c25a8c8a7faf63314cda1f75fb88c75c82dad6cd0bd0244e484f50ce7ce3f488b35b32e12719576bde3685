@@ -1,0 +1,7 @@
+declare const process: any;
+declare const global: any;
+declare const util: any;
+declare const assert: any;
+declare const _suman: any;
+declare const then: <TResult1 = any, TResult2 = never>(onfulfilled?: (value: any) => TResult1 | PromiseLike<TResult1>, onrejected?: (reason: any) => TResult2 | PromiseLike<TResult2>) => Promise<TResult1 | TResult2>;
+declare const katch: <TResult = never>(onrejected?: (reason: any) => TResult | PromiseLike<TResult>) => Promise<any>;

@@ -1,0 +1,27 @@
+{
+  "name": "poolio",
+  "version": "0.2.54018",
+  "description": "Create a versatile pool of child process workers.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "typings": "dist/index.d.ts",
+  "scripts": {
+    "test": "./scripts/test.sh"
+  },
+  "author": "Olegzandr VD",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/ORESoftware/poolio.git"
+  },
+  "dependencies": {
+    "chalk": "^1.1.3",
+    "residence": "latest"
+  },
+  "devDependencies": {
+    "@types/async": "^2.0.40",
+    "@types/chalk": "^0.4.31",
+    "@types/node": "^8.0.3",
+    "async": "2.4.1"
+  }
+}

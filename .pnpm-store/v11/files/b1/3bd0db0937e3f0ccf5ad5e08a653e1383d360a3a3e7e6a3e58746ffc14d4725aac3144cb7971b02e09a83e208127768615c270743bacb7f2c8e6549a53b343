@@ -1,0 +1,26 @@
+/// <reference types="node" />
+import * as stream from 'stream';
+import { JSONParser } from "@oresoftware/json-stream-parser";
+export declare const r2gSmokeTest: () => boolean;
+export interface ParsedObject extends Object {
+    [index: string]: any;
+}
+export declare const stdMarker = "@json-stdio";
+export declare const stdEventName = "@json-stdio-event";
+export interface AnyIndex extends Object {
+    [key: string]: any;
+}
+export declare const getJSON: (obj: AnyIndex, marker?: string) => string;
+export declare type Stringifiable = object | string | boolean | number | null;
+export declare const getJSONCanonical: (v: Stringifiable, marker?: string) => string;
+export declare const initLogToStdout: (marker: string) => (obj: any) => void;
+export declare const initLogToStderr: (marker: string) => (obj: any) => void;
+export declare const logToStdout: (obj: any) => void;
+export declare const logToStderr: (obj: any) => void;
+export declare const log: (obj: any) => void;
+export declare const logerr: (obj: any) => void;
+export declare const createParser: (marker?: string, eventName?: string) => JSONParser<any>;
+export interface Object2JSONOpts {
+    marker: string;
+}
+export declare const transformObject2JSON: (opts?: Object2JSONOpts) => stream.Transform;

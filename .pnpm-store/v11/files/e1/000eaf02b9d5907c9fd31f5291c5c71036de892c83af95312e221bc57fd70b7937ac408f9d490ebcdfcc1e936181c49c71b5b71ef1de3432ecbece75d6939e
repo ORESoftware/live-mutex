@@ -1,0 +1,41 @@
+{
+  "name": "ansi-256-colors",
+  "version": "1.1.0",
+  "description": "256 xterm color codes",
+  "license": "MIT",
+  "repository": "jbnicolai/ansi-256-colors",
+  "author": "Joshua Appelman <joshua@jbna.nl>",
+  "engines": {
+    "node": ">=0.10.0"
+  },
+  "scripts": {
+    "test": "mocha"
+  },
+  "files": [
+    "index.js"
+  ],
+  "keywords": [
+    "color",
+    "colour",
+    "colors",
+    "terminal",
+    "console",
+    "cli",
+    "string",
+    "ansi",
+    "styles",
+    "tty",
+    "formatting",
+    "rgb",
+    "256",
+    "shell",
+    "xterm",
+    "log",
+    "logging",
+    "command-line",
+    "text"
+  ],
+  "devDependencies": {
+    "mocha": "*"
+  }
+}

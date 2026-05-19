@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Suman</title>
+</head>
+<body>
+
+<script data-main="main.js" type="text/javascript" src="require.js"></script>
+
+
+<script>
+  window.__suman = {};
+  window.__suman.SUMAN_SOCKETIO_SERVER_PORT = 3000;
+</script>
+<script src="suman-amd.js"></script>
+
+<script>
+
+  require(['suman', 'module'], function (suman, module) {
+
+    console.log('module:', module);
+
+    const Test = suman.init(module);
+
+    Test.create((describe, it) => {
+
+      it('too much', t => {
+
+      });
+
+    });
+
+  });
+
+  require(['suman', 'module'], function (suman, module) {
+
+    console.log('module:', module);
+
+    const Test = suman.init(module);
+
+    Test.create((describe, it) => {
+
+      it('too much', t => {
+
+      });
+
+    });
+
+  });
+
+
+</script>
+
+</body>
+</html>

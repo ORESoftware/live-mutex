@@ -1,0 +1,89 @@
+'use strict';
+Object.defineProperty(exports, "__esModule", { value: true });
+const stream = require("stream");
+const assert = require("assert");
+const util = require("util");
+const json_stream_parser_1 = require("@oresoftware/json-stream-parser");
+const safe = require("@oresoftware/safe-stringify");
+exports.r2gSmokeTest = function () {
+    return true;
+};
+exports.stdMarker = '@json-stdio';
+exports.stdEventName = '@json-stdio-event';
+exports.getJSON = (obj, marker) => {
+    marker = marker || exports.stdMarker;
+    try {
+        obj[marker] = true;
+    }
+    catch (err) {
+        console.error(`json-stdio could not add "${marker}" property to the following value (next line)\n:${util.inspect(obj)}\n`);
+        throw err;
+    }
+    return safe.stringify(obj);
+};
+exports.getJSONCanonical = (v, marker) => {
+    marker = marker || exports.stdMarker;
+    if (typeof v === "undefined") {
+        v = null;
+    }
+    return safe.stringify({
+        [marker]: true,
+        value: v
+    });
+};
+exports.initLogToStdout = function (marker) {
+    assert(marker && typeof marker === 'string', `first argument to "${exports.initLogToStdout.name}" must be a string.`);
+    return function logToStdout(obj) {
+        try {
+            console.log(exports.getJSONCanonical(obj, marker));
+        }
+        catch (err) {
+            console.error(`json-stdio could not stringify the following value (next line)\n:${util.inspect(obj)}\n`);
+            throw err;
+        }
+    };
+};
+exports.initLogToStderr = function (marker) {
+    assert(marker && typeof marker === 'string', `first argument to "${exports.initLogToStderr.name}" must be a string.`);
+    return function logToStderr(obj) {
+        try {
+            console.error(exports.getJSONCanonical(obj, marker));
+        }
+        catch (err) {
+            console.error(`json-stdio could not stringify the following value (next line)\n:${util.inspect(obj)}\n`);
+            throw err;
+        }
+    };
+};
+exports.logToStdout = exports.initLogToStdout(exports.stdMarker);
+exports.logToStderr = exports.initLogToStderr(exports.stdMarker);
+exports.log = exports.logToStdout;
+exports.logerr = exports.logToStderr;
+exports.createParser = (marker, eventName) => {
+    marker = marker || exports.stdMarker;
+    eventName = eventName || exports.stdEventName;
+    const strm = new json_stream_parser_1.JSONParser();
+    strm.on('data', (d) => {
+        if (d && d[marker] === true) {
+            strm.emit(eventName, d.value);
+        }
+    });
+    return strm;
+};
+exports.transformObject2JSON = function (opts) {
+    const marker = opts && opts.marker || exports.stdMarker;
+    return new stream.Transform({
+        objectMode: true,
+        transform(chunk, encoding, cb) {
+            try {
+                this.push(exports.getJSONCanonical(chunk) + '\n');
+            }
+            catch (err) {
+            }
+            cb();
+        },
+        flush(cb) {
+            cb();
+        }
+    });
+};

@@ -1,0 +1,10 @@
+node_modules
+.idea
+exp*.js
+*.txt
+*.log
+*.json
+*.md
+*.sh
+*.ts
+!*.d.ts

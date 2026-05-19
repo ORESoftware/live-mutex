@@ -1,0 +1,4 @@
+#!/usr/bin/env node
+export interface IPreOptCheck {
+    [key: string]: any;
+}

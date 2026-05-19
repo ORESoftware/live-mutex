@@ -1,0 +1,87 @@
+'use strict';
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.r2gSmokeTest = function () {
+    return true;
+};
+exports.stringify = (v) => {
+    const cache = new Set();
+    return JSON.stringify(v, function (key, val) {
+        if (val && typeof val === 'object') {
+            if (cache.has(val)) {
+                try {
+                    return JSON.parse(JSON.stringify(val));
+                }
+                catch (err) {
+                    return;
+                }
+            }
+            cache.add(val);
+        }
+        return val;
+    });
+};
+const parentSym = Symbol('parent');
+const cacheSym = Symbol('cache');
+const copyInner = (parent, key, val, copyParent) => {
+    if (!(val && typeof val === 'object')) {
+        return copyParent[key] = val;
+    }
+    const cache = copyParent[cacheSym];
+    if (typeof val['toJSON'] === 'function') {
+        val = val.toJSON();
+    }
+    if (cache.has(val)) {
+        try {
+            return copyParent[key] = JSON.parse(JSON.stringify(cache.get(val)));
+        }
+        catch (err) {
+            return copyParent[key] = null;
+        }
+    }
+    if (val === parent.__proto__) {
+        return;
+    }
+    if (val === Object.getPrototypeOf(parent)) {
+        return;
+    }
+    const copyVal = Array.isArray(val) ? [] : {};
+    copyVal[parentSym] = copyParent;
+    copyParent[key] = copyVal;
+    cache.set(val, copyVal);
+    copyVal[cacheSym] = new Map(cache);
+    let keys = null;
+    if (Array.isArray(val)) {
+        keys = val.keys();
+    }
+    else {
+        keys = Object.keys(val);
+    }
+    for (const k of keys) {
+        copyInner(val, k, val[k], copyVal);
+    }
+};
+const copyOuter = (val) => {
+    if (!(val && typeof val === 'object')) {
+        return val;
+    }
+    let copy = null, keys = null;
+    if (typeof val['toJSON'] === 'function') {
+        val = val.toJSON();
+    }
+    if (Array.isArray(val)) {
+        copy = [];
+        keys = val.keys();
+    }
+    else {
+        copy = {};
+        keys = Object.keys(val);
+    }
+    copy[cacheSym] = new Map();
+    for (const k of keys) {
+        copyInner(val, k, val[k], copy);
+    }
+    return copy;
+};
+exports.stringifyDeep = (v) => {
+    return JSON.stringify(copyOuter(v));
+};

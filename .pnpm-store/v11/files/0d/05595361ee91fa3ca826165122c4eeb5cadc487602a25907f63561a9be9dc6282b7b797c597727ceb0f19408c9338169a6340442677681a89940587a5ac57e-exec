@@ -1,0 +1,35 @@
+{
+  "name": "proxy-mcproxy",
+  "version": "0.0.109",
+  "description": "Recursive proxy-object creation.",
+  "main": "dist/main.js",
+  "typings": "dist/main.d.ts",
+  "types": "dist/main.d.ts",
+  "scripts": {
+    "test": "suman test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ORESoftware/proxy-mcproxy.git"
+  },
+  "keywords": [
+    "proxy",
+    "recursive",
+    "immutable",
+    "immutability",
+    "test",
+    "testing"
+  ],
+  "author": "Olegzandr VD",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/ORESoftware/proxy-mcproxy/issues"
+  },
+  "homepage": "https://github.com/ORESoftware/proxy-mcproxy#readme",
+  "dependencies": {
+    "freeze-existing-props": "0.0.1005"
+  },
+  "devDependencies": {
+    "@types/node": "^12.7.5"
+  }
+}

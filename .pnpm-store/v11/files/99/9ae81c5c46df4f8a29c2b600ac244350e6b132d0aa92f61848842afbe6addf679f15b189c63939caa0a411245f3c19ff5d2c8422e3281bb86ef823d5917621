@@ -1,0 +1,34 @@
+const http = require('http');
+module.exports = data => {
+    return {
+        dependencies: {
+            'example': function () {
+                return { 'just': 'an example' };
+            },
+            'example_dot_com': cb => {
+                http.get({
+                    host: 'example.com',
+                    port: 80,
+                    path: '/',
+                    agent: false
+                }, res => {
+                    res.setEncoding('utf8');
+                    let data = '';
+                    res.on('data', d => {
+                        data += d;
+                    });
+                    res.on('end', () => {
+                        cb(null, data);
+                    });
+                });
+            },
+            'fs_search': () => {
+                return new Promise(function (resolve, reject) {
+                    setTimeout(function () {
+                        resolve('some filesystem values');
+                    }, 1000);
+                });
+            }
+        }
+    };
+};
