@@ -1,0 +1,3 @@
+#!/usr/bin/env node
+declare const suman: any;
+declare const Test: any;

@@ -1,0 +1,1 @@
+export declare const noFilesFoundError: (dirs: string[]) => void;

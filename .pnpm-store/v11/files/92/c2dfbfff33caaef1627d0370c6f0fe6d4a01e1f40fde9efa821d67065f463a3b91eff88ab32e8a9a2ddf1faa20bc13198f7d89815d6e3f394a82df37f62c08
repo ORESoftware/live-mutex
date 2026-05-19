@@ -1,0 +1,13 @@
+module.exports = data => {
+    return {
+        groups: [
+            {
+                name: '',
+                useContainer: true,
+                build: '',
+                pathToScript: '',
+                run: ''
+            }
+        ]
+    };
+};

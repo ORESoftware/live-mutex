@@ -1,0 +1,121 @@
+const os = require('os');
+const path = require('path');
+const numOfCPUs = os.cpus().length || 1;
+module.exports = {
+    matchAny: [/\.test\.js$/, /\.spec\.js$/],
+    matchNone: [/fixture/, /\/.target\//],
+    matchAll: [],
+    testDir: 'test',
+    testSrcDir: 'test',
+    sumanHelpersDir: '.suman',
+    uniqueAppName: '<your-app-name-here>',
+    logsDir: process.env['SUMAN_LOGS_DIR'],
+    allowRunInPlace: true,
+    viewGantt: false,
+    retriesEnabled: false,
+    useColorByDefault: true,
+    debugHooks: true,
+    allowSymlinks: false,
+    bundleWithChaiAssertions: false,
+    autoLoggingPre: true,
+    autoLoggingPost: true,
+    autoLoggingIoc: true,
+    autoLoggingHooks: true,
+    installSumanExtraDeps: true,
+    autoLoggingTestCases: true,
+    isLogChildStdout: false,
+    isLogChildStderr: true,
+    includeSumanGlobalsInPath: true,
+    useSumanUtilityPatches: true,
+    useTAPOutput: false,
+    errorsOnly: false,
+    enforceUniqueTestCaseNames: false,
+    replayErrorsAtRunnerEnd: true,
+    logStdoutToTestLogs: false,
+    alwaysUseRunner: false,
+    enforceGlobalInstallationOnly: false,
+    enforceLocalInstallationOnly: false,
+    sourceTopLevelDepsInPackageDotJSON: false,
+    enforceTestCaseNames: true,
+    enforceBlockNames: true,
+    enforceHookNames: false,
+    bail: true,
+    bailRunner: true,
+    useBabelRegister: false,
+    executeRunnerCWDAtTestFile: true,
+    sendStderrToSumanErrLogOnly: true,
+    useSuiteNameInTestCaseOutput: false,
+    ultraSafe: false,
+    verbose: true,
+    checkMemoryUsage: false,
+    fullStackTraces: false,
+    disableAutoOpen: false,
+    suppressRunnerOutput: true,
+    allowCollectUsageStats: true,
+    verbosity: 5,
+    saveLogsForThisManyPastRuns: 5,
+    maxParallelProcesses: Math.max(6, numOfCPUs),
+    resultsCapCount: 100,
+    resultsCapSize: 7000,
+    defaultHookTimeout: 5000,
+    defaultTestCaseTimeout: 5000,
+    timeoutToSearchForAvailServer: 2000,
+    defaultDelayFunctionTimeout: 8000,
+    defaultChildProcessTimeout: 8000000,
+    defaultTestSuiteTimeout: 15000,
+    expireResultsAfter: 10000000,
+    coverage: {
+        coverageDir: 'coverage',
+        nyc: {
+            use: false,
+        },
+        istanbul: {}
+    },
+    watch: {
+        options: {},
+        per: {
+            'zoom': {
+                exec: 'FORCE_COLOR=1 suman test',
+                include: [],
+                exclude: [],
+                includes: [__dirname],
+                excludes: ['/test/', '/node_modules/', '/.git/'],
+                confOverride: {}
+            }
+        }
+    },
+    browser: {
+        entryPoints: [
+            {
+                html: 'absolute or relative path to an .html file',
+                browsers: []
+            },
+            {
+                script: 'absolute or relative path to a file'
+            }
+        ]
+    },
+    scripts: {
+        example: 'NODE_ENV=test echo "I love hippos";'
+    },
+    reporters: {
+        default: 'std-reporter',
+        map: {
+            'tap': 'suman-reporters/modules/tap-reporter'
+        }
+    },
+    servers: {
+        '*default': {
+            host: '127.0.0.1',
+            port: 6969
+        },
+        '###': {
+            host: '127.0.0.1',
+            port: 6969
+        },
+    },
+    babelRegisterOpts: {
+        ignore: /fixture/,
+        extensions: ['.es6', '.es', '.jsx', '.js']
+    }
+};

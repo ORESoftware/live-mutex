@@ -1,0 +1,17 @@
+/// <reference types="node" />
+import * as stream from 'stream';
+export interface PTOptions {
+    omitWhitespace?: boolean;
+    color?: Function;
+}
+export declare const r2gSmokeTest: () => boolean;
+export declare const pt: (pre: string, o?: PTOptions) => PrependTransform;
+export default pt;
+export declare class PrependTransform extends stream.Transform {
+    lastLineData: string;
+    pre: string;
+    opts: PTOptions;
+    constructor(pre: string, o?: PTOptions);
+    _transform(chunk: string, encoding: string, cb: Function): any;
+    _flush(cb: Function): any;
+}

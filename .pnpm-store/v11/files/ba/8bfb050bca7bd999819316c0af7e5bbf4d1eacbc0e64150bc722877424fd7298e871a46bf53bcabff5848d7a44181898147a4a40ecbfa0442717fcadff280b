@@ -1,0 +1,4 @@
+export declare const ascii: {
+    suman_slant: any;
+    suman_runner: any;
+};

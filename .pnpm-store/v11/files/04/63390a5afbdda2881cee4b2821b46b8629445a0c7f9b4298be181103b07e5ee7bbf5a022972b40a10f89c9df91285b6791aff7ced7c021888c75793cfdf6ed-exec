@@ -1,0 +1,3 @@
+Readme file here primarily for version control stability
+
+Suman recommends that you tail the files in this directory when you're developing tests => most useful thing to do is to tail the runner-debug.log when running tests with the Suman runner,this is because accessing the individual test errors is less transparent due to the nature of child-processes/subprocesses)

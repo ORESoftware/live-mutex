@@ -1,0 +1,37 @@
+{
+  "name": "@oresoftware/json-stream-parser",
+  "version": "0.0.124",
+  "description": "Parse JSON streams into JS objects.",
+  "main": "dist/main.js",
+  "bin": {
+    "json_parser": "cli/json-parser.js"
+  },
+  "types": "dist/main.d.ts",
+  "typings": "dist/main.d.ts",
+  "scripts": {
+    "test": "suman test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ORESoftware/json-parser.git"
+  },
+  "keywords": [
+    "typescript",
+    "library",
+    "skeleton",
+    "scaffold"
+  ],
+  "author": "Olegzandr von Denman",
+  "license": "SEE LICENSE IN license.md",
+  "bugs": {
+    "url": "https://github.com/ORESoftware/json-parser/issues"
+  },
+  "homepage": "https://github.com/ORESoftware/json-parser#readme",
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^12.6.8"
+  },
+  "r2g": {
+    "test": "node .r2g/tests/smoke-test.1.js"
+  }
+}

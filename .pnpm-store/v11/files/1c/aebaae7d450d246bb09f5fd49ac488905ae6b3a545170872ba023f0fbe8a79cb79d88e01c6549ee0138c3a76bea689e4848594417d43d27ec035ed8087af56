@@ -1,0 +1,36 @@
+{
+  "name": "suman-watch-plugins",
+  "version": "0.0.102",
+  "description": "Plugins to be used with suman-watch utilities.",
+  "main": "index.js",
+  "scripts": {
+    "test": "./scripts/test.sh"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sumanjs/suman-watch-plugins.git"
+  },
+  "keywords": [
+    "sumanjs",
+    "suman",
+    "watch",
+    "testing",
+    "dx",
+    "developer-experience"
+  ],
+  "author": "Olegzandr VD",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/sumanjs/suman-watch-plugins/issues"
+  },
+  "homepage": "https://github.com/sumanjs/suman-watch-plugins#readme",
+  "dependencies": {
+    "chalk": "^2.3.0",
+    "semver": "^5.4.1",
+    "suman-utils": "0.0.73121"
+  },
+  "devDependencies": {
+    "@types/core-js": "^0.9.43",
+    "@types/node": "^8.0.47"
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "_id": "suman-utils@0.0.73119",
+  "_location": "/suman-utils",
+  "_phantomChildren": {},
+  "_requiredBy": [
+    "#EXISTING"
+  ],
+  "author": {
+    "name": "Olegzandr VD"
+  },
+  "bugs": {
+    "url": "https://github.com/ORESoftware/suman-utils/issues"
+  },
+  "dependencies": {
+    "async": "^2.1.5",
+    "chalk": "^2.1.0",
+    "mkdirp": "^0.5.1",
+    "residence": "latest",
+    "rimraf": "^2.6.0",
+    "suman-browser-polyfills": "latest",
+    "suman-debug": "latest"
+  },
+  "description": "Shared module within the Suman test runner ecosystem",
+  "devDependencies": {
+    "@types/async": "^2.0.38",
+    "@types/core-js": "^0.9.35",
+    "@types/immutable": "^3.8.7",
+    "@types/node": "^8.0.12",
+    "@types/whatwg-fetch": "0.0.33",
+    "node-check-fast": "latest",
+    "rxjs": "^5.2.0"
+  },
+  "gitHead": "d04c59843944ed5bd360cab5df7de9aaf29d2bdf",
+  "homepage": "https://github.com/ORESoftware/suman-utils#readme",
+  "keywords": [
+    "utils",
+    "test",
+    "framework"
+  ],
+  "license": "ISC",
+  "main": "lib/index.js",
+  "name": "suman-utils",
+  "optionalDependencies": {},
+  "readme": "\n# Suman-Utils\n\n[![Build Status](https://travis-ci.org/sumanjs/suman-utils.svg?branch=master)](https://travis-ci.org/sumanjs/suman-utils)\n\n\n# Shared utility library for SumanJS projects\n\nHas many public utility functions for various tasks, mostly unique to SumanJS.\n\n\n\n",
+  "readmeFilename": "README.md",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ORESoftware/suman-utils.git"
+  },
+  "scripts": {
+    "test": "./@test.sh"
+  },
+  "types": "lib/index.d.ts",
+  "typings": "lib/index.d.ts",
+  "version": "0.0.73121"
+}

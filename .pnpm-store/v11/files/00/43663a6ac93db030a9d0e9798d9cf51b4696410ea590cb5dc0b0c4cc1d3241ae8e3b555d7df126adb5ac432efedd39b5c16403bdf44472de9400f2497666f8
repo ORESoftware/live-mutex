@@ -1,0 +1,18 @@
+#!/usr/bin/env node
+'use strict';
+Object.defineProperty(exports, "__esModule", { value: true });
+const _1 = require(".");
+const chalk_1 = require("chalk");
+let v = process.argv[2] || '';
+const color = process.argv[3] || '';
+const isStderr = process.argv[4] || '';
+if (color) {
+    try {
+        v = chalk_1.default[color](v);
+    }
+    catch (err) {
+    }
+}
+process.stdin.resume()
+    .pipe(_1.pt(v))
+    .pipe(isStderr ? process.stderr : process.stdout);

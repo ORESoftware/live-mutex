@@ -1,0 +1,1 @@
+export declare const run: (projectRoot: string, sumanLibRoot: string, opts: Partial<import("../../../suman-shell/dist/index").ISumanDOptions>) => void;

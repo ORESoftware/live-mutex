@@ -1,0 +1,45 @@
+{
+  "name": "suman-reporters",
+  "version": "0.0.1015",
+  "description": "Suman standard reporters",
+  "main": "index.js",
+  "scripts": {
+    "test": "./scripts/test.sh"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sumanjs/suman-reporters.git"
+  },
+  "keywords": [
+    "suman",
+    "test runner",
+    "sumanjs",
+    "reporters",
+    "tap-json",
+    "tap",
+    "test",
+    "test-protocol",
+    "tapjs"
+  ],
+  "author": "Olegzandr VD",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/sumanjs/suman-reporters/issues"
+  },
+  "homepage": "https://github.com/sumanjs/suman-reporters#readme",
+  "dependencies": {
+    "chalk": "^2.4.0",
+    "json-stdio": "latest",
+    "lodash.isequal": "^4.5.0",
+    "progress": "^2.0.0",
+    "suman-browser-polyfills": "latest",
+    "suman-events": "latest",
+    "suman-utils": "latest"
+  },
+  "devDependencies": {
+    "@types/core-js": "^0.9.42",
+    "@types/lodash.isequal": "^4.5.2",
+    "@types/node": "^10.1.2",
+    "@types/socket.io-client": "^1.4.31"
+  }
+}

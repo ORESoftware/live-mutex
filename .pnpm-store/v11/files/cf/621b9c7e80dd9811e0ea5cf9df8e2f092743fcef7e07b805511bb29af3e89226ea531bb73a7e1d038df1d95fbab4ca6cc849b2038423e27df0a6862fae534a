@@ -1,0 +1,5 @@
+module.exports = data => {
+    return {
+        'suman-pre-hook (example)': ['suman-post-hook-1 (example)', 'suman-post-hook-2 (example)'],
+    };
+};

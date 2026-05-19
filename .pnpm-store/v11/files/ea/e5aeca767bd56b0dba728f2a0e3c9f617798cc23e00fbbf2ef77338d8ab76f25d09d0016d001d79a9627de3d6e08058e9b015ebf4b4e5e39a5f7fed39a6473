@@ -1,0 +1,37 @@
+'use strict';
+const process = require('suman-browser-polyfills/modules/process');
+const global = require('suman-browser-polyfills/modules/global');
+const util = require('util');
+const assert = require('assert');
+const _suman = global.__suman = (global.__suman || {});
+Object.values = Object.values || function (v) {
+    return Object.keys(v).map(function (k) {
+        return v[k];
+    });
+};
+const then = Promise.prototype.then;
+Promise.prototype.then = function (fn1, fn2) {
+    if (process.domain) {
+        fn1 = fn1 && process.domain.bind(fn1);
+        fn2 = fn2 && process.domain.bind(fn2);
+    }
+    return then.call(this, fn1, fn2);
+};
+const katch = Promise.prototype.catch;
+Promise.prototype.catch = function (fn1) {
+    if (process.domain) {
+        fn1 = fn1 && process.domain.bind(fn1);
+    }
+    return katch.call(this, fn1);
+};
+String.prototype.times = Number.prototype.times = function (cb) {
+    if (typeof cb !== 'function') {
+        throw new TypeError('Callback is not a function');
+    }
+    else if (isNaN(parseInt(Number(this.valueOf())))) {
+        throw new TypeError('Object/value is not a valid number');
+    }
+    for (let i = 0; i < Number(this.valueOf()); i++) {
+        cb(i);
+    }
+};
