@@ -1,0 +1,34 @@
+{
+  "name": "ascii-table"
+, "version": "0.0.9"
+, "license": "MIT"
+, "keywords": [
+    "table"
+  , "ascii"
+  , "console"
+  ]
+, "contributors": [
+    {
+      "name": "Matthew Oliveira"
+    , "github": "https://github.com/m4olivei"
+    }
+  , {
+      "name": "Peter Daum"
+    , "github": "https://github.com/coders-kitchen"
+    }
+  ]
+, "author": "Beau Sorensen <mail@beausorensen.com> (http://github.com/sorensen)"
+, "description": "Easy tables for your console data"
+, "repository": {
+    "type": "git"
+  , "url": "git://github.com/sorensen/ascii-table.git"
+  }
+, "main": "index.js"
+, "scripts": {
+    "test": "make test"
+  }
+, "devDependencies": {
+    "mocha": "*"
+  }
+, "dependencies": {}
+}

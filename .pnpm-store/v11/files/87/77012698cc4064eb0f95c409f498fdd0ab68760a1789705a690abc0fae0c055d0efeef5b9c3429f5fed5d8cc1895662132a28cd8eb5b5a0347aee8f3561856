@@ -1,0 +1,49 @@
+'use strict';
+Object.defineProperty(exports, "__esModule", { value: true });
+const assert = require("assert");
+exports.r2gSmokeTest = function () {
+    return true;
+};
+const log = console.log.bind(console, '[freeze]');
+exports.freezeExistingProps = function ($obj, depth) {
+    depth = depth || 0;
+    assert(Number.isInteger(depth), 'depth value must be an integer.');
+    depth = Math.min(5, depth);
+    (function recurse(obj, depth) {
+        Object.keys(obj).forEach(function (key) {
+            try {
+                Object.defineProperty(obj, key, {
+                    writable: false
+                });
+            }
+            catch (e) {
+                console.error(e.stack || e);
+            }
+            if (depth > 0 && obj[key]) {
+                recurse(obj[key], --depth);
+            }
+        });
+    })($obj, depth);
+    return $obj;
+};
+exports.freezeAllProps = function ($obj, depth) {
+    depth = depth || 0;
+    assert(Number.isInteger(depth), 'depth value must be an integer.');
+    depth = Math.min(5, depth);
+    (function recurse(obj, depth) {
+        try {
+            Object.freeze(obj);
+        }
+        catch (e) {
+            console.error(e.stack || e);
+        }
+        finally {
+            Object.keys(obj).forEach(function (key) {
+                if (depth > 0 && obj[key]) {
+                    recurse(obj[key], --depth);
+                }
+            });
+        }
+    })($obj, depth);
+    return $obj;
+};

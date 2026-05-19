@@ -1,0 +1,100 @@
+declare const _default: {
+    matchAny: any[];
+    matchNone: RegExp[];
+    matchAll: RegExp[];
+    testDir: string;
+    testSrcDir: string;
+    sumanHelpersDir: string;
+    uniqueAppName: string;
+    browser: string;
+    autoLoggingPre: boolean;
+    autoLoggingPost: boolean;
+    autoLoggingIoc: boolean;
+    autoLoggingHooks: boolean;
+    installSumanExtraDeps: boolean;
+    autoLoggingTestCases: boolean;
+    isLogChildStdout: boolean;
+    isLogChildStderr: boolean;
+    includeSumanGlobalsInPath: boolean;
+    useSumanUtilityPatches: boolean;
+    useTAPOutput: boolean;
+    errorsOnly: boolean;
+    replayErrorsAtRunnerEnd: boolean;
+    logStdoutToTestLogs: boolean;
+    allowArrowFunctionsForTestBlocks: boolean;
+    alwaysUseRunner: boolean;
+    enforceGlobalInstallationOnly: boolean;
+    enforceLocalInstallationOnly: boolean;
+    sourceTopLevelDepsInPackageDotJSON: boolean;
+    enforceTestCaseNames: boolean;
+    enforceBlockNames: boolean;
+    enforceHookNames: boolean;
+    bail: boolean;
+    bailRunner: boolean;
+    useBabelRegister: boolean;
+    transpile: boolean;
+    executeRunnerCWDAtTestFile: boolean;
+    sendStderrToSumanErrLogOnly: boolean;
+    useSuiteNameInTestCaseOutput: boolean;
+    ultraSafe: boolean;
+    verbose: boolean;
+    checkMemoryUsage: boolean;
+    fullStackTraces: boolean;
+    disableAutoOpen: boolean;
+    suppressRunnerOutput: boolean;
+    allowCollectUsageStats: boolean;
+    highestPerformance: boolean;
+    saveLogsForThisManyPastRuns: number;
+    verbosity: number;
+    maxParallelProcesses: number;
+    resultsCapCount: number;
+    resultsCapSize: number;
+    defaultHookTimeout: number;
+    defaultTestCaseTimeout: number;
+    timeoutToSearchForAvailServer: number;
+    defaultDelayFunctionTimeout: number;
+    defaultChildProcessTimeout: number;
+    defaultTestSuiteTimeout: number;
+    expireResultsAfter: number;
+    coverage: {
+        coverageDir: string;
+        nyc: {
+            use: boolean;
+        };
+        istanbul: {};
+    };
+    watch: {
+        '//tests': {
+            'default': {
+                script: (p: any) => string;
+                include: any[];
+                exclude: string[];
+            };
+        };
+        '//project': {
+            'default': {
+                script: string;
+                include: any[];
+                exclude: string[];
+            };
+        };
+    };
+    reporters: {
+        'tap': string;
+    };
+    servers: {
+        '*default': {
+            host: string;
+            port: number;
+        };
+        '###': {
+            host: string;
+            port: number;
+        };
+    };
+    babelRegisterOpts: {
+        ignore: RegExp;
+        extensions: string[];
+    };
+};
+export default _default;

@@ -1,0 +1,44 @@
+{
+  "name": "residence",
+  "version": "0.0.217",
+  "description": "Find project root given current working directory",
+  "author": {
+    "name": "Olegzandr Denman"
+  },
+  "gitHead": "0eca9260f550f6553495e2222d2a087c6357d395",
+  "homepage": "https://github.com/ORESoftware/residence#readme",
+  "keywords": [
+    "search",
+    "find root",
+    "home",
+    "project root",
+    "suman"
+  ],
+  "license": "MIT",
+  "main": "dist/main.js",
+  "types": "dist/main.d.ts",
+  "typings": "dist/main.d.ts",
+  "bin": {
+    "residence_find_proj_root": "dist/cli.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ORESoftware/residence.git"
+  },
+  "scripts": {
+    "test": "suman test"
+  },
+  "r2g": {
+    "test": "echo 'r2g test is a noop here'"
+  },
+  "nlu": {
+    "linkable": true
+  },
+  "bugs": {
+    "url": "https://github.com/ORESoftware/residence/issues"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^12.7.5"
+  }
+}

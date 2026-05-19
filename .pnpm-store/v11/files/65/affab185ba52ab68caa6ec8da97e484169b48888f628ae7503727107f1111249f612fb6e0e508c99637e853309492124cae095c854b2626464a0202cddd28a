@@ -1,0 +1,44 @@
+{
+  "_id": "suman-browser-polyfills@0.0.1008",
+  "_location": "/suman-browser-polyfills",
+  "_phantomChildren": {},
+  "_requiredBy": [
+    "#EXISTING"
+  ],
+  "author": {
+    "name": "Olegzandr VD"
+  },
+  "bugs": {
+    "url": "https://github.com/sumanjs/suman-browser-polyfills/issues"
+  },
+  "dependencies": {
+    "async": "^2.4.1"
+  },
+  "description": "Browser polyfills for heavy backend codebases",
+  "devDependencies": {},
+  "gitHead": "16d708a135cf086e1f8e454533c7763ba9225abe",
+  "homepage": "https://github.com/sumanjs/suman-browser-polyfills#readme",
+  "keywords": [
+    "suman",
+    "test",
+    "browser",
+    "polyfill",
+    "shim",
+    "node.js",
+    "npm"
+  ],
+  "license": "ISC",
+  "main": "index.js",
+  "name": "suman-browser-polyfills",
+  "optionalDependencies": {},
+  "readme": "# Suman Browser Polyfills\n\nThis allows to run Suman in the browser.",
+  "readmeFilename": "README.md",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sumanjs/suman-browser-polyfills.git"
+  },
+  "scripts": {
+    "test": "./@test.sh"
+  },
+  "version": "0.0.1009"
+}

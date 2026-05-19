@@ -1,0 +1,16 @@
+'use strict';
+Object.defineProperty(exports, "__esModule", { value: true });
+const json_stream_parser_1 = require("@oresoftware/json-stream-parser");
+exports.r2gSmokeTest = () => {
+    return true;
+};
+exports.createParser = () => {
+    const strm = new json_stream_parser_1.JSONParser();
+    strm.on('data', (d) => {
+        if (d && d['@tap-json'] === true) {
+            strm.emit('testpoint', d);
+        }
+    });
+    return strm;
+};
+exports.default = exports.createParser;

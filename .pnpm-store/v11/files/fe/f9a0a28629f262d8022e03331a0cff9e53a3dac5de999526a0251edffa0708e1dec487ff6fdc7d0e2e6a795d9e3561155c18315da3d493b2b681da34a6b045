@@ -1,0 +1,3 @@
+export declare const r2gSmokeTest: () => boolean;
+export declare const stringify: (v: number | boolean | object) => string;
+export declare const stringifyDeep: (v: number | boolean | object) => string;

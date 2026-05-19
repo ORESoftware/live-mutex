@@ -1,0 +1,9 @@
+#!/usr/bin/env node
+'use strict';
+Object.defineProperty(exports, "__esModule", { value: true });
+const main_1 = require("./main");
+process.stdin.resume()
+    .pipe(main_1.createParser())
+    .on(main_1.stdEventName, v => {
+    console.log(v);
+});

@@ -1,0 +1,36 @@
+{
+  "name": "suman-run-plugins",
+  "version": "0.0.106",
+  "description": "Plugins for running target code with various executables.",
+  "main": "index.js",
+  "scripts": {
+    "test": "suman"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sumanjs/suman-run-plugins.git"
+  },
+  "keywords": [
+    "suman",
+    "suman-run-plugins",
+    "testing",
+    "plugins",
+    "sumanjs",
+    "execute",
+    "run",
+    "test",
+    "mocha",
+    "ava",
+    "jasmine"
+  ],
+  "author": "Olegzandr VD",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/sumanjs/suman-run-plugins/issues"
+  },
+  "homepage": "https://github.com/sumanjs/suman-run-plugins#readme",
+  "devDependencies": {
+    "@types/core-js": "^0.9.46",
+    "@types/node": "^10.1.4"
+  }
+}

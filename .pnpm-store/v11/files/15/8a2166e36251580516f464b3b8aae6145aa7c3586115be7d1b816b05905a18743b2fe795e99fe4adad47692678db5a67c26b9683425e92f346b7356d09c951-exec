@@ -1,0 +1,44 @@
+{
+  "name": "prepend-transform",
+  "version": "0.0.1019",
+  "description": "Prepend a string to beginning of each line of stdout/stderr.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "typings": "dist/index.d.ts",
+  "bin": {
+    "prepend_with": "dist/cli.js"
+  },
+  "scripts": {
+    "test": "suman test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ORESoftware/prepend-transform.git"
+  },
+  "keywords": [
+    "suman",
+    "test",
+    "prepend",
+    "stream",
+    "transform",
+    "stdout",
+    "stderr",
+    "stdio",
+    "pipe"
+  ],
+  "author": "Olegzandr VD",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/ORESoftware/prepend-transform/issues"
+  },
+  "homepage": "https://github.com/ORESoftware/prepend-transform#readme",
+  "devDependencies": {
+    "@types/node": "^8.0.1"
+  },
+  "dependencies": {
+    "chalk": "^2.4.1"
+  },
+  "r2g": {
+    "test": "echo 'noop'"
+  }
+}

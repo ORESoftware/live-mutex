@@ -1,0 +1,32 @@
+{
+  "name": "@oresoftware/safe-stringify",
+  "version": "0.0.111",
+  "description": "Safely stringify objects with recursive references.",
+  "main": "dist/main.js",
+  "types": "dist/main.d.ts",
+  "typings": "dist/main.d.ts",
+  "scripts": {
+    "test": "node test/simple.js",
+    "postinstall": "./assets/postinstall.sh"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ORESoftware/typescript-library-skeleton.git"
+  },
+  "keywords": [
+    "typescript",
+    "library",
+    "skeleton",
+    "scaffold"
+  ],
+  "author": "TODO Yo.Mama",
+  "license": "SEE LICENSE IN LICENSE.md",
+  "bugs": {
+    "url": "https://github.com/ORESoftware/typescript-library-skeleton/issues"
+  },
+  "homepage": "https://github.com/ORESoftware/typescript-library-skeleton#readme",
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^12.7.4"
+  }
+}

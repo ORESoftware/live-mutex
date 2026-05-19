@@ -1,0 +1,80 @@
+class IterableWMapFilter {
+    constructor(intialVals) {
+        this.vals = [];
+        this.operations = [];
+        for (const v in intialVals) {
+            this.vals.push(intialVals[v]);
+        }
+    }
+    add(v) {
+        this.vals.push(v);
+    }
+    map(fn) {
+        const ret = new IterableWMapFilter(this.vals.slice(0));
+        ret.operations = this.operations.concat({
+            next(value, done) {
+                if (done === true) {
+                    return { done: true, value: null };
+                }
+                return { done: false, value: fn(value) };
+            }
+        });
+        return ret;
+    }
+    filter(fn) {
+        const ret = new IterableWMapFilter(this.vals.slice(0));
+        ret.operations = this.operations.concat({
+            next(val, done) {
+                if (done === true) {
+                    return { done: true, value: null };
+                }
+                if (Boolean(fn(val))) {
+                    return { done: false, value: val };
+                }
+                else {
+                    return { done: false, ignore: true };
+                }
+            }
+        });
+        return ret;
+    }
+    next() {
+        if (this.vals.length < 1) {
+            return { done: true, value: null };
+        }
+        let n = this.vals.shift();
+        for (let v of this.operations) {
+            const z = v.next(n);
+            if (z.ignore === true) {
+                return this.next();
+            }
+            n = z.value;
+        }
+        return { done: false, value: n };
+    }
+    [Symbol.iterator]() {
+        return this;
+    }
+}
+const v = new IterableWMapFilter([1, 2, 3])
+    .filter((v) => {
+    return true;
+})
+    .map(v => {
+    return v + 11;
+});
+const z = v.filter((v) => {
+    return false;
+});
+v.add(4);
+v.add(5);
+v.add(6);
+z.add(4);
+z.add(5);
+z.add(6);
+for (let x of v) {
+    console.log('result from v:', x);
+}
+for (let x of z) {
+    console.log('result from z:', x);
+}

@@ -1,0 +1,7 @@
+import { JSONParser } from '@oresoftware/json-stream-parser';
+export interface IParsedObject {
+    [index: string]: any;
+}
+export declare const r2gSmokeTest: () => boolean;
+export declare const createParser: () => JSONParser<any>;
+export default createParser;

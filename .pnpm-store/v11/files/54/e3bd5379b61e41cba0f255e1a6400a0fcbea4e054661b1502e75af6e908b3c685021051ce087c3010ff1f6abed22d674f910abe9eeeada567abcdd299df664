@@ -1,0 +1,7 @@
+declare let http: any;
+declare let fs: any;
+declare let util: any;
+declare let Server: any;
+declare let io: any;
+declare let Transform: any;
+declare let Parser: any;

@@ -1,0 +1,6 @@
+'use strict';
+Object.defineProperty(exports, "__esModule", { value: true });
+const stdio = require("./main");
+process.argv.slice(2).forEach(v => {
+    stdio.log(v);
+});

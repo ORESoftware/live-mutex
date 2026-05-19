@@ -1,0 +1,19 @@
+exports.default = () => {
+    return {
+        exclusions: [
+            {
+                list: []
+            },
+            {
+                groups: [
+                    {
+                        list: []
+                    },
+                    {
+                        list: []
+                    }
+                ]
+            }
+        ]
+    };
+};
