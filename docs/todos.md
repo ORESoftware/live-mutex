@@ -4,7 +4,7 @@
 
 ### Convert `resolutions` object to Map
 
-**Status**: Pending  
+**Status**: Pending (updated 2026-05-20)ing (as of 2026-05-20)"  
 **Priority**: High  
 **Files Affected**: 
 - `src/client.ts`
