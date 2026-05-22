@@ -68,4 +68,4 @@ Remove the following deps from optionalDependencies:
 the former had a minor security vulnerability in the "extend" package
     
     
-----------------------------------------------------------
+----------------------------------------------------------# Live-Mutex Change-Log (Updated for Reader-Writer Locks feature branch bca9d481-fdcd-4586-aa98-b20ede600396 / task 1b84c549-34e5-4141-bf9a-d9796b3637c2) 2024-10-XX TBD release (v0.3.x+ or next minor)  * Added comprehensive support for Reader-Writer locks (read-preferring and write-preferring modes)  * New decision tree documentation for RW lock flows (acquire/release for readers/writers)  * Updated compilation guide and related docs  * Broker and client enhancements for rwStatus handling (BeginRead/EndRead, BeginWrite/EndWrite)  * Force options and queue management for exclusive write access  * Multi-reader concurrency with maxRead limits and write-key coordination   -------------------------------------------------------------  
