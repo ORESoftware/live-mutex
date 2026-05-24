@@ -1,7 +1,17 @@
 'use strict';
 
 
-import {routineEnter} from './routine';
+import {routineEnter, isOtelEnabled, setOtelEnabled} from './routine';
+
+/// Shared admin token used to gate `/admin/*` endpoints. Defaults to
+/// the literal string the user explicitly chose; operators can
+/// override via the `LMX_ADMIN_TOKEN` env var without rebuilding.
+/// Compared against the inbound `x-admin-token` header (or the
+/// `Authorization: Bearer …` header) on every admin request.
+function adminToken(): string {
+    const env = process.env.LMX_ADMIN_TOKEN;
+    return env && env.trim() ? env.trim() : 'all-dogs-go-to-heaven';
+}
 /**
  * Optional HTTP front-end for live-mutex.
  *
@@ -177,7 +187,60 @@ export class LMXHttpServer {
             return this.handleReleaseMany(body, res);
         }
 
+        // Admin surface — runtime OTel kill-switch. Authenticated by a
+        // simple shared-secret header (`x-admin-token`) so an operator
+        // can flip the flag without redeploying. The default token is
+        // the literal value baked in by request; override via the
+        // `LMX_ADMIN_TOKEN` env var in production.
+        if (path === '/admin/otel') {
+            if (!this.checkAdminAuth(req, res)) return;
+            if (method === 'GET') {
+                return this.respondJson(res, 200, {enabled: isOtelEnabled()});
+            }
+            if (method === 'POST') {
+                const body = await this.readJsonBody(req, res);
+                if (!body) return;
+                if (typeof body.enabled !== 'boolean') {
+                    return this.respondJson(res, 400, {
+                        error: '`enabled` is required and must be a boolean.',
+                    });
+                }
+                const previous = setOtelEnabled(body.enabled);
+                return this.respondJson(res, 200, {
+                    previous,
+                    enabled: isOtelEnabled(),
+                });
+            }
+            return this.respondJson(res, 405, {
+                error: `${method} not allowed on /admin/otel; use GET or POST.`,
+            });
+        }
+
         return this.respondJson(res, 404, {error: `No route for ${method} ${path}.`});
+    }
+
+    /// Validate the admin shared-secret on inbound requests to
+    /// `/admin/*`. Accepts either of:
+    ///
+    ///   - `x-admin-token: <token>`
+    ///   - `authorization: Bearer <token>`
+    ///
+    /// Returns `true` when the request is authorized; otherwise sends a
+    /// 401 response and returns `false`.
+    private checkAdminAuth(req: http.IncomingMessage, res: http.ServerResponse): boolean {
+        const routineId = 'ddl-routine-checkAdminAuth-Up7';
+        routineEnter(routineId, "LMXHttpServer.checkAdminAuth");
+        const expected = adminToken();
+        const headerToken = (req.headers['x-admin-token'] || '').toString().trim();
+        const authHeader = (req.headers['authorization'] || '').toString().trim();
+        const bearerToken = /^Bearer\s+(.+)$/i.exec(authHeader)?.[1]?.trim() || '';
+        if (headerToken === expected || bearerToken === expected) {
+            return true;
+        }
+        this.respondJson(res, 401, {
+            error: 'admin endpoint requires `x-admin-token` (or `Authorization: Bearer ...`).',
+        });
+        return false;
     }
 
     private async handleLock(body: any, res: http.ServerResponse): Promise<void> {

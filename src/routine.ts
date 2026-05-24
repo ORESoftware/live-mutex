@@ -95,6 +95,14 @@ const SERVICE_NAME_DEFAULT = 'live-mutex';
 
 let otelInitialised = false;
 let cachedTracer: Tracer | null = null;
+/// Runtime kill-switch for OTel span emission. Toggled by
+/// `setOtelEnabled` (called from the broker's HTTP admin endpoint
+/// `POST /admin/otel`). When `false`, `routineEnter` skips the OTel
+/// `startSpan`/`end` pair entirely — stdout logging continues
+/// regardless. Default `false` until `initOtel()` confirms an OTLP
+/// exporter has been wired up; flipping the flag without a configured
+/// exporter is harmless (spans go to the no-op tracer either way).
+let otelEnabled = false;
 
 /** Internal: lazy tracer accessor. Falls back to the no-op tracer if OTel isn't configured. */
 function getTracer(): Tracer {
@@ -126,13 +134,17 @@ export function routineEnter(routineId: string, codeFunction: string): void {
     `lmx routine: routineId=${routineId} fn=${codeFunction} event=enter\n`,
   );
 
-  // 2. OTel span. `startSpan` (NOT `startActiveSpan`) returns a brand-new
-  //    span without making it the active context. No AsyncLocalStorage
-  //    write, no async_hooks subscription, no monkey-patching. When OTel
-  //    isn't initialised, this is a no-op via the API package's default
-  //    no-op tracer. We end the span synchronously to keep its lifetime
-  //    confined to the entry event itself — it documents that the
-  //    function fired, it does not enclose the rest of the body.
+  // 2. OTel span — gated on the runtime kill-switch `otelEnabled`. When
+  //    off, we skip the startSpan/end pair entirely so there is zero
+  //    OTel touch per call (no allocation, no batch-processor enqueue,
+  //    no spec-time collection). Operators flip this flag at runtime via
+  //    the `POST /admin/otel` HTTP endpoint without restarting the
+  //    process. We use `startSpan` (NOT `startActiveSpan`) so even when
+  //    enabled the span is a leaf — no AsyncLocalStorage write, no
+  //    async_hooks subscription, no monkey-patching.
+  if (!otelEnabled) {
+    return;
+  }
   const span = getTracer().startSpan('routine', {
     attributes: {
       'routine_id': routineId,
@@ -141,6 +153,32 @@ export function routineEnter(routineId: string, codeFunction: string): void {
   });
   span.setStatus({ code: SpanStatusCode.OK });
   span.end();
+}
+
+/**
+ * Runtime kill-switch for OTel span emission. Returns the previous
+ * value so callers (e.g. the HTTP admin endpoint) can include it in
+ * an audit log.
+ *
+ * Safe to call any time — before or after `initOtel()`, with or
+ * without a configured OTLP exporter. When called with `enabled=true`
+ * but no exporter is wired up, spans are emitted to the API package's
+ * no-op tracer and quietly discarded.
+ */
+export function setOtelEnabled(enabled: boolean): boolean {
+  const fnRoutineId = 'ddl-routine-setOtelEnabled-Tg5';
+  const previous = otelEnabled;
+  otelEnabled = !!enabled;
+  process.stdout.write(
+    `lmx otel: ${fnRoutineId} fn=setOtelEnabled previous=${previous} next=${otelEnabled}\n`,
+  );
+  return previous;
+}
+
+/** Read-only accessor for the current runtime kill-switch state. */
+export function isOtelEnabled(): boolean {
+  const fnRoutineId = 'ddl-routine-isOtelEnabled-Bf8';
+  return otelEnabled;
 }
 
 /**
@@ -226,9 +264,14 @@ export function initOtel(): void {
   trace.setGlobalTracerProvider(provider);
 
   otelInitialised = true;
+  // Default the runtime kill-switch to ON now that an exporter is
+  // wired up. Operators can disable via `POST /admin/otel` without
+  // restarting; the flag is the only thing controlling whether spans
+  // actually get created in `routineEnter`.
+  otelEnabled = true;
 
   process.stdout.write(
-    `lmx otel: OTLP exporter installed -> ${endpoint} (service=${serviceName}, no-monkey-patch mode)\n`,
+    `lmx otel: OTLP exporter installed -> ${endpoint} (service=${serviceName}, no-monkey-patch mode, runtime kill-switch=on)\n`,
   );
 }
 
