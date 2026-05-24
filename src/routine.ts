@@ -16,6 +16,32 @@
  *      it flows through OTLP into observability backends with no extra
  *      work at the call site.
  *
+ * ## Zero-monkey-patching policy (Node.js)
+ *
+ * This module deliberately avoids every OTel feature that would install
+ * a global hook into Node's runtime. Specifically:
+ *
+ *   - We use `BasicTracerProvider` from `@opentelemetry/sdk-trace-base`,
+ *     **not** `NodeTracerProvider` from `@opentelemetry/sdk-trace-node`.
+ *     `NodeTracerProvider.register()` would install an
+ *     `AsyncHooksContextManager` (or `AsyncLocalStorageContextManager`),
+ *     register W3C trace-context + baggage propagators globally, and on
+ *     newer SDKs subscribe to Node `async_hooks`. We don't need any of
+ *     that for our use-case (one-shot spans at function entry — no
+ *     parent/child propagation across `await` boundaries).
+ *   - We wire the provider via `trace.setGlobalTracerProvider(provider)`
+ *     directly, never via `provider.register(...)`. This keeps the
+ *     install footprint to just "the global tracer factory now points at
+ *     our provider"; nothing else in Node's runtime is touched.
+ *   - We do not import or register any auto-instrumentation
+ *     (`@opentelemetry/instrumentation`, `auto-instrumentations-node`,
+ *     etc.). Nothing in this process gets monkey-patched. HTTP, fs,
+ *     dns, child_process, gRPC client modules — all stay original.
+ *
+ * If a future change ever needs cross-`await` parent-span propagation,
+ * the right move is to make that *opt-in* (a separate explicit
+ * initialiser the caller has to invoke) — never default-on.
+ *
  * ## Usage
  *
  * Every top-level function should start with a single line:
@@ -30,27 +56,27 @@
  * }
  * ```
  *
- * `routineEnter` does three things synchronously:
+ * `routineEnter` does two things synchronously:
  *
- *   - Writes a single line to stdout in the existing `chalk` style so plain
- *     log readers (`kubectl logs`, `grep`) see the entry.
+ *   - Writes a single line to stdout in plain text so log readers
+ *     (`kubectl logs`, `grep`) see the entry without any colour codes.
  *   - Starts a one-shot OTel span named `routine` with attributes
- *     `routine_id=<id>` and `code.function=<fnName>`, then immediately ends
- *     it. The span's brief lifetime keeps the parent OTel context untouched
- *     (so nested fns still attribute to whichever ambient span is active),
- *     while still surfacing the routine entry as a real, exportable span
- *     for OTel-aware viewers.
- *   - When OTel isn't initialised (e.g. tests, no `OTEL_EXPORTER_OTLP_ENDPOINT`
- *     env var), the span call is a no-op via `@opentelemetry/api`'s default
- *     no-op tracer.
+ *     `routine_id=<id>` and `code.function=<fnName>`, then immediately
+ *     ends it. Because we never enter the span as the active context,
+ *     there is no async-context tracking, no AsyncLocalStorage, no
+ *     async_hooks involvement. The span is recorded as a leaf event.
+ *   - When OTel isn't initialised (e.g. tests, no
+ *     `OTEL_EXPORTER_OTLP_ENDPOINT` env var), the span call is a no-op
+ *     via `@opentelemetry/api`'s default no-op tracer.
  *
  * ## OTel exporter
  *
  * `initOtel()` is called from the broker entrypoint
- * (`lm-start-server.ts`). It checks `OTEL_EXPORTER_OTLP_ENDPOINT`; when set,
- * it installs a Node SDK Tracer Provider with an OTLP/gRPC exporter. When
- * unset, it installs nothing — the default no-op tracer takes over and
- * `routineEnter` becomes a stdout-only operation.
+ * (`lm-start-server.ts`). It checks `OTEL_EXPORTER_OTLP_ENDPOINT`; when
+ * set, it installs a basic tracer provider + OTLP/gRPC exporter and
+ * points the global `trace` API at it. When unset, it installs nothing
+ * — the default no-op tracer takes over and `routineEnter` becomes a
+ * stdout-only operation.
  *
  * Idempotent: subsequent calls to `initOtel()` after the first are
  * silently ignored.
@@ -59,7 +85,6 @@
 import {
   trace,
   Tracer,
-  Span,
   SpanStatusCode,
   diag,
   DiagConsoleLogger,
@@ -101,10 +126,13 @@ export function routineEnter(routineId: string, codeFunction: string): void {
     `lmx routine: routineId=${routineId} fn=${codeFunction} event=enter\n`,
   );
 
-  // 2. OTel span. `startSpan` returns a no-op span when OTel isn't
-  //    initialised, so this is safe to call unconditionally. We end the
-  //    span synchronously to keep its lifetime confined to fn entry — it
-  //    documents the entry event, it does not enclose the rest of the body.
+  // 2. OTel span. `startSpan` (NOT `startActiveSpan`) returns a brand-new
+  //    span without making it the active context. No AsyncLocalStorage
+  //    write, no async_hooks subscription, no monkey-patching. When OTel
+  //    isn't initialised, this is a no-op via the API package's default
+  //    no-op tracer. We end the span synchronously to keep its lifetime
+  //    confined to the entry event itself — it documents that the
+  //    function fired, it does not enclose the rest of the body.
   const span = getTracer().startSpan('routine', {
     attributes: {
       'routine_id': routineId,
@@ -125,6 +153,15 @@ export function routineEnter(routineId: string, codeFunction: string): void {
  *
  * The SDK is loaded lazily so a caller that never sets the OTLP endpoint
  * env var doesn't pay the SDK startup cost.
+ *
+ * Wiring strategy is the minimal one possible: construct a
+ * `BasicTracerProvider`, attach a `BatchSpanProcessor`+OTLP/gRPC exporter,
+ * and point the global tracer factory at it via
+ * `trace.setGlobalTracerProvider`. We deliberately do **not** call
+ * `provider.register(...)` because that's the call that would install an
+ * async-context manager and trace-context propagators — i.e. the call
+ * that would let OTel observe Node internals. See the file header for
+ * the full no-monkey-patching rationale.
  */
 export function initOtel(): void {
   const routineId = 'ddl-routine-initOtel-Vq8wzKp';
@@ -153,10 +190,9 @@ export function initOtel(): void {
   const { Resource } = require('@opentelemetry/resources');
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const {
-    NodeTracerProvider,
-  } = require('@opentelemetry/sdk-trace-node');
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { BatchSpanProcessor } = require('@opentelemetry/sdk-trace-base');
+    BasicTracerProvider,
+    BatchSpanProcessor,
+  } = require('@opentelemetry/sdk-trace-base');
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const {
     OTLPTraceExporter,
@@ -178,14 +214,21 @@ export function initOtel(): void {
   });
 
   const exporter = new OTLPTraceExporter({ url: endpoint });
-  const provider = new NodeTracerProvider({ resource });
+  const provider = new BasicTracerProvider({ resource });
   provider.addSpanProcessor(new BatchSpanProcessor(exporter));
-  provider.register();
+
+  // Point the global API at our provider WITHOUT calling
+  // `provider.register(...)`. `register()` is the entry point that
+  // would install a Node-specific context manager (async_hooks /
+  // AsyncLocalStorage) and the W3C trace-context propagator globally —
+  // exactly the kind of monkey-patching this module exists to avoid.
+  // `setGlobalTracerProvider` only updates the tracer factory pointer.
+  trace.setGlobalTracerProvider(provider);
 
   otelInitialised = true;
 
   process.stdout.write(
-    `lmx otel: OTLP exporter installed -> ${endpoint} (service=${serviceName})\n`,
+    `lmx otel: OTLP exporter installed -> ${endpoint} (service=${serviceName}, no-monkey-patch mode)\n`,
   );
 }
 
@@ -198,8 +241,7 @@ export async function shutdownOtel(): Promise<void> {
   const routineId = 'ddl-routine-shutdownOtel-Hl3';
   routineEnter(routineId, 'shutdownOtel');
   if (!otelInitialised) return;
-  // The provider is registered globally via `provider.register()`; recover
-  // it from the global API surface and call `shutdown()` if available.
+  // Recover the registered provider and call `shutdown()` if available.
   const provider: any = (trace as any).getTracerProvider();
   if (provider && typeof provider.shutdown === 'function') {
     try {
@@ -212,71 +254,4 @@ export async function shutdownOtel(): Promise<void> {
       );
     }
   }
-}
-
-/**
- * Wrap a sync or async function body in an OTel span that *encloses* the
- * full body (unlike `routineEnter`, which is a brief one-shot span).
- *
- * Useful for the broker's request handlers, where you want all child
- * operations (queue pushes, response writes) to attribute to the same
- * parent span.
- *
- * ```ts
- * export async function handleAcquire(req: AcquireRequest) {
- *   const routineId = 'ddl-routine-handleAcquire-…';
- *   return withRoutineSpan(routineId, 'handleAcquire', async () => {
- *     // body
- *   });
- * }
- * ```
- */
-export function withRoutineSpan<T>(
-  routineId: string,
-  codeFunction: string,
-  fn: (span: Span) => T,
-): T {
-  const fnRoutineId = 'ddl-routine-withRoutineSpan-Op4';
-  routineEnter(routineId, codeFunction);
-  return getTracer().startActiveSpan(
-    `routine:${codeFunction}`,
-    {
-      attributes: {
-        'routine_id': routineId,
-        'code.function': codeFunction,
-      },
-    },
-    (span) => {
-      try {
-        const result = fn(span);
-        if (result instanceof Promise) {
-          return result
-            .then((v) => {
-              span.setStatus({ code: SpanStatusCode.OK });
-              return v;
-            })
-            .catch((err) => {
-              span.recordException(err as Error);
-              span.setStatus({
-                code: SpanStatusCode.ERROR,
-                message: (err as Error)?.message,
-              });
-              throw err;
-            })
-            .finally(() => span.end()) as unknown as T;
-        }
-        span.setStatus({ code: SpanStatusCode.OK });
-        span.end();
-        return result;
-      } catch (err) {
-        span.recordException(err as Error);
-        span.setStatus({
-          code: SpanStatusCode.ERROR,
-          message: (err as Error)?.message,
-        });
-        span.end();
-        throw err;
-      }
-    },
-  );
 }

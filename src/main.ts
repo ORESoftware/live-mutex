@@ -11,7 +11,7 @@ export {Broker, LMXBroker, LvMtxBroker} from './broker';
 export {Broker1, LMXBroker as LMXBroker1, LvMtxBroker as LvMtxBroker1} from './broker-1';
 export {LMXHttpServer} from './http-server';
 export {InProcessBridge} from './in-process-bridge';
-export {routineEnter, withRoutineSpan, initOtel, shutdownOtel} from './routine';
+export {routineEnter, initOtel, shutdownOtel} from './routine';
 
 export {LMXLockRequestError, LMXUnlockRequestError} from "./shared-internal";
 export {LMXClientException, LMXClientLockException, LMXClientUnlockException} from "./exceptions";

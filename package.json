@@ -62,7 +62,6 @@
     "@opentelemetry/exporter-trace-otlp-grpc": "^0.55.0",
     "@opentelemetry/resources": "^1.28.0",
     "@opentelemetry/sdk-trace-base": "^1.28.0",
-    "@opentelemetry/sdk-trace-node": "^1.28.0",
     "@opentelemetry/semantic-conventions": "^1.28.0",
     "@oresoftware/json-stream-parser": "0.0.124",
     "@oresoftware/linked-queue": "^2.2.13",
