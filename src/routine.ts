@@ -90,6 +90,7 @@ import {
   DiagConsoleLogger,
   DiagLogLevel,
 } from '@opentelemetry/api';
+import { isLogLevelEnabled } from './log-level';
 
 const SERVICE_NAME_DEFAULT = 'live-mutex';
 
@@ -130,9 +131,17 @@ export function routineEnter(routineId: string, codeFunction: string): void {
   //    so it has zero `console.*` overhead in tests that pipe stdout to a
   //    file. No chalk colours: this can run in test/non-tty contexts where
   //    ANSI escape codes would corrupt downstream parsers.
-  process.stdout.write(
-    `lmx routine: routineId=${routineId} fn=${codeFunction} event=enter\n`,
-  );
+  //
+  //    Gated on the runtime log level (see `src/log-level.ts` and the
+  //    `POST /admin/log-level` endpoint). The line is classified as
+  //    `info` so the default level still emits it; setting the level
+  //    to `silent`, `error`, or `warn` at runtime quiets it without a
+  //    restart.
+  if (isLogLevelEnabled('info')) {
+    process.stdout.write(
+      `lmx routine: routineId=${routineId} fn=${codeFunction} event=enter\n`,
+    );
+  }
 
   // 2. OTel span — gated on the runtime kill-switch `otelEnabled`. When
   //    off, we skip the startSpan/end pair entirely so there is zero
@@ -169,9 +178,11 @@ export function setOtelEnabled(enabled: boolean): boolean {
   const fnRoutineId = 'ddl-routine-setOtelEnabled-Tg5';
   const previous = otelEnabled;
   otelEnabled = !!enabled;
-  process.stdout.write(
-    `lmx otel: ${fnRoutineId} fn=setOtelEnabled previous=${previous} next=${otelEnabled}\n`,
-  );
+  if (isLogLevelEnabled('info')) {
+    process.stdout.write(
+      `lmx otel: ${fnRoutineId} fn=setOtelEnabled previous=${previous} next=${otelEnabled}\n`,
+    );
+  }
   return previous;
 }
 
