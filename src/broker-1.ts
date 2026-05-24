@@ -181,7 +181,21 @@ export interface NotifyObj {
     uuid: string,
     pid: number,
     ttl: number,
-    keepLocksAfterDeath: boolean
+    keepLocksAfterDeath: boolean,
+    /// Optional `acquire-many` membership. When set, this waiter is part
+    /// of an `acquireMany` request that wants ALL `allKeys` granted
+    /// atomically (union semantics, not a composite intersection lock).
+    /// The waiter is queued on the FIRST key it finds contended; on each
+    /// progress event for that key, `ensureNewLockHolder` dequeues the
+    /// waiter and re-attempts the WHOLE composite. If any other member
+    /// key is still taken, the attempt rolls back its provisional grants
+    /// and re-queues the waiter on the new contended key. The
+    /// pre-allocated `compositeLockUuid` is reused across attempts so
+    /// the client sees a stable identifier.
+    acquireMany?: {
+        allKeys: string[],
+        compositeLockUuid: string
+    }
 }
 
 
@@ -1402,6 +1416,17 @@ export class Broker1 {
                 break;
             }
 
+            // Multi-key (`acquire-many`) waiter: re-attempt the WHOLE
+            // composite atomically. Either grants all member keys (and
+            // emits `acquired:true`), or rolls back this attempt and
+            // re-queues the waiter on the new contended key. Either way
+            // it's terminal for this iteration of the drain loop, so we
+            // `continue` to consider the next waiter.
+            if (n.acquireMany) {
+                this.tryGrantAcquireManyFromQueue(n);
+                continue;
+            }
+
             // Found a valid client - grant them the lock
             const ws = n.ws;
             const ttl = n.ttl;
@@ -1709,6 +1734,124 @@ export class Broker1 {
         }
     }
 
+    /// Atomically grant a queued `acquire-many` waiter ALL of its member
+    /// keys, or roll back and re-queue on the new contended key.
+    ///
+    /// Called from `ensureNewLockHolder` after dequeueing a waiter whose
+    /// `n.acquireMany` is set. Walks the waiter's `allKeys` in their
+    /// canonical (sorted) order. If every key has a free slot, grants
+    /// all of them under a single `compositeLockUuid` and emits
+    /// `acquired:true`. If any key is still contended, rolls back the
+    /// provisional grants made inside this attempt and re-queues the
+    /// waiter on the new contended key — `ensureNewLockHolder` will
+    /// re-enter here when that key frees up.
+    ///
+    /// The pre-allocated `compositeLockUuid` is reused across attempts
+    /// so the client sees a stable identifier across `acquired:false`
+    /// → `acquired:true` transitions.
+    private tryGrantAcquireManyFromQueue(n: NotifyObj): void {
+        const routineId = 'ddl-routine-tryGrantAcquireMany-Yp4';
+        routineEnter(routineId, "Broker1.tryGrantAcquireManyFromQueue");
+
+        if (!n.acquireMany) {
+            // Defensive: caller checked `n.acquireMany` already, but be
+            // explicit so a refactor can't silently lose this contract.
+            return;
+        }
+        const allKeys = n.acquireMany.allKeys;
+        const compositeLockUuid = n.acquireMany.compositeLockUuid;
+        const ws = n.ws;
+        const uuid = n.uuid;
+        const pid = n.pid;
+        const ttl = n.ttl;
+        const keepLocksAfterDeath = n.keepLocksAfterDeath || false;
+
+        const grantedKeys: string[] = [];
+        const fencingTokens: Record<string, number> = {};
+        const holderUuids: Record<string, string> = {};
+        let contendedKey: string | null = null;
+
+        for (const k of allKeys) {
+            let lckK = this.locks.get(k);
+            if (!lckK) {
+                lckK = this.getDefaultLockObject(k, keepLocksAfterDeath, 1);
+                this.locks.set(k, lckK);
+            }
+            const count = lckK.lockholders.size;
+            const max = lckK.max;
+            if (count >= max) {
+                contendedKey = k;
+                break;
+            }
+            const holderUuid = uuidV4();
+            lckK.timestampEmptied = null;
+            lckK.nextFencingToken++;
+            const token = lckK.nextFencingToken;
+            const expiresAt = ttl === Infinity ? Infinity : Date.now() + ttl;
+            lckK.lockholders.set(holderUuid, {
+                pid,
+                ws,
+                uuid: holderUuid,
+                fencingToken: token,
+                compositeLockUuid,
+                expiresAt
+            });
+            if (expiresAt !== Infinity) {
+                this.holderDeadlines.set(holderUuid, { key: k, expiresAt, holderUuid });
+            }
+            if (!this.wsToKeys.has(ws)) {
+                this.wsToKeys.set(ws, {});
+            }
+            this.wsToKeys.get(ws)[k] = true;
+            grantedKeys.push(k);
+            fencingTokens[k] = token;
+            holderUuids[k] = holderUuid;
+        }
+
+        if (contendedKey) {
+            // Roll back provisional grants — they belong to no caller
+            // now. We're about to re-queue the waiter on the new
+            // contended key.
+            for (const gk of grantedKeys) {
+                const lckG = this.locks.get(gk);
+                const holderId = holderUuids[gk];
+                if (lckG && holderId) {
+                    this.holderDeadlines.delete(holderId);
+                    lckG.lockholders.delete(holderId);
+                }
+            }
+            let lckC = this.locks.get(contendedKey);
+            if (!lckC) {
+                lckC = this.getDefaultLockObject(contendedKey, keepLocksAfterDeath, 1);
+                this.locks.set(contendedKey, lckC);
+            }
+            const alreadyQueuedResult = lckC.notify.get(uuid) as [string, NotifyObj] | [typeof IsVoid] | undefined;
+            const alreadyQueued = alreadyQueuedResult && !IsVoid.check(alreadyQueuedResult[0]);
+            if (!alreadyQueued) {
+                lckC.notify.enqueue(uuid, n);
+            }
+            return;
+        }
+
+        // All keys granted — register the composite + emit
+        // `acquired:true`. Mirrors the immediate-grant path in
+        // `acquireMany` so cross-runtime clients see the same shape
+        // regardless of whether they were queued.
+        this.compositeLocks.set(compositeLockUuid, {
+            keys: allKeys,
+            holderUuids: new Map(Object.entries(holderUuids)),
+            fencingTokens: new Map(Object.entries(fencingTokens))
+        });
+        this.send(ws, {
+            type: 'acquire-many',
+            uuid,
+            keys: allKeys,
+            acquired: true,
+            lockUuid: compositeLockUuid,
+            fencingTokens
+        });
+    }
+
     /// `acquire-many` — atomic acquisition of N keys (union semantics:
     /// the caller wants ALL keys held simultaneously, but unlike a
     /// composite intersection-lock it's modelled as N independent
@@ -1716,10 +1859,15 @@ export class Broker1 {
     ///
     /// Implementation acquires keys in **sorted order** to prevent
     /// deadlock between concurrent multi-key requests. If any key
-    /// can't be granted immediately, the whole request queues on
-    /// the first contended key (rolling back keys we already grabbed
-    /// inside this attempt). This keeps progressive grant simple and
-    /// matches the broker's existing per-key queueing primitive.
+    /// can't be granted immediately, the request is **queued on the
+    /// first contended key** (rolling back keys we already grabbed
+    /// inside this attempt). When that key eventually frees up,
+    /// `ensureNewLockHolder` re-enters `tryGrantAcquireManyFromQueue`
+    /// to re-attempt the whole composite; if a *different* key is
+    /// now contended, the waiter is re-queued there. The pre-
+    /// allocated `compositeLockUuid` is reused across attempts so the
+    /// client sees a stable identifier from the initial
+    /// `acquired:false` frame to the final `acquired:true`.
     acquireMany(data: any, ws: LMXSocket) {
         const routineId = 'ddl-routine-MWp8lto7T7ST6_IQF-';
         routineEnter(routineId, "Broker1.acquireMany");
@@ -1790,13 +1938,41 @@ export class Broker1 {
                         }
                     }
                 }
+                // Queue the waiter on the contended key so a future
+                // release on `k` triggers a re-attempt. This is what
+                // turns `acquired:false` into a *queued* response: the
+                // client library waits for a follow-up `acquired:true`
+                // frame, and `ensureNewLockHolder` is responsible for
+                // emitting it. Pre-allocate the lock object if missing
+                // so we don't drop the waiter on the floor.
+                let contendedLock = this.locks.get(k);
+                if (!contendedLock) {
+                    contendedLock = this.getDefaultLockObject(k, keepLocksAfterDeath, 1);
+                    this.locks.set(k, contendedLock);
+                }
+                const ttlForNotify: number = ttl === Infinity ? Infinity : (ttl || this.lockExpiresAfter);
+                const alreadyQueuedResult = contendedLock.notify.get(uuid) as [string, NotifyObj] | [typeof IsVoid] | undefined;
+                const alreadyQueued = alreadyQueuedResult && !IsVoid.check(alreadyQueuedResult[0]);
+                if (!alreadyQueued) {
+                    contendedLock.notify.enqueue(uuid, {
+                        ws,
+                        uuid,
+                        pid,
+                        ttl: ttlForNotify,
+                        keepLocksAfterDeath,
+                        acquireMany: {
+                            allKeys: keys,
+                            compositeLockUuid
+                        }
+                    });
+                }
                 return this.send(ws, {
                     type: 'acquire-many',
                     uuid,
                     keys,
                     acquired: false,
                     contendedKey: k,
-                    lockRequestCount: existing ? existing.notify.length : 0
+                    lockRequestCount: contendedLock.notify.length
                 });
             }
             // Grant `k` immediately. Mint a per-key holder uuid so each
