@@ -1,5 +1,7 @@
 'use strict';
 
+
+import {routineEnter} from './routine';
 import * as util from "util";
 import {LMXLockRequestError, LMXUnlockRequestError} from "./shared-internal";
 import {LMXClientError} from "./shared-internal";
@@ -15,6 +17,8 @@ export class LMXClientException {
   originalError: any;
   
   constructor(key: string, id: string, code: LMXClientError, message: string, originalError:any) {
+    const routineId = 'ddl-routine-wE054QKEBKlG02y40b';
+    routineEnter(routineId, "LMXClientException.constructor");
     this.id = id;
     this.key = key;
     this.code = code;
@@ -38,6 +42,8 @@ export class LMXClientLockException extends Error {
   id: string;
 
   constructor(key: string, id: string, code: LMXLockRequestError, message: string) {
+    const routineId = 'ddl-routine-9txeQhZtHSb59vuaYW';
+    routineEnter(routineId, "LMXClientLockException.constructor");
     super(message);
     this.name = 'LMXClientLockException';
     this.id = id;
@@ -63,6 +69,8 @@ export class LMXClientUnlockException extends Error {
   id: string;
 
   constructor(key: string, id: string, code: LMXUnlockRequestError, message: string) {
+    const routineId = 'ddl-routine-eihZdNvGAgpiuuPN_U';
+    routineEnter(routineId, "LMXClientUnlockException.constructor");
     super(message);
     this.name = 'LMXClientUnlockException';
     this.id = id;

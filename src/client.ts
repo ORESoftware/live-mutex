@@ -1,5 +1,7 @@
 'use strict';
 
+
+import {routineEnter} from './routine';
 //core
 import * as util from 'util';
 import * as assert from 'assert';
@@ -136,13 +138,19 @@ export interface LMXClientUnlockOpts {
 
 export interface LMLockSuccessData {
   (fn?: LMClientUnlockCallBack): void
-  
+
   acquired: true,
   key: string,
   unlock: LMLockSuccessData,
   lockUuid: string,
   readersCount: number,
-  id: string
+  id: string,
+  /// Per-key monotonic fencing token assigned by the broker on grant.
+  /// `null` when talking to a broker that pre-dates fencing-token
+  /// support (any older broker — the field has been added in this
+  /// improvement series). Strictly greater than every previous token
+  /// for the same key, so callers can detect stale handoffs.
+  fencingToken: number | null
 }
 
 export interface LMUnlockSuccessData {
@@ -200,6 +208,8 @@ export class Client {
   recovering = false;
   
   constructor(o?: Partial<ClientOpts>, cb?: LMClientCallBack) {
+    const routineId = 'ddl-routine-cJX87kyewufP2RKyfQ';
+    routineEnter(routineId, "Client.constructor");
     
     this.isOpen = false;
     const opts = this.opts = o || {};
@@ -626,22 +636,32 @@ export class Client {
   };
   
   private onSocketDestroy(err: any) {
+    const routineId = 'ddl-routine-VDHbcd4GWBPB5UkEbO';
+    routineEnter(routineId, "Client.onSocketDestroy");
     log.info('Socket destroy callback error:', err);
   }
   
   static create(opts?: Partial<ClientOpts>): Client {
+    const routineId = 'ddl-routine-houXYhJwF3HUXlrAP1';
+    routineEnter(routineId, "Client.create");
     return new Client(opts);
   }
   
   getConnectionInterface() {
+    const routineId = 'ddl-routine-qTLVY207Rg_Fo_8Fel';
+    routineEnter(routineId, "Client.getConnectionInterface");
     return this.socketFile || this.port;
   }
   
   getConnectionInterfaceStr() {
+    const routineId = 'ddl-routine-hqRGNbmVMiWwp_-JXS';
+    routineEnter(routineId, "Client.getConnectionInterfaceStr");
     return this.socketFile ? `socket-file: ${this.socketFile}` : `host:port '${this.getHost()}:${this.getPort()}'`
   }
   
   private _fireCallbacksPrematurely(originalErr: any) {
+    const routineId = 'ddl-routine-YmHcsp3bXPZGFzzKyn';
+    routineEnter(routineId, "Client._fireCallbacksPrematurely");
     
     for (const k of Object.keys(this.timers)) {
       clearTimeout(this.timers[k]);
@@ -668,12 +688,16 @@ export class Client {
   }
   
   setNoRecover() {
+    const routineId = 'ddl-routine-DZJgWzWcwQQ1gk8Kzr';
+    routineEnter(routineId, "Client.setNoRecover");
     this.noRecover = true;
   }
   
   requestLockInfo(key: string, cb: EVCb<any>): void;
   requestLockInfo(key: string, opts: any, cb: EVCb<any>): void;
   requestLockInfo(key: string, opts: any | EVCb<any>, cb?: EVCb<any>) {
+    const routineId = 'ddl-routine-Gmfh1lWNESF4Mw1rKH';
+    routineEnter(routineId, "Client.requestLockInfo");
     
     assert.equal(typeof key, 'string', 'Key passed to lmx#lock needs to be a string.');
     
@@ -728,6 +752,8 @@ export class Client {
   }
   
   acquire(key: string, opts?: Partial<LMXClientLockOpts>): Promise<LMLockSuccessData> {
+    const routineId = 'ddl-routine-hqVI_DRtfkb16cfMU2';
+    routineEnter(routineId, "Client.acquire");
   
     return new Promise((resolve, reject) => {
       try {
@@ -745,6 +771,8 @@ export class Client {
   }
   
   release(key: string, opts?: string | boolean | Partial<LMXClientUnlockOpts>): Promise<LMUnlockSuccessData> {
+    const routineId = 'ddl-routine-F2rCOwh5gJ--taGlQu';
+    routineEnter(routineId, "Client.release");
 
     return new Promise((resolve, reject) => {
       try {
@@ -761,24 +789,34 @@ export class Client {
   }
   
   lockp(key: string, opts?: Partial<LMXClientLockOpts>): Promise<LMLockSuccessData> {
+    const routineId = 'ddl-routine-LYUCbmrC2IYbWswhku';
+    routineEnter(routineId, "Client.lockp");
     log.warn('lockp is deprecated because it is a confusing method name, use aliases acquire/acquireLock instead.');
     return this.acquire.apply(this, <any>arguments);
   }
   
   unlockp(key: string, opts?: string | boolean | Partial<LMXClientUnlockOpts>): Promise<LMUnlockSuccessData> {
+    const routineId = 'ddl-routine-LUSwjyw8cjfDZluBtz';
+    routineEnter(routineId, "Client.unlockp");
     log.warn('unlockp is deprecated because it is a confusing method name, use aliases release/releaseLock instead.');
     return this.release.apply(this, <any>arguments);
   }
   
   acquireLock(key: string, opts?: boolean | number | Partial<LMXClientLockOpts>): Promise<LMLockSuccessData> {
+    const routineId = 'ddl-routine-GaQi9J7j73mynXf0JQ';
+    routineEnter(routineId, "Client.acquireLock");
     return this.acquire.apply(this, <any>arguments);
   }
   
   releaseLock(key: string, opts: Partial<LMXClientUnlockOpts>): Promise<LMUnlockSuccessData> {
+    const routineId = 'ddl-routine-LluuH-JwBQYk7OH7vZ';
+    routineEnter(routineId, "Client.releaseLock");
     return this.release.apply(this, <any>arguments);
   }
   
   run(fn: LMLockSuccessData) {
+    const routineId = 'ddl-routine-G60fFu_gUUSWGFtnhV';
+    routineEnter(routineId, "Client.run");
     return new Promise((resolve, reject) => {
       fn((err, val) => {
         err ? reject(err) : resolve(val);
@@ -787,14 +825,20 @@ export class Client {
   }
   
   runUnlock(fn: LMLockSuccessData): Promise<any> {
+    const routineId = 'ddl-routine-JgtiE3iS6ZERb7ZA_h';
+    routineEnter(routineId, "Client.runUnlock");
     return this.run.apply(this, arguments);
   }
   
   execUnlock(fn: LMLockSuccessData): Promise<any> {
+    const routineId = 'ddl-routine-Ki_wKeoF6honAUBaQ9';
+    routineEnter(routineId, "Client.execUnlock");
     return this.run.apply(this, arguments);
   }
   
   protected cleanUp(uuid: string) {
+    const routineId = 'ddl-routine-JbESUQtknxRBjHVzhw';
+    routineEnter(routineId, "Client.cleanUp");
     clearTimeout(this.timers[uuid]);
     delete this.timers[uuid];
     delete this.timeouts[uuid];
@@ -802,6 +846,8 @@ export class Client {
   }
   
   protected fireUnlockCallbackWithError(cb: LMClientUnlockCallBack, isNextTick: boolean, err: LMXClientUnlockException) {
+    const routineId = 'ddl-routine-s3NqgEpvd5Mtr7bi83';
+    routineEnter(routineId, "Client.fireUnlockCallbackWithError");
     const uuid = err.id;
     const key = err.key; // unused
     this.cleanUp(uuid);
@@ -816,6 +862,8 @@ export class Client {
   }
   
   protected fireLockCallbackWithError(cb: LMClientLockCallBack, isNextTick: boolean, err: LMXClientLockException) {
+    const routineId = 'ddl-routine-pvtgTr9CPkfs-gORoi';
+    routineEnter(routineId, "Client.fireLockCallbackWithError");
     const uuid = err.id;
     const key = err.key;  // unused
     this.cleanUp(uuid);
@@ -829,6 +877,8 @@ export class Client {
   }
   
   protected fireCallbackWithError(cb: EVCb<any>, isNextTick: boolean, err: LMXClientException) {
+    const routineId = 'ddl-routine-DNQg3e4m4wIEsS9VAF';
+    routineEnter(routineId, "Client.fireCallbackWithError");
     const uuid = err.id;
     const key = err.key;  // unused
     this.cleanUp(uuid);
@@ -845,6 +895,8 @@ export class Client {
   ls(opts: any, cb?: EVCb<any>): void;
   
   ls(opts: any, cb?: EVCb<any>) {
+    const routineId = 'ddl-routine-raSapijwcQc1NV2VfA';
+    routineEnter(routineId, "Client.ls");
     
     if (typeof opts === 'function') {
       cb = opts;
@@ -872,6 +924,8 @@ export class Client {
     key: string,
     opts: LMXClientLockOpts
   ): [string, LMXClientLockOpts] {
+    const routineId = 'ddl-routine-BePZ3_w02e-SqGACRs';
+    routineEnter(routineId, "Client.preParseLockOptsForPromises");
     
     if (typeof opts === 'boolean') {
       opts = {force: opts};
@@ -890,6 +944,8 @@ export class Client {
     opts: number | boolean | LMXClientLockOpts | LMClientLockCallBack,
     cb?: LMClientLockCallBack
   ): [string, LMXClientLockOpts, LMClientLockCallBack] {
+    const routineId = 'ddl-routine-ybI3LPgy_iCeE6gFLy';
+    routineEnter(routineId, "Client.parseLockOpts");
     
     if (typeof opts === 'function') {
       cb = opts;
@@ -909,24 +965,32 @@ export class Client {
   }
   
   _simulateVersionMismatch() {
+    const routineId = 'ddl-routine-VkOvqkyBPfR-62DWEW';
+    routineEnter(routineId, "Client._simulateVersionMismatch");
     this.write({
       type: 'simulate-version-mismatch',
     });
   }
   
   _invokeBrokerSideEndCall() {
+    const routineId = 'ddl-routine-XL8VpEteX8oL8Y72qT';
+    routineEnter(routineId, "Client._invokeBrokerSideEndCall");
     this.write({
       type: 'end-connection-from-broker-for-testing-purposes'
     });
   }
   
   _invokeBrokerSideDestroyCall() {
+    const routineId = 'ddl-routine-10XAkTlm9X8O-cYVnX';
+    routineEnter(routineId, "Client._invokeBrokerSideDestroyCall");
     this.write({
       type: 'destroy-connection-from-broker-for-testing-purposes'
     });
   }
   
   _makeClientSideError() {
+    const routineId = 'ddl-routine-3HpZhhVaqfJLmqoi8K';
+    routineEnter(routineId, "Client._makeClientSideError");
     this.close();
   }
   
@@ -936,6 +1000,8 @@ export class Client {
   lock(key: string, ttl: number, cb: LMClientLockCallBack): void;
   lock(key: string, opts: number | boolean | Partial<LMXClientLockOpts>, cb: LMClientLockCallBack): void;
   lock(key: string, opts: number | boolean | Partial<LMXClientLockOpts> | LMClientLockCallBack, cb?: LMClientLockCallBack): void {
+    const routineId = 'ddl-routine-5M0jY1khDck4OqTgSc';
+    routineEnter(routineId, "Client.lock");
     
     try {
       [key, opts, cb] = this.parseLockOpts(key, opts, cb);
@@ -1061,16 +1127,22 @@ export class Client {
   }
   
   on() {
+    const routineId = 'ddl-routine-HqtrLGGxwSa-b7dzsS';
+    routineEnter(routineId, "Client.on");
     log.warn('warning:', 'use c.emitter.on() instead of c.on()');
     return this.emitter.on.apply(this.emitter, arguments);
   }
   
   once() {
+    const routineId = 'ddl-routine--3Ym2jK8VCVy_pugxl';
+    routineEnter(routineId, "Client.once");
     log.warn('warning:', 'use c.emitter.once() instead of c.once()');
     return this.emitter.once.apply(this.emitter, arguments);
   }
   
   private lockInternal(key: string, opts: any, cb: LMClientLockCallBack) {
+    const routineId = 'ddl-routine-sRIwTZPqVr5qPOax2G';
+    routineEnter(routineId, "Client.lockInternal");
     
     const uuid = opts._uuid = opts._uuid || UUID.v4();
     const ttl = opts.ttl || this.ttl;
@@ -1230,6 +1302,11 @@ export class Client {
         boundUnlock.key = key;
         boundUnlock.unlock = boundUnlock.release = boundUnlock;
         boundUnlock.lockUuid = boundUnlock.id = uuid;
+        // Pass through the broker-minted fencing token so downstream
+        // callers can compare-and-swap on it. Older brokers don't
+        // include this field — surface `null` rather than `undefined`
+        // so the absence is unambiguous.
+        boundUnlock.fencingToken = Number.isInteger(data.fencingToken) ? data.fencingToken : null;
         return cb(null, boundUnlock);
       }
       
@@ -1294,16 +1371,22 @@ export class Client {
   }
   
   noop(err?: any) {
+    const routineId = 'ddl-routine-5Veh3OLLBVcfW2tet9';
+    routineEnter(routineId, "Client.noop");
     // this is a no-operation, obviously
     // no ref to this, so can't use "this" here
     err && log.error(err);
   }
   
   getPort() {
+    const routineId = 'ddl-routine-1I6v_qVcrBRLRWK7Ew';
+    routineEnter(routineId, "Client.getPort");
     return this.port;
   }
   
   getHost() {
+    const routineId = 'ddl-routine-aCZPnUyQ3A9MGn3hf2';
+    routineEnter(routineId, "Client.getHost");
     return this.host;
   }
   
@@ -1312,6 +1395,8 @@ export class Client {
    * @param callback Function that receives warning messages/errors
    */
   onWarning(callback: (...args: any[]) => void): void {
+    const routineId = 'ddl-routine-ajvrO2_KC4vt2Sq18F';
+    routineEnter(routineId, "Client.onWarning");
     this.emitter.on('warning', callback);
   }
 
@@ -1320,6 +1405,8 @@ export class Client {
    * @param callback Function that receives error messages
    */
   onError(callback: (...args: any[]) => void): void {
+    const routineId = 'ddl-routine-T4gapnmdw_CU_iSHnW';
+    routineEnter(routineId, "Client.onError");
     this.emitter.on('error', callback);
   }
   
@@ -1327,6 +1414,8 @@ export class Client {
     key: string,
     opts?: string | boolean | LMXClientUnlockOpts,
   ): [string, LMXClientUnlockOpts] {
+    const routineId = 'ddl-routine-y8mTeBtmBntpHUFdFP';
+    routineEnter(routineId, "Client.preParseUnlockOptsForPromise");
     
     if (typeof opts === 'boolean') {
       opts = {force: opts};
@@ -1345,6 +1434,8 @@ export class Client {
     opts?: string | boolean | LMXClientUnlockOpts | LMClientUnlockCallBack,
     cb?: LMClientUnlockCallBack
   ): [string, LMXClientUnlockOpts, LMClientUnlockCallBack] {
+    const routineId = 'ddl-routine-8ZAHv135RULGRDbne7';
+    routineEnter(routineId, "Client.parseUnlockOpts");
     
     if (typeof opts === 'function') {
       cb = opts;
@@ -1376,6 +1467,8 @@ export class Client {
   unlock(key: string, opts: string | boolean | LMXClientUnlockOpts, cb: LMClientUnlockCallBack): void;
   
   unlock(key: string, opts?: string | boolean | LMXClientUnlockOpts | LMClientUnlockCallBack, cb?: LMClientUnlockCallBack) {
+    const routineId = 'ddl-routine-ZeGRfjvHWE2yt5TUXw';
+    routineEnter(routineId, "Client.unlock");
     
     try {
       [key, opts, cb] = this.parseUnlockOpts(key, opts, cb);
@@ -1540,6 +1633,8 @@ export class Client {
   }
 
   ping(cb?: EVCb<any>) : Promise<any>{
+    const routineId = 'ddl-routine-9ekSAHkN982vJUIngi';
+    routineEnter(routineId, "Client.ping");
     if (cb && typeof cb !== 'function') {
       throw new Error('Optional callback must be a function.');
     }
@@ -1588,6 +1683,8 @@ export class Client {
   }
 
   getSystemStats(cb?: EVCb<any>): Promise<any> {
+    const routineId = 'ddl-routine-Btl0L48yLLCwN_zZJb';
+    routineEnter(routineId, "Client.getSystemStats");
 
     if (cb && typeof cb !== 'function') {
       throw new Error('Optional callback must be a function.');

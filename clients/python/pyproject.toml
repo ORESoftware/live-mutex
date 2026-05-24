@@ -1,0 +1,16 @@
+[project]
+name = "live-mutex-client"
+version = "0.1.0"
+description = "Python asyncio client for the live-mutex broker."
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [{name = "ORESoftware"}]
+dependencies = []
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

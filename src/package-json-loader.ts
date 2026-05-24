@@ -1,5 +1,7 @@
 'use strict';
 
+
+import {routineEnter} from './routine';
 /**
  * Utility to load package.json in both CommonJS and ESM environments
  */
@@ -11,6 +13,8 @@ import { fileURLToPath } from 'url';
 let packageJson: any = null;
 
 function loadPackageJson(): any {
+    const routineId = 'ddl-routine-nzIxd5gWqhxhdqAogT';
+    routineEnter(routineId, "loadPackageJson");
     if (packageJson) {
         return packageJson;
     }
