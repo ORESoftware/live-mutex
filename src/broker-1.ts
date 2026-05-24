@@ -865,6 +865,29 @@ export class Broker1 {
         return this.socketFile || this.port;
     }
 
+    /**
+     * Runtime mutator for the TCP_NODELAY policy applied to *newly
+     * accepted* sockets. The connection-accept handler reads
+     * `self.noDelay` per-connection, so flipping this field is enough
+     * for new connections to pick up the new value; already-accepted
+     * sockets keep whatever Nagle setting they were created with.
+     *
+     * Note: Node's `net.Socket` API only exposes `setNoDelay` (Nagle).
+     * Linux's TCP_QUICKACK is intentionally NOT exposed here — the
+     * Rust broker (`rust-network-mutex-rs`) has a QUICKACK toggle on
+     * its admin surface; this Node broker deliberately limits itself
+     * to NODELAY to match the API Node ships out of the box.
+     *
+     * Returns the previous value for audit logging.
+     */
+    setNoDelay(value: boolean): boolean {
+        const routineId = 'ddl-routine-setNoDelay-Pq4';
+        routineEnter(routineId, "Broker1.setNoDelay");
+        const previous = this.noDelay;
+        this.noDelay = !!value;
+        return previous;
+    }
+
     getVersion() {
         const routineId = 'ddl-routine-zX08q5PMXrIcL-yTOy';
         routineEnter(routineId, "Broker1.getVersion");
