@@ -1,0 +1,75 @@
+# syntax=docker/dockerfile:1.6
+#
+# Modern multi-stage build for the patched `live-mutex` broker (the one
+# deployed as `dd-live-mutex-submodule`).
+#
+# The legacy `Dockerfile` at the root of this repo is pinned to
+# `node:12.3.1-alpine` and a single-stage layout that never compiled
+# the TS sources end-to-end inside the image; downstream consumers
+# (e.g. the EC2 cluster running `dd-live-mutex-submodule`) had to
+# `git submodule update` on the host and run `npm ci && npm run build`
+# at pod start, which is brittle and adds 10–30s to every cold start.
+#
+# This Dockerfile lifts that into a published image:
+#
+#   1. Stage `build` runs `npm ci --ignore-scripts` against the full
+#      dependency tree, then `npm run build` to produce `dist/`. We
+#      then re-install with `--omit=dev` so the runtime layer ships
+#      production deps only.
+#
+#   2. Stage `runtime` is a fresh `node:22-bookworm-slim` with just the
+#      built `dist/` and `node_modules/` and a sane default env. The
+#      broker's HTTP front-end (`LMX_HTTP_PORT=6971`) is on by default.
+#
+# Build:
+#   docker buildx build \
+#     --platform linux/amd64 \
+#     --file Dockerfile.image \
+#     --tag docker.io/oresoftware/live-mutex-submodule:0.2.25-dd.1 \
+#     --push .
+#
+# Run:
+#   docker run --rm -p 6970:6970 -p 6971:6971 \
+#     docker.io/oresoftware/live-mutex-submodule:0.2.25-dd.1
+
+FROM node:22-bookworm-slim AS build
+
+WORKDIR /app
+
+# Cache `npm ci` separately from src changes.
+COPY package.json package-lock.json ./
+RUN npm ci --ignore-scripts
+
+# Bring in just what `npm run build` needs (TS sources + tsconfigs +
+# the two post-compile fix-up scripts referenced by the `build` script
+# in package.json).
+COPY tsconfig.json tsconfig.esm.json tsconfig.test.json ./
+COPY src ./src
+COPY scripts/add-esm-extensions.js scripts/fix-commonjs-import-meta.js ./scripts/
+
+RUN npm run build
+
+# Re-install with production deps only — devDependencies (typescript,
+# @types/*, suman, …) are not needed at runtime.
+RUN npm ci --omit=dev --ignore-scripts
+
+FROM node:22-bookworm-slim AS runtime
+
+ENV NODE_ENV=production \
+    live_mutex_host=0.0.0.0 \
+    live_mutex_port=6970 \
+    LMX_HTTP_PORT=6971 \
+    LMX_HTTP_HOST=0.0.0.0
+
+WORKDIR /app
+
+# `node:22-bookworm-slim` already ships uid/gid 1000 ("node").
+USER node
+
+COPY --from=build --chown=node:node /app/node_modules ./node_modules
+COPY --from=build --chown=node:node /app/dist          ./dist
+COPY --from=build --chown=node:node /app/package.json  ./package.json
+
+EXPOSE 6970 6971
+
+ENTRYPOINT ["node", "dist/lm-start-server.js"]
