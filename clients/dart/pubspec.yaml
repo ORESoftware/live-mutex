@@ -1,0 +1,7 @@
+name: live_mutex_client
+description: Dart client for the live-mutex broker (TCP NDJSON wire protocol).
+version: 0.1.0
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+dependencies:
+  uuid: ^4.0.0

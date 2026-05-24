@@ -58,6 +58,11 @@
   },
   "homepage": "https://github.com/ORESoftware/live-mutex#readme",
   "dependencies": {
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/exporter-trace-otlp-grpc": "^0.55.0",
+    "@opentelemetry/resources": "^1.28.0",
+    "@opentelemetry/sdk-trace-base": "^1.28.0",
+    "@opentelemetry/semantic-conventions": "^1.28.0",
     "@oresoftware/json-stream-parser": "0.0.124",
     "@oresoftware/linked-queue": "^2.2.13",
     "chalk": "^2.4.2",
