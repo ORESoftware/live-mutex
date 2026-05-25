@@ -43,6 +43,26 @@
  *  15. End-to-end through the bridge: `await bridge.lock(...)`
  *      resolves only AFTER the broker's lock-handler has fully
  *      returned (proves the awaiter never observes mid-handler state).
+ *  16. FIFO is preserved across multiple separate `write()` calls
+ *      (cross-write order, not just within-buffer order).
+ *  17. Malformed JSON in `write()` is dropped silently (no error
+ *      emit, no callback rejection, surrounding valid frames still
+ *      flow).
+ *  18. `write('')` and `write('\n\n')` deliver no frames, no errors.
+ *  19. `onFrame` throwing emits an `'error'` event on the socket
+ *      and does NOT block subsequent frame delivery.
+ *  20. `end(payload)` writes the trailing payload (delivered to
+ *      `onFrame`) BEFORE running the `finish` -> `end` -> `close`
+ *      lifecycle, and `end()`'s callback fires after close.
+ *  21. `removeAllListeners('event')` is selective — only that
+ *      event's listeners are removed; siblings survive.
+ *  22. The LMX-extension `destroyTimeout` field is assignable and
+ *      reassignable (broker version-mismatch flow stores + clears
+ *      a Timer here).
+ *  23. Bridge integration: `bridge.shutdown()` rejects every
+ *      in-flight awaiter with `InProcessBridge: shutdown` (not a
+ *      dispatch timeout), and post-shutdown `bridge.lock()` rejects
+ *      synchronously with `InProcessBridge: closed`.
  *
  * Self-times-out at 8s. Any hang means a callback didn't fire or a
  * lifecycle event went missing.
@@ -381,8 +401,255 @@ async function main() {
         await new Promise<void>(r => broker.close(() => r()));
     }
 
+    // ===========================================================
+    // [16] Cross-write FIFO: frames from N separate write() calls
+    //      are delivered to onFrame in the order written.
+    // ===========================================================
+    console.log('\n[16] FIFO is preserved across multiple write() calls');
+    {
+        const frames: any[] = [];
+        const sock = new VirtualSocket(f => frames.push(f));
+        for (let i = 0; i < 25; i++) {
+            sock.write(`{"i":${i}}\n`);
+        }
+        const lenA = frames.length;
+        if (lenA !== 0) fail(`frames delivered sync inside write loop (got ${lenA})`);
+        await new Promise<void>(r => setImmediate(r));
+        const lenB = frames.length;
+        if (lenB !== 25) fail(`expected 25 frames; got ${lenB}`);
+        for (let i = 0; i < 25; i++) {
+            if (frames[i].i !== i) {
+                fail(`order broken at index ${i}; got ${JSON.stringify(frames.map(f => f.i))}`);
+            }
+        }
+        ok('25 frames from 25 separate write() calls delivered in order');
+    }
+
+    // ===========================================================
+    // [17] Malformed JSON in write() is dropped silently — does
+    //      NOT crash, does NOT reject the write callback, does NOT
+    //      emit 'error', does NOT block surrounding valid frames.
+    // ===========================================================
+    console.log('\n[17] malformed JSON frames are dropped silently');
+    {
+        const frames: any[] = [];
+        const errs: any[] = [];
+        const sock = new VirtualSocket(f => frames.push(f));
+        sock.on('error', e => errs.push(e));
+        let cbErr: any = 'NOT-CALLED';
+        sock.write(
+            'not json at all\n' +
+            '{"valid":1}\n' +
+            'totally bogus {trailing\n' +
+            '{"valid":2}\n',
+            'utf8',
+            err => { cbErr = err; },
+        );
+        await new Promise<void>(r => setImmediate(r));
+        if (cbErr !== null) fail(`write cb should fire with null on success; got ${cbErr}`);
+        if (errs.length !== 0) fail(`unexpected 'error' emit: ${errs.map(e => e.message).join(', ')}`);
+        if (frames.length !== 2) fail(`expected 2 valid frames; got ${frames.length}`);
+        if (frames[0].valid !== 1 || frames[1].valid !== 2) {
+            fail(`bad valid frames: ${JSON.stringify(frames)}`);
+        }
+        ok(`bogus lines silently dropped; 2 valid frames preserved`);
+    }
+
+    // ===========================================================
+    // [18] write('') and write('\n\n\n') deliver no frames and
+    //      cause no errors. The broker never writes empty frames
+    //      but the surface should be tolerant.
+    // ===========================================================
+    console.log('\n[18] empty / newline-only writes deliver no frames');
+    {
+        const frames: any[] = [];
+        const errs: any[] = [];
+        const sock = new VirtualSocket(f => frames.push(f));
+        sock.on('error', e => errs.push(e));
+        sock.write('');
+        sock.write('\n');
+        sock.write('\n\n\n\n');
+        await new Promise<void>(r => setImmediate(r));
+        if (frames.length !== 0) fail(`expected 0 frames; got ${frames.length}`);
+        if (errs.length !== 0) fail(`unexpected error emits: ${errs.map(e => e.message).join(', ')}`);
+        ok('no frames delivered, no errors emitted');
+    }
+
+    // ===========================================================
+    // [19] onFrame throwing emits an 'error' event on the socket
+    //      and does NOT crash the process or stall further frames.
+    // ===========================================================
+    console.log('\n[19] onFrame throwing -> error event, surrounding frames still flow');
+    {
+        let throwOnNext = true;
+        const seen: any[] = [];
+        const errs: any[] = [];
+        const sock = new VirtualSocket(f => {
+            if (throwOnNext) {
+                throwOnNext = false;
+                throw new Error('boom-in-onFrame');
+            }
+            seen.push(f);
+        });
+        sock.on('error', e => errs.push(e));
+        sock.write('{"a":1}\n');  // this one throws inside onFrame
+        sock.write('{"a":2}\n');  // this one is fine
+        await new Promise<void>(r => setImmediate(r));
+        if (errs.length !== 1) fail(`expected 1 error emit; got ${errs.length}`);
+        if (!errs[0] || !String(errs[0].message).includes('boom-in-onFrame')) {
+            fail(`unexpected error: ${errs[0]?.message}`);
+        }
+        if (seen.length !== 1 || seen[0].a !== 2) {
+            fail(`expected the second frame to still arrive; got ${JSON.stringify(seen)}`);
+        }
+        ok(`error event fired with original Error; subsequent frame still delivered`);
+    }
+
+    // ===========================================================
+    // [20] end(payload) drains the trailing write THEN runs the
+    //      finish -> end -> close lifecycle in order.
+    // ===========================================================
+    console.log('\n[20] end(payload) delivers trailing frame BEFORE close');
+    {
+        const frames: any[] = [];
+        const events: string[] = [];
+        const sock = new VirtualSocket(f => {
+            frames.push(f);
+            events.push(`frame#${(f as any).n}`);
+        });
+        sock.on('finish', () => events.push('finish'));
+        sock.on('end', () => events.push('end'));
+        sock.on('close', () => events.push('close'));
+
+        let endCbFired = false;
+        sock.end('{"n":1}\n', 'utf8', () => { endCbFired = true; });
+
+        await new Promise<void>(r => setImmediate(r));
+        await new Promise<void>(r => setImmediate(r)); // an extra macrotask for safety
+
+        if (!endCbFired) fail('end() callback did not fire');
+        if (frames.length !== 1) fail(`expected 1 trailing frame; got ${frames.length}`);
+        if (frames[0].n !== 1) fail(`bad trailing frame: ${JSON.stringify(frames[0])}`);
+        // Frame must arrive BEFORE finish/end/close.
+        const frameIdx = events.indexOf('frame#1');
+        const finishIdx = events.indexOf('finish');
+        const closeIdx = events.indexOf('close');
+        if (frameIdx === -1 || finishIdx === -1 || closeIdx === -1) {
+            fail(`missing event in stream: ${events}`);
+        }
+        if (!(frameIdx < finishIdx && finishIdx < closeIdx)) {
+            fail(`out-of-order: ${events}`);
+        }
+        if (sock.destroyed !== true) fail('socket should be destroyed after end()');
+        ok(`trailing frame -> finish -> end -> close in order: ${events}`);
+    }
+
+    // ===========================================================
+    // [21] removeAllListeners('event') is selective — only that
+    //      event's listeners are removed, others survive.
+    // ===========================================================
+    console.log('\n[21] removeAllListeners(event) is selective');
+    {
+        const sock = new VirtualSocket(() => {});
+        let aCount = 0;
+        let bCount = 0;
+        sock.on('a', () => { aCount++; });
+        sock.on('a', () => { aCount++; });
+        sock.on('b', () => { bCount++; });
+        sock.removeAllListeners('a');
+        sock.emit('a');
+        sock.emit('a');
+        sock.emit('b');
+        if (aCount !== 0) fail(`'a' listeners should be gone; saw aCount=${aCount}`);
+        if (bCount !== 1) fail(`'b' listener should fire once; saw bCount=${bCount}`);
+        ok(`'a' listeners removed; 'b' listener intact`);
+    }
+
+    // ===========================================================
+    // [22] destroyTimeout (LMX-extension) is assignable + clearable
+    //      — broker version-mismatch flow stores a Timer here, then
+    //      clears it on receiving the version-mismatch ack.
+    // ===========================================================
+    console.log('\n[22] destroyTimeout LMX extension behaves');
+    {
+        const sock = new VirtualSocket(() => {});
+        if (sock.destroyTimeout !== undefined) fail(`initial destroyTimeout: ${sock.destroyTimeout}`);
+        const t = setTimeout(() => {}, 60_000);
+        sock.destroyTimeout = t;
+        if (sock.destroyTimeout !== t) fail('destroyTimeout assignment did not stick');
+        clearTimeout(sock.destroyTimeout);
+        sock.destroyTimeout = undefined;
+        if (sock.destroyTimeout !== undefined) fail('destroyTimeout reset failed');
+        ok('destroyTimeout: undefined -> Timer -> undefined transitions');
+    }
+
+    // ===========================================================
+    // [23] Bridge: shutdown() rejects all in-flight awaiters with a
+    //      clear error. Locks an idle broker by stubbing
+    //      broker.lock to never-reply, then asserts every awaiter
+    //      gets `InProcessBridge: shutdown` (not the dispatch
+    //      timeout — shutdown should win the race even with the
+    //      default 60s timeout still ticking).
+    // ===========================================================
+    console.log('\n[23] bridge.shutdown() rejects all in-flight awaiters');
+    {
+        const broker = new Broker1({noListen: true, port: 0, host: '127.0.0.1'});
+        broker.emitter.on('warning', () => {});
+        const bridge = new InProcessBridge(broker);
+
+        // Stub lock/unlock/etc to be no-ops so requests pend forever.
+        (broker as any).lock = () => {};
+        (broker as any).unlock = () => {};
+        (broker as any).acquireMany = () => {};
+        (broker as any).releaseMany = () => {};
+
+        const promises = [
+            bridge.lock({key: 'p-1', ttl: 5000}),
+            bridge.lock({key: 'p-2', ttl: 5000}),
+            bridge.acquireMany(['x', 'y'], 5000),
+            bridge.releaseMany('fake-uuid'),
+            bridge.unlock({key: 'p-3'}),
+        ];
+
+        const pendingNow = bridge.pendingCount;
+        if (pendingNow !== promises.length) {
+            fail(`pendingCount=${pendingNow}, expected ${promises.length}`);
+        }
+        ok(`pendingCount=${pendingNow} before shutdown`);
+
+        bridge.shutdown();
+
+        const settled = await Promise.allSettled(promises);
+        for (let i = 0; i < settled.length; i++) {
+            const s = settled[i];
+            if (s.status !== 'rejected') {
+                fail(`promise[${i}] resolved instead of rejecting: ${JSON.stringify((s as any).value)}`);
+            }
+            const msg = String((s as any).reason?.message ?? s.reason);
+            if (!msg.includes('shutdown')) {
+                fail(`promise[${i}] rejected with non-shutdown error: ${msg}`);
+            }
+        }
+        if (bridge.pendingCount !== 0) fail(`pendingCount=${bridge.pendingCount} after shutdown`);
+        ok(`all ${promises.length} pending awaiters rejected with 'shutdown' error; pendingCount=0`);
+
+        // Sanity: a NEW dispatch on a closed bridge should reject
+        // immediately with `InProcessBridge: closed`, not pend.
+        try {
+            await bridge.lock({key: 'after-shutdown', ttl: 1000});
+            fail('expected lock-after-shutdown to reject');
+        } catch (err: any) {
+            if (!String(err.message).includes('closed')) {
+                fail(`expected 'closed'; got ${err.message}`);
+            }
+            ok('post-shutdown dispatch rejects with InProcessBridge: closed');
+        }
+
+        await new Promise<void>(r => broker.close(() => r()));
+    }
+
     clearTimeout(watchdog);
-    console.log('\n\u2705 virtual-socket-test: all 15 checks passed');
+    console.log('\n\u2705 virtual-socket-test: all 23 checks passed');
     process.exit(0);
 }
 
