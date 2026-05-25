@@ -650,6 +650,86 @@ serializes the request through a global lexicographic key order so
 two concurrent `acquireMany` requests with overlapping keys cannot
 deadlock.
 
+#### Why a multi-key lock instead of N single-key acquires
+
+The textbook way to "lock A and B" is to acquire them in some agreed
+global order. That gets you correctness, but you still own the
+bookkeeping:
+
+- You have to remember the canonical order and apply it everywhere a
+  caller wants both keys, forever.
+- A timeout or panic between acquiring `A` and acquiring `B` leaves `A`
+  held and orphaned until its TTL fires.
+- A second caller that wants only `B` can grab it between your two
+  acquires — you never observe a quiet moment when both are held by no
+  one else.
+- Releasing requires two calls; if the second `release` fails or the
+  process dies between them, you leak one key until the sweeper
+  catches up.
+
+`acquireMany` collapses all of that into one broker round-trip: the
+broker checks every key, grants only when *all* of them are free, and
+emits a single `lockUuid` that releases the whole set with one call.
+No in-between state is visible to anyone — including the caller's own
+retries.
+
+Concretely, callers use it for things like: transferring an item
+between two queues, rotating a two-key credential without ever exposing
+a window where neither key is held, or running a migration that has to
+hold the source and destination shard locks simultaneously.
+
+#### Guarantees
+
+The two properties below hold *by construction*, not by polling or
+retries:
+
+1. **Atomicity.** While a composite holder owns `lockUuid X` covering
+   keys `[A, B]`, no other caller will ever be granted `A` alone, `B`
+   alone, or any other `acquireMany` request that overlaps `{A, B}`.
+   Equivalently: no subset of your keys is ever observable to another
+   holder.
+
+   This is preserved through every failure mode the broker handles:
+   contention with single-key `acquire` on overlapping keys, contention
+   with another `acquireMany`, partial-grant races (the broker rolls
+   back any keys it tentatively claimed if a later key in the set turns
+   out to be held), the centralised TTL sweeper expiring one of your
+   keys, and the owning client's TCP socket closing — the broker's
+   socket-close cleanup releases every member of the set together.
+
+2. **Deadlock freedom via global lexicographic ordering.** The broker
+   sorts every `keys` array into ascending Unicode-code-point order
+   before queueing. Two callers issuing `acquireMany(['A','B'])` and
+   `acquireMany(['B','A'])` therefore wait on the same key's notify
+   queue and one wins outright; neither can hold one half while
+   waiting on the other. Worked example:
+
+   ```text
+   t=0  caller-1 sends keys=[A, B]   → broker sorts → wait on A.notify
+   t=0  caller-2 sends keys=[B, A]   → broker sorts → wait on A.notify
+   t=1  A is free → caller-1 wins A, then atomically claims B
+   t=1  caller-2 stays in A.notify   (A is now held by caller-1)
+   t=N  caller-1 releases lockUuid   → A and B both free
+   t=N  caller-2 wakes, claims A and B atomically
+   ```
+
+   Without the broker-side sort, caller-1 could claim `A`, caller-2
+   could claim `B`, and both would block forever waiting for the
+   other's key — a classic two-resource deadlock.
+
+#### Where `acquireMany` lives in the API
+
+`acquireMany` is **not** exposed on the standard TCP `Client`; it lives
+on `Broker1`, on `InProcessBridge` (HTTP-server-style, no socket
+round-trip), on the HTTP `/v1/acquire-many` endpoint, and on the raw
+TCP `acquire-many` frame. The intent is that an in-process broker or a
+service-side bridge (e.g. an HTTP gateway pod running `live-mutex` as a
+library) coordinates multi-key state transitions on behalf of a fleet
+of single-key TCP clients. New cross-runtime clients are welcome to add
+an `acquire-many` method that issues the wire frame directly — the
+broker accepts it from any TCP/UDS connection — but the official Node
+`Client` keeps single-key semantics on purpose.
+
 The TCP/UDS wire protocol uses a `type: 'acquire-many'` frame, and
 there are three convenient ways to drive it from Node.js:
 
@@ -662,6 +742,9 @@ curl -s http://127.0.0.1:6971/v1/acquire-many \
 # => { "acquired": true, "keys":["orders","users"],
 #      "lockUuid":"…", "fencingTokens": {"orders": 7, "users": 3} }
 
+# Single release call drops every member of the set atomically. The
+# broker rejects any release that doesn't match the original lockUuid,
+# so one caller can't accidentally release another caller's set.
 curl -s http://127.0.0.1:6971/v1/release-many \
   -H 'content-type: application/json' \
   -d '{"lockUuid":"<uuid from above>"}' | jq
@@ -678,6 +761,8 @@ const bridge = new InProcessBridge(broker);
 
 const grant = await bridge.acquireMany(['users', 'orders'], 5000);
 // grant.fencingTokens => { users: <n>, orders: <m> }
+
+// One call releases every key in the composite atomically.
 await bridge.releaseMany(grant.lockUuid);
 
 bridge.shutdown();
@@ -685,30 +770,48 @@ bridge.shutdown();
 
 #### 3. Direct TCP (any client that speaks the wire format)
 
-The TCP frame is `{ "type": "acquire-many", "uuid", "keys": [...], "ttl"? }`
-and the response is `{ "type": "acquire-many", "acquired": true|false,
-"keys", "lockUuid"?, "fencingTokens"? }`. As with single-key acquires, a
-contended request first responds with `acquired: false` and the queue
-depth, and later — when the broker has every key — emits a second
-frame with `acquired: true` plus the `lockUuid` and `fencingTokens`.
+```text
+client → broker
+{ "type": "acquire-many",
+  "uuid": "<correlation-id>",
+  "keys": ["users", "orders"],
+  "ttl": 5000 }
 
-#### Behavior under contention
+broker → client (when every key is free)
+{ "type": "acquire-many",
+  "uuid": "<correlation-id>",
+  "acquired": true,
+  "keys": ["orders", "users"],
+  "lockUuid": "...",
+  "fencingTokens": { "orders": 7, "users": 3 } }
 
-If any of the requested keys is held when the request arrives, the
-acquire-many is queued at the contended key's notify queue. Once
-that key's holder releases, the broker re-checks every requested
-key in lexicographic order and either grants the whole set
-atomically or re-queues. An acquire-many holder always either holds
-all of its keys or none, regardless of partial-grant races, sweeper
-TTL evictions, or owning-client disconnects.
+client → broker
+{ "type": "release-many",
+  "uuid": "<correlation-id-2>",
+  "lockUuid": "..." }
+```
 
-#### Why lexicographic ordering
+Under contention the broker first responds with `acquired: false`
+plus the current queue depth, and emits a second `acquire-many` frame
+with `acquired: true` once every key is held. The single `lockUuid`
+in the response is the only handle needed to release the whole set.
 
-If two callers do `acquireMany(['A','B'])` and `acquireMany(['B','A'])`
-with a naive grant order they could grab one key each and deadlock.
-The broker normalizes both to lexicographic order before queueing, so
-both callers wait on the same key's queue and one always wins
-outright while the other re-tries the whole set.
+#### Constraints
+
+- `keys` is bounded by the broker (mirrors the Rust port's `1..=5`
+  cap). Larger sets are rejected with `acquired: false` plus an
+  `error` field, before any state mutation.
+- Empty `keys` arrays and requests that set both `key` and `keys` are
+  rejected the same way — there is no "fall back to single-key on
+  empty composite" sentinel.
+- `max > 1` (semaphore-style concurrency) is **single-key only**.
+  Composite holders always behave like `max=1` per member; combining
+  semaphore and composite is deadlock-prone (you'd need to lock K
+  slots across N keys in some agreed order, and the right answer is
+  workload-specific).
+- Composite locks are exclusive across *all* lock kinds on a member
+  key: while a composite is held on `A`, no `acquire("A")`, RW
+  reader, or RW writer can grant. The inverse also holds.
 
 <br>
 
