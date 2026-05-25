@@ -15,6 +15,7 @@ import chalk from "chalk";
 import {createParser} from "./json-parser";
 import * as cu from './client-utils';
 import { packageJsonData as clientPackage } from './package-json-loader';
+import {LMXRequestType, LMXResponseType} from './protocol';
 
 if (!(clientPackage.version && typeof clientPackage.version === 'string')) {
   throw new Error('Client NPM package did not have a top-level field that is a string.');
@@ -390,11 +391,11 @@ export class Client {
         this.emitter.emit('warning', data.warning);
       }
       
-      if (data.type === 'version-mismatch') {
+      if (data.type === LMXResponseType.VersionMismatch) {
         this.emitter.emit('error', data);
         log.error(data);
         this.cannotContinue = true;
-        this.write({type: 'version-mismatch-confirmed'});
+        this.write({type: LMXRequestType.VersionMismatchConfirmed});
         this._fireCallbacksPrematurely(new Error('lmx version-match:' + util.inspect(data)));
         return;
       }
@@ -431,8 +432,8 @@ export class Client {
       if (to) {
         log.debug(chalk.yellow('[CLIENT] Request timed out'), {uuid, type: data.type});
         this.emitter.emit('warning', 'Client side lock/unlock request timed-out.');
-        if (data.acquired === true && data.type === 'lock') {
-          self.write({uuid: uuid, _uuid, key: data.key, type: 'lock-received-rejected'});
+        if (data.acquired === true && data.type === LMXResponseType.Lock) {
+          self.write({uuid: uuid, _uuid, key: data.key, type: LMXRequestType.LockReceivedRejected});
         }
         return;
       }
@@ -447,7 +448,7 @@ export class Client {
       this.emitter.emit('warning', 'lmx implementation warning, ' +
         'no fn with that uuid in the resolutions hash => ' + util.inspect(data, {breakLength: Infinity}));
       
-      if (data.acquired === true && data.type === 'lock') {
+      if (data.acquired === true && data.type === LMXResponseType.Lock) {
         
         // this most likely occurs when a retry request gets sent before the previous lock request gets resolved
         
@@ -456,7 +457,7 @@ export class Client {
         this.write({
           uuid: uuid,
           key: data.key,
-          type: 'lock-received-rejected'
+          type: LMXRequestType.LockReceivedRejected
         });
       }
       
@@ -517,7 +518,7 @@ export class Client {
           self.isOpen = true;
           clearTimeout(to);
           ws.removeListener('error', onFirstErr);
-          this.write({type: 'version', value: clientPackage.version});
+          this.write({type: LMXRequestType.Version, value: clientPackage.version});
           resolve(this);
         });
         
@@ -746,7 +747,7 @@ export class Client {
     this.write({
       uuid: uuid,
       key: key,
-      type: 'lock-info-request',
+      type: LMXRequestType.LockInfoRequest,
     });
     
   }
@@ -915,7 +916,7 @@ export class Client {
     this.write({
       keepLocksAfterDeath: opts.keepLocksAfterDeath,
       uuid: id,
-      type: 'ls',
+      type: LMXRequestType.Ls,
     });
     
   }
@@ -968,7 +969,7 @@ export class Client {
     const routineId = 'ddl-routine-VkOvqkyBPfR-62DWEW';
     routineEnter(routineId, "Client._simulateVersionMismatch");
     this.write({
-      type: 'simulate-version-mismatch',
+      type: LMXRequestType.SimulateVersionMismatch,
     });
   }
   
@@ -976,7 +977,7 @@ export class Client {
     const routineId = 'ddl-routine-XL8VpEteX8oL8Y72qT';
     routineEnter(routineId, "Client._invokeBrokerSideEndCall");
     this.write({
-      type: 'end-connection-from-broker-for-testing-purposes'
+      type: LMXRequestType.EndConnectionFromBrokerForTesting
     });
   }
   
@@ -984,7 +985,7 @@ export class Client {
     const routineId = 'ddl-routine-10XAkTlm9X8O-cYVnX';
     routineEnter(routineId, "Client._invokeBrokerSideDestroyCall");
     this.write({
-      type: 'destroy-connection-from-broker-for-testing-purposes'
+      type: LMXRequestType.DestroyConnectionFromBrokerForTesting
     });
   }
   
@@ -1205,7 +1206,7 @@ export class Client {
       
       if (!this.isOpen) {
         this.timeouts[uuid] = true;
-        this.write({uuid, key, type: 'lock-client-error'});
+        this.write({uuid, key, type: LMXRequestType.LockClientError});
         
         return this.fireLockCallbackWithError(cb, false, new LMXClientLockException(
           key,
@@ -1219,7 +1220,7 @@ export class Client {
       if (newRetryCount >= maxRetries) {
         
         this.timeouts[uuid] = true;
-        this.write({uuid, key, type: 'lock-client-timeout'});
+        this.write({uuid, key, type: LMXRequestType.LockClientTimeout});
         
         return this.fireLockCallbackWithError(cb, false, new LMXClientLockException(
           key,
@@ -1295,7 +1296,7 @@ export class Client {
       if (data.acquired === true) {
         // lock was acquired for the given key, yippee
         this.cleanUp(uuid);
-        this.write({uuid, key, type: 'lock-received'}); // we let the broker know that we received the lock
+        this.write({uuid, key, type: LMXRequestType.LockReceived}); // we let the broker know that we received the lock
         const boundUnlock = this.unlock.bind(this, key, {_uuid: uuid, rwStatus, force: forceUnlock});
         boundUnlock.acquired = true;
         boundUnlock.readersCount = Number.isInteger(data.readersCount) ? data.readersCount : null;
@@ -1361,7 +1362,7 @@ export class Client {
         retryCount,
         uuid: uuid,
         key: key,
-        type: 'lock',
+        type: LMXRequestType.Lock,
         ttl: ttl,
         rwStatus,
         max
@@ -1627,7 +1628,7 @@ export class Client {
       key: key,
       rwStatus,
       force: force,
-      type: 'unlock'
+      type: LMXRequestType.Unlock
     });
     log.debug(chalk.cyan('unlock: unlock request sent for key:'), key, 'uuid:', uuid);
   }
@@ -1669,7 +1670,7 @@ export class Client {
 
       this.write({
         uuid: uuid,
-        type: 'ping',
+        type: LMXRequestType.Ping,
         timestamp: clientTimestamp
       });
     })
@@ -1726,7 +1727,7 @@ export class Client {
 
       this.write({
         uuid: uuid,
-        type: 'system-stats-request'
+        type: LMXRequestType.SystemStatsRequest
       });
     }).then(val => {
       cb && cb(null, val);

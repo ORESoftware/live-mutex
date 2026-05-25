@@ -45,6 +45,7 @@ import {routineEnter} from './routine';
 import {EventEmitter} from 'events';
 import * as UUID from 'uuid';
 import {Broker1, LMXSocket} from './broker-1';
+import {LMXRequestType} from './protocol';
 
 /**
  * Awaiter handle for a single in-flight in-process request. The
@@ -446,7 +447,7 @@ export class InProcessBridge {
         routineEnter(routineId, "InProcessBridge.lock");
         const uuid = UUID.v4();
         const payload = {
-            type: 'lock',
+            type: LMXRequestType.Lock,
             uuid,
             key: data.key,
             ttl: data.ttl ?? null,
@@ -465,7 +466,7 @@ export class InProcessBridge {
         routineEnter(routineId, "InProcessBridge.unlock");
         const uuid = UUID.v4();
         const payload: any = {
-            type: 'unlock',
+            type: LMXRequestType.Unlock,
             uuid,
             key: data.key,
             force: data.force ?? false,
@@ -479,7 +480,7 @@ export class InProcessBridge {
         routineEnter(routineId, "InProcessBridge.acquireMany");
         const uuid = UUID.v4();
         const payload = {
-            type: 'acquire-many',
+            type: LMXRequestType.AcquireMany,
             uuid,
             keys,
             ttl: ttlMs ?? null,
@@ -493,7 +494,7 @@ export class InProcessBridge {
         const routineId = 'ddl-routine-RNu7juP5ClqIoEqukL';
         routineEnter(routineId, "InProcessBridge.releaseMany");
         const uuid = UUID.v4();
-        const payload = {type: 'release-many', uuid, lockUuid};
+        const payload = {type: LMXRequestType.ReleaseMany, uuid, lockUuid};
         return this.dispatch(uuid, () => this.broker.releaseMany(payload, this.socket as unknown as LMXSocket));
     }
 

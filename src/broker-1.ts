@@ -20,6 +20,12 @@ import {LinkedQueue, LinkedQueueValue, IsVoid} from '@oresoftware/linked-queue';
 //project
 const isLocalDev = process.env.oresoftware_local_dev === 'yes';
 import {forDebugging} from './shared-internal';
+import {
+    LMXRequestType,
+    LMXRequest,
+    isLMXRequestType,
+    assertExhaustive,
+} from './protocol';
 
 const debugLog = process.argv.indexOf('--lmx-debug') > 0 || process.env.lmx_debug === 'yes';
 
@@ -359,7 +365,13 @@ export class Broker1 {
 
         const onData = (ws: LMXSocket, data: any) => {
 
-            if (data.type === 'version-mismatch-confirmed') {
+            // Pre-dispatch frames that exist outside the typed
+            // request union OR have to run before lmxClosed gating.
+            // `version-mismatch-confirmed` is the way the client
+            // says "I saw your version-mismatch reply, you can drop
+            // me" — we have to honor it AFTER `ws.destroyTimeout`
+            // was armed but BEFORE the `ws.lmxClosed` short-circuit.
+            if (data && data.type === LMXRequestType.VersionMismatchConfirmed) {
                 clearTimeout(ws.destroyTimeout);
                 ws.destroy();
                 return;
@@ -369,124 +381,35 @@ export class Broker1 {
                 return;
             }
 
-            if (data.type === 'simulate-version-mismatch') {
-                return self.onVersion({value: '0.0.1'}, ws);
-            }
-
-            if (data.type === 'end-connection-from-broker-for-testing-purposes') {
-                return self.abruptlyEndConnection(ws);
-            }
-
-            if (data.type === 'destroy-connection-from-broker-for-testing-purposes') {
-                return self.abruptlyDestroyConnection(ws);
-            }
-
-            const key = data.key;
-
-            if (data.ttl === null) {
+            // Default ttl normalisation matches the legacy contract:
+            // `null` means "never expire". This used to live next to
+            // the `'version'` branch; we hoist it so the typed switch
+            // can rely on the ttl already being normalised.
+            if (data && data.ttl === null) {
                 data.ttl = Infinity;
             }
 
-            if (data.inspectCommand) {
+            // Operator-only `inspect` debug surface — orthogonal to
+            // the request enum and intentionally untyped.
+            if (data && data.inspectCommand) {
                 return self.inspect(data, ws);
             }
 
-            if (data.type === 'version') {
-                return self.onVersion(data, ws);
+            // Reject malformed / unknown frames at the entry point
+            // rather than letting them fall through every case arm.
+            // This is also what guarantees the typed-switch below
+            // is faithfully exhaustive: by the time we reach the
+            // switch, `data.type` is an `LMXRequestType` member.
+            if (!data || !isLMXRequestType(data.type)) {
+                this.emitter.emit('warning',
+                    `implementation error, bad data sent to broker => ${util.inspect(data)}`);
+                self.send(ws, {
+                    error: `LMX broker received unknown 'type' field => ${util.inspect(data && data.type)}`,
+                });
+                return;
             }
 
-            if (data.type === 'ls') {
-                return self.ls(data, ws);
-            }
-
-            if (data.type === 'unlock') {
-                return self.unlock(data, ws);
-            }
-
-            if (data.type === 'lock') {
-                return self.lock(data, ws);
-            }
-
-            if (data.type === 'acquire-many') {
-                return self.acquireMany(data, ws);
-            }
-
-            if (data.type === 'release-many') {
-                return self.releaseMany(data, ws);
-            }
-
-            if (data.type === 'increment-readers') {
-                return self.incrementReaders(data, ws);
-            }
-
-            if (data.type === 'decrement-readers') {
-                return self.decrementReaders(data, ws);
-            }
-
-            if (data.type === 'register-write-flag-check') {
-                return self.registerWriteFlagCheck(data, ws);
-            }
-
-            if (data.type === 'register-write-flag-and-readers-check') {
-                return self.registerWriteFlagAndReadersCheck(data, ws);
-            }
-
-            if (data.type === 'set-write-flag-false-and-broadcast') {
-                return self.setWriteFlagToFalseAndBroadcast(data, ws);
-            }
-
-            if (data.type === 'lock-received') {
-                clearTimeout(self.timeouts[data.key]);
-                return delete self.timeouts[data.key];
-            }
-
-            if (data.type === 'lock-client-timeout' || data.type === 'lock-client-error') {
-
-                // if the client times out, we don't want to send them any more messages
-                const lck = self.locks.get(key);
-                const uuid = data.uuid;
-
-                if (!lck) {
-                    this.emitter.emit('warning', `Lock for key "${key}" has probably expired.`);
-                    return;
-                }
-
-                return lck.notify.remove(uuid);
-            }
-
-            if (data.type === 'lock-received-rejected') {
-
-                const lck = self.locks.get(key);
-
-                if (!lck) {
-                    this.emitter.emit('warning', `Lock for key "${key}" has probably expired.`);
-                    return;
-                }
-
-                self.rejected[data.uuid] = true;
-                return self.ensureNewLockHolder(lck, data);
-            }
-
-            if (data.type === 'lock-info-request') {
-                return self.retrieveLockInfo(data, ws);
-            }
-
-            if (data.type === 'ping') {
-                return self.ping(data, ws);
-            }
-
-            if (data.type === 'system-stats-request') {
-                return self.getSystemStats(data, ws);
-            }
-
-            this.emitter.emit('warning', `implementation error, bad data sent to broker => ${util.inspect(data)}`);
-
-            self.send(ws, {
-                key: data.key,
-                uuid: data.uuid,
-                error: 'Malformed data sent to Live-Mutex broker.'
-            });
-
+            return self.dispatchRequest(data as LMXRequest, ws);
         };
 
         const wss = this.wss = net.createServer({}, (ws: LMXSocket) => {
@@ -1058,6 +981,144 @@ export class Broker1 {
         const routineId = 'ddl-routine-sGf9wy-_JLqs5wt6Px';
         routineEnter(routineId, "Broker1.ls");
         return this.send(ws, {ls_result: Object.keys(this.locks), uuid: data.uuid});
+    }
+
+    /**
+     * Typed dispatcher for parsed wire-protocol requests. The
+     * `LMXRequest` discriminated union pairs with `assertExhaustive`
+     * in the `default` arm so any future addition to
+     * `LMXRequestType` is a compile error in this method until a
+     * matching case is added — the same property the Rust port has
+     * via `match req { … }` exhaustiveness.
+     *
+     * Pre-conditions enforced by the caller (`onData`):
+     *
+     *   * `req.type` is a member of `LMXRequestType` (validated via
+     *     `isLMXRequestType`). Unknown values are rejected before
+     *     reaching this method, so the `default` arm is genuinely
+     *     unreachable at runtime.
+     *   * `ws.lmxClosed === false`.
+     *   * `version-mismatch-confirmed` was handled separately
+     *     because it must run BEFORE the `lmxClosed` short-circuit;
+     *     see `onData`.
+     */
+    dispatchRequest(req: LMXRequest, ws: LMXSocket): any {
+        const routineId = 'ddl-routine-broker1-dispatchRequest-Hx7';
+        routineEnter(routineId, "Broker1.dispatchRequest");
+
+        switch (req.type) {
+            case LMXRequestType.Version:
+                return this.onVersion(req as any, ws);
+
+            case LMXRequestType.SimulateVersionMismatch:
+                return this.onVersion({value: '0.0.1'} as any, ws);
+
+            case LMXRequestType.EndConnectionFromBrokerForTesting:
+                return this.abruptlyEndConnection(ws);
+
+            case LMXRequestType.DestroyConnectionFromBrokerForTesting:
+                return this.abruptlyDestroyConnection(ws);
+
+            case LMXRequestType.VersionMismatchConfirmed:
+                // `onData` handles this branch BEFORE the `lmxClosed`
+                // short-circuit so the broker can drop the socket
+                // even after marking it closed. Reaching this case
+                // here means a duplicate / stale frame slipped past
+                // the gate; emit a warning and ignore it.
+                this.emitter.emit('warning',
+                    `lmx broker: stray '${LMXRequestType.VersionMismatchConfirmed}' frame after socket flagged closed; dropping.`);
+                return;
+
+            case LMXRequestType.Ls:
+                return this.ls(req as any, ws);
+
+            case LMXRequestType.Unlock:
+                return this.unlock(req as any, ws);
+
+            case LMXRequestType.Lock:
+                return this.lock(req as any, ws);
+
+            case LMXRequestType.AcquireMany:
+                return this.acquireMany(req as any, ws);
+
+            case LMXRequestType.ReleaseMany:
+                return this.releaseMany(req as any, ws);
+
+            case LMXRequestType.IncrementReaders:
+                return this.incrementReaders(req as any, ws);
+
+            case LMXRequestType.DecrementReaders:
+                return this.decrementReaders(req as any, ws);
+
+            case LMXRequestType.RegisterWriteFlagCheck:
+                return this.registerWriteFlagCheck(req as any, ws);
+
+            case LMXRequestType.RegisterWriteFlagCheckQueued:
+                // Broker-1 historically forwarded the queued probe
+                // through the same handler (the legacy `broker.ts`
+                // never grew this branch). Keep the existing
+                // forwarding so the `RWLockClient` queued-handoff
+                // path keeps working unchanged.
+                return this.registerWriteFlagCheck(req as any, ws);
+
+            case LMXRequestType.RegisterWriteFlagAndReadersCheck:
+                return this.registerWriteFlagAndReadersCheck(req as any, ws);
+
+            case LMXRequestType.SetWriteFlagFalseAndBroadcast:
+                return this.setWriteFlagToFalseAndBroadcast(req as any, ws);
+
+            case LMXRequestType.LockReceived: {
+                // Client confirmed receipt — cancel the broker's
+                // re-election timer for this key.
+                const k = (req as any).key;
+                clearTimeout(this.timeouts[k]);
+                delete this.timeouts[k];
+                return;
+            }
+
+            case LMXRequestType.LockClientTimeout:
+            case LMXRequestType.LockClientError: {
+                // Client gave up locally. Remove its waiter entry
+                // from this key's notify queue so the broker
+                // doesn't try to grant on a dead/uninterested socket.
+                const k = (req as any).key;
+                const lck = this.locks.get(k);
+                if (!lck) {
+                    this.emitter.emit('warning', `Lock for key "${k}" has probably expired.`);
+                    return;
+                }
+                lck.notify.remove((req as any).uuid);
+                return;
+            }
+
+            case LMXRequestType.LockReceivedRejected: {
+                const k = (req as any).key;
+                const lck = this.locks.get(k);
+                if (!lck) {
+                    this.emitter.emit('warning', `Lock for key "${k}" has probably expired.`);
+                    return;
+                }
+                this.rejected[(req as any).uuid] = true;
+                return this.ensureNewLockHolder(lck, req as any);
+            }
+
+            case LMXRequestType.LockInfoRequest:
+                return this.retrieveLockInfo(req as any, ws);
+
+            case LMXRequestType.Ping:
+                return this.ping(req as any, ws);
+
+            case LMXRequestType.SystemStatsRequest:
+                return this.getSystemStats(req as any, ws);
+
+            default:
+                // Compile-time exhaustiveness: every member of
+                // `LMXRequestType` must be handled above. Adding a
+                // new variant without a matching case will widen
+                // `req` here from `never` to the unhandled variant
+                // and fail type-check at build time.
+                return assertExhaustive(req);
+        }
     }
 
     broadcast(data: any, ws: LMXSocket) {
