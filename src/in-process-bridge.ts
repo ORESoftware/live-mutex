@@ -59,94 +59,350 @@ type Pending = {
 };
 
 /**
- * Mock `net.Socket` that the broker can hold onto as an opaque
- * connection handle. We only implement the surface the broker
- * actually touches — see the call sites in `broker-1.ts`:
- * `ws.writable`, `ws.write(buf, enc, cb)`, `ws.lmxClosed`, plus
- * the no-op `destroy` / `end` / `removeAllListeners` cleanup hooks.
+ * In-process stand-in for `net.Socket` that the `Broker1` can treat
+ * as an ordinary connected peer. The broker's hot path types every
+ * connection as `LMXSocket extends net.Socket`, so this class has to
+ * present enough of that surface to behave faithfully under three
+ * orthogonal pressures:
  *
- * `pipe()` is implemented as a no-op identity because the broker's
- * connection handler calls `ws.pipe(createParser())` — but we never
- * route the bridge's virtual socket through `net.createServer`, so
- * `pipe` is never actually invoked. It's defined defensively so a
- * future refactor that does call it doesn't crash.
+ *   1. **Method/property surface** — every method the broker actually
+ *      calls and every property it actually reads must exist and behave
+ *      sensibly. Missing methods would crash; missing properties would
+ *      silently produce `undefined` and break invariants like
+ *      `if (!ws.writable)` checks.
+ *
+ *   2. **Async semantics** — real `net.Socket` callbacks (the `write`
+ *      cb, `'data'` events on the peer's read side, lifecycle events
+ *      like `'finish'`/`'end'`/`'close'`) **never** fire synchronously
+ *      inside the call that triggered them. The kernel/libuv always
+ *      interpose at least one tick. The previous implementation fired
+ *      `onFrame` synchronously inside `write()`, which meant the
+ *      bridge's awaiter could resume mid-broker-handler and observe
+ *      half-mutated broker state. Every callback below is dispatched
+ *      via `process.nextTick`, which is the closest faithful mimic of
+ *      "the data crossed the boundary."
+ *
+ *   3. **Lifecycle ordering** — `end()` must emit `'finish'` then
+ *      `'end'` then `'close'`; `destroy(err)` must emit `'error'`
+ *      (only when an Error was supplied) then `'close'`; both flows
+ *      must be idempotent. This matches the documented stream/socket
+ *      contract operators rely on when they wire `.once('end', …)`,
+ *      `.once('error', …)`, etc.
+ *
+ * This class does NOT pretend to fully implement `net.Socket` (there
+ * are dozens of internal `_writev`/`_write` hooks meant only for the
+ * stream subsystem). It implements the documented public surface plus
+ * the LMX-specific extension fields (`lmxClosed`, `destroyTimeout`)
+ * that `LMXSocket` adds. The `as unknown as LMXSocket` cast at the
+ * call site is the explicit acknowledgement that we're a structural
+ * subset, not a full subclass.
  */
-class VirtualSocket extends EventEmitter {
+const NEXT_TICK = process.nextTick;
+
+export class VirtualSocket extends EventEmitter {
+    // ---- net.Socket-mirroring state ---------------------------------
     public writable = true;
+    public readable = true;
+    public destroyed = false;
+    public connecting = false;
+    public pending = false;
+    public bufferSize = 0;
+    public bytesRead = 0;
+    public bytesWritten = 0;
+    public timeout = 0;
+    public allowHalfOpen = false;
+    public localAddress = 'inproc';
+    public localPort = 0;
+    public remoteAddress = 'inproc';
+    public remoteFamily: 'IPv4' | 'IPv6' = 'IPv4';
+    public remotePort = 0;
+
+    // ---- LMXSocket extensions ---------------------------------------
     public lmxClosed = false;
-    public destroyTimeout: NodeJS.Timeout | undefined;
+    public destroyTimeout: NodeJS.Timeout | undefined = undefined;
+
+    // ---- internals --------------------------------------------------
+    private finishEmitted = false;
+    private endEmitted = false;
+    private closeEmitted = false;
 
     constructor(private readonly onFrame: (frame: any) => void) {
+        super();
         const routineId = 'ddl-routine-WoFE6z7qO40Cz1uHkd';
         routineEnter(routineId, "VirtualSocket.constructor");
-        super();
-        // The broker registers many listeners; lift the warning ceiling
-        // so multi-listener flows don't pollute logs. 256 is well above
-        // the per-connection listener count the broker installs (< 8).
+        // The broker installs ~6 listeners per accepted socket and
+        // also subscribes from the parser side. 256 is generous for
+        // any plausible future addition without spamming
+        // MaxListenersExceededWarning into stderr.
         this.setMaxListeners(256);
     }
 
-    /// Capture the broker's reply. The wire framing matches the TCP
-    /// path: one or more newline-terminated JSON objects per write.
-    /// We forward each parsed object to the bridge's correlation map.
-    write(data: string | Buffer, encoding?: any, cb?: any): boolean {
+    /**
+     * `readyState` mirrors `net.Socket.readyState` for any operator
+     * code (or a future debugger) that introspects the socket.
+     */
+    get readyState(): 'open' | 'readOnly' | 'writeOnly' | 'closed' | 'opening' {
+        if (this.destroyed) return 'closed';
+        if (this.writable && this.readable) return 'open';
+        if (this.writable) return 'writeOnly';
+        if (this.readable) return 'readOnly';
+        return 'closed';
+    }
+
+    /**
+     * Accept the broker's reply frames and forward them to the bridge.
+     *
+     * The broker always writes exactly one newline-terminated JSON
+     * object per call (`JSON.stringify(data) + '\n'`). We split on
+     * newline anyway as future-proofing.
+     *
+     * Async-correctness: BOTH the `onFrame` callback AND the write
+     * callback are scheduled via `process.nextTick`. The previous
+     * implementation called `onFrame` synchronously inside `write()`,
+     * which meant the bridge's awaiter could resume *during* the
+     * broker's send call and observe state the broker hadn't yet
+     * finished mutating. Real `net.Socket` always crosses at least
+     * one event-loop tick between sender's `write()` and receiver's
+     * `'data'` event; this implementation does the same.
+     */
+    write(
+        data: string | Buffer | Uint8Array,
+        encoding?: BufferEncoding | ((err?: Error | null) => void),
+        cb?: (err?: Error | null) => void
+    ): boolean {
         const routineId = 'ddl-routine-bJjgk0J2Y3jw4yPBC7';
         routineEnter(routineId, "VirtualSocket.write");
-        const text = typeof data === 'string' ? data : data.toString('utf8');
-        // The broker always writes exactly one frame at a time
-        // (`JSON.stringify(data) + '\n'`), but split-on-newline is the
-        // robust choice — defends against any future change.
+
+        // net.Socket accepts (data), (data, encoding), (data, cb),
+        // and (data, encoding, cb). Normalize to a single callback.
+        const callback: ((err?: Error | null) => void) | undefined =
+            typeof encoding === 'function' ? encoding : cb;
+        const enc: BufferEncoding =
+            typeof encoding === 'string' ? encoding : 'utf8';
+
+        if (this.destroyed || !this.writable) {
+            const err = Object.assign(
+                new Error('Cannot call write after a stream was destroyed'),
+                {code: 'ERR_STREAM_DESTROYED'},
+            );
+            if (callback) NEXT_TICK(callback, err);
+            return false;
+        }
+
+        let buf: Buffer;
+        if (typeof data === 'string') {
+            buf = Buffer.from(data, enc);
+        } else if (Buffer.isBuffer(data)) {
+            buf = data;
+        } else if (data instanceof Uint8Array) {
+            buf = Buffer.from(data.buffer, data.byteOffset, data.byteLength);
+        } else {
+            const err = new TypeError(
+                `VirtualSocket.write: unsupported data type ${typeof data}`,
+            );
+            if (callback) NEXT_TICK(callback, err);
+            return false;
+        }
+
+        this.bytesWritten += buf.byteLength;
+        const text = buf.toString('utf8');
+
         for (const line of text.split('\n')) {
             if (line.length === 0) continue;
+            let frame: any;
             try {
-                const frame = JSON.parse(line);
-                this.onFrame(frame);
+                frame = JSON.parse(line);
             } catch {
-                // Drop malformed frames silently — the TCP path also
-                // emits a 'warning' here; we don't have a place to
-                // surface that and it would only fire on a bug.
+                // Match the TCP path: malformed frames are dropped.
+                // (The real socket path emits a 'warning' here, but
+                // we have no plumbing to surface it from a write call
+                // and the bridge protocol is internal — a malformed
+                // frame would be a bug, not a client misbehavior.)
+                continue;
             }
+            this.bytesRead += line.length + 1;
+            const captured = frame;
+            // FIFO order across frames is preserved because
+            // process.nextTick is a queue.
+            NEXT_TICK(() => {
+                if (this.destroyed) return;
+                try {
+                    this.onFrame(captured);
+                } catch (err) {
+                    this.emit('error', err);
+                }
+            });
         }
-        // The TCP `send` path uses a `(err) => {...; cb && process.nextTick(cb)}`
-        // shape. Honour both call-styles (encoding+cb, or just cb).
-        const callback = typeof encoding === 'function' ? encoding : cb;
-        if (typeof callback === 'function') {
-            process.nextTick(callback);
-        }
+
+        if (callback) NEXT_TICK(callback, null);
         return true;
     }
 
-    setNoDelay(_value: boolean): void {
-      const routineId = 'ddl-routine-Vrs-ZEZMgsE_Dg8ajg';
-      routineEnter(routineId, "VirtualSocket.setNoDelay");
-        // No-op; the broker calls this defensively in its TCP path.
-    }
-
-    destroy(): void {
-        const routineId = 'ddl-routine-BWbtmhL8y5oFTERAvH';
-        routineEnter(routineId, "VirtualSocket.destroy");
-        if (this.lmxClosed) return;
-        this.lmxClosed = true;
-        this.writable = false;
-        this.emit('end');
-    }
-
-    end(): void {
+    /**
+     * Half-close the write side. Real `net.Socket.end()` sequence:
+     *   - flush any pending writes
+     *   - emit `'finish'` (write side fully drained)
+     *   - peer FIN-ACK arrives → emit `'end'`
+     *   - resources released → emit `'close'`
+     *
+     * For our virtual socket there's no peer to FIN-ACK, so we
+     * synthesize all three on `nextTick` in the documented order.
+     * Idempotent: a second `end()` is a no-op.
+     */
+    end(
+        data?: any,
+        encoding?: BufferEncoding | (() => void),
+        cb?: () => void,
+    ): this {
         const routineId = 'ddl-routine-tCwQ_9Cia5ybFRg5-r';
         routineEnter(routineId, "VirtualSocket.end");
-        this.destroy();
+
+        // net.Socket.end signatures: (), (data), (data, encoding),
+        // (data, encoding, cb), (cb), (data, cb).
+        let endCb: (() => void) | undefined;
+        let payload: any = data;
+        let enc: BufferEncoding | undefined;
+        if (typeof data === 'function') {
+            endCb = data as () => void;
+            payload = undefined;
+        } else if (typeof encoding === 'function') {
+            endCb = encoding as () => void;
+        } else {
+            enc = encoding as BufferEncoding | undefined;
+            endCb = cb;
+        }
+
+        if (this.destroyed) {
+            if (endCb) NEXT_TICK(endCb);
+            return this;
+        }
+
+        const finalize = () => {
+            if (!this.writable) return; // re-entrancy guard
+            this.writable = false;
+            if (!this.finishEmitted) {
+                this.finishEmitted = true;
+                this.emit('finish');
+            }
+            if (!this.endEmitted) {
+                this.endEmitted = true;
+                this.emit('end');
+            }
+            // 'close' lands one tick later, mirroring net.Socket.
+            NEXT_TICK(() => {
+                this.readable = false;
+                this.destroyed = true;
+                this.lmxClosed = true;
+                if (!this.closeEmitted) {
+                    this.closeEmitted = true;
+                    this.emit('close', false);
+                }
+                if (endCb) endCb();
+            });
+        };
+
+        if (payload !== undefined) {
+            // Drain the trailing payload through write() so its
+            // bytes count toward bytesWritten and any frames it
+            // contains reach the bridge before close.
+            this.write(payload, enc as any, () => NEXT_TICK(finalize));
+        } else {
+            NEXT_TICK(finalize);
+        }
+        return this;
     }
+
+    /**
+     * Abrupt close. Idempotent. Emits `'error'` (if an Error was
+     * supplied) then `'close'` on the next tick. After `destroy()`,
+     * `write()` returns false with `ERR_STREAM_DESTROYED` on the cb.
+     */
+    destroy(err?: Error | null): this {
+        const routineId = 'ddl-routine-BWbtmhL8y5oFTERAvH';
+        routineEnter(routineId, "VirtualSocket.destroy");
+        if (this.destroyed) return this;
+        this.writable = false;
+        this.readable = false;
+        this.destroyed = true;
+        this.lmxClosed = true;
+        NEXT_TICK(() => {
+            if (err) this.emit('error', err);
+            if (!this.closeEmitted) {
+                this.closeEmitted = true;
+                this.emit('close', !!err);
+            }
+        });
+        return this;
+    }
+
+    /// `address()` is what `net.Server` connection callbacks read on
+    /// every accepted socket. We return the same shape so future
+    /// introspection code doesn't crash on `.address().port`.
+    address(): {address: string, family: string, port: number} {
+        return {address: this.localAddress, family: this.remoteFamily, port: this.localPort};
+    }
+
+    /**
+     * The broker calls `pipe(createParser())` on accepted sockets so
+     * inbound bytes flow through the NDJSON parser. The bridge never
+     * goes through that path — inbound traffic is delivered via
+     * direct method calls (`broker.lock(payload, virtualSocket)`).
+     * `pipe` is an identity no-op so any future code that does call
+     * it doesn't crash, and so `ws.pipe(parser).on('data', …)` still
+     * lets the caller subscribe to the parser they passed in.
+     */
+    pipe<T>(target: T): T {
+        const routineId = 'ddl-routine-UW5cpE6tXO9q0ekt-Z';
+        routineEnter(routineId, "VirtualSocket.pipe");
+        return target;
+    }
+
+    unpipe(_target?: any): this {
+        return this;
+    }
+
+    // ---- chainable no-op tuning methods -----------------------------
+    // All of these exist on net.Socket and are called defensively by
+    // socket-tuning code. None of them have a meaningful in-process
+    // analogue. They return `this` to preserve the documented
+    // chainable signature so `socket.setNoDelay(true).setKeepAlive(...)`
+    // patterns survive.
+
+    setNoDelay(_value?: boolean): this {
+        const routineId = 'ddl-routine-Vrs-ZEZMgsE_Dg8ajg';
+        routineEnter(routineId, "VirtualSocket.setNoDelay");
+        return this;
+    }
+
+    setKeepAlive(_enable?: boolean, _initialDelay?: number): this {
+        return this;
+    }
+
+    setTimeout(timeout: number, callback?: () => void): this {
+        // Capture the requested timeout so debug/observation code can
+        // read it back; we don't actually fire 'timeout' on idle since
+        // there's no real I/O to time out. If a caller needs that
+        // behavior they can install the listener directly.
+        this.timeout = timeout;
+        if (callback) this.once('timeout', callback);
+        return this;
+    }
+
+    setEncoding(_encoding?: BufferEncoding): this {
+        return this;
+    }
+
+    unref(): this { return this; }
+    ref(): this { return this; }
+    pause(): this { return this; }
+    resume(): this { return this; }
+    cork(): void { /* noop */ }
+    uncork(): void { /* noop */ }
 
     removeAllListeners(event?: string | symbol): this {
         const routineId = 'ddl-routine-7swZayhZQfvHIFSgKh';
         routineEnter(routineId, "VirtualSocket.removeAllListeners");
         return super.removeAllListeners(event);
-    }
-
-    pipe<T>(target: T): T {
-        const routineId = 'ddl-routine-UW5cpE6tXO9q0ekt-Z';
-        routineEnter(routineId, "VirtualSocket.pipe");
-        return target;
     }
 }
 

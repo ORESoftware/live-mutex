@@ -10,7 +10,7 @@ export {Client, LMXClient, LvMtxClient} from './client';
 export {Broker, LMXBroker, LvMtxBroker} from './broker';
 export {Broker1, LMXBroker as LMXBroker1, LvMtxBroker as LvMtxBroker1} from './broker-1';
 export {LMXHttpServer} from './http-server';
-export {InProcessBridge} from './in-process-bridge';
+export {InProcessBridge, VirtualSocket} from './in-process-bridge';
 export {routineEnter, initOtel, shutdownOtel, setOtelEnabled, isOtelEnabled} from './routine';
 export {getLogLevel, setLogLevel, isLogLevelEnabled, LMX_LOG_LEVELS} from './log-level';
 export type {LMXLogLevel} from './log-level';
