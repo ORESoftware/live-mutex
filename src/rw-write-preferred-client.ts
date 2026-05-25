@@ -13,6 +13,7 @@ import * as UUID from 'uuid';
 import {Client, ClientOpts, LMClientCallBack, LMClientUnlockCallBack} from "./client";
 import {weAreDebugging} from "./we-are-debugging";
 import {EVCb} from "./shared-internal";
+import {LMXRequestType} from "./protocol";
 
 
 export const log = {
@@ -481,7 +482,7 @@ export class RWLockWritePrefClient extends Client {
     };
 
     log.debug(chalk.cyan('[RW] registerWriteFlagCheck SENDING REQUEST'), {key, uuid});
-    this.write({key, uuid, type: 'register-write-flag-check'});
+    this.write({key, uuid, type: LMXRequestType.RegisterWriteFlagCheck});
 
   }
 
@@ -503,7 +504,7 @@ export class RWLockWritePrefClient extends Client {
     this.write({
       key,
       uuid,
-      type: 'register-write-flag-and-readers-check'
+      type: LMXRequestType.RegisterWriteFlagAndReadersCheck
     });
 
   }
@@ -521,7 +522,7 @@ export class RWLockWritePrefClient extends Client {
     log.debug(chalk.cyan('[RW] incrementReaders SENDING REQUEST'), {key, uuid});
     this.write({
       uuid,
-      type: 'increment-readers',
+      type: LMXRequestType.IncrementReaders,
       key
     });
   }
@@ -537,7 +538,7 @@ export class RWLockWritePrefClient extends Client {
     };
     this.write({
       uuid,
-      type: 'decrement-readers',
+      type: LMXRequestType.DecrementReaders,
       key
     });
   }
@@ -553,7 +554,7 @@ export class RWLockWritePrefClient extends Client {
     };
     this.write({
       uuid,
-      type: 'set-write-flag-false-and-broadcast',
+      type: LMXRequestType.SetWriteFlagFalseAndBroadcast,
       key
     });
   }
