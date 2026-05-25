@@ -1006,26 +1006,48 @@ export class Broker1 {
 
             const notify = lockObj.notify;
 
-            for (const uuid of Object.keys(uuids)) {
+            // Scrub the closing client's queued waiter entries from
+            // this key's notify list. The previous implementation
+            // wrote `for (const uuid of Object.keys(uuids))` against
+            // an array, which iterates string indices ('0','1',...)
+            // instead of the actual uuids — silently leaving stale
+            // entries in the queue that a later grant cycle would
+            // try to wake on a dead socket.
+            for (const uuid of uuids) {
                 notify.remove(uuid);
             }
 
-            // Drop the centralised deadline rows for this client's
-            // holders so the sweeper doesn't bother visiting them.
-            // The actual `unlock(force:true)` call below will also
-            // prune any stragglers, but it's cheap to do it here too.
-            for (const lockholder of lockObj.lockholders.values()) {
-                if (lockholder.ws === ws) {
-                    this.holderDeadlines.delete(lockholder.uuid);
+            // Walk the holders for THIS key and figure out which ones
+            // belong to the closing socket. Only those should be
+            // released. The previous implementation called
+            // `unlock({force:true, key:k}, ws)` without a `_uuid`,
+            // which fell into the wipe-all branch and evicted every
+            // peer holder on the key — fine for `max=1` keys where
+            // the closing client was the sole holder, catastrophic
+            // for semaphores (`max>1`) where peer clients were still
+            // alive and counted on their slot.
+            const myHolderUuids: string[] = [];
+            for (const [holderUuid, holder] of lockObj.lockholders) {
+                if (holder.ws === ws) {
+                    myHolderUuids.push(holderUuid);
+                    this.holderDeadlines.delete(holderUuid);
                 }
             }
-
-            if (lockObj.isViaShell !== true) {
-                // delete lockObj[k];
-                this.unlock({force: true, key: k, from: 'client socket closed/ended/errored'}, ws);
+            if (myHolderUuids.length === 0) {
+                continue;
             }
-            else if (!lockObj.keepLocksAfterDeath) {
-                this.unlock({force: true, key: k, from: 'client socket closed/ended/errored'}, ws);
+
+            const shouldRelease =
+                lockObj.isViaShell !== true || !lockObj.keepLocksAfterDeath;
+            if (!shouldRelease) continue;
+
+            for (const holderUuid of myHolderUuids) {
+                this.unlock({
+                    force: true,
+                    key: k,
+                    _uuid: holderUuid,
+                    from: 'client socket closed/ended/errored',
+                }, ws);
             }
 
         }
@@ -2380,35 +2402,74 @@ export class Broker1 {
 
             const ln = lck.notify.length;
 
-            // Drop the deadline row first — the centralised sweeper
-            // (`tickTtl`) is the only thing that fires evictions now,
-            // so removing the entry here keeps the sweep cheap and
-            // avoids a phantom eviction message racing this unlock.
-            if (_uuid) this.holderDeadlines.delete(_uuid);
+            // Phase 1 — targeted holder removal. Capture whether the
+            // caller's `_uuid` actually matched a live holder so
+            // downstream branches can distinguish "I unlocked my own
+            // hold" from "I sent force=true with a stale or invalid
+            // _uuid". Drop the deadline row alongside the holder so
+            // the centralised sweeper (`tickTtl`) doesn't emit a
+            // phantom eviction message racing this unlock.
+            let wasHolder = false;
+            if (_uuid && lck.lockholders.has(_uuid)) {
+                this.holderDeadlines.delete(_uuid);
+                lck.lockholders.delete(_uuid);
+                // Mark for late-unlock idempotency: if the same caller
+                // retries (e.g. their first unlock crossed paths with
+                // a TTL eviction or a duplicate cleanup), the second
+                // request gets `unlocked:true` instead of "wrong uuid".
+                lck.lockholdersAllReleased[_uuid] = true;
+                wasHolder = true;
+            }
 
-            // remove the lockholder, as the above if stmt checked it,
-            //so we don't need to check before deleting it again.
-            lck.lockholders.delete(_uuid);
-
-            // delete lck.lockholderTimeouts[_uuid];
-
+            // Phase 2 — force-mode dispositions. Three sub-cases that
+            // historically conflated to a single wipe-all branch and
+            // produced two latent bugs:
+            //
+            //   (a) `force:true` with no `_uuid` — used by
+            //       `cleanupConnection` and by operator-driven
+            //       wholesale resets. Keep the legacy "wipe everyone
+            //       on this key" semantic.
+            //   (b) `force:true` with a `_uuid` that DID match (handled
+            //       in Phase 1 above; nothing more to do here).
+            //   (c) `force:true` with a `_uuid` that did NOT match.
+            //       Previously this fell into the wipe-all branch on
+            //       max=1 keys and silently no-op'd on max>1 keys
+            //       while still reporting `unlocked:true`. Both were
+            //       wrong:
+            //         - max=1: an attacker passing a wrong `_uuid`
+            //                  could evict the legitimate holder.
+            //         - max>1: the broker reported success while the
+            //                  lockholders map still had every peer
+            //                  ("phantom unlock"), confusing CAS
+            //                  callers downstream.
+            //       Fail loudly in both, keep peers untouched.
             if (force) {
-                // If this is a semaphore lock and we're just targeting one lock holder,
-                // only remove that specific holder
-                if (_uuid && lck.max > 1) {
-                    // Just remove this specific lock holder
-                    const removed = lck.lockholders.delete(_uuid);
-                    if (removed) {
-                        lck.lockholdersAllReleased[_uuid] = true;
-                    }
-                } else {
-                    // Traditional force behavior - remove all lock holders
+                if (!_uuid) {
+                    // (a) legacy wipe-all
                     for (const k of lck.lockholders.keys()) {
                         lck.lockholdersAllReleased[k] = true;
                         this.holderDeadlines.delete(k);
                     }
                     lck.lockholders = new Map();
+                } else if (!wasHolder) {
+                    // (c) targeted force on a non-existent holder.
+                    // Reply with a structured error and DO NOT touch
+                    // any peer's hold or fall through to "unlocked:true".
+                    if (uuid && ws) {
+                        log.debug('unlock: rejecting force-unlock with non-matching _uuid for key:', key, 'uuid:', uuid, '_uuid:', _uuid);
+                        this.send(ws, {
+                            uuid: uuid,
+                            key: key,
+                            lockRequestCount: ln,
+                            type: 'unlock',
+                            unlocked: false,
+                            error: `force-unlock: no holder with _uuid='${_uuid}' on key '${key}' (max=${lck.max}).`,
+                        });
+                    }
+                    // Don't drain the queue — nothing actually freed up.
+                    return;
                 }
+                // (b) handled by Phase 1; fall through to send unlocked:true.
             }
 
             if (uuid && ws) {
