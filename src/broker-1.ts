@@ -2044,6 +2044,21 @@ export class Broker1 {
                         }
                     }
                 }
+                // No-wait (try-lock): the caller asked to fail fast. We've
+                // already rolled back any partial grants above; do NOT queue,
+                // so there's no deferred composite grant to leak.
+                if (data.wait === false) {
+                    const existingContended = this.locks.get(k);
+                    return this.send(ws, {
+                        type: 'acquire-many',
+                        uuid,
+                        keys,
+                        acquired: false,
+                        contendedKey: k,
+                        lockRequestCount: existingContended ? existingContended.notify.length : 0
+                    });
+                }
+
                 // Queue the waiter on the contended key so a future
                 // release on `k` triggers a re-attempt. This is what
                 // turns `acquired:false` into a *queued* response: the
@@ -2304,6 +2319,21 @@ export class Broker1 {
                 // Lock exists *and* already has a lockholder; adding ws to list of to be notified
                 // if we are retrying, we may attempt to call lock() more than once
                 // we don't want to push the same ws object / same uuid combo to array
+
+                // No-wait (try-lock): the caller asked to fail fast rather
+                // than be queued. Emit the same `acquired:false` notice but do
+                // NOT enqueue, so there is no deferred grant to leak.
+                if (data.wait === false) {
+                    this.send(ws, {
+                        readersCount: lck.readers,
+                        key: key,
+                        uuid: uuid,
+                        lockRequestCount: ln,
+                        type: 'lock',
+                        acquired: false
+                    });
+                    return;
+                }
 
                 if (force) {
 

@@ -1,19 +1,26 @@
 # live-mutex cross-runtime clients
 
-Reference clients for the `live-mutex` broker in five languages. Each client
+Reference clients for the `live-mutex` broker in eight languages. Each client
 speaks the same JSON-over-TCP wire protocol the JS broker exposes (NDJSON;
 one frame per line). They are intentionally minimal — focused on
 **correctness of the new wire protocol features** rather than feature
 parity with the canonical Node.js client (which also covers RW locks,
 `ls`, retries, etc.).
 
-| Language | Path                | Acquire | Release | Fencing tokens | acquire-many | Smoke test |
-|----------|---------------------|:-------:|:-------:|:--------------:|:------------:|:----------:|
-| Rust     | `clients/rust`      | ✅      | ✅      | ✅              | ✅           | `cargo run --example smoke` |
-| Python 3 | `clients/python`    | ✅      | ✅      | ✅              | ✅           | `python -m live_mutex_client.smoke` |
-| Go       | `clients/go`        | ✅      | ✅      | ✅              | ✅           | `go run ./cmd/smoke` |
-| Dart     | `clients/dart`      | ✅      | ✅      | ✅              | ✅           | `dart run example/smoke.dart` |
-| Java     | `clients/java`      | ✅      | ✅      | ✅              | ✅           | `mvn -q exec:java` |
+The native TypeScript client is the library itself (`src/client.ts`), so the
+list below plus TypeScript covers Dart, C++, Python, TypeScript, Go, Gleam,
+Rust and Java.
+
+| Language    | Path                | Acquire | Release | Fencing tokens | acquire-many | Smoke test |
+|-------------|---------------------|:-------:|:-------:|:--------------:|:------------:|:----------:|
+| Rust        | `clients/rust`      | ✅      | ✅      | ✅              | ✅           | `cargo run --example smoke` |
+| Python 3    | `clients/python`    | ✅      | ✅      | ✅              | ✅           | `python -m live_mutex_client.smoke` |
+| Go          | `clients/go`        | ✅      | ✅      | ✅              | ✅           | `go run ./cmd/smoke` |
+| Dart        | `clients/dart`      | ✅      | ✅      | ✅              | ✅           | `dart run example/smoke.dart` |
+| Java 17+    | `clients/java`      | ✅      | ✅      | ✅              | ✅           | `mvn -q exec:java` |
+| C++17       | `clients/cpp`       | ✅      | ✅      | ✅              | ✅           | `make run` / `make test` |
+| Gleam       | `clients/gleam`     | ✅      | ✅      | ✅              | ✅           | `LIVE_MUTEX_SMOKE=1 gleam test` |
+| TypeScript  | `src/client.ts`     | ✅      | ✅      | ✅              | ✅           | `npm test` |
 
 All clients implement at minimum:
 
@@ -24,8 +31,8 @@ All clients implement at minimum:
 - A `releaseMany(lockUuid)`.
 - A correlation map keyed by request-uuid so a single connection can multiplex.
 
-**Wire format crib sheet** (see also `PROTOCOL.md` in the repo root once
-written):
+**Wire format crib sheet** (see also `clients/PROTOCOL.md` for the full
+specification):
 
 ```
 client → broker
@@ -47,5 +54,11 @@ ack path — the broker tolerates clients that don't ack (the centralised
 TTL sweeper picks up any stragglers), so for a stateless caller the
 simplified flow is sufficient.
 
-Run the broker on `127.0.0.1:6970` (e.g. `node dist/lm-start-server.js`)
-before running any of the smoke tests.
+Run the broker (the fencing-token-aware `Broker1`) before running any of the
+smoke tests. The C++/Gleam smokes default to `127.0.0.1:7970`; override with
+`LMX_HOST`/`LMX_PORT`. A quick way to start `Broker1`:
+
+```sh
+node -e "const {Broker1}=require('./dist/main.js'); \
+  new Broker1({port:7970,host:'127.0.0.1'}).ensure().then(()=>console.log('up'))"
+```
