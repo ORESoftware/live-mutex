@@ -143,7 +143,7 @@ export interface LockObj {
   lockholderTimeouts: UuidHash,
   lockholdersAllReleased: UuidHash,
   lockholders: LockholdersType,  // uuid(s) that hold the lock
-  notify: LinkedQueue<NotifyObj>, //Array<NotifyObj>,
+  notify: LinkedQueue<NotifyObj, string>, //Array<NotifyObj>,
   key: string,
   keepLocksAfterDeath: boolean
   to: NodeJS.Timer,
@@ -1098,7 +1098,7 @@ export class Broker {
         }
         
         // get the first 5, ideally we'd mix requests from different clients/ws
-        notifyList.deq(5).forEach((lqv: [string, NotifyObj] | [typeof IsVoid] | { value: NotifyObj }) => {
+        (notifyList.deq(5) as Array<[string, NotifyObj] | [unknown] | { value: NotifyObj }>).forEach((lqv) => {
           // deq returns [K, V] tuples from dequeue() (despite type definition saying LinkedQueueValue)
           let obj: NotifyObj;
           if (Array.isArray(lqv) && !IsVoid.check(lqv[0])) {

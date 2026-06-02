@@ -330,7 +330,7 @@ export class Client {
         throw new Error('please call ensure()/connect() on this lmx client, before using the lock/unlock methods.');
       }
       
-      if (!ws.writable) {
+      if (!ws.writable || ws.destroyed || (ws as any).writableEnded) {
         return this.ensure((err, val) => {
           if (err) {
             throw new Error('Could not reconnect.');
@@ -584,11 +584,15 @@ export class Client {
     // Connection cleanup is handled in close() and cleanupConnection methods
     
     this.endCurrentConnection = () => {
+      this._fireCallbacksPrematurely(new Error('lmx client connection was ended by endCurrentConnection().'));
+      this.isOpen = false;
+      connectPromise = null;
       return ws && ws.end();
     };
     
     this.close = () => {
       this.noRecover = true;
+      this._fireCallbacksPrematurely(new Error('lmx client was closed.'));
       // Clean up all timers to prevent memory leaks
       for (const k of Object.keys(this.timers)) {
         clearTimeout(this.timers[k]);
@@ -659,7 +663,7 @@ export class Client {
         message: err.message,
         stack: err.stack,
         forcePrematureCallback: true,
-        originalErrorString: inspectError(err)
+        originalErrorString: inspectError(originalErr)
       };
       
       fn.call(this, e, e);
