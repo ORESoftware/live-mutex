@@ -30,6 +30,7 @@ import {LMXClientException} from "./exceptions";
 import {LMXClientError} from "./shared-internal";
 import {inspectError} from "./shared-internal";
 import {log} from "./client-utils";
+import {emitEmitterInfoTelemetry, emitEmitterWarningTelemetry} from "./telemetry";
 
 if (weAreDebugging) {
   log.debug('lmx client is in debug mode. Timeouts are turned off.');
@@ -95,9 +96,7 @@ export interface IUuidTimeoutBool {
   [key: string]: boolean
 }
 
-export interface IClientResolution {
-  [key: string]: EVCb<any>
-}
+export type IClientResolution = Map<string, EVCb<any>>;
 
 export type LMClientCallBack = (err: any, c?: Client) => void;
 export type Ensure = (cb?: LMClientCallBack) => Promise<Client>;
@@ -315,12 +314,25 @@ export class Client {
     let ws: net.Socket | null = null;
     let connectPromise: Promise<Client> | null = null;
     const self = this;
+
+    this.emitter.on('info', function () {
+      emitEmitterInfoTelemetry('live-mutex.client', Array.from(arguments), {
+        'lmx.component': 'client'
+      });
+    });
+
+    this.emitter.on('warning', function () {
+      emitEmitterWarningTelemetry('live-mutex.client', Array.from(arguments), {
+        'lmx.component': 'client'
+      });
+    });
     
     this.emitter.on('warning', function () {
-      if (self.emitter.listenerCount('warning') < 2) {
-        log.warn('No "warning" event handler(s) attached by end-user to client.emitter, therefore logging these errors from LMX library:');
-        log.warn(...Array.from(arguments).map(v => (typeof v === 'string' ? v : util.inspect(v))));
-        log.warn('Add a "warning" event listener to the lmx client to get rid of this message.');
+      if (self.emitter.listenerCount('warning') < 3) {
+        const prefix = chalk.magenta.bold('lmx client warning:');
+        console.error(prefix, 'No "warning" event handler(s) attached by end-user to client.emitter, therefore logging these errors from LMX library:');
+        console.error(prefix, ...Array.from(arguments).map(v => (typeof v === 'string' ? v : util.inspect(v))));
+        console.error(prefix, 'Add a "warning" event listener to the lmx client to get rid of this message.');
       }
     });
     
@@ -395,7 +407,7 @@ export class Client {
         );
       }
       
-      const fn = this.resolutions[uuid];
+      const fn = this.resolutions.get(uuid);
       const to = this.timeouts[uuid];
       
       // Debug logging for RW lock operations
@@ -404,13 +416,13 @@ export class Client {
       }
       
       delete this.timeouts[uuid];
-      // delete self.resolutions[uuid]; // don't do this here, the same resolution fn might need to be called more than once
+      // Don't delete the resolution here; some request types need more than one broker response.
       
       if (this.giveups[uuid]) {
         log.debug(chalk.yellow('[CLIENT] Request was given up'), {uuid, type: data.type});
         clearTimeout(this.timers[uuid]);
         delete this.giveups[uuid];
-        delete this.resolutions[uuid];
+        this.resolutions.delete(uuid);
         return;
       }
       
@@ -537,9 +549,10 @@ export class Client {
             ws.removeAllListeners();
           }
           
-          for (const [k, v] of Object.entries(this.resolutions)) {
+          for (const [k, v] of Array.from(this.resolutions.entries())) {
             this.giveups[k] = true;
             clearTimeout(this.timers[k]);
+            this.resolutions.delete(k);
             v('lmx connection ended/closed. ' +
               'A new connection will be created but all locking requests' +
               ' in-flight should get receive errors in the callbacks.', {});
@@ -601,7 +614,7 @@ export class Client {
       // Clean up all timeouts
       this.timeouts = {};
       // Clean up resolutions
-      this.resolutions = {};
+      this.resolutions.clear();
       // Clean up giveups
       this.giveups = {};
       // Remove all event listeners from emitter
@@ -619,7 +632,7 @@ export class Client {
     };
     
     this.timeouts = {};
-    this.resolutions = {};
+    this.resolutions = new Map();
     this.giveups = {};
     this.timers = {};
     
@@ -654,10 +667,9 @@ export class Client {
     this.timers = {};
     const err = new Error('Unknown error - firing resolution callbacks prematurely.');
     
-    for (let k of Object.keys(this.resolutions)) {
+    for (const [k, fn] of Array.from(this.resolutions.entries())) {
       
-      const fn = this.resolutions[k];
-      delete this.resolutions[k];
+      this.resolutions.delete(k);
       
       const e = {
         message: err.message,
@@ -689,7 +701,7 @@ export class Client {
     opts = opts || {};
     const uuid = opts._uuid || UUID.v4();
     
-    this.resolutions[uuid] = (err, data) => {
+    this.resolutions.set(uuid, (err, data) => {
       
       clearTimeout(this.timers[uuid]);
       delete this.timeouts[uuid];
@@ -705,7 +717,7 @@ export class Client {
       }
       
       if (String(key) !== String(data.key)) {
-        delete this.resolutions[uuid];
+        this.resolutions.delete(uuid);
         throw new Error('lmx implementation error => bad key.');
       }
       
@@ -718,10 +730,10 @@ export class Client {
       }
       
       if (data.lockInfo === true) {
-        delete this.resolutions[uuid];
+        this.resolutions.delete(uuid);
         cb(null, {data});
       }
-    };
+    });
     
     this.write({
       uuid: uuid,
@@ -802,7 +814,7 @@ export class Client {
     clearTimeout(this.timers[uuid]);
     delete this.timers[uuid];
     delete this.timeouts[uuid];
-    delete this.resolutions[uuid];
+    this.resolutions.delete(uuid);
   }
   
   protected fireUnlockCallbackWithError(cb: LMClientUnlockCallBack, isNextTick: boolean, err: LMXClientUnlockException) {
@@ -862,7 +874,7 @@ export class Client {
     opts = opts || {};
     const id = UUID.v4();
     
-    this.resolutions[id] = cb;
+    this.resolutions.set(id, cb);
     
     this.write({
       keepLocksAfterDeath: opts.keepLocksAfterDeath,
@@ -1130,7 +1142,7 @@ export class Client {
       
       timedOut = true;
       delete this.timers[uuid];
-      delete this.resolutions[uuid];
+      this.resolutions.delete(uuid);
       
       const currentRetryCount = opts.__retryCount;
       const newRetryCount = ++opts.__retryCount;
@@ -1173,7 +1185,7 @@ export class Client {
       
     }, lrt);
     
-    this.resolutions[uuid] = (err, data) => {
+    this.resolutions.set(uuid, (err, data) => {
       
       if (timedOut) {
         return;
@@ -1277,7 +1289,7 @@ export class Client {
         `Implementation error, please report, fallthrough in condition [1]`
       ));
       
-    };
+    });
     
     {
       
@@ -1442,7 +1454,7 @@ export class Client {
       
     }, urt);
     
-    this.resolutions[uuid] = (err, data) => {
+    this.resolutions.set(uuid, (err, data) => {
       
       log.debug(chalk.cyan('unlock resolution called for key:'), key, 'uuid:', uuid, 'err:', err, 'data type:', data?.type, 'unlocked:', data?.unlocked);
       
@@ -1527,7 +1539,7 @@ export class Client {
         'lmx internal/implementation error: fallthrough in unlock resolution routine.'
       ));
       
-    };
+    });
     
     let force: boolean = (opts.__retryCount > 0) || Boolean(opts.force);
     
@@ -1557,8 +1569,8 @@ export class Client {
       const uuid = UUID.v4();
       const clientTimestamp = Date.now();
 
-      this.resolutions[uuid] = (err, data) => {
-        delete this.resolutions[uuid];
+      this.resolutions.set(uuid, (err, data) => {
+        this.resolutions.delete(uuid);
 
         if (err) {
           return reject( new Error(`Ping error: ${util.inspect(err)}`));
@@ -1574,7 +1586,7 @@ export class Client {
               serverTime: data.serverTimestamp,
               timestamp: data.timestamp
             });
-      };
+      });
 
       this.write({
         uuid: uuid,
@@ -1604,8 +1616,8 @@ export class Client {
 
       const uuid = UUID.v4();
 
-      this.resolutions[uuid] = (err, data) => {
-        delete this.resolutions[uuid];
+      this.resolutions.set(uuid, (err, data) => {
+        this.resolutions.delete(uuid);
 
         if (err) {
           return reject(new Error(`System stats error: ${util.inspect(err)}`));
@@ -1629,7 +1641,7 @@ export class Client {
         };
 
         resolve(result);
-      };
+      });
 
       this.write({
         uuid: uuid,

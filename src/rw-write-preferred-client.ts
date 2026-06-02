@@ -11,15 +11,39 @@ import * as UUID from 'uuid';
 import {Client, ClientOpts, LMClientCallBack, LMClientUnlockCallBack} from "./client";
 import {weAreDebugging} from "./we-are-debugging";
 import {EVCb} from "./shared-internal";
+import {emitTelemetryEvent} from "./telemetry";
 
+const rwScopeName = 'live-mutex.client.rw-write-preferred';
+
+const emitRwLog = (severity: 'debug' | 'info' | 'warn' | 'error', args: any[]) => {
+  emitTelemetryEvent({
+    scopeName: rwScopeName,
+    name: `${rwScopeName}.log.${severity}`,
+    severity,
+    args,
+    attributes: {
+      'lmx.component': 'rw-write-preferred-client'
+    }
+  });
+};
 
 export const log = {
-  info: console.log.bind(console, chalk.gray.bold('lmx client info:')),
-  warn: console.error.bind(console, chalk.magenta.bold('lmx client warning:')),
-  error: console.error.bind(console, chalk.red.bold('lmx client error:')),
+  info(...args: any[]) {
+    emitRwLog('info', args);
+    console.log(chalk.gray.bold('lmx client info:'), ...args);
+  },
+  warn(...args: any[]) {
+    emitRwLog('warn', args);
+    console.error(chalk.magenta.bold('lmx client warning:'), ...args);
+  },
+  error(...args: any[]) {
+    emitRwLog('error', args);
+    console.error(chalk.red.bold('lmx client error:'), ...args);
+  },
   debug: function (...args: any[]) {
     // Always log RW lock operations for debugging
     if (weAreDebugging || process.env.LMX_DEBUG_RW === '1' || process.env.LMX_CAPTURE_LOGS === '1') {
+      emitRwLog('debug', args);
       console.log('lmx debugging:', ...args);
     }
   }
@@ -421,7 +445,7 @@ export class RWLockWritePrefClient extends Client {
     const uuid = UUID.v4();
     log.debug(chalk.cyan('[RW] registerWriteFlagCheck START'), {key, uuid});
 
-    this.resolutions[uuid] = (err, val) => {
+    this.resolutions.set(uuid, (err, val) => {
       log.debug(chalk.magenta('client got register-write-flag-check response, type:', val?.type, 'uuid:', uuid));
       
       // If we got a queued response, wait for the actual success response
@@ -445,10 +469,10 @@ export class RWLockWritePrefClient extends Client {
       
       // This is the final success response (register-write-flag-success)
       log.debug(chalk.magenta('received final success response, calling callback'));
-      delete this.resolutions[uuid];
+      this.resolutions.delete(uuid);
       log.debug(chalk.cyan('[RW] registerWriteFlagCheck CALLING CALLBACK'), {key, uuid});
       return cb(err, val);
-    };
+    });
 
     log.debug(chalk.cyan('[RW] registerWriteFlagCheck SENDING REQUEST'), {key, uuid});
     this.write({key, uuid, type: 'register-write-flag-check'});
@@ -460,12 +484,12 @@ export class RWLockWritePrefClient extends Client {
     const uuid = UUID.v4();
     log.debug(chalk.cyan('[RW] registerWriteFlagAndReadersCheck START'), {key, uuid});
 
-    this.resolutions[uuid] = (err, val) => {
+    this.resolutions.set(uuid, (err, val) => {
       log.debug(chalk.cyan('[RW] registerWriteFlagAndReadersCheck RESPONSE'), {key, uuid, err: !!err, valType: val?.type, hasVal: !!val});
-      delete this.resolutions[uuid];
+      this.resolutions.delete(uuid);
       log.debug(chalk.cyan('[RW] registerWriteFlagAndReadersCheck CALLING CALLBACK'), {key, uuid});
       cb(err, val);
-    };
+    });
 
     log.debug(chalk.cyan('[RW] registerWriteFlagAndReadersCheck SENDING REQUEST'), {key, uuid});
     this.write({
@@ -479,11 +503,12 @@ export class RWLockWritePrefClient extends Client {
   incrementReaders(key: any, cb: any) {
     const uuid = UUID.v4();
     log.debug(chalk.cyan('[RW] incrementReaders START'), {key, uuid});
-    this.resolutions[uuid] = (err, val) => {
+    this.resolutions.set(uuid, (err, val) => {
       log.debug(chalk.cyan('[RW] incrementReaders RESPONSE'), {key, uuid, err: !!err, valType: val?.type, hasVal: !!val});
+      this.resolutions.delete(uuid);
       log.debug(chalk.cyan('[RW] incrementReaders CALLING CALLBACK'), {key, uuid});
       cb(err, val);
-    };
+    });
     log.debug(chalk.cyan('[RW] incrementReaders SENDING REQUEST'), {key, uuid});
     this.write({
       uuid,
@@ -495,10 +520,11 @@ export class RWLockWritePrefClient extends Client {
   decrementReaders(key: string, cb: EVCb<any>) {
     const uuid = UUID.v4();
     log.debug(chalk.magenta('decrementReaders: sending request for key:'), key, 'uuid:', uuid);
-    this.resolutions[uuid] = (err, val) => {
+    this.resolutions.set(uuid, (err, val) => {
       log.debug(chalk.magenta('decrementReaders: received response for key:'), key, 'uuid:', uuid, 'type:', val?.type);
+      this.resolutions.delete(uuid);
       cb(err, val);
-    };
+    });
     this.write({
       uuid,
       type: 'decrement-readers',
@@ -509,10 +535,11 @@ export class RWLockWritePrefClient extends Client {
   setWriteFlagToFalse(key: string, cb: EVCb<any>) {
     const uuid = UUID.v4();
     log.debug(chalk.magenta('setWriteFlagToFalse: sending request for key:'), key, 'uuid:', uuid);
-    this.resolutions[uuid] = (err, val) => {
+    this.resolutions.set(uuid, (err, val) => {
       log.debug(chalk.magenta('setWriteFlagToFalse: received response for key:'), key, 'uuid:', uuid, 'type:', val?.type, 'err:', err);
+      this.resolutions.delete(uuid);
       cb(err, val);
-    };
+    });
     this.write({
       uuid,
       type: 'set-write-flag-false-and-broadcast',

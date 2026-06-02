@@ -11,6 +11,15 @@ export {Broker1, LMXBroker as LMXBroker1, LvMtxBroker as LvMtxBroker1} from './b
 
 export {LMXLockRequestError, LMXUnlockRequestError} from "./shared-internal";
 export {LMXClientException, LMXClientLockException, LMXClientUnlockException} from "./exceptions";
+export {
+  createTelemetryEvent,
+  emitTelemetryEvent,
+  emitEmitterInfoTelemetry,
+  emitEmitterWarningTelemetry,
+  LMXTelemetryEvent,
+  LMXTelemetryInput,
+  LMXTelemetrySeverity
+} from "./telemetry";
 
 export const r2gSmokeTest = function () {
   return true;

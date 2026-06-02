@@ -15,15 +15,39 @@ import {LinkedQueue, LinkedQueueValue, IsVoid} from '@oresoftware/linked-queue';
 //project
 const isLocalDev = process.env.oresoftware_local_dev === 'yes';
 import {forDebugging} from './shared-internal';
+import {emitEmitterInfoTelemetry, emitEmitterWarningTelemetry, emitTelemetryEvent} from "./telemetry";
 
 const debugLog = process.argv.indexOf('--lmx-debug') > 0 || process.env.lmx_debug === 'yes';
+const brokerScopeName = 'live-mutex.broker1';
+
+const emitBrokerLog = (severity: 'debug' | 'info' | 'warn' | 'error' | 'fatal', args: any[]) => {
+    emitTelemetryEvent({
+        scopeName: brokerScopeName,
+        name: `${brokerScopeName}.log.${severity}`,
+        severity,
+        args,
+        attributes: {
+            'lmx.component': 'broker1'
+        }
+    });
+};
 
 export const log = {
-    info: console.log.bind(console, chalk.gray.bold('lmx broker info:')),
-    error: console.error.bind(console, chalk.red.bold('lmx broker error:')),
-    warn: console.error.bind(console, chalk.yellow.bold('lmx broker warning:')),
+    info(...args: any[]) {
+        emitBrokerLog('info', args);
+        console.log(chalk.gray.bold('lmx broker info:'), ...args);
+    },
+    error(...args: any[]) {
+        emitBrokerLog('error', args);
+        console.error(chalk.red.bold('lmx broker error:'), ...args);
+    },
+    warn(...args: any[]) {
+        emitBrokerLog('warn', args);
+        console.error(chalk.yellow.bold('lmx broker warning:'), ...args);
+    },
     debug(...args: any[]) {
         if (debugLog) {
+            emitBrokerLog('debug', args);
             let newTime = Date.now();
             let elapsed = newTime - forDebugging.previousTime;
             forDebugging.previousTime = newTime;
@@ -263,11 +287,30 @@ export class Broker1 {
 
         const self = this;
 
+        this.emitter.on('info', function () {
+            emitEmitterInfoTelemetry(brokerScopeName, Array.from(arguments), {
+                'lmx.component': 'broker1'
+            });
+        });
+
         this.emitter.on('warning', function () {
-            if (self.emitter.listenerCount('warning') < 2) {
-                log.warn('No "warning" event handlers attached by end-user to the broker emitter, therefore logging these errors from library:');
-                log.warn(...arguments);
-                log.warn('Add a "warning" event listener to the lmx broker emitter to get rid of this message.');
+            const args = Array.from(arguments);
+
+            if (args.length === 1 && args[0] === '"exit" event has occurred.') {
+                return;
+            }
+
+            emitEmitterWarningTelemetry(brokerScopeName, args, {
+                'lmx.component': 'broker1'
+            });
+        });
+
+        this.emitter.on('warning', function () {
+            if (self.emitter.listenerCount('warning') < 3) {
+                const prefix = chalk.yellow.bold('lmx broker warning:');
+                console.error(prefix, 'No "warning" event handlers attached by end-user to the broker emitter, therefore logging these errors from library:');
+                console.error(prefix, ...Array.from(arguments));
+                console.error(prefix, 'Add a "warning" event listener to the lmx broker emitter to get rid of this message.');
             }
         });
 
@@ -678,6 +721,11 @@ export class Broker1 {
             }
         }
         this.connectedClients.clear();
+        this.locks.clear();
+        this.wsToKeys.clear();
+        this.wsToUUIDs.clear();
+        this.rejected = {};
+        this.registeredListeners = {};
         
         // Clean up Unix domain socket file if it exists
         if (this.socketFile) {
