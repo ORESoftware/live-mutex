@@ -180,7 +180,7 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
 
       // Acquire 5 locks
       for (let i = 0; i < 5; i++) {
-        c.lock('order-test', {}, (err, unlock) => {
+        c.lock('order-test', {max: 5}, (err, unlock) => {
           if (err) {
             return t.fail(err);
           }
@@ -189,10 +189,18 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
           
           if (acquired === 5) {
             // Release in reverse order
+            let released = 0;
             for (let j = unlocks.length - 1; j >= 0; j--) {
-              unlocks[j](() => {});
+              unlocks[j]((unlockErr) => {
+                if (unlockErr) {
+                  return t.fail(unlockErr);
+                }
+
+                if (++released === unlocks.length) {
+                  t.done();
+                }
+              });
             }
-            t.done();
           }
         });
       }
@@ -237,4 +245,3 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
   });
   
 }]);
-

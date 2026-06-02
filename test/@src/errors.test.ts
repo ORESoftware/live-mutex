@@ -50,6 +50,7 @@ Test.create((b, assert, before, describe, it, path, fs, inject, after) => {
 
     after.cb(h => {
       console.log('closing broker...');
+      c.close();
       return broker.close(h);
     });
 

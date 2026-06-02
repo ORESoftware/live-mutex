@@ -40,12 +40,11 @@ import Timer = NodeJS.Timer;
 import {RWStatus, inspectError} from "./shared-internal";
 import {compareVersions} from "./compare-versions";
 import {joinToStr} from "./shared-internal";
+import {packageJsonData as brokerPackage} from './package-json-loader';
 
 if (weAreDebugging) {
     log.error('Broker is in debug mode. Timeouts are turned off.');
 }
-
-const brokerPackage = require('../package.json');
 
 if (!(brokerPackage.version && typeof brokerPackage.version === 'string')) {
     throw new Error('Broker NPM package did not have a top-level field that is a string.');
@@ -146,7 +145,7 @@ export interface LockObj {
     lockholderTimeouts: UuidHash,
     lockholdersAllReleased: UuidHash,
     lockholders: LockholdersType,  // uuid(s) that hold the lock
-    notify: LinkedQueue<NotifyObj>, //Array<NotifyObj>,
+    notify: LinkedQueue<NotifyObj, string>, //Array<NotifyObj>,
     key: string,
     keepLocksAfterDeath: boolean
     writerFlag: boolean,
@@ -1260,7 +1259,7 @@ export class Broker {
                     }
 
                     // get the first 5, ideally we'd mix requests from different clients/ws
-                    notifyList.deq(5).forEach((lqv: [string, NotifyObj] | [typeof IsVoid] | { value: NotifyObj }) => {
+                    (notifyList.deq(5) as Array<[string, NotifyObj] | [unknown] | { value: NotifyObj }>).forEach((lqv) => {
                         // deq returns [K, V] tuples from dequeue() (despite type definition saying LinkedQueueValue)
                         let obj: NotifyObj;
                         if (Array.isArray(lqv) && !IsVoid.check(lqv[0])) {

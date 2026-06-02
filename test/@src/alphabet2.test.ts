@@ -19,6 +19,7 @@ Test.create(['lmUtils', (b, assert, before, describe, it, path, fs, inject, afte
   const result = [];
   const port = process.env.lmx_port ? parseInt(process.env.lmx_port) : (7000 + parseInt(process.env.SUMAN_CHILD_ID || '1'));
   const conf = {port};
+  const clients: Client[] = [];
   
   const handleEvents = function (v) {
 
@@ -44,6 +45,7 @@ Test.create(['lmUtils', (b, assert, before, describe, it, path, fs, inject, afte
 
     after.cb(h => {
       console.log('closing broker...');
+      clients.forEach(c => c.close());
       return broker.close(h);
     });
 
@@ -56,6 +58,7 @@ Test.create(['lmUtils', (b, assert, before, describe, it, path, fs, inject, afte
       async.times(5, function (n, cb) {
 
         const c = new Client({port: conf.port, ttl: 5000, lockRequestTimeout: 100});
+        clients.push(c);
         handleEvents(c);
 
         async.whilst(hasMoreLetters, function (cb) {

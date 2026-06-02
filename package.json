@@ -1,6 +1,6 @@
 {
   "name": "live-mutex",
-  "version": "0.2.25",
+  "version": "0.2.26",
   "description": "Simple mutex that uses a TCP server; useful if you cannot install Redis, etc.",
   "main": "dist/main.js",
   "module": "dist/esm/main.js",
@@ -15,7 +15,10 @@
     }
   },
   "files": [
-    "dist",
+    "assets",
+    "dist/*.d.ts",
+    "dist/*.js",
+    "dist/esm",
     "readme.md",
     "license.md"
   ],
@@ -39,7 +42,7 @@
     "compile:test": "tsc --project tsconfig.test.json",
     "compile:all": "npm run compile && npm run compile:test",
     "compile:check": "tsc --noEmit",
-    "build": "npm run compile && npm run compile:esm && node scripts/add-esm-extensions.js && node scripts/fix-commonjs-import-meta.js",
+    "build": "npm run compile && npm run compile:esm && node scripts/add-esm-extensions.js && node scripts/write-esm-package-boundary.cjs && node scripts/fix-esm-package-json-loader.cjs && node scripts/fix-commonjs-import-meta.js",
     "test": "node scripts/run-tests.js",
     "test:old": "./scripts/test.sh",
     "postinstall": "./assets/postinstall.sh"
@@ -59,7 +62,7 @@
   "homepage": "https://github.com/ORESoftware/live-mutex#readme",
   "dependencies": {
     "@oresoftware/json-stream-parser": "0.0.124",
-    "@oresoftware/linked-queue": "^2.2.13",
+    "@oresoftware/linked-queue": "^3.1.12",
     "chalk": "^2.4.2",
     "tcp-ping": "^0.1.1",
     "uuid": "^3.3.2"
@@ -69,7 +72,7 @@
     "@types/node": "^10.1.2",
     "@types/tcp-ping": "^0.1.0",
     "@types/uuid": "^3.4.3",
-    "suman": "^1.1.51244",
+    "suman": "^1.1.51245",
     "typescript": "^5.9.3"
   }
 }

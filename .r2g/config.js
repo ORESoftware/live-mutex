@@ -16,7 +16,8 @@ exports.default = {
   tests: '',
 
   packages: {
-    '@oresoftware/linked-queue': true
+    '@oresoftware/linked-queue': true,
+    'suman': true
   }
 
 };

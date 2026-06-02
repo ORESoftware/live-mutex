@@ -61,7 +61,7 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
           c.endRead('a', {writeKey},(err,val) => {
             console.error('here is args 2:,', err, val);
 
-            if(err.match(/no lock with key/)){
+            if(err && String(err).match(/no lock with key/)){
               err =null;
             }
 
