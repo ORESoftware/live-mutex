@@ -31,9 +31,17 @@ function sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+const parsedTestPort = Number.parseInt(process.env.LMX_TEST_PORT || '', 10);
+const testPortBase = Number.isInteger(parsedTestPort) ? parsedTestPort : 8000 + Math.floor(Math.random() * 1000);
+let testPortOffset = 0;
+
+function getNextPort(): number {
+    return testPortBase + testPortOffset++;
+}
+
 async function testDefaultMaxOne(): Promise<void> {
     console.log('\n=== Test 1: Default max=1 (Exclusive Lock) ===');
-    const port = 8000 + Math.floor(Math.random() * 1000);
+    const port = getNextPort();
     const broker = new Broker({port});
     await broker.ensure();
     
@@ -125,7 +133,7 @@ async function testDefaultMaxOne(): Promise<void> {
 
 async function testSemaphoreMaxThree(): Promise<void> {
     console.log('\n=== Test 2: Semaphore max=3 (3 Concurrent Holders) ===');
-    const port = 8000 + Math.floor(Math.random() * 1000);
+    const port = getNextPort();
     const broker = new Broker({port});
     await broker.ensure();
     
@@ -221,7 +229,7 @@ async function testSemaphoreMaxThree(): Promise<void> {
 
 async function testSemaphoreMaxTen(): Promise<void> {
     console.log('\n=== Test 3: Semaphore max=10 (10 Concurrent Holders) ===');
-    const port = 8000 + Math.floor(Math.random() * 1000);
+    const port = getNextPort();
     const broker = new Broker({port});
     await broker.ensure();
     
@@ -321,7 +329,7 @@ async function testSemaphoreMaxTen(): Promise<void> {
 
 async function testSemaphoreStress(): Promise<void> {
     console.log('\n=== Test 4: Semaphore Stress Test (max=5, 50 clients, 10 ops each) ===');
-    const port = 8000 + Math.floor(Math.random() * 1000);
+    const port = getNextPort();
     const broker = new Broker({port});
     await broker.ensure();
     
@@ -422,7 +430,7 @@ async function testSemaphoreStress(): Promise<void> {
 
 async function testMixedMaxValues(): Promise<void> {
     console.log('\n=== Test 5: Mixed Max Values (Different keys with different max) ===');
-    const port = 8000 + Math.floor(Math.random() * 1000);
+    const port = getNextPort();
     const broker = new Broker({port});
     await broker.ensure();
     
@@ -534,8 +542,13 @@ async function testMixedMaxValues(): Promise<void> {
         console.error('❌ Mixed max values test failed:', err.message);
         throw err;
     } finally {
-        await new Promise<void>(resolve => broker.close(resolve));
-        clients.forEach(c => c.close());
+        clients.forEach(c => {
+            try { c.close(); } catch (e) {}
+        });
+        await Promise.race([
+            new Promise<void>(resolve => broker.close(resolve)),
+            new Promise<void>(resolve => setTimeout(resolve, 2000))
+        ]);
         try { 
             fs.unlinkSync(tmpFile1);
             fs.unlinkSync(tmpFile2);
@@ -595,4 +608,3 @@ runAllTests().catch((err: any) => {
     console.error('Fatal error:', err);
     setTimeout(() => process.exit(1), 500);
 });
-

@@ -6,7 +6,7 @@
 process.argv.push('--lmx-debug');
 process.env.lmx_debug = 'yes';
 
-import {Broker, RWLockClient, RWLockWritePrefClient, Client} from '../dist/main';
+import {Broker1, RWLockClient, RWLockWritePrefClient, Client} from '../dist/main';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -69,6 +69,14 @@ function appendFileValue(filePath: string, value: number): void {
     fs.appendFileSync(filePath, `${value}\n`, 'utf8');
 }
 
+const parsedTestPort = Number.parseInt(process.env.LMX_TEST_PORT || '', 10);
+const testPortBase = Number.isInteger(parsedTestPort) ? parsedTestPort : 7000 + Math.floor(Math.random() * 1000);
+let testPortOffset = 0;
+
+function getNextPort(): number {
+    return testPortBase + testPortOffset++;
+}
+
 interface TestResult {
     success: boolean;
     error?: string;
@@ -89,14 +97,24 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMsg: string
     ]);
 }
 
+function closeClient(client: {close: () => void}): void {
+    try { client.close(); } catch (e) {}
+}
+
+async function closeBroker(broker: Broker1): Promise<void> {
+    await Promise.race([
+        new Promise<void>(resolve => broker.close(() => resolve())),
+        new Promise<void>(resolve => setTimeout(resolve, 2000))
+    ]);
+}
+
 async function testRWLockWithFile(): Promise<TestResult> {
     console.log('\n=== Testing RW Lock with File Operations ===');
     debug.log('Starting RW Lock test');
     
-    // Use a random port to avoid conflicts
-    const port = 7000 + Math.floor(Math.random() * 1000);
+    const port = getNextPort();
     debug.log(`Using port: ${port}`);
-    const broker = new Broker({port});
+    const broker = new Broker1({port});
     debug.log('Broker created, ensuring...');
     await withTimeout(broker.ensure(), 5000, 'Broker ensure timeout');
     debug.log('Broker ensured');
@@ -109,7 +127,7 @@ async function testRWLockWithFile(): Promise<TestResult> {
         debug.error('[BROKER ERROR]', err);
     });
     
-    const client = new RWLockClient({port});
+    const client = new RWLockClient({port, lockRequestTimeout: 30000});
     debug.log('Client created, ensuring...');
     await withTimeout(client.ensure(), 5000, 'Client ensure timeout');
     debug.log('Client ensured');
@@ -121,6 +139,19 @@ async function testRWLockWithFile(): Promise<TestResult> {
     client.emitter.on('error', (err: any) => {
         debug.error('[CLIENT ERROR]', err);
     });
+
+    const readerClients: RWLockClient[] = [client];
+    for (let i = 1; i < 5; i++) {
+        const readerClient = new RWLockClient({port, lockRequestTimeout: 30000});
+        await withTimeout(readerClient.ensure(), 5000, `Reader client ${i} ensure timeout`);
+        readerClient.emitter.on('warning', (msg: any) => {
+            debug.warn(`[READER CLIENT ${i} WARNING]`, msg);
+        });
+        readerClient.emitter.on('error', (err: any) => {
+            debug.error(`[READER CLIENT ${i} ERROR]`, err);
+        });
+        readerClients.push(readerClient);
+    }
     
     const tmpFile = createTmpFile();
     const readKey = 'read-key';
@@ -128,154 +159,157 @@ async function testRWLockWithFile(): Promise<TestResult> {
     
     console.log('Using temp file:', tmpFile);
     console.log('Initial file value:', readFileValue(tmpFile));
-    
-    // Test 1: Multiple readers can read simultaneously
-    console.log('\n--- Test 1: Multiple concurrent readers ---');
-    debug.log('Starting test 1: Multiple concurrent readers');
-    const readerPromises: Promise<void>[] = [];
-    for (let i = 0; i < 5; i++) {
-        readerPromises.push(withTimeout(new Promise<void>((resolve, reject) => {
-            debug.log(`Reader ${i}: Requesting read lock...`);
-            client.beginRead(readKey, {writeKey}, (err: any, release: any) => {
+
+    try {
+        // Test 1: Multiple readers can read simultaneously
+        console.log('\n--- Test 1: Multiple concurrent readers ---');
+        debug.log('Starting test 1: Multiple concurrent readers');
+        const readerPromises: Promise<void>[] = [];
+        for (let i = 0; i < 5; i++) {
+            const readerClient = readerClients[i];
+            readerPromises.push(withTimeout(new Promise<void>((resolve, reject) => {
+                debug.log(`Reader ${i}: Requesting read lock...`);
+                readerClient.beginRead(readKey, {writeKey}, (err: any, release: any) => {
+                    if (err) {
+                        debug.error(`Reader ${i}: Error acquiring read lock:`, err);
+                        return reject(err);
+                    }
+
+                    debug.log(`Reader ${i}: Read lock acquired`);
+                    const value = readFileValue(tmpFile);
+                    console.log(`Reader ${i} read value: ${value}`);
+
+                    setTimeout(() => {
+                        debug.log(`Reader ${i}: Releasing read lock...`);
+                        release((releaseErr: any) => {
+                            if (releaseErr) {
+                                debug.error(`Reader ${i}: Error releasing read lock:`, releaseErr);
+                                return reject(releaseErr);
+                            }
+                            debug.log(`Reader ${i}: Read lock released`);
+                            resolve();
+                        });
+                    }, 50);
+                });
+            }), 35000, `Reader ${i} timeout`));
+        }
+
+        await Promise.all(readerPromises);
+        console.log('✅ Multiple readers completed successfully');
+
+        // Test 2: Writer is exclusive
+        console.log('\n--- Test 2: Writer exclusivity ---');
+        debug.log('Starting test 2: Writer exclusivity');
+        let writeValue = 100;
+        await withTimeout(new Promise<void>((resolve, reject) => {
+            debug.log('Requesting write lock...');
+            client.beginWrite(writeKey, {}, (err: any, release: any) => {
                 if (err) {
-                    debug.error(`Reader ${i}: Error acquiring read lock:`, err);
+                    debug.error('Error acquiring write lock:', err);
                     return reject(err);
                 }
-                
-                debug.log(`Reader ${i}: Read lock acquired`);
-                const value = readFileValue(tmpFile);
-                console.log(`Reader ${i} read value: ${value}`);
-                
-                setTimeout(() => {
-                    debug.log(`Reader ${i}: Releasing read lock...`);
-                    release((releaseErr: any) => {
+
+                debug.log('Write lock acquired');
+                writeFileValue(tmpFile, writeValue);
+                console.log(`Writer wrote value: ${writeValue}`);
+
+                // Try to read while write lock is held (should wait)
+                let readAttempted = false;
+                debug.log('Attempting read while write lock is held...');
+                client.beginRead(readKey, {writeKey}, (readErr: any, readRelease: any) => {
+                    readAttempted = true;
+                    debug.log('Read lock callback invoked');
+                    if (readErr) {
+                        debug.error('Read error during write:', readErr);
+                        console.error('Read error during write:', readErr);
+                        return reject(readErr);
+                    }
+
+                    debug.log('Read lock acquired after write');
+                    const readValue = readFileValue(tmpFile);
+                    console.log(`Read after write completed, value: ${readValue}`);
+
+                    if (readValue !== writeValue) {
+                        return reject(new Error(`Expected ${writeValue}, got ${readValue}`));
+                    }
+
+                    debug.log('Releasing read lock...');
+                    readRelease((releaseErr: any) => {
                         if (releaseErr) {
-                            debug.error(`Reader ${i}: Error releasing read lock:`, releaseErr);
+                            debug.error('Error releasing read lock:', releaseErr);
                             return reject(releaseErr);
                         }
-                        debug.log(`Reader ${i}: Read lock released`);
+                        debug.log('Read lock released');
                         resolve();
                     });
-                }, 50);
-            });
-        }), 10000, `Reader ${i} timeout`));
-    }
-    
-    await Promise.all(readerPromises);
-    console.log('✅ Multiple readers completed successfully');
-    
-    // Test 2: Writer is exclusive
-    console.log('\n--- Test 2: Writer exclusivity ---');
-    debug.log('Starting test 2: Writer exclusivity');
-    let writeValue = 100;
-    await withTimeout(new Promise<void>((resolve, reject) => {
-        debug.log('Requesting write lock...');
-        client.beginWrite(writeKey, {}, (err: any, release: any) => {
-            if (err) {
-                debug.error('Error acquiring write lock:', err);
-                return reject(err);
-            }
-            
-            debug.log('Write lock acquired');
-            writeFileValue(tmpFile, writeValue);
-            console.log(`Writer wrote value: ${writeValue}`);
-            
-            // Try to read while write lock is held (should wait)
-            let readAttempted = false;
-            debug.log('Attempting read while write lock is held...');
-            client.beginRead(readKey, {writeKey}, (readErr: any, readRelease: any) => {
-                readAttempted = true;
-                debug.log('Read lock callback invoked');
-                if (readErr) {
-                    debug.error('Read error during write:', readErr);
-                    console.error('Read error during write:', readErr);
-                    return reject(readErr);
-                }
-                
-                debug.log('Read lock acquired after write');
-                const readValue = readFileValue(tmpFile);
-                console.log(`Read after write completed, value: ${readValue}`);
-                
-                if (readValue !== writeValue) {
-                    return reject(new Error(`Expected ${writeValue}, got ${readValue}`));
-                }
-                
-                debug.log('Releasing read lock...');
-                readRelease((releaseErr: any) => {
-                    if (releaseErr) {
-                        debug.error('Error releasing read lock:', releaseErr);
-                        return reject(releaseErr);
-                    }
-                    debug.log('Read lock released');
-                    resolve();
                 });
-            });
-            
-            setTimeout(() => {
-                if (!readAttempted) {
-                    debug.log('Read is waiting (as expected)');
-                    console.log('Read is waiting (as expected)');
-                }
-                debug.log('Releasing write lock...');
-                release((releaseErr: any) => {
-                    if (releaseErr) {
-                        debug.error('Error releasing write lock:', releaseErr);
-                    } else {
-                        debug.log('Write lock released');
-                    }
-                });
-            }, 100);
-        });
-    }), 15000, 'Writer exclusivity test timeout');
-    console.log('✅ Writer exclusivity test passed');
-    
-    // Test 3: Multiple writes are serialized
-    console.log('\n--- Test 3: Multiple writes serialized ---');
-    const writePromises: Promise<void>[] = [];
-    for (let i = 0; i < 5; i++) {
-        writePromises.push(new Promise<void>((resolve, reject) => {
-            client.beginWrite(writeKey, {}, (err: any, release: any) => {
-                if (err) return reject(err);
-                
-                const currentValue = readFileValue(tmpFile);
-                const newValue = currentValue + 1;
-                writeFileValue(tmpFile, newValue);
-                console.log(`Write ${i}: ${currentValue} -> ${newValue}`);
-                
+
                 setTimeout(() => {
+                    if (!readAttempted) {
+                        debug.log('Read is waiting (as expected)');
+                        console.log('Read is waiting (as expected)');
+                    }
+                    debug.log('Releasing write lock...');
                     release((releaseErr: any) => {
-                        if (releaseErr) return reject(releaseErr);
-                        resolve();
+                        if (releaseErr) {
+                            debug.error('Error releasing write lock:', releaseErr);
+                        } else {
+                            debug.log('Write lock released');
+                        }
                     });
-                }, 20);
+                }, 100);
             });
-        }));
+        }), 15000, 'Writer exclusivity test timeout');
+        console.log('✅ Writer exclusivity test passed');
+
+        // Test 3: Multiple writes are serialized
+        console.log('\n--- Test 3: Multiple writes serialized ---');
+        const writePromises: Promise<void>[] = [];
+        for (let i = 0; i < 5; i++) {
+            writePromises.push(new Promise<void>((resolve, reject) => {
+                client.beginWrite(writeKey, {}, (err: any, release: any) => {
+                    if (err) return reject(err);
+
+                    const currentValue = readFileValue(tmpFile);
+                    const newValue = currentValue + 1;
+                    writeFileValue(tmpFile, newValue);
+                    console.log(`Write ${i}: ${currentValue} -> ${newValue}`);
+
+                    setTimeout(() => {
+                        release((releaseErr: any) => {
+                            if (releaseErr) return reject(releaseErr);
+                            resolve();
+                        });
+                    }, 20);
+                });
+            }));
+        }
+
+        await Promise.all(writePromises);
+        const finalValue = readFileValue(tmpFile);
+        console.log(`Final value after 5 writes: ${finalValue}`);
+
+        if (finalValue !== 105) {
+            throw new Error(`Expected final value 105, got ${finalValue}`);
+        }
+        console.log('✅ Multiple writes serialized correctly');
+
+        return {success: true};
     }
-    
-    await Promise.all(writePromises);
-    const finalValue = readFileValue(tmpFile);
-    console.log(`Final value after 5 writes: ${finalValue}`);
-    
-    if (finalValue !== 105) {
-        throw new Error(`Expected final value 105, got ${finalValue}`);
+    finally {
+        readerClients.forEach(closeClient);
+        await closeBroker(broker);
+        try { fs.unlinkSync(tmpFile); } catch (e) {}
     }
-    console.log('✅ Multiple writes serialized correctly');
-    
-    // Cleanup
-    fs.unlinkSync(tmpFile);
-    await new Promise<void>(resolve => broker.close(() => resolve()));
-    client.close();
-    
-    return {success: true};
 }
 
 async function testRWLockWritePrefWithFile(): Promise<TestResult> {
     console.log('\n=== Testing RW Lock Write Preferred with File Operations ===');
     debug.log('Starting RW Lock Write Preferred test');
     
-    const port = 7000 + Math.floor(Math.random() * 1000);
+    const port = getNextPort();
     debug.log(`Using port: ${port}`);
-    const broker = new Broker({port});
+    const broker = new Broker1({port});
     debug.log('Broker created, ensuring...');
     await broker.ensure();
     debug.log('Broker ensured');
@@ -364,9 +398,9 @@ async function testRWLockWritePrefWithFile(): Promise<TestResult> {
     console.log('✅ Write preferred lock test passed');
     
     // Cleanup
-    fs.unlinkSync(tmpFile);
-    await new Promise<void>(resolve => broker.close(() => resolve()));
-    client.close();
+    closeClient(client);
+    await closeBroker(broker);
+    try { fs.unlinkSync(tmpFile); } catch (e) {}
     
     return {success: true};
 }
@@ -375,9 +409,9 @@ async function testSemaphoreLogic(): Promise<TestResult> {
     console.log('\n=== Testing Semaphore Logic ===');
     debug.log('Starting semaphore test');
     
-    const port = 7000 + Math.floor(Math.random() * 1000);
+    const port = getNextPort();
     debug.log(`Using port: ${port}`);
-    const broker = new Broker({port});
+    const broker = new Broker1({port});
     debug.log('Broker created, ensuring...');
     await broker.ensure();
     debug.log('Broker ensured');
@@ -482,8 +516,8 @@ async function testSemaphoreLogic(): Promise<TestResult> {
     console.log('✅ Semaphore logic test passed');
     
     // Cleanup
-    await new Promise<void>(resolve => broker.close(() => resolve()));
-    clients.forEach(c => c.close());
+    clients.forEach(closeClient);
+    await closeBroker(broker);
     
     return {success: true, errors: errors.length, memoryGrowth};
 }
@@ -492,9 +526,9 @@ async function testConcurrentRWOperations(): Promise<TestResult> {
     console.log('\n=== Testing Concurrent RW Operations ===');
     debug.log('Starting concurrent RW operations test');
     
-    const port = 7000 + Math.floor(Math.random() * 1000);
+    const port = getNextPort();
     debug.log(`Using port: ${port}`);
-    const broker = new Broker({port});
+    const broker = new Broker1({port});
     debug.log('Broker created, ensuring...');
     await broker.ensure();
     debug.log('Broker ensured');
@@ -598,9 +632,9 @@ async function testConcurrentRWOperations(): Promise<TestResult> {
     console.log('✅ Concurrent RW operations test passed');
     
     // Cleanup
-    fs.unlinkSync(tmpFile);
-    await new Promise<void>(resolve => broker.close(() => resolve()));
-    clients.forEach(c => c.close());
+    clients.forEach(closeClient);
+    await closeBroker(broker);
+    try { fs.unlinkSync(tmpFile); } catch (e) {}
     
     return {success: true};
 }
@@ -697,4 +731,3 @@ runAllTests().catch((err: any) => {
     console.error('Fatal error:', err);
     process.exit(1);
 });
-

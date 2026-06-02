@@ -98,7 +98,7 @@ function analyzeMemoryGrowth() {
 
 // Test configuration
 const TEST_CONFIG = {
-    port: 8888,
+    port: process.env.LMX_TEST_PORT ? parseInt(process.env.LMX_TEST_PORT, 10) : 8888,
     duration: 120000, // 2 minutes
     clientCount: 20,
     operationsPerSecond: 10,
@@ -416,4 +416,3 @@ if (require.main === module) {
 }
 
 export { runMemoryLeakTest };
-

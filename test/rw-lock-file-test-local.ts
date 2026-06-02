@@ -28,9 +28,28 @@ function sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+const parsedTestPort = Number.parseInt(process.env.LMX_TEST_PORT || '', 10);
+const testPortBase = Number.isInteger(parsedTestPort) ? parsedTestPort : 8000 + Math.floor(Math.random() * 1000);
+let testPortOffset = 0;
+
+function getNextPort(): number {
+    return testPortBase + testPortOffset++;
+}
+
+function closeClient(client: { close: () => void }): void {
+    try { client.close(); } catch (e) {}
+}
+
+async function closeBroker(broker: Broker): Promise<void> {
+    await Promise.race([
+        new Promise<void>(resolve => broker.close(resolve)),
+        new Promise<void>(resolve => setTimeout(resolve, 2000))
+    ]);
+}
+
 async function testBasicRWLock(): Promise<void> {
     console.log('\n=== Test 1: Basic Read-Write Lock ===');
-    const port = 8000 + Math.floor(Math.random() * 1000);
+    const port = getNextPort();
     const broker = new Broker({port});
     await broker.ensure();
     
@@ -77,15 +96,15 @@ async function testBasicRWLock(): Promise<void> {
         console.error('❌ Basic RWLock test failed:', err.message);
         throw err;
     } finally {
-        await new Promise<void>(resolve => broker.close(resolve));
-        client.close();
+        closeClient(client);
+        await closeBroker(broker);
         try { fs.unlinkSync(tmpFile); } catch (e) {}
     }
 }
 
 async function testConcurrentReaders(): Promise<void> {
     console.log('\n=== Test 2: Concurrent Readers ===');
-    const port = 8000 + Math.floor(Math.random() * 1000);
+    const port = getNextPort();
     const broker = new Broker({port});
     await broker.ensure();
     
@@ -125,15 +144,15 @@ async function testConcurrentReaders(): Promise<void> {
         console.error('❌ Concurrent readers test failed:', err.message);
         throw err;
     } finally {
-        await new Promise<void>(resolve => broker.close(resolve));
-        clients.forEach(c => c.close());
+        clients.forEach(closeClient);
+        await closeBroker(broker);
         try { fs.unlinkSync(tmpFile); } catch (e) {}
     }
 }
 
 async function testExclusiveWriter(): Promise<void> {
     console.log('\n=== Test 3: Exclusive Writer ===');
-    const port = 8000 + Math.floor(Math.random() * 1000);
+    const port = getNextPort();
     const broker = new Broker({port});
     await broker.ensure();
     
@@ -188,15 +207,15 @@ async function testExclusiveWriter(): Promise<void> {
         console.error('❌ Exclusive writer test failed:', err.message);
         throw err;
     } finally {
-        await new Promise<void>(resolve => broker.close(resolve));
-        clients.forEach(c => c.close());
+        clients.forEach(closeClient);
+        await closeBroker(broker);
         try { fs.unlinkSync(tmpFile); } catch (e) {}
     }
 }
 
 async function testReaderWriterInteraction(): Promise<void> {
     console.log('\n=== Test 4: Reader-Writer Interaction ===');
-    const port = 8000 + Math.floor(Math.random() * 1000);
+    const port = getNextPort();
     const broker = new Broker({port});
     await broker.ensure();
     
@@ -265,16 +284,16 @@ async function testReaderWriterInteraction(): Promise<void> {
         console.error('❌ Reader-writer interaction test failed:', err.message);
         throw err;
     } finally {
-        await new Promise<void>(resolve => broker.close(resolve));
-        readerClient.close();
-        writerClient.close();
+        closeClient(readerClient);
+        closeClient(writerClient);
+        await closeBroker(broker);
         try { fs.unlinkSync(tmpFile); } catch (e) {}
     }
 }
 
 async function testSemaphoreLogic(): Promise<void> {
     console.log('\n=== Test 5: Semaphore Logic ===');
-    const port = 8000 + Math.floor(Math.random() * 1000);
+    const port = getNextPort();
     const broker = new Broker({port});
     await broker.ensure();
     
@@ -347,15 +366,15 @@ async function testSemaphoreLogic(): Promise<void> {
         console.error('❌ Semaphore test failed:', err.message);
         throw err;
     } finally {
-        await new Promise<void>(resolve => broker.close(resolve));
-        clients.forEach(c => c.close());
+        clients.forEach(closeClient);
+        await closeBroker(broker);
         try { fs.unlinkSync(tmpFile); } catch (e) {}
     }
 }
 
 async function testSemaphoreStress(): Promise<void> {
     console.log('\n=== Test 6: Semaphore Stress Test ===');
-    const port = 8000 + Math.floor(Math.random() * 1000);
+    const port = getNextPort();
     const broker = new Broker({port});
     await broker.ensure();
     
@@ -433,8 +452,8 @@ async function testSemaphoreStress(): Promise<void> {
         console.error('❌ Semaphore stress test failed:', err.message);
         throw err;
     } finally {
-        await new Promise<void>(resolve => broker.close(resolve));
-        clients.forEach(c => c.close());
+        clients.forEach(closeClient);
+        await closeBroker(broker);
         try { fs.unlinkSync(tmpFile); } catch (e) {}
     }
 }
@@ -489,4 +508,3 @@ runAllTests().catch((err: any) => {
     console.error('Fatal error:', err);
     setImmediate(() => process.exit(1));
 });
-

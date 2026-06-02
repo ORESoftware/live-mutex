@@ -4,14 +4,21 @@ import * as async from 'async';
 import * as assert from "assert";
 import * as domain from "domain";
 
-// Use random port to avoid conflicts with other tests
-const port = 8000 + Math.floor(Math.random() * 1000);
+// Prefer the serial runner's assigned port, with a random fallback for manual runs.
+const port = process.env.LMX_TEST_PORT ? parseInt(process.env.LMX_TEST_PORT, 10) : 8000 + Math.floor(Math.random() * 1000);
 
 Promise.all([
   new Broker({port}).ensure(),
   new Client({port}).connect()
 ])
 .then(function ([b, c]) {
+
+  const clients: Client[] = [c];
+
+  const registerClient = function (client: Client) {
+    clients.push(client);
+    return client;
+  };
 
   b.emitter.on('warning', function (v) {
     if (!String(v).match(/no lock with key/)) {
@@ -52,27 +59,27 @@ Promise.all([
 
       function(cb){
 
-        const c = Client.create({port});
-        c.ensure((err, client) => {
+        const client = registerClient(Client.create({port}));
+        client.ensure((err, readyClient) => {
 
           if (err) {
             return cb(err);
           }
 
-          if (!client) {
+          if (!readyClient) {
             return cb(new Error('Client ensure returned undefined'));
           }
 
           
 
-          client.lock('z', function (err, v) {
+          readyClient.lock('z', function (err, v) {
             if (err) {
               return cb(err);
             }
             console.log('the error:', err);
             console.log('the v:', v);
             console.log('the id:', v.id);
-            client.unlock('z', v.id, function (err, v) {
+            readyClient.unlock('z', v.id, function (err, v) {
               
               console.log(err,v);
                 cb(err, v);
@@ -85,17 +92,17 @@ Promise.all([
 
         
 
-        const c = new Client({port});
-        c.ensure().then(function () {
+        const c2 = registerClient(new Client({port}));
+        c2.ensure().then(function () {
 
           
 
-          c.lock('z', function (err, {id}) {
+          c2.lock('z', function (err, {id}) {
 
             
 
             if (err) return cb(err);
-            c.unlock('z', id, cb);
+            c2.unlock('z', id, cb);
           });
         });
       },
@@ -103,21 +110,22 @@ Promise.all([
 
         
 
-        const c = Client.create({port});
+        const c3 = registerClient(Client.create({port}));
 
-        c.ensure().then(c => {
-          c.lock('z', function (err, {id}) {
+        c3.ensure().then(client => {
+          client.lock('z', function (err, {id}) {
 
             
             if (err) return cb(err);
-            c.unlock('z', id, cb);
+            client.unlock('z', id, cb);
           });
 
         });
       },
       function (cb) {
 
-         Client.create({port}).ensure().then(c => {
+         const c4 = registerClient(Client.create({port}));
+         c4.ensure().then(c => {
 
           
 
@@ -144,13 +152,23 @@ Promise.all([
 
       // Cleanup: close client and broker
       const cleanup = () => {
-        try {
-          c.close();
-        } catch (e) {
-          // Ignore cleanup errors
-        }
+        clients.forEach(client => {
+          try {
+            client.close();
+          } catch (e) {
+            // Ignore cleanup errors
+          }
+        });
         
-        b.close((closeErr) => {
+        let finished = false;
+
+        const finish = (closeErr?: any) => {
+          if (finished) {
+            return;
+          }
+
+          finished = true;
+
           if (closeErr) {
             console.error('Broker close error:', closeErr);
           }
@@ -162,6 +180,13 @@ Promise.all([
             console.log('all done.');
             process.exit(0);
           }
+        };
+
+        const closeTimeout = setTimeout(() => finish(), 2000);
+
+        b.close((closeErr) => {
+          clearTimeout(closeTimeout);
+          finish(closeErr);
         });
       };
       
