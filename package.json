@@ -48,7 +48,7 @@
     "postinstall": "./assets/postinstall.sh"
   },
   "r2g": {
-    "test": "./test/setup-test.sh && suman --default"
+    "test": "node .r2g/tests/phase-contract.cjs --phase-z"
   },
   "repository": {
     "type": "git",
