@@ -4,7 +4,9 @@
 
 import * as assert from 'assert';
 import {Client} from '../src/client';
-import {emitTelemetryEvent} from '../src/telemetry';
+import {createTelemetryEvent, emitTelemetryEvent} from '../src/telemetry';
+
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 const onceProcessEvent = (name: string): Promise<any> => {
   return new Promise((resolve, reject) => {
@@ -81,6 +83,7 @@ const main = async () => {
 
     const receivedWarning = await warningEvent;
     assert.ok(receivedWarning instanceof Error);
+    assert.strictEqual((receivedWarning as any).code, 'LIVE_MUTEX_TEST_WARNING');
     assert.strictEqual((receivedWarning as any).lmxTelemetry.name, emittedWarning.name);
     assert.strictEqual((receivedWarning as any).lmxTelemetry.severityText, 'WARN');
     assert.strictEqual((receivedWarning as any).lmxTelemetry.attributes['test.case'], 'process-warning');
@@ -100,6 +103,67 @@ const main = async () => {
     assert.ok((receivedEmitterWarning as any).lmxTelemetry.message.includes('client warning from emitter'));
   });
 
+  {
+    const previousProcessTelemetry = process.env.LMX_PROCESS_TELEMETRY;
+    try {
+      process.env.LMX_PROCESS_TELEMETRY = 'nope';
+      let emitted = false;
+      const onInfo = () => {
+        emitted = true;
+      };
+
+      process.once('info' as any, onInfo);
+      emitTelemetryEvent({
+        scopeName: 'live-mutex.test',
+        name: 'live-mutex.test.disabled-info',
+        severity: 'info',
+        args: ['should not emit']
+      });
+      await delay(25);
+      process.removeListener('info' as any, onInfo);
+      assert.strictEqual(emitted, false, 'LMX_PROCESS_TELEMETRY=nope should suppress process info events');
+    }
+    finally {
+      if (previousProcessTelemetry === undefined) {
+        delete process.env.LMX_PROCESS_TELEMETRY;
+      }
+      else {
+        process.env.LMX_PROCESS_TELEMETRY = previousProcessTelemetry;
+      }
+    }
+  }
+
+  {
+    const previousServiceName = process.env.OTEL_SERVICE_NAME;
+    try {
+      process.env.OTEL_SERVICE_NAME = 'lmx-test-service';
+      const event = createTelemetryEvent({
+        scopeName: 'Live Mutex Test Scope',
+        name: 'Live Mutex Test Event!',
+        severity: 'debug',
+        args: ['debug message'],
+        attributes: {
+          'test.case': 'create-event'
+        }
+      });
+
+      assert.strictEqual(event.serviceName, 'lmx-test-service');
+      assert.strictEqual(event.name, 'live.mutex.test.event');
+      assert.strictEqual(event.severityText, 'DEBUG');
+      assert.strictEqual(event.severityNumber, 5);
+      assert.strictEqual(event.attributes['service.name'], 'lmx-test-service');
+      assert.strictEqual(event.attributes['test.case'], 'create-event');
+    }
+    finally {
+      if (previousServiceName === undefined) {
+        delete process.env.OTEL_SERVICE_NAME;
+      }
+      else {
+        process.env.OTEL_SERVICE_NAME = previousServiceName;
+      }
+    }
+  }
+
   console.log('telemetry-test passed');
 };
 
@@ -107,4 +171,3 @@ main().catch(err => {
   console.error(err && err.stack || err);
   process.exit(1);
 });
-
