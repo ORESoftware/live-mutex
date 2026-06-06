@@ -1,7 +1,7 @@
 # Modern minimal Dockerfile used by the k8s live-smoke test only.
 # The repo's main Dockerfile pins node:12.3.1-alpine and is too old for
-# current dev work; this image is built locally + loaded into minikube
-# via `minikube image load`. Not pushed to docker hub from this branch.
+# current dev work; this image is built locally for k8s live-smoke checks.
+# It is not pushed to docker hub from this branch.
 FROM node:20-alpine
 WORKDIR /app
 COPY package.json package-lock.json ./
