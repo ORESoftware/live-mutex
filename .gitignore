@@ -14,6 +14,7 @@ test/.suman/.meta
 *.log
 *.tgz
 *.DS_Store
+erl_crash.dump
 src/*.js
 src/*.d.ts
 
