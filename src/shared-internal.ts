@@ -1,5 +1,7 @@
 'use strict';
 
+
+import {routineEnter} from './routine';
 import * as util from "util";
 
 export type EVCb<T, E = any> = (err: E, val?: T) => void
@@ -9,6 +11,8 @@ export const forDebugging = {
 };
 
 export const inspectError = (err: any): string => {
+  const routineId = 'ddl-routine-869DQuCdI7t_-7rULA';
+  routineEnter(routineId, "inspectError");
   return typeof err === 'string' ? err : util.inspect(err, {
     showHidden: true,
     depth: 5
@@ -16,6 +20,8 @@ export const inspectError = (err: any): string => {
 };
 
 export const joinToStr = (...args: any[]): string => {
+  const routineId = 'ddl-routine-bWnvU9DoYXOeJ0L-wk';
+  routineEnter(routineId, "joinToStr");
   return args.map(inspectError).join(' ');
 };
 

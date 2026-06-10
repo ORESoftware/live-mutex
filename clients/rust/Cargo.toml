@@ -1,0 +1,18 @@
+[package]
+name = "live-mutex-client"
+version = "0.1.0"
+edition = "2021"
+description = "Rust client for the live-mutex broker (TCP/UDS NDJSON wire protocol)."
+license = "MIT"
+repository = "https://github.com/ORESoftware/live-mutex"
+
+[dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "net", "io-util", "sync", "macros", "time"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4"] }
+thiserror = "1"
+
+[[example]]
+name = "smoke"
+path = "examples/smoke.rs"

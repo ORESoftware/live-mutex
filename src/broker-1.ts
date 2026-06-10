@@ -1,10 +1,15 @@
 'use strict';
 
+
+import {routineEnter} from './routine';
 //core
 import * as assert from 'assert';
 import * as net from 'net';
 import * as util from 'util';
 import * as fs from 'fs';
+import * as UUID from 'uuid';
+
+const uuidV4 = (): string => UUID.v4();
 
 //npm
 import chalk from "chalk";
@@ -15,6 +20,12 @@ import {LinkedQueue, LinkedQueueValue, IsVoid} from '@oresoftware/linked-queue';
 //project
 const isLocalDev = process.env.oresoftware_local_dev === 'yes';
 import {forDebugging} from './shared-internal';
+import {
+    LMXRequestType,
+    LMXRequest,
+    isLMXRequestType,
+    assertExhaustive,
+} from './protocol';
 
 const debugLog = process.argv.indexOf('--lmx-debug') > 0 || process.env.lmx_debug === 'yes';
 
@@ -134,7 +145,19 @@ export type LockholdersType = Map<string, {
     pid: number,
     ws: net.Socket,
     uuid: string,
-    timer?: NodeJS.Timer // Add the timer property
+    /// Per-holder fencing token. Strictly monotonic per key — a
+    /// caller seeing a smaller token than they previously held
+    /// knows their grant is stale (e.g. they were TTL-evicted and a
+    /// successor grabbed the lock). Always >= 1.
+    fencingToken: number,
+    /// Composite-lock bookkeeping: the public lock UUID issued for an
+    /// `acquire-many` grant. `null` for ordinary single-key holds.
+    /// All members of the same composite share the same value.
+    compositeLockUuid?: string | null,
+    /// Wall-clock millisecond deadline for this hold. `Infinity` means
+    /// "never expire". Used by the centralised sweeper —
+    /// see `Broker1.startTtlSweeper`.
+    expiresAt: number
 }>
 
 export interface LockObj {
@@ -143,6 +166,11 @@ export interface LockObj {
     max: number, // max number of lockholders (legacy, kept for backward compatibility)
     maxRead?: number, // max number of concurrent readers (default: 10)
     maxWrite?: number, // max number of concurrent writers (default: 1)
+    /// Counter used to mint per-key fencing tokens. Increments on every
+    /// successful grant (single-key or via `acquire-many`). Never resets
+    /// while the `LockObj` is alive, so each holder gets a strictly
+    /// greater token than any previous holder of the same key.
+    nextFencingToken: number,
     lockholderTimeouts: UuidHash,
     lockholdersAllReleased: UuidHash,
     lockholders: LockholdersType,  // uuid(s) that hold the lock
@@ -159,7 +187,21 @@ export interface NotifyObj {
     uuid: string,
     pid: number,
     ttl: number,
-    keepLocksAfterDeath: boolean
+    keepLocksAfterDeath: boolean,
+    /// Optional `acquire-many` membership. When set, this waiter is part
+    /// of an `acquireMany` request that wants ALL `allKeys` granted
+    /// atomically (union semantics, not a composite intersection lock).
+    /// The waiter is queued on the FIRST key it finds contended; on each
+    /// progress event for that key, `ensureNewLockHolder` dequeues the
+    /// waiter and re-attempts the WHOLE composite. If any other member
+    /// key is still taken, the attempt rolls back its provisional grants
+    /// and re-queues the waiter on the new contended key. The
+    /// pre-allocated `compositeLockUuid` is reused across attempts so
+    /// the client sees a stable identifier.
+    acquireMany?: {
+        allKeys: string[],
+        compositeLockUuid: string
+    }
 }
 
 
@@ -204,7 +246,38 @@ export class Broker1 {
     connectedClients = new Set<LMXSocket>();
     registeredListeners = <{ [key: string]: Array<RegisteredListener> }>{};
 
+    // -- Fencing-token + sweeper bookkeeping ---------------------------------
+    // `holderDeadlines` is the single source of truth for "when does this
+    // hold expire?". Indexed by the holder's `_uuid` (== the same uuid the
+    // client passes back to `unlock`). Replaces the prior per-holder
+    // `setTimeout`, which scaled poorly (one timer per outstanding lock,
+    // O(N) clears on unlock). One `setInterval` (`ttlSweeperHandle`) walks
+    // this map every `ttlSweepIntervalMs` and evicts expired holders via
+    // the existing `ensureNewLockHolder` path.
+    holderDeadlines = new Map<string, { key: string, expiresAt: number, holderUuid: string }>();
+    ttlSweeperHandle: NodeJS.Timeout | null = null;
+    ttlSweepIntervalMs = 25;
+    /// Cumulative number of TTL-driven evictions. Exposed via
+    /// `getSystemStats` and the HTTP `/metrics` endpoint.
+    ttlEvictionsTotal = 0;
+    /// Effective ceiling on per-key `max`. Mirrors the rust port's
+    /// `LMX_MAX_CONCURRENCY_CAP`. Set very high by default — primary
+    /// purpose is bounding the per-key holder map, not policy.
+    maxConcurrencyCap = 1000;
+    /// Cumulative count of `lock` requests whose `max` was clamped to
+    /// `maxConcurrencyCap`. Non-zero means a caller asked for more
+    /// parallelism than the broker is willing to grant.
+    concurrencyCapClampsTotal = 0;
+    /// Composite locks (`acquire-many`) registry. Keyed by the broker-
+    /// minted `compositeLockUuid` so an `unlock-many` request can
+    /// quickly find every member key + its per-key holder uuid.
+    compositeLocks = new Map<string, { keys: string[], holderUuids: Map<string, string>, fencingTokens: Map<string, number> }>();
+    /// Wall-clock at startup. Exposed in `/metrics`.
+    startedAt = Date.now();
+
     constructor(o?: IBrokerOptsPartial, cb?: IErrorFirstCB) {
+        const routineId = 'ddl-routine-JjE0VDkv3k9z8KVVwf';
+        routineEnter(routineId, "Broker1.constructor");
 
         this.isOpen = false;
         const opts = this.opts = o || {};
@@ -292,7 +365,13 @@ export class Broker1 {
 
         const onData = (ws: LMXSocket, data: any) => {
 
-            if (data.type === 'version-mismatch-confirmed') {
+            // Pre-dispatch frames that exist outside the typed
+            // request union OR have to run before lmxClosed gating.
+            // `version-mismatch-confirmed` is the way the client
+            // says "I saw your version-mismatch reply, you can drop
+            // me" — we have to honor it AFTER `ws.destroyTimeout`
+            // was armed but BEFORE the `ws.lmxClosed` short-circuit.
+            if (data && data.type === LMXRequestType.VersionMismatchConfirmed) {
                 clearTimeout(ws.destroyTimeout);
                 ws.destroy();
                 return;
@@ -302,116 +381,35 @@ export class Broker1 {
                 return;
             }
 
-            if (data.type === 'simulate-version-mismatch') {
-                return self.onVersion({value: '0.0.1'}, ws);
-            }
-
-            if (data.type === 'end-connection-from-broker-for-testing-purposes') {
-                return self.abruptlyEndConnection(ws);
-            }
-
-            if (data.type === 'destroy-connection-from-broker-for-testing-purposes') {
-                return self.abruptlyDestroyConnection(ws);
-            }
-
-            const key = data.key;
-
-            if (data.ttl === null) {
+            // Default ttl normalisation matches the legacy contract:
+            // `null` means "never expire". This used to live next to
+            // the `'version'` branch; we hoist it so the typed switch
+            // can rely on the ttl already being normalised.
+            if (data && data.ttl === null) {
                 data.ttl = Infinity;
             }
 
-            if (data.inspectCommand) {
+            // Operator-only `inspect` debug surface — orthogonal to
+            // the request enum and intentionally untyped.
+            if (data && data.inspectCommand) {
                 return self.inspect(data, ws);
             }
 
-            if (data.type === 'version') {
-                return self.onVersion(data, ws);
+            // Reject malformed / unknown frames at the entry point
+            // rather than letting them fall through every case arm.
+            // This is also what guarantees the typed-switch below
+            // is faithfully exhaustive: by the time we reach the
+            // switch, `data.type` is an `LMXRequestType` member.
+            if (!data || !isLMXRequestType(data.type)) {
+                this.emitter.emit('warning',
+                    `implementation error, bad data sent to broker => ${util.inspect(data)}`);
+                self.send(ws, {
+                    error: `LMX broker received unknown 'type' field => ${util.inspect(data && data.type)}`,
+                });
+                return;
             }
 
-            if (data.type === 'ls') {
-                return self.ls(data, ws);
-            }
-
-            if (data.type === 'unlock') {
-                return self.unlock(data, ws);
-            }
-
-            if (data.type === 'lock') {
-                return self.lock(data, ws);
-            }
-
-            if (data.type === 'increment-readers') {
-                return self.incrementReaders(data, ws);
-            }
-
-            if (data.type === 'decrement-readers') {
-                return self.decrementReaders(data, ws);
-            }
-
-            if (data.type === 'register-write-flag-check') {
-                return self.registerWriteFlagCheck(data, ws);
-            }
-
-            if (data.type === 'register-write-flag-and-readers-check') {
-                return self.registerWriteFlagAndReadersCheck(data, ws);
-            }
-
-            if (data.type === 'set-write-flag-false-and-broadcast') {
-                return self.setWriteFlagToFalseAndBroadcast(data, ws);
-            }
-
-            if (data.type === 'lock-received') {
-                clearTimeout(self.timeouts[data.key]);
-                return delete self.timeouts[data.key];
-            }
-
-            if (data.type === 'lock-client-timeout' || data.type === 'lock-client-error') {
-
-                // if the client times out, we don't want to send them any more messages
-                const lck = self.locks.get(key);
-                const uuid = data.uuid;
-
-                if (!lck) {
-                    this.emitter.emit('warning', `Lock for key "${key}" has probably expired.`);
-                    return;
-                }
-
-                return lck.notify.remove(uuid);
-            }
-
-            if (data.type === 'lock-received-rejected') {
-
-                const lck = self.locks.get(key);
-
-                if (!lck) {
-                    this.emitter.emit('warning', `Lock for key "${key}" has probably expired.`);
-                    return;
-                }
-
-                self.rejected[data.uuid] = true;
-                return self.ensureNewLockHolder(lck, data);
-            }
-
-            if (data.type === 'lock-info-request') {
-                return self.retrieveLockInfo(data, ws);
-            }
-
-            if (data.type === 'ping') {
-                return self.ping(data, ws);
-            }
-
-            if (data.type === 'system-stats-request') {
-                return self.getSystemStats(data, ws);
-            }
-
-            this.emitter.emit('warning', `implementation error, bad data sent to broker => ${util.inspect(data)}`);
-
-            self.send(ws, {
-                key: data.key,
-                uuid: data.uuid,
-                error: 'Malformed data sent to Live-Mutex broker.'
-            });
-
+            return self.dispatchRequest(data as LMXRequest, ws);
         };
 
         const wss = this.wss = net.createServer({}, (ws: LMXSocket) => {
@@ -565,6 +563,10 @@ export class Broker1 {
                     }
 
                     self.isOpen = true;
+                    // Start the centralised TTL sweeper as soon as we're
+                    // listening — see `tickTtl` / `startTtlSweeper` for
+                    // why this replaces the legacy per-holder timers.
+                    self.startTtlSweeper();
                     clearTimeout(to);
                     wss.removeListener('error', reject);
                     resolve(self);
@@ -589,6 +591,12 @@ export class Broker1 {
         this.wsToUUIDs = new Map(); // keys are ws objects, values are lock key maps {uuid: true}
         this.wsToKeys = new Map(); // keys are ws objects, values are key maps {key: true}
 
+        // Start the TTL sweeper unconditionally — `noListen` brokers
+        // (used by integration tests injecting state directly) still
+        // need wall-clock eviction. The interval is `unref()`'d so it
+        // never blocks process exit.
+        this.startTtlSweeper();
+
         // if the user passes a callback then we call
         // ensure() on behalf of the user
         cb && this.ensure(cb);
@@ -596,25 +604,35 @@ export class Broker1 {
     }
 
     static create(opts: IBrokerOptsPartial): Broker1 {
+        const routineId = 'ddl-routine-V4vGtuyEzod37V8S_9';
+        routineEnter(routineId, "Broker1.create");
         return new Broker1(opts);
     }
 
     private emit(...args: Parameters<EventEmitter['emit']>) {
+        const routineId = 'ddl-routine-anbNfZxePuQyDEA7OA';
+        routineEnter(routineId, "Broker1.emit");
         log.warn('warning:', 'use b.emitter.emit() instead of b.emit()');
         return this.emitter.emit.apply(this.emitter, args);
     }
 
     private on(...args: Parameters<EventEmitter['on']>) {
+        const routineId = 'ddl-routine-8DUeVl-qYaIUQS1iv-';
+        routineEnter(routineId, "Broker1.on");
         log.warn('warning:', 'use c.emitter.on() instead of c.on()');
         return this.emitter.on.apply(this.emitter, args);
     }
 
     private once(...args: Parameters<EventEmitter['once']>) {
+        const routineId = 'ddl-routine-h0QjvSllH7xViimF8i';
+        routineEnter(routineId, "Broker1.once");
         log.warn('warning:', 'use c.emitter.once() instead of c.once()');
         return this.emitter.once.apply(this.emitter, args);
     }
 
     ping(data: any, ws: net.Socket) {
+        const routineId = 'ddl-routine-hAQet_Z6mcmMv9Xz3b';
+        routineEnter(routineId, "Broker1.ping");
         const uuid = data.uuid;
         const timestamp = data.timestamp || Date.now();
 
@@ -628,48 +646,110 @@ export class Broker1 {
     }
 
     getSystemStats(data: any, ws: net.Socket) {
+        const routineId = 'ddl-routine-sz3xB9rrFZrd1U9Eq9';
+        routineEnter(routineId, "Broker1.getSystemStats");
         const uuid = data.uuid;
-
-        // Count all pending lock requests across all locks
-        let pendingRequests = 0;
-        this.locks.forEach(lock => {
-            pendingRequests += lock.notify.length || 0;
-        });
-
-        const stats = {
-            memoryUsage: process.memoryUsage(),
-            uptime: process.uptime(),
-            connectedClients: this.connectedClients.size,
-            totalLocks: this.locks.size,
-            pendingRequests: pendingRequests,
-            activeTimeouts: Object.keys(this.timeouts).length,
-            pid: process.pid
-        };
-
         this.send(ws, {
             uuid: uuid,
             type: 'system-stats-response',
-            stats: stats
+            stats: this.buildStatsSnapshot()
         });
     }
 
+    /// Build a structured snapshot of broker state. Used by both the
+    /// TCP `system-stats-request` reply and the HTTP `/metrics` /
+    /// `/status` endpoints. Pure (no side effects), so it's safe to
+    /// call from any code path.
+    buildStatsSnapshot() {
+        const routineId = 'ddl-routine-xZVFyRS1nx8EDAoY3K';
+        routineEnter(routineId, "Broker1.buildStatsSnapshot");
+        let pendingRequests = 0;
+        let totalHolders = 0;
+        let totalReaders = 0;
+        const topKeys: Array<{ key: string, holders: number, waiters: number, max: number, fencingToken: number }> = [];
+        for (const [k, lck] of this.locks) {
+            const holders = lck.lockholders.size;
+            const waiters = lck.notify.length || 0;
+            pendingRequests += waiters;
+            totalHolders += holders;
+            totalReaders += lck.readers || 0;
+            if (holders > 0 || waiters > 0) {
+                topKeys.push({
+                    key: k, holders, waiters,
+                    max: lck.max,
+                    fencingToken: lck.nextFencingToken
+                });
+            }
+        }
+        // Sort by contention (holders + waiters) desc so the status page
+        // shows the hottest keys first.
+        topKeys.sort((a, b) => (b.holders + b.waiters) - (a.holders + a.waiters));
+
+        return {
+            memoryUsage: process.memoryUsage(),
+            uptime: process.uptime(),
+            startedAt: this.startedAt,
+            connectedClients: this.connectedClients.size,
+            totalLocks: this.locks.size,
+            totalHolders,
+            totalReaders,
+            pendingRequests,
+            activeTimeouts: Object.keys(this.timeouts).length,
+            // New (sweeper / fencing / cap) counters — see field docs above.
+            pendingDeadlines: this.holderDeadlines.size,
+            ttlEvictionsTotal: this.ttlEvictionsTotal,
+            maxConcurrencyCap: this.maxConcurrencyCap,
+            concurrencyCapClampsTotal: this.concurrencyCapClampsTotal,
+            compositeLocksHeld: this.compositeLocks.size,
+            ttlSweepIntervalMs: this.ttlSweepIntervalMs,
+            topKeys: topKeys.slice(0, 10),
+            pid: process.pid
+        };
+    }
+
+    /// Render the current broker state as Prometheus text exposition.
+    /// Mirrors the metric names used by `dd-rust-network-mutex` so
+    /// dashboards work across both implementations (only the prefix
+    /// differs: `lmx_*` here vs. `dd_rust_network_mutex_*` there).
+    renderPrometheus(): string {
+        const routineId = 'ddl-routine-z160UVsijGGwKH3Cz3';
+        routineEnter(routineId, "Broker1.renderPrometheus");
+        const s = this.buildStatsSnapshot();
+        const lines: string[] = [];
+        const metric = (name: string, help: string, type: 'counter' | 'gauge', value: number) => {
+            lines.push(`# HELP lmx_${name} ${help}`);
+            lines.push(`# TYPE lmx_${name} ${type}`);
+            lines.push(`lmx_${name} ${value}`);
+        };
+        metric('keys', 'Total number of distinct keys with live state.', 'gauge', s.totalLocks);
+        metric('holders', 'Number of currently-held locks across all keys.', 'gauge', s.totalHolders);
+        metric('readers', 'Number of currently-held RW read holds across all keys.', 'gauge', s.totalReaders);
+        metric('waiters', 'Number of pending lock requests waiting in queues.', 'gauge', s.pendingRequests);
+        metric('clients', 'Number of currently-connected TCP/UDS clients.', 'gauge', s.connectedClients);
+        metric('pending_deadlines', 'Number of holders currently registered in the TTL sweeper deadline index.', 'gauge', s.pendingDeadlines);
+        metric('ttl_evictions_total', 'Cumulative TTL-driven evictions since broker start.', 'counter', s.ttlEvictionsTotal);
+        metric('max_concurrency_cap', 'Effective per-key concurrency ceiling enforced by the broker.', 'gauge', s.maxConcurrencyCap);
+        metric('concurrency_cap_clamps_total', 'Cumulative `lock` requests whose `max` was clamped to the cap.', 'counter', s.concurrencyCapClampsTotal);
+        metric('composite_locks_held', 'Number of currently-held `acquire-many` composite holds.', 'gauge', s.compositeLocksHeld);
+        metric('uptime_seconds', 'Process uptime in seconds.', 'gauge', s.uptime);
+        return lines.join('\n') + '\n';
+    }
+
     close(cb: (err: any) => void): void {
+        const routineId = 'ddl-routine-TifUrwblfO8bNJWS8U';
+        routineEnter(routineId, "Broker1.close");
         // Clean up all timers to prevent memory leaks
         for (const key of Object.keys(this.timeouts)) {
             clearTimeout(this.timeouts[key]);
             delete this.timeouts[key];
         }
-        
-        // Clean up all lockholder timers
-        for (const [key, lockObj] of this.locks) {
-            for (const lockholder of lockObj.lockholders.values()) {
-                if (lockholder.timer) {
-                    clearTimeout(lockholder.timer);
-                    lockholder.timer = null;
-                }
-            }
-        }
-        
+
+        // Stop the centralised TTL sweeper. There are no per-holder
+        // timers to clear any more — all eviction state lives in
+        // `holderDeadlines`, which is dropped wholesale below.
+        this.stopTtlSweeper();
+        this.holderDeadlines.clear();
+
         // Close all client connections
         for (const client of this.connectedClients) {
             try {
@@ -703,18 +783,49 @@ export class Broker1 {
     }
 
     getListeningInterface() {
+        const routineId = 'ddl-routine-XmT4a7M_0CcbIdgtQf';
+        routineEnter(routineId, "Broker1.getListeningInterface");
         return this.socketFile || this.port;
     }
 
+    /**
+     * Runtime mutator for the TCP_NODELAY policy applied to *newly
+     * accepted* sockets. The connection-accept handler reads
+     * `self.noDelay` per-connection, so flipping this field is enough
+     * for new connections to pick up the new value; already-accepted
+     * sockets keep whatever Nagle setting they were created with.
+     *
+     * Note: Node's `net.Socket` API only exposes `setNoDelay` (Nagle).
+     * Linux's TCP_QUICKACK is intentionally NOT exposed here — the
+     * Rust broker (`rust-network-mutex-rs`) has a QUICKACK toggle on
+     * its admin surface; this Node broker deliberately limits itself
+     * to NODELAY to match the API Node ships out of the box.
+     *
+     * Returns the previous value for audit logging.
+     */
+    setNoDelay(value: boolean): boolean {
+        const routineId = 'ddl-routine-setNoDelay-Pq4';
+        routineEnter(routineId, "Broker1.setNoDelay");
+        const previous = this.noDelay;
+        this.noDelay = !!value;
+        return previous;
+    }
+
     getVersion() {
+        const routineId = 'ddl-routine-zX08q5PMXrIcL-yTOy';
+        routineEnter(routineId, "Broker1.getVersion");
         return brokerPackage.version;
     }
 
     getPort() {
+        const routineId = 'ddl-routine-LwxZ3aM6EiQJXxwPPs';
+        routineEnter(routineId, "Broker1.getPort");
         return this.port;
     }
 
     getHost() {
+        const routineId = 'ddl-routine-sWQxRve4pWKnWtcvpB';
+        routineEnter(routineId, "Broker1.getHost");
         return this.host;
     }
 
@@ -723,6 +834,8 @@ export class Broker1 {
      * @param callback Function that receives warning messages/errors
      */
     onWarning(callback: (...args: any[]) => void): void {
+        const routineId = 'ddl-routine-7WQ5lw6mVlfZXsevbx';
+        routineEnter(routineId, "Broker1.onWarning");
         this.emitter.on('warning', callback);
     }
 
@@ -731,22 +844,30 @@ export class Broker1 {
      * @param callback Function that receives error messages
      */
     onError(callback: (...args: any[]) => void): void {
+        const routineId = 'ddl-routine-01bktUZwktcl7Lj18h';
+        routineEnter(routineId, "Broker1.onError");
         this.emitter.on('error', callback);
     }
 
     abruptlyDestroyConnection(ws: LMXSocket) {
+        const routineId = 'ddl-routine-biO1KkjGbwAQXaA8RP';
+        routineEnter(routineId, "Broker1.abruptlyDestroyConnection");
         log.error('Connection will be destroyed.');
         ws.destroy();
         ws.removeAllListeners();
     }
 
     abruptlyEndConnection(ws: LMXSocket) {
+        const routineId = 'ddl-routine-BjGwi4zoAi83TFbo1Q';
+        routineEnter(routineId, "Broker1.abruptlyEndConnection");
         log.error('Connection will be ended.');
         ws.end();
         ws.removeAllListeners();
     }
 
     onVersion(data: any, ws: LMXSocket) {
+        const routineId = 'ddl-routine-jC0Gf8pH0Q73_FMJGY';
+        routineEnter(routineId, "Broker1.onVersion");
 
         const clientVersion = data.value;
         const brokerVersion = brokerPackage.version;
@@ -777,6 +898,8 @@ export class Broker1 {
     }
 
     cleanupConnection(ws: LMXSocket) {
+        const routineId = 'ddl-routine-PMPIak5cirOZJKKg8S';
+        routineEnter(routineId, "Broker1.cleanupConnection");
 
         if (ws.lmxClosed === true) {
             return;
@@ -806,24 +929,48 @@ export class Broker1 {
 
             const notify = lockObj.notify;
 
-            for (const uuid of Object.keys(uuids)) {
+            // Scrub the closing client's queued waiter entries from
+            // this key's notify list. The previous implementation
+            // wrote `for (const uuid of Object.keys(uuids))` against
+            // an array, which iterates string indices ('0','1',...)
+            // instead of the actual uuids — silently leaving stale
+            // entries in the queue that a later grant cycle would
+            // try to wake on a dead socket.
+            for (const uuid of uuids) {
                 notify.remove(uuid);
             }
 
-            // Clear any timers associated with this websocket, before unlocking
-            for (const lockholder of lockObj.lockholders.values()) {
-                if (lockholder.ws === ws && lockholder.timer) {
-                    clearTimeout(lockholder.timer);
-                    lockholder.timer = null;
+            // Walk the holders for THIS key and figure out which ones
+            // belong to the closing socket. Only those should be
+            // released. The previous implementation called
+            // `unlock({force:true, key:k}, ws)` without a `_uuid`,
+            // which fell into the wipe-all branch and evicted every
+            // peer holder on the key — fine for `max=1` keys where
+            // the closing client was the sole holder, catastrophic
+            // for semaphores (`max>1`) where peer clients were still
+            // alive and counted on their slot.
+            const myHolderUuids: string[] = [];
+            for (const [holderUuid, holder] of lockObj.lockholders) {
+                if (holder.ws === ws) {
+                    myHolderUuids.push(holderUuid);
+                    this.holderDeadlines.delete(holderUuid);
                 }
             }
-
-            if (lockObj.isViaShell !== true) {
-                // delete lockObj[k];
-                this.unlock({force: true, key: k, from: 'client socket closed/ended/errored'}, ws);
+            if (myHolderUuids.length === 0) {
+                continue;
             }
-            else if (!lockObj.keepLocksAfterDeath) {
-                this.unlock({force: true, key: k, from: 'client socket closed/ended/errored'}, ws);
+
+            const shouldRelease =
+                lockObj.isViaShell !== true || !lockObj.keepLocksAfterDeath;
+            if (!shouldRelease) continue;
+
+            for (const holderUuid of myHolderUuids) {
+                this.unlock({
+                    force: true,
+                    key: k,
+                    _uuid: holderUuid,
+                    from: 'client socket closed/ended/errored',
+                }, ws);
             }
 
         }
@@ -831,10 +978,152 @@ export class Broker1 {
     }
 
     ls(data: any, ws: LMXSocket) {
+        const routineId = 'ddl-routine-sGf9wy-_JLqs5wt6Px';
+        routineEnter(routineId, "Broker1.ls");
         return this.send(ws, {ls_result: Object.keys(this.locks), uuid: data.uuid});
     }
 
+    /**
+     * Typed dispatcher for parsed wire-protocol requests. The
+     * `LMXRequest` discriminated union pairs with `assertExhaustive`
+     * in the `default` arm so any future addition to
+     * `LMXRequestType` is a compile error in this method until a
+     * matching case is added — the same property the Rust port has
+     * via `match req { … }` exhaustiveness.
+     *
+     * Pre-conditions enforced by the caller (`onData`):
+     *
+     *   * `req.type` is a member of `LMXRequestType` (validated via
+     *     `isLMXRequestType`). Unknown values are rejected before
+     *     reaching this method, so the `default` arm is genuinely
+     *     unreachable at runtime.
+     *   * `ws.lmxClosed === false`.
+     *   * `version-mismatch-confirmed` was handled separately
+     *     because it must run BEFORE the `lmxClosed` short-circuit;
+     *     see `onData`.
+     */
+    dispatchRequest(req: LMXRequest, ws: LMXSocket): any {
+        const routineId = 'ddl-routine-broker1-dispatchRequest-Hx7';
+        routineEnter(routineId, "Broker1.dispatchRequest");
+
+        switch (req.type) {
+            case LMXRequestType.Version:
+                return this.onVersion(req as any, ws);
+
+            case LMXRequestType.SimulateVersionMismatch:
+                return this.onVersion({value: '0.0.1'} as any, ws);
+
+            case LMXRequestType.EndConnectionFromBrokerForTesting:
+                return this.abruptlyEndConnection(ws);
+
+            case LMXRequestType.DestroyConnectionFromBrokerForTesting:
+                return this.abruptlyDestroyConnection(ws);
+
+            case LMXRequestType.VersionMismatchConfirmed:
+                // `onData` handles this branch BEFORE the `lmxClosed`
+                // short-circuit so the broker can drop the socket
+                // even after marking it closed. Reaching this case
+                // here means a duplicate / stale frame slipped past
+                // the gate; emit a warning and ignore it.
+                this.emitter.emit('warning',
+                    `lmx broker: stray '${LMXRequestType.VersionMismatchConfirmed}' frame after socket flagged closed; dropping.`);
+                return;
+
+            case LMXRequestType.Ls:
+                return this.ls(req as any, ws);
+
+            case LMXRequestType.Unlock:
+                return this.unlock(req as any, ws);
+
+            case LMXRequestType.Lock:
+                return this.lock(req as any, ws);
+
+            case LMXRequestType.AcquireMany:
+                return this.acquireMany(req as any, ws);
+
+            case LMXRequestType.ReleaseMany:
+                return this.releaseMany(req as any, ws);
+
+            case LMXRequestType.IncrementReaders:
+                return this.incrementReaders(req as any, ws);
+
+            case LMXRequestType.DecrementReaders:
+                return this.decrementReaders(req as any, ws);
+
+            case LMXRequestType.RegisterWriteFlagCheck:
+                return this.registerWriteFlagCheck(req as any, ws);
+
+            case LMXRequestType.RegisterWriteFlagCheckQueued:
+                // Broker-1 historically forwarded the queued probe
+                // through the same handler (the legacy `broker.ts`
+                // never grew this branch). Keep the existing
+                // forwarding so the `RWLockClient` queued-handoff
+                // path keeps working unchanged.
+                return this.registerWriteFlagCheck(req as any, ws);
+
+            case LMXRequestType.RegisterWriteFlagAndReadersCheck:
+                return this.registerWriteFlagAndReadersCheck(req as any, ws);
+
+            case LMXRequestType.SetWriteFlagFalseAndBroadcast:
+                return this.setWriteFlagToFalseAndBroadcast(req as any, ws);
+
+            case LMXRequestType.LockReceived: {
+                // Client confirmed receipt — cancel the broker's
+                // re-election timer for this key.
+                const k = (req as any).key;
+                clearTimeout(this.timeouts[k]);
+                delete this.timeouts[k];
+                return;
+            }
+
+            case LMXRequestType.LockClientTimeout:
+            case LMXRequestType.LockClientError: {
+                // Client gave up locally. Remove its waiter entry
+                // from this key's notify queue so the broker
+                // doesn't try to grant on a dead/uninterested socket.
+                const k = (req as any).key;
+                const lck = this.locks.get(k);
+                if (!lck) {
+                    this.emitter.emit('warning', `Lock for key "${k}" has probably expired.`);
+                    return;
+                }
+                lck.notify.remove((req as any).uuid);
+                return;
+            }
+
+            case LMXRequestType.LockReceivedRejected: {
+                const k = (req as any).key;
+                const lck = this.locks.get(k);
+                if (!lck) {
+                    this.emitter.emit('warning', `Lock for key "${k}" has probably expired.`);
+                    return;
+                }
+                this.rejected[(req as any).uuid] = true;
+                return this.ensureNewLockHolder(lck, req as any);
+            }
+
+            case LMXRequestType.LockInfoRequest:
+                return this.retrieveLockInfo(req as any, ws);
+
+            case LMXRequestType.Ping:
+                return this.ping(req as any, ws);
+
+            case LMXRequestType.SystemStatsRequest:
+                return this.getSystemStats(req as any, ws);
+
+            default:
+                // Compile-time exhaustiveness: every member of
+                // `LMXRequestType` must be handled above. Adding a
+                // new variant without a matching case will widen
+                // `req` here from `never` to the unhandled variant
+                // and fail type-check at build time.
+                return assertExhaustive(req);
+        }
+    }
+
     broadcast(data: any, ws: LMXSocket) {
+        const routineId = 'ddl-routine-aQyDpH6dG1bZK7ema3';
+        routineEnter(routineId, "Broker1.broadcast");
 
         const key = data.key;
         const uuid = data.uuid;
@@ -877,6 +1166,8 @@ export class Broker1 {
     }
 
     incrementReaders(data: any, ws: net.Socket) {
+        const routineId = 'ddl-routine-p5ZeAkpg1bEnlfYJ_i';
+        routineEnter(routineId, "Broker1.incrementReaders");
 
         const key = data.key;
         const uuid = data.uuid;
@@ -900,6 +1191,8 @@ export class Broker1 {
     }
 
     setWriteFlagToFalseAndBroadcast(data: any, ws: net.Socket) {
+        const routineId = 'ddl-routine-RA8AmZ4MKcIgJxueJq';
+        routineEnter(routineId, "Broker1.setWriteFlagToFalseAndBroadcast");
 
         const key = data.key;
         const uuid = data.uuid;
@@ -922,6 +1215,8 @@ export class Broker1 {
     }
 
     decrementReaders(data: any, ws: net.Socket) {
+        const routineId = 'ddl-routine-EI8D9e4ABqh76TF3Uu';
+        routineEnter(routineId, "Broker1.decrementReaders");
 
         const key = data.key;
         const uuid = data.uuid;
@@ -951,6 +1246,8 @@ export class Broker1 {
     }
 
     registerWriteFlagAndReadersCheck(data: any, ws: net.Socket) {
+        const routineId = 'ddl-routine-IECie_TqsOzSf9VqSK';
+        routineEnter(routineId, "Broker1.registerWriteFlagAndReadersCheck");
 
         const key = data.key;
         const uuid = data.uuid;
@@ -991,12 +1288,31 @@ export class Broker1 {
     }
 
     getDefaultLockObject(key: string, keepLocksAfterDeath?: boolean, max?: number, maxRead?: number, maxWrite?: number): LockObj {
+        const routineId = 'ddl-routine-qlPRsjjWl7JCmxi0M-';
+        routineEnter(routineId, "Broker1.getDefaultLockObject");
 
         return {
             readers: 0,
-            max: max || 1, // Legacy field, kept for backward compatibility
+            // Legacy `max` field. Note `max == 0` is rejected up-front
+            // in `lock()` (see `validateMaxField`), so the defensive
+            // `|| 1` here only fires when callers omit the field
+            // entirely (`undefined` / null).
+            max: max || 1,
             maxRead: maxRead !== undefined ? maxRead : (maxRead === null ? 10 : undefined), // Default: 10 for read locks
             maxWrite: maxWrite !== undefined ? maxWrite : (maxWrite === null ? 1 : undefined), // Default: 1 for write locks
+            // Seed the per-key fencing-token counter from wall-clock
+            // millis. Subsequent grants increment by 1 (`++`), so:
+            //   * monotonicity is still strictly counter-driven (no
+            //     dependence on the clock between grants),
+            //   * tokens are wall-clock-aligned so operators can spot
+            //     "this lock was issued ~now" by reading the number,
+            //   * after a broker restart the same key's tokens jump to
+            //     a fresh `Date.now()` — strictly greater than any
+            //     prior incarnation's tokens (assuming the wall clock
+            //     didn't rewind further than the broker's uptime),
+            //   * stays well inside `Number.MAX_SAFE_INTEGER` (a key
+            //     would need ~9e15 grants in its lifetime to overflow).
+            nextFencingToken: Date.now(),
             lockholders: new Map(),
             lockholdersAllReleased: {},
             keepLocksAfterDeath,
@@ -1010,6 +1326,8 @@ export class Broker1 {
     }
 
     registerWriteFlagCheck(data: any, ws: net.Socket) {
+        const routineId = 'ddl-routine-hMv0PM_6oirTM6mApV';
+        routineEnter(routineId, "Broker1.registerWriteFlagCheck");
 
         const key = data.key;
         const uuid = data.uuid;
@@ -1070,6 +1388,8 @@ export class Broker1 {
     }
 
     inspect(data: any, ws: net.Socket) {
+        const routineId = 'ddl-routine-3DUhpmN2OmyvuEuz6Y';
+        routineEnter(routineId, "Broker1.inspect");
 
         if (typeof data.inspectCommand !== 'string') {
             return this.send(ws, {error: 'inspectCommand was not a string'});
@@ -1093,7 +1413,20 @@ export class Broker1 {
 
     }
 
-    private grantLock(lck: LockObj, ws: LMXSocket, uuid: string, pid: number, ttl: number, key: string) {
+    /// Grant `key` to `ws`. Mints a fresh fencing token (strictly
+    /// monotonic per key) and records a deadline in
+    /// `holderDeadlines` instead of arming a per-holder `setTimeout`.
+    /// The single broker-wide TTL sweeper (`startTtlSweeper` →
+    /// `tickTtl`) is the only thing that fires evictions now —
+    /// historically there was one timer per outstanding lock, which
+    /// scaled poorly under heavy semaphore use and made unlock
+    /// quadratic in the number of holders we had to clear.
+    ///
+    /// Returns the fencing token so callers (`lock`, `acquireMany`)
+    /// can include it in the grant response.
+    private grantLock(lck: LockObj, ws: LMXSocket, uuid: string, pid: number, ttl: number, key: string): number {
+        const routineId = 'ddl-routine-letgqptk20OjPFKcDO';
+        routineEnter(routineId, "Broker1.grantLock");
 
         if (ttl !== Infinity) {
             ttl = weAreDebugging ? 50000000 : (ttl || this.lockExpiresAfter);
@@ -1105,47 +1438,38 @@ export class Broker1 {
 
         this.wsToKeys.get(ws)[key] = true;
 
-        let timer: NodeJS.Timer = null;
+        // Strictly monotonic per-key fencing token. Strict monotonicity
+        // — never resets while the LockObj is alive — means a holder
+        // who reads its token can detect stale-handoff bugs (e.g. a
+        // resource being modified by an ex-holder whose TTL fired).
+        lck.nextFencingToken++;
+        const token = lck.nextFencingToken;
+        const expiresAt = this.scheduleDeadline(key, uuid, ttl);
 
-        if (ttl !== Infinity) {
-            // Set TTL for this specific lock holder
-
-            timer = setTimeout(() => {
-                this.emitter.emit('warning',
-                    `lmx broker warning, lock holder timed out after ${ttl}ms for key => "${key}", uuid => "${uuid}"`);
-
-                if (this.locks.has(key)) {
-                    const lock = this.locks.get(key);
-
-                    // Mark that this specific holder timed out (for potential unlock requests)
-                    lock.lockholderTimeouts[uuid] = true;
-
-                    // Remove only this specific lock holder
-                    const hadHolder = lock.lockholders.delete(uuid);
-
-                    if (hadHolder) {
-
-                        this.ensureNewLockHolder(lock, {key, _uuid: uuid});
-
-                    }
-                }
-            }, ttl);
-        }
-
-        lck.lockholders.set(uuid, {pid: pid, uuid, ws, timer});
+        lck.lockholders.set(uuid, {
+            pid,
+            uuid,
+            ws,
+            fencingToken: token,
+            compositeLockUuid: null,
+            expiresAt
+        });
+        return token;
     }
 
     ensureNewLockHolder(lck: LockObj, data: any) {
+        const routineId = 'ddl-routine-joG1ztmn2R_wxdRWtb';
+        routineEnter(routineId, "Broker1.ensureNewLockHolder");
 
         const locks = this.locks;
         const notifyList = lck.notify;
 
-        // Remove previous lock holder if _uuid is provided
+        // Remove previous lock holder if _uuid is provided. The
+        // sweeper's centralised deadline index is the only thing
+        // tracking TTL now — drop the row so the next sweep doesn't
+        // bother inspecting an already-released holder.
         if (data._uuid) {
-            const lockholder = lck.lockholders.get(data._uuid);
-            if (lockholder && lockholder.timer) {
-                clearTimeout(lockholder.timer);
-            }
+            this.holderDeadlines.delete(data._uuid);
             lck.lockholders.delete(data._uuid);
         }
 
@@ -1198,12 +1522,23 @@ export class Broker1 {
                 break;
             }
 
+            // Multi-key (`acquire-many`) waiter: re-attempt the WHOLE
+            // composite atomically. Either grants all member keys (and
+            // emits `acquired:true`), or rolls back this attempt and
+            // re-queues the waiter on the new contended key. Either way
+            // it's terminal for this iteration of the drain loop, so we
+            // `continue` to consider the next waiter.
+            if (n.acquireMany) {
+                this.tryGrantAcquireManyFromQueue(n);
+                continue;
+            }
+
             // Found a valid client - grant them the lock
             const ws = n.ws;
             const ttl = n.ttl;
             const uuid = n.uuid;
 
-            this.grantLock(lck, ws, uuid, n.pid, ttl, key);
+            const fencingToken = this.grantLock(lck, ws, uuid, n.pid, ttl, key);
             lck.keepLocksAfterDeath = n.keepLocksAfterDeath || false;
 
             const ln = lck.notify.length;
@@ -1214,7 +1549,8 @@ export class Broker1 {
                 uuid: n.uuid,
                 type: 'lock',
                 lockRequestCount: ln,
-                acquired: true
+                acquired: true,
+                fencingToken
             });
 
             // Clear any existing timeout for this key
@@ -1301,6 +1637,8 @@ export class Broker1 {
     }
 
     retrieveLockInfo(data: any, ws: net.Socket) {
+        const routineId = 'ddl-routine-sCi0yybxG5_0AB7Rvz';
+        routineEnter(routineId, "Broker1.retrieveLockInfo");
 
         const key = data.key;
         const lck = this.locks.get(key);
@@ -1326,6 +1664,8 @@ export class Broker1 {
     }
 
     cleanUpLocks(): void {
+        const routineId = 'ddl-routine-K_e9-m-vRMzy-mjeDk';
+        routineEnter(routineId, "Broker1.cleanUpLocks");
 
         this.lockCounts = 0;
         const now = Date.now();
@@ -1353,7 +1693,505 @@ export class Broker1 {
         });
     }
 
+    /// Validate the `max`/`maxRead`/`maxWrite` fields of an incoming
+    /// `lock` request. Sends a `{type:'lock', acquired:false, error:...}`
+    /// reply and returns `false` if any field is malformed; the caller
+    /// should `return` immediately in that case.
+    ///
+    /// Previously these fields were validated only client-side and the
+    /// broker silently degenerated `max=0` / negative values into either
+    /// `1` (`max || 1` in `getDefaultLockObject`) or "always queue"
+    /// (`count >= 0` always true). That was a foot-gun: a misconfigured
+    /// caller would either get the wrong concurrency level or hang
+    /// forever, with no diagnostic. The Rust port (`rust-network-mutex-rs`)
+    /// rejects these eagerly; we do the same here so cross-runtime
+    /// behaviour matches.
+    private validateMaxField(data: any, ws: LMXSocket): boolean {
+        const routineId = 'ddl-routine-f9W536K79v1JDngSl9';
+        routineEnter(routineId, "Broker1.validateMaxField");
+        const errMsg = (field: string) =>
+            `\`${field}\` must be a positive integer (>= 1) when provided; omit the field to keep the default.`;
+
+        for (const field of ['max', 'maxRead', 'maxWrite'] as const) {
+            const v = data[field];
+            if (v === undefined || v === null) continue;
+            if (!Number.isInteger(v) || v < 1) {
+                this.send(ws, {
+                    type: 'lock',
+                    uuid: data.uuid,
+                    key: data.key,
+                    acquired: false,
+                    lockRequestCount: 0,
+                    readersCount: 0,
+                    error: errMsg(field)
+                });
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// Clamp a requested `max` against `maxConcurrencyCap`. Increments
+    /// `concurrencyCapClampsTotal` on a clamp. Returns the effective
+    /// `max` to use.
+    private clampMax(requested: number): number {
+        const routineId = 'ddl-routine-etU2Hw8-oMVUrdhIWE';
+        routineEnter(routineId, "Broker1.clampMax");
+        if (!Number.isInteger(requested) || requested < 1) {
+            // Defensive: we expect callers to have passed `validateMaxField`
+            // first. Treat as "use default" rather than throwing.
+            return 1;
+        }
+        if (requested > this.maxConcurrencyCap) {
+            this.concurrencyCapClampsTotal++;
+            return this.maxConcurrencyCap;
+        }
+        return requested;
+    }
+
+    /// Register a TTL deadline for a freshly granted hold. Called from
+    /// `grantLock` after the holder is inserted into `lck.lockholders`.
+    /// `Infinity` ttl is treated as "no eviction" — we simply skip
+    /// registering, so the sweeper has nothing to scan.
+    private scheduleDeadline(key: string, holderUuid: string, ttl: number): number {
+        const routineId = 'ddl-routine-8aNlR3egRuRPfrR4eU';
+        routineEnter(routineId, "Broker1.scheduleDeadline");
+        const expiresAt = ttl === Infinity ? Infinity : Date.now() + ttl;
+        if (expiresAt !== Infinity) {
+            this.holderDeadlines.set(holderUuid, { key, expiresAt, holderUuid });
+        }
+        return expiresAt;
+    }
+
+    /// One periodic sweep over `holderDeadlines`. Evicts every entry whose
+    /// `expiresAt <= now` by:
+    ///   1. checking the holder is still present in the live `LockObj` (the
+    ///      sweeper does *not* eagerly remove deadlines on `unlock`, so we
+    ///      may see stale rows — that's fine, we just skip them),
+    ///   2. removing the holder from `lck.lockholders`,
+    ///   3. recording the eviction in `lockholderTimeouts` so a later
+    ///      `unlock` from the racy ex-holder gets a sane "your hold was
+    ///      already released" reply,
+    ///   4. calling `ensureNewLockHolder` to wake the next waiter.
+    ///
+    /// Public so tests can drive eviction synchronously without waiting on
+    /// `setInterval`.
+    tickTtl(now: number = Date.now()): number {
+        const routineId = 'ddl-routine-M6yenWsAn7Nrl9QQrG';
+        routineEnter(routineId, "Broker1.tickTtl");
+        let evicted = 0;
+        // Snapshot the keys we plan to inspect — `ensureNewLockHolder`
+        // mutates `holderDeadlines` indirectly when it grants new
+        // holders, so iterating in-place is unsafe.
+        const expired: Array<{ key: string, holderUuid: string }> = [];
+        for (const [uuid, entry] of this.holderDeadlines) {
+            if (entry.expiresAt <= now) {
+                expired.push({ key: entry.key, holderUuid: uuid });
+            }
+        }
+
+        for (const { key, holderUuid } of expired) {
+            this.holderDeadlines.delete(holderUuid);
+            const lck = this.locks.get(key);
+            if (!lck) continue;
+            const holder = lck.lockholders.get(holderUuid);
+            if (!holder) continue;
+            // Mark as "expired by sweeper" so a late `unlock` from this
+            // holder's owner returns `unlocked:true` instead of an error.
+            lck.lockholderTimeouts[holderUuid] = true;
+            lck.lockholders.delete(holderUuid);
+            this.ttlEvictionsTotal++;
+            this.emitter.emit('warning',
+                `lmx broker: TTL sweeper evicted holder uuid=${holderUuid} on key="${key}" after wall-clock deadline.`);
+            // Re-grant: same code path the legacy per-holder timer called.
+            this.ensureNewLockHolder(lck, { key, _uuid: holderUuid });
+        }
+        return evicted = expired.length;
+    }
+
+    /// Start the periodic sweeper. Idempotent — calling twice is a no-op.
+    /// `lm-start-server` calls this in the constructor's `ensure()` flow.
+    startTtlSweeper(intervalMs?: number): void {
+        const routineId = 'ddl-routine-vNGTlfT8Mwb2YIWKk3';
+        routineEnter(routineId, "Broker1.startTtlSweeper");
+        if (this.ttlSweeperHandle) return;
+        if (intervalMs && Number.isInteger(intervalMs) && intervalMs > 0) {
+            this.ttlSweepIntervalMs = intervalMs;
+        }
+        const handle = setInterval(() => {
+            try {
+                this.tickTtl();
+            } catch (err) {
+                this.emitter.emit('warning', `lmx broker: TTL sweeper threw: ${inspectError(err as Error)}`);
+            }
+        }, this.ttlSweepIntervalMs);
+        // Don't keep the event loop alive just for the sweeper.
+        if (typeof handle.unref === 'function') handle.unref();
+        this.ttlSweeperHandle = handle;
+    }
+
+    /// Stop the sweeper. Used by tests and by `Broker1.close` (if added).
+    stopTtlSweeper(): void {
+        const routineId = 'ddl-routine-wGrYhuom4cyuG6t_sz';
+        routineEnter(routineId, "Broker1.stopTtlSweeper");
+        if (this.ttlSweeperHandle) {
+            clearInterval(this.ttlSweeperHandle);
+            this.ttlSweeperHandle = null;
+        }
+    }
+
+    /// Atomically grant a queued `acquire-many` waiter ALL of its member
+    /// keys, or roll back and re-queue on the new contended key.
+    ///
+    /// Called from `ensureNewLockHolder` after dequeueing a waiter whose
+    /// `n.acquireMany` is set. Walks the waiter's `allKeys` in their
+    /// canonical (sorted) order. If every key has a free slot, grants
+    /// all of them under a single `compositeLockUuid` and emits
+    /// `acquired:true`. If any key is still contended, rolls back the
+    /// provisional grants made inside this attempt and re-queues the
+    /// waiter on the new contended key — `ensureNewLockHolder` will
+    /// re-enter here when that key frees up.
+    ///
+    /// The pre-allocated `compositeLockUuid` is reused across attempts
+    /// so the client sees a stable identifier across `acquired:false`
+    /// → `acquired:true` transitions.
+    private tryGrantAcquireManyFromQueue(n: NotifyObj): void {
+        const routineId = 'ddl-routine-tryGrantAcquireMany-Yp4';
+        routineEnter(routineId, "Broker1.tryGrantAcquireManyFromQueue");
+
+        if (!n.acquireMany) {
+            // Defensive: caller checked `n.acquireMany` already, but be
+            // explicit so a refactor can't silently lose this contract.
+            return;
+        }
+        const allKeys = n.acquireMany.allKeys;
+        const compositeLockUuid = n.acquireMany.compositeLockUuid;
+        const ws = n.ws;
+        const uuid = n.uuid;
+        const pid = n.pid;
+        const ttl = n.ttl;
+        const keepLocksAfterDeath = n.keepLocksAfterDeath || false;
+
+        const grantedKeys: string[] = [];
+        const fencingTokens: Record<string, number> = {};
+        const holderUuids: Record<string, string> = {};
+        let contendedKey: string | null = null;
+
+        for (const k of allKeys) {
+            let lckK = this.locks.get(k);
+            if (!lckK) {
+                lckK = this.getDefaultLockObject(k, keepLocksAfterDeath, 1);
+                this.locks.set(k, lckK);
+            }
+            const count = lckK.lockholders.size;
+            const max = lckK.max;
+            if (count >= max) {
+                contendedKey = k;
+                break;
+            }
+            const holderUuid = uuidV4();
+            lckK.timestampEmptied = null;
+            lckK.nextFencingToken++;
+            const token = lckK.nextFencingToken;
+            const expiresAt = ttl === Infinity ? Infinity : Date.now() + ttl;
+            lckK.lockholders.set(holderUuid, {
+                pid,
+                ws,
+                uuid: holderUuid,
+                fencingToken: token,
+                compositeLockUuid,
+                expiresAt
+            });
+            if (expiresAt !== Infinity) {
+                this.holderDeadlines.set(holderUuid, { key: k, expiresAt, holderUuid });
+            }
+            if (!this.wsToKeys.has(ws)) {
+                this.wsToKeys.set(ws, {});
+            }
+            this.wsToKeys.get(ws)[k] = true;
+            grantedKeys.push(k);
+            fencingTokens[k] = token;
+            holderUuids[k] = holderUuid;
+        }
+
+        if (contendedKey) {
+            // Roll back provisional grants — they belong to no caller
+            // now. We're about to re-queue the waiter on the new
+            // contended key.
+            for (const gk of grantedKeys) {
+                const lckG = this.locks.get(gk);
+                const holderId = holderUuids[gk];
+                if (lckG && holderId) {
+                    this.holderDeadlines.delete(holderId);
+                    lckG.lockholders.delete(holderId);
+                }
+            }
+            let lckC = this.locks.get(contendedKey);
+            if (!lckC) {
+                lckC = this.getDefaultLockObject(contendedKey, keepLocksAfterDeath, 1);
+                this.locks.set(contendedKey, lckC);
+            }
+            const alreadyQueuedResult = lckC.notify.get(uuid) as [string, NotifyObj] | [typeof IsVoid] | undefined;
+            const alreadyQueued = alreadyQueuedResult && !IsVoid.check(alreadyQueuedResult[0]);
+            if (!alreadyQueued) {
+                lckC.notify.enqueue(uuid, n);
+            }
+            return;
+        }
+
+        // All keys granted — register the composite + emit
+        // `acquired:true`. Mirrors the immediate-grant path in
+        // `acquireMany` so cross-runtime clients see the same shape
+        // regardless of whether they were queued.
+        this.compositeLocks.set(compositeLockUuid, {
+            keys: allKeys,
+            holderUuids: new Map(Object.entries(holderUuids)),
+            fencingTokens: new Map(Object.entries(fencingTokens))
+        });
+        this.send(ws, {
+            type: 'acquire-many',
+            uuid,
+            keys: allKeys,
+            acquired: true,
+            lockUuid: compositeLockUuid,
+            fencingTokens
+        });
+    }
+
+    /// `acquire-many` — atomic acquisition of N keys (union semantics:
+    /// the caller wants ALL keys held simultaneously, but unlike a
+    /// composite intersection-lock it's modelled as N independent
+    /// holds tracked under one client-visible `lockUuid`).
+    ///
+    /// Implementation acquires keys in **sorted order** to prevent
+    /// deadlock between concurrent multi-key requests. If any key
+    /// can't be granted immediately, the request is **queued on the
+    /// first contended key** (rolling back keys we already grabbed
+    /// inside this attempt). When that key eventually frees up,
+    /// `ensureNewLockHolder` re-enters `tryGrantAcquireManyFromQueue`
+    /// to re-attempt the whole composite; if a *different* key is
+    /// now contended, the waiter is re-queued there. The pre-
+    /// allocated `compositeLockUuid` is reused across attempts so the
+    /// client sees a stable identifier from the initial
+    /// `acquired:false` frame to the final `acquired:true`.
+    acquireMany(data: any, ws: LMXSocket) {
+        const routineId = 'ddl-routine-MWp8lto7T7ST6_IQF-';
+        routineEnter(routineId, "Broker1.acquireMany");
+        const uuid = data.uuid;
+        const rawKeys: unknown = data.keys;
+        const ttl = data.ttl === null ? Infinity
+            : (Number.isInteger(data.ttl) && data.ttl > 0 ? data.ttl : this.lockExpiresAfter);
+        const pid = data.pid;
+        const keepLocksAfterDeath = Boolean(data.keepLocksAfterDeath);
+
+        // Validate input shape early — every error path returns the
+        // canonical `acquire-many` failure response so cross-runtime
+        // clients can switch on `type` without case analysis on
+        // `error`.
+        const fail = (msg: string) => this.send(ws, {
+            type: 'acquire-many',
+            uuid,
+            keys: Array.isArray(rawKeys) ? rawKeys : [],
+            acquired: false,
+            error: msg
+        });
+
+        if (!Array.isArray(rawKeys)) {
+            return fail('`keys` must be a non-empty array of strings.');
+        }
+        if (rawKeys.length === 0) {
+            return fail('`keys` must be a non-empty array of strings.');
+        }
+        if (rawKeys.length > 64) {
+            // Hard cap; primary purpose is to bound the rollback path
+            // and the per-request fencing-token map size. Operators can
+            // bump this later if a real workload demands it.
+            return fail(`\`keys\` cannot have more than 64 entries (got ${rawKeys.length}).`);
+        }
+        for (const k of rawKeys) {
+            if (typeof k !== 'string' || k.length === 0) {
+                return fail('Every entry in `keys` must be a non-empty string.');
+            }
+        }
+        // De-dup and sort. Acquiring in a stable order across all callers
+        // is what prevents pairwise deadlock.
+        const keys: string[] = Array.from(new Set(rawKeys as string[])).sort();
+
+        // Optimistic fast path: all keys are currently grantable.
+        // Walk them in order, grabbing each. If any one is contended,
+        // roll back what we grabbed inside this attempt and queue on
+        // the contended key.
+        const grantedKeys: string[] = [];
+        const fencingTokens: Record<string, number> = {};
+        const holderUuids: Record<string, string> = {};
+        const compositeLockUuid = uuidV4();
+
+        for (const k of keys) {
+            const existing = this.locks.get(k);
+            const count = existing ? existing.lockholders.size : 0;
+            const max = existing ? existing.max : 1;
+            if (count >= max) {
+                // Roll back any grants we made earlier in this attempt
+                // — they belong to no caller now.
+                for (const gk of grantedKeys) {
+                    const lckG = this.locks.get(gk);
+                    const holderId = holderUuids[gk];
+                    if (lckG && holderId) {
+                        const holder = lckG.lockholders.get(holderId);
+                        if (holder) {
+                            this.holderDeadlines.delete(holderId);
+                            lckG.lockholders.delete(holderId);
+                        }
+                    }
+                }
+                // No-wait (try-lock): the caller asked to fail fast. We've
+                // already rolled back any partial grants above; do NOT queue,
+                // so there's no deferred composite grant to leak.
+                if (data.wait === false) {
+                    const existingContended = this.locks.get(k);
+                    return this.send(ws, {
+                        type: 'acquire-many',
+                        uuid,
+                        keys,
+                        acquired: false,
+                        contendedKey: k,
+                        lockRequestCount: existingContended ? existingContended.notify.length : 0
+                    });
+                }
+
+                // Queue the waiter on the contended key so a future
+                // release on `k` triggers a re-attempt. This is what
+                // turns `acquired:false` into a *queued* response: the
+                // client library waits for a follow-up `acquired:true`
+                // frame, and `ensureNewLockHolder` is responsible for
+                // emitting it. Pre-allocate the lock object if missing
+                // so we don't drop the waiter on the floor.
+                let contendedLock = this.locks.get(k);
+                if (!contendedLock) {
+                    contendedLock = this.getDefaultLockObject(k, keepLocksAfterDeath, 1);
+                    this.locks.set(k, contendedLock);
+                }
+                const ttlForNotify: number = ttl === Infinity ? Infinity : (ttl || this.lockExpiresAfter);
+                const alreadyQueuedResult = contendedLock.notify.get(uuid) as [string, NotifyObj] | [typeof IsVoid] | undefined;
+                const alreadyQueued = alreadyQueuedResult && !IsVoid.check(alreadyQueuedResult[0]);
+                if (!alreadyQueued) {
+                    contendedLock.notify.enqueue(uuid, {
+                        ws,
+                        uuid,
+                        pid,
+                        ttl: ttlForNotify,
+                        keepLocksAfterDeath,
+                        acquireMany: {
+                            allKeys: keys,
+                            compositeLockUuid
+                        }
+                    });
+                }
+                return this.send(ws, {
+                    type: 'acquire-many',
+                    uuid,
+                    keys,
+                    acquired: false,
+                    contendedKey: k,
+                    lockRequestCount: contendedLock.notify.length
+                });
+            }
+            // Grant `k` immediately. Mint a per-key holder uuid so each
+            // member has independent unlock semantics, and a per-key
+            // fencing token.
+            const holderUuid = uuidV4();
+            let lck = existing;
+            if (!lck) {
+                lck = this.getDefaultLockObject(k, keepLocksAfterDeath, 1);
+                this.locks.set(k, lck);
+            }
+            lck.timestampEmptied = null;
+            lck.nextFencingToken++;
+            const token = lck.nextFencingToken;
+            const expiresAt = ttl === Infinity ? Infinity : Date.now() + ttl;
+            lck.lockholders.set(holderUuid, {
+                pid, ws, uuid: holderUuid, fencingToken: token,
+                compositeLockUuid, expiresAt
+            });
+            if (expiresAt !== Infinity) {
+                this.holderDeadlines.set(holderUuid, { key: k, expiresAt, holderUuid });
+            }
+            if (!this.wsToKeys.has(ws)) this.wsToKeys.set(ws, {});
+            this.wsToKeys.get(ws)[k] = true;
+            grantedKeys.push(k);
+            fencingTokens[k] = token;
+            holderUuids[k] = holderUuid;
+        }
+
+        this.compositeLocks.set(compositeLockUuid, {
+            keys,
+            holderUuids: new Map(Object.entries(holderUuids)),
+            fencingTokens: new Map(Object.entries(fencingTokens))
+        });
+
+        this.send(ws, {
+            type: 'acquire-many',
+            uuid,
+            keys,
+            acquired: true,
+            lockUuid: compositeLockUuid,
+            fencingTokens
+        });
+    }
+
+    /// `release-many` — release every member of an `acquire-many` grant.
+    /// Looks up the composite by `lockUuid`, releases each per-key
+    /// holder, and re-grants any waiters that the freed slots admit.
+    releaseMany(data: any, ws: LMXSocket) {
+        const routineId = 'ddl-routine-19v7y5wptl2E-jPQuE';
+        routineEnter(routineId, "Broker1.releaseMany");
+        const uuid = data.uuid;
+        const lockUuid = data.lockUuid;
+        const composite = lockUuid ? this.compositeLocks.get(lockUuid) : null;
+
+        if (!composite) {
+            return this.send(ws, {
+                type: 'release-many',
+                uuid,
+                released: false,
+                error: lockUuid
+                    ? `Unknown composite lockUuid="${lockUuid}" (already released or never granted).`
+                    : '`lockUuid` is required for `release-many`.'
+            });
+        }
+
+        for (const k of composite.keys) {
+            const holderId = composite.holderUuids.get(k);
+            if (!holderId) continue;
+            const lck = this.locks.get(k);
+            if (!lck) continue;
+            this.holderDeadlines.delete(holderId);
+            const removed = lck.lockholders.delete(holderId);
+            if (removed) lck.lockholdersAllReleased[holderId] = true;
+            // Wake the next waiter on this key. The signature mirrors
+            // what `unlock()` passes — `_uuid` is the freed holder's
+            // identifier so `ensureNewLockHolder` has the context it
+            // expects.
+            this.ensureNewLockHolder(lck, { key: k, _uuid: holderId });
+        }
+
+        this.compositeLocks.delete(lockUuid);
+        this.send(ws, {
+            type: 'release-many',
+            uuid,
+            lockUuid,
+            keys: composite.keys,
+            released: true
+        });
+    }
+
     lock(data: any, ws: LMXSocket) {
+        const routineId = 'ddl-routine-uqAdO-ZiaFbzajJj5r';
+        routineEnter(routineId, "Broker1.lock");
+
+        if (!this.validateMaxField(data, ws)) {
+            return;
+        }
 
         const key = data.key;
         const keepLocksAfterDeath = Boolean(data.keepLocksAfterDeath);
@@ -1482,6 +2320,21 @@ export class Broker1 {
                 // if we are retrying, we may attempt to call lock() more than once
                 // we don't want to push the same ws object / same uuid combo to array
 
+                // No-wait (try-lock): the caller asked to fail fast rather
+                // than be queued. Emit the same `acquired:false` notice but do
+                // NOT enqueue, so there is no deferred grant to leak.
+                if (data.wait === false) {
+                    this.send(ws, {
+                        readersCount: lck.readers,
+                        key: key,
+                        uuid: uuid,
+                        lockRequestCount: ln,
+                        type: 'lock',
+                        acquired: false
+                    });
+                    return;
+                }
+
                 if (force) {
 
                     // because of the force option, we put it to the front of the line
@@ -1531,7 +2384,7 @@ export class Broker1 {
                 lck.readers = Math.max(0, --lck.readers);
             }
 
-            this.grantLock(lck, ws, uuid, pid, ttl, key);
+            const fencingToken = this.grantLock(lck, ws, uuid, pid, ttl, key);
 
             this.send(ws, {
                 readersCount: lck.readers,
@@ -1539,7 +2392,8 @@ export class Broker1 {
                 key: key,
                 lockRequestCount: ln,
                 type: 'lock',
-                acquired: true
+                acquired: true,
+                fencingToken
             });
 
             return;
@@ -1572,7 +2426,7 @@ export class Broker1 {
             lckTemp.readers = Math.max(0, --lckTemp.readers);
         }
 
-        this.grantLock(lckTemp, ws, uuid, pid, ttl, key);
+        const fencingToken = this.grantLock(lckTemp, ws, uuid, pid, ttl, key);
 
         this.send(ws, {
             readersCount: lckTemp.readers,
@@ -1580,12 +2434,15 @@ export class Broker1 {
             lockRequestCount: 0,
             key: key,
             type: 'lock',
-            acquired: true
+            acquired: true,
+            fencingToken
         });
 
     }
 
     unlock(data: any, ws?: net.Socket) {
+        const routineId = 'ddl-routine-8SVOFkIeN1L4uIj8VK';
+        routineEnter(routineId, "Broker1.unlock");
 
         const key = data.key;
         const uuid = data.uuid;
@@ -1636,35 +2493,74 @@ export class Broker1 {
 
             const ln = lck.notify.length;
 
-            // Get the lockholder's information
-            const lockholder = lck.lockholders.get(_uuid);
-
-            if (lockholder && lockholder.timer) {
-                clearTimeout(lockholder.timer);
+            // Phase 1 — targeted holder removal. Capture whether the
+            // caller's `_uuid` actually matched a live holder so
+            // downstream branches can distinguish "I unlocked my own
+            // hold" from "I sent force=true with a stale or invalid
+            // _uuid". Drop the deadline row alongside the holder so
+            // the centralised sweeper (`tickTtl`) doesn't emit a
+            // phantom eviction message racing this unlock.
+            let wasHolder = false;
+            if (_uuid && lck.lockholders.has(_uuid)) {
+                this.holderDeadlines.delete(_uuid);
+                lck.lockholders.delete(_uuid);
+                // Mark for late-unlock idempotency: if the same caller
+                // retries (e.g. their first unlock crossed paths with
+                // a TTL eviction or a duplicate cleanup), the second
+                // request gets `unlocked:true` instead of "wrong uuid".
+                lck.lockholdersAllReleased[_uuid] = true;
+                wasHolder = true;
             }
 
-            // remove the lockholder, as the above if stmt checked it,
-            //so we don't need to check before deleting it again.
-            lck.lockholders.delete(_uuid);
-
-            // delete lck.lockholderTimeouts[_uuid];
-
+            // Phase 2 — force-mode dispositions. Three sub-cases that
+            // historically conflated to a single wipe-all branch and
+            // produced two latent bugs:
+            //
+            //   (a) `force:true` with no `_uuid` — used by
+            //       `cleanupConnection` and by operator-driven
+            //       wholesale resets. Keep the legacy "wipe everyone
+            //       on this key" semantic.
+            //   (b) `force:true` with a `_uuid` that DID match (handled
+            //       in Phase 1 above; nothing more to do here).
+            //   (c) `force:true` with a `_uuid` that did NOT match.
+            //       Previously this fell into the wipe-all branch on
+            //       max=1 keys and silently no-op'd on max>1 keys
+            //       while still reporting `unlocked:true`. Both were
+            //       wrong:
+            //         - max=1: an attacker passing a wrong `_uuid`
+            //                  could evict the legitimate holder.
+            //         - max>1: the broker reported success while the
+            //                  lockholders map still had every peer
+            //                  ("phantom unlock"), confusing CAS
+            //                  callers downstream.
+            //       Fail loudly in both, keep peers untouched.
             if (force) {
-                // If this is a semaphore lock and we're just targeting one lock holder,
-                // only remove that specific holder
-                if (_uuid && lck.max > 1) {
-                    // Just remove this specific lock holder
-                    const removed = lck.lockholders.delete(_uuid);
-                    if (removed) {
-                        lck.lockholdersAllReleased[_uuid] = true;
-                    }
-                } else {
-                    // Traditional force behavior - remove all lock holders
+                if (!_uuid) {
+                    // (a) legacy wipe-all
                     for (const k of lck.lockholders.keys()) {
                         lck.lockholdersAllReleased[k] = true;
+                        this.holderDeadlines.delete(k);
                     }
                     lck.lockholders = new Map();
+                } else if (!wasHolder) {
+                    // (c) targeted force on a non-existent holder.
+                    // Reply with a structured error and DO NOT touch
+                    // any peer's hold or fall through to "unlocked:true".
+                    if (uuid && ws) {
+                        log.debug('unlock: rejecting force-unlock with non-matching _uuid for key:', key, 'uuid:', uuid, '_uuid:', _uuid);
+                        this.send(ws, {
+                            uuid: uuid,
+                            key: key,
+                            lockRequestCount: ln,
+                            type: 'unlock',
+                            unlocked: false,
+                            error: `force-unlock: no holder with _uuid='${_uuid}' on key '${key}' (max=${lck.max}).`,
+                        });
+                    }
+                    // Don't drain the queue — nothing actually freed up.
+                    return;
                 }
+                // (b) handled by Phase 1; fall through to send unlocked:true.
             }
 
             if (uuid && ws) {

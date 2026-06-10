@@ -1,0 +1,24 @@
+# Scoped dockerignore for `Dockerfile.image` — the legacy `.dockerignore`
+# at repo root excludes `src/` and `scripts/`, which makes a from-source
+# multi-stage build impossible. Buildx prefers `<dockerfile>.dockerignore`
+# when one exists alongside `--file`, so this file shadows the global one
+# without disturbing the legacy `Dockerfile` flow.
+
+.git
+.idea
+.cursor
+.github
+.circleci
+.r2g
+node_modules
+dist
+lib
+docs
+test
+fixtures
+**/*.log
+.dockerignore
+Dockerfile
+Dockerfile.circleci
+Dockerfile.r2g
+**/.DS_Store

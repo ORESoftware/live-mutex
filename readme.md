@@ -28,11 +28,7 @@
 
 # Live-Mutex / LMX  :lock: + :unlock:
 
-<<<<<<< HEAD
-> **📖 For detailed usage guide, see [docs/readme.md](./docs/readme.md)**
-=======
-> **📖 For detailed usage instructions, see [README-2.md](./README-2.md)**
->>>>>>> 111df4ddf6ca756705f9e905054c7873e61cc6ce
+> **📖 For detailed usage instructions, see [docs/readme-2.md](./docs/readme-2.md)**
 
 ### Disclaimer
 
@@ -88,7 +84,7 @@ const {key, id} = await client.acquire('my-key');
 await client.release(key, {id});
 ```
 
-**For detailed usage, see [readme-2.md](./readme-2.md)**  
+**For detailed usage, see [docs/readme-2.md](./docs/readme-2.md)**  
 **For broker migration guide, see [BROKER_MIGRATION.md](./BROKER_MIGRATION.md)**
 
 # Simple Working Examples:
@@ -278,7 +274,7 @@ $ lmx set uds_path "$PWD/zoom"
 If `uds_path` is set, it will override host/port. You must use `$ lmx set a b`, to change settings. You can elect to use these environment variables
 in Node.js, by using `{env: true}` in your Node.js code.
 
-**For more CLI commands and examples, see [readme-2.md](./readme-2.md)**
+**For more CLI commands and examples, see [docs/readme-2.md](./docs/readme-2.md)**
 
 </details>
 
@@ -303,7 +299,7 @@ $ lmx status 6970 localhost
 $ lmx health-check
 ```
 
-For detailed usage information, see [README-2.md](./README-2.md).
+For detailed usage information, see [docs/readme-2.md](./docs/readme-2.md).
 
 <br>
 
@@ -322,7 +318,12 @@ import {Broker} from 'live-mutex';
 import {LMXClient, LMXBroker1} from 'live-mutex';
 ```
 
-> **Note**: `Broker1` is the recommended broker implementation. `Broker` is legacy and will be deprecated. See [BROKER-COMPARISON.md](./BROKER-COMPARISON.md) for details and [MIGRATION-GUIDE.md](./MIGRATION-GUIDE.md) for migration instructions.
+> **Note**: `Broker1` is the recommended broker implementation and the
+> only one that emits **fencing tokens** on grants and supports the
+> **`acquire-many` / multi-key** wire protocol. `Broker` is legacy and
+> will be deprecated. See [BROKER-COMPARISON.md](./BROKER-COMPARISON.md)
+> for details and [MIGRATION-GUIDE.md](./MIGRATION-GUIDE.md) for migration
+> instructions.
 
 <br>
 
@@ -600,6 +601,220 @@ Non-binary semaphores are well-supported by live-mutex and are a primary feature
 
 <br>
 
+## Fencing tokens
+
+Live-Mutex's `Broker1` returns a per-key, monotonically increasing
+`fencingToken: number` on every successful acquire. The pattern is the
+one Martin Kleppmann describes in
+["How to do distributed locking"](https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html):
+when an acquirer pauses (GC, network blip, suspended VM) past its
+TTL and the broker hands the lock to a newer waiter, the resource
+behind the lock can use the token to reject the stale holder's
+eventual write — even though both peers believed they held the lock.
+
+```ts
+import {Broker1, Client} from 'live-mutex';
+
+const broker = new Broker1({port: 6970});
+await broker.ensure();
+
+const client = new Client({port: 6970});
+await client.ensure();
+
+const grant = await client.acquire('orders');
+// grant.fencingToken: number — strictly greater than any prior token for 'orders'
+await downstream.write({fencingToken: grant.fencingToken, /* … */});
+await client.release(grant.key, grant.id);
+```
+
+Notes:
+
+- Tokens are minted at grant time on a per-key counter, so they are
+  unique for every successful grant on that key (including semaphore
+  slots — each holder gets its own token).
+- Use `Broker1` (the actively maintained broker), not the legacy
+  `Broker` class, if you want fencing tokens — only `Broker1` emits
+  the `fencingToken` field on grant frames.
+- Tokens are advisory: the broker enforces the lock, and the
+  downstream resource enforces the token. A resource that doesn't
+  read tokens still gets correct mutual exclusion under happy-path
+  timing; tokens harden the corner cases.
+
+<br>
+
+## Multi-key (acquireMany) locking
+
+Live-Mutex supports atomic acquisition of multiple keys in a single
+request. Either all keys are acquired or none — the broker
+serializes the request through a global lexicographic key order so
+two concurrent `acquireMany` requests with overlapping keys cannot
+deadlock.
+
+#### Why a multi-key lock instead of N single-key acquires
+
+The textbook way to "lock A and B" is to acquire them in some agreed
+global order. That gets you correctness, but you still own the
+bookkeeping:
+
+- You have to remember the canonical order and apply it everywhere a
+  caller wants both keys, forever.
+- A timeout or panic between acquiring `A` and acquiring `B` leaves `A`
+  held and orphaned until its TTL fires.
+- A second caller that wants only `B` can grab it between your two
+  acquires — you never observe a quiet moment when both are held by no
+  one else.
+- Releasing requires two calls; if the second `release` fails or the
+  process dies between them, you leak one key until the sweeper
+  catches up.
+
+`acquireMany` collapses all of that into one broker round-trip: the
+broker checks every key, grants only when *all* of them are free, and
+emits a single `lockUuid` that releases the whole set with one call.
+No in-between state is visible to anyone — including the caller's own
+retries.
+
+Concretely, callers use it for things like: transferring an item
+between two queues, rotating a two-key credential without ever exposing
+a window where neither key is held, or running a migration that has to
+hold the source and destination shard locks simultaneously.
+
+#### Guarantees
+
+The two properties below hold *by construction*, not by polling or
+retries:
+
+1. **Atomicity.** While a composite holder owns `lockUuid X` covering
+   keys `[A, B]`, no other caller will ever be granted `A` alone, `B`
+   alone, or any other `acquireMany` request that overlaps `{A, B}`.
+   Equivalently: no subset of your keys is ever observable to another
+   holder.
+
+   This is preserved through every failure mode the broker handles:
+   contention with single-key `acquire` on overlapping keys, contention
+   with another `acquireMany`, partial-grant races (the broker rolls
+   back any keys it tentatively claimed if a later key in the set turns
+   out to be held), the centralised TTL sweeper expiring one of your
+   keys, and the owning client's TCP socket closing — the broker's
+   socket-close cleanup releases every member of the set together.
+
+2. **Deadlock freedom via global lexicographic ordering.** The broker
+   sorts every `keys` array into ascending Unicode-code-point order
+   before queueing. Two callers issuing `acquireMany(['A','B'])` and
+   `acquireMany(['B','A'])` therefore wait on the same key's notify
+   queue and one wins outright; neither can hold one half while
+   waiting on the other. Worked example:
+
+   ```text
+   t=0  caller-1 sends keys=[A, B]   → broker sorts → wait on A.notify
+   t=0  caller-2 sends keys=[B, A]   → broker sorts → wait on A.notify
+   t=1  A is free → caller-1 wins A, then atomically claims B
+   t=1  caller-2 stays in A.notify   (A is now held by caller-1)
+   t=N  caller-1 releases lockUuid   → A and B both free
+   t=N  caller-2 wakes, claims A and B atomically
+   ```
+
+   Without the broker-side sort, caller-1 could claim `A`, caller-2
+   could claim `B`, and both would block forever waiting for the
+   other's key — a classic two-resource deadlock.
+
+#### Where `acquireMany` lives in the API
+
+`acquireMany` is **not** exposed on the standard TCP `Client`; it lives
+on `Broker1`, on `InProcessBridge` (HTTP-server-style, no socket
+round-trip), on the HTTP `/v1/acquire-many` endpoint, and on the raw
+TCP `acquire-many` frame. The intent is that an in-process broker or a
+service-side bridge (e.g. an HTTP gateway pod running `live-mutex` as a
+library) coordinates multi-key state transitions on behalf of a fleet
+of single-key TCP clients. New cross-runtime clients are welcome to add
+an `acquire-many` method that issues the wire frame directly — the
+broker accepts it from any TCP/UDS connection — but the official Node
+`Client` keeps single-key semantics on purpose.
+
+The TCP/UDS wire protocol uses a `type: 'acquire-many'` frame, and
+there are three convenient ways to drive it from Node.js:
+
+#### 1. HTTP (any runtime)
+
+```bash
+curl -s http://127.0.0.1:6971/v1/acquire-many \
+  -H 'content-type: application/json' \
+  -d '{"keys":["users","orders"],"ttlMs":5000}' | jq
+# => { "acquired": true, "keys":["orders","users"],
+#      "lockUuid":"…", "fencingTokens": {"orders": 7, "users": 3} }
+
+# Single release call drops every member of the set atomically. The
+# broker rejects any release that doesn't match the original lockUuid,
+# so one caller can't accidentally release another caller's set.
+curl -s http://127.0.0.1:6971/v1/release-many \
+  -H 'content-type: application/json' \
+  -d '{"lockUuid":"<uuid from above>"}' | jq
+```
+
+#### 2. In-process bridge (HTTP-server-style, no socket round-trip)
+
+```ts
+import {Broker1, InProcessBridge} from 'live-mutex';
+
+const broker = new Broker1({port: 6970});
+await broker.ensure();
+const bridge = new InProcessBridge(broker);
+
+const grant = await bridge.acquireMany(['users', 'orders'], 5000);
+// grant.fencingTokens => { users: <n>, orders: <m> }
+
+// One call releases every key in the composite atomically.
+await bridge.releaseMany(grant.lockUuid);
+
+bridge.shutdown();
+```
+
+#### 3. Direct TCP (any client that speaks the wire format)
+
+```text
+client → broker
+{ "type": "acquire-many",
+  "uuid": "<correlation-id>",
+  "keys": ["users", "orders"],
+  "ttl": 5000 }
+
+broker → client (when every key is free)
+{ "type": "acquire-many",
+  "uuid": "<correlation-id>",
+  "acquired": true,
+  "keys": ["orders", "users"],
+  "lockUuid": "...",
+  "fencingTokens": { "orders": 7, "users": 3 } }
+
+client → broker
+{ "type": "release-many",
+  "uuid": "<correlation-id-2>",
+  "lockUuid": "..." }
+```
+
+Under contention the broker first responds with `acquired: false`
+plus the current queue depth, and emits a second `acquire-many` frame
+with `acquired: true` once every key is held. The single `lockUuid`
+in the response is the only handle needed to release the whole set.
+
+#### Constraints
+
+- `keys` is bounded by the broker (mirrors the Rust port's `1..=5`
+  cap). Larger sets are rejected with `acquired: false` plus an
+  `error` field, before any state mutation.
+- Empty `keys` arrays and requests that set both `key` and `keys` are
+  rejected the same way — there is no "fall back to single-key on
+  empty composite" sentinel.
+- `max > 1` (semaphore-style concurrency) is **single-key only**.
+  Composite holders always behave like `max=1` per member; combining
+  semaphore and composite is deadlock-prone (you'd need to lock K
+  slots across N keys in some agreed order, and the right answer is
+  workload-specific).
+- Composite locks are exclusive across *all* lock kinds on a member
+  key: while a composite is held on `A`, no `acquire("A")`, RW
+  reader, or RW writer can grant. The inverse also holds.
+
+<br>
+
 ## Live-Mutex utils
 
 <details>
@@ -704,15 +919,15 @@ exports.createPool = function(opts){
 
 ## Documentation
 
-- **[README-2.md](./README-2.md)** - Comprehensive usage guide with examples and best practices
+- **[docs/readme-2.md](./docs/readme-2.md)** - Comprehensive usage guide with examples and best practices
 - **[BROKER-COMPARISON.md](./BROKER-COMPARISON.md)** - Differences between Broker and Broker1
 - **[MIGRATION-GUIDE.md](./MIGRATION-GUIDE.md)** - Guide for migrating from Broker to Broker1
 
 ### Quick Links
 
-- **Getting Started**: Run `lmx quick-start` or see [README-2.md](./README-2.md)
+- **Getting Started**: Run `lmx quick-start` or see [docs/readme-2.md](./docs/readme-2.md)
 - **CLI Tools**: See the "New CLI Tools" section above
-- **Docker**: See [README-2.md](./README-2.md#docker-usage) for Docker examples
+- **Docker**: See [docs/readme-2.md](./docs/readme-2.md#docker-usage) for Docker examples
 - **Broker vs Broker1**: See [BROKER-COMPARISON.md](./BROKER-COMPARISON.md)
 
 <br>
