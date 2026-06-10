@@ -84,16 +84,13 @@ Promise.all([
       function (cb) {
 
         
-
         const c = new Client({port});
         c.ensure().then(function () {
 
-          
 
           c.lock('z', function (err, {id}) {
 
             
-
             if (err) return cb(err);
             c.unlock('z', id, cb);
           });
