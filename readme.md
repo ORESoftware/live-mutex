@@ -1,4 +1,12 @@
-
+<!-- BEGIN k8s-cluster-submodule-notice -->
+> [!NOTE]
+> **Canonical source.** This repository is the source of truth for its code. It
+> is also vendored as a **secondary** git submodule of
+> [ORESoftware/k8s-cluster](https://github.com/ORESoftware/k8s-cluster) at
+> `remote/submodules/live-mutex` — make changes here, not in that submodule checkout.
+>
+> On disk: source clone `~/codes/ores/live-mutex` · submodule checkout `~/codes/ores/k8s-cluster/remote/submodules/live-mutex`.
+<!-- END k8s-cluster-submodule-notice -->
 
 <a align="right" href="https://travis-ci.org/ORESoftware/live-mutex">
     <img align="right" alt="Travis Build Status" src="https://travis-ci.org/ORESoftware/live-mutex.svg?branch=dev">
