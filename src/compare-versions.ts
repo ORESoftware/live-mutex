@@ -1,7 +1,11 @@
 'use strict';
 
 
+
+import {routineEnter} from './routine';
 export const compareVersions = (clientVersion: string, brokerVersion: string) => {
+  const routineId = 'ddl-routine-mREWT5Q8cT-wA3KXWJ';
+  routineEnter(routineId, "compareVersions");
   
   if(!(clientVersion && typeof clientVersion === 'string')){
     throw new Error(`The client version is not defined as string: '${clientVersion}'`);

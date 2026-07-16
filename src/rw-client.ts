@@ -1,5 +1,7 @@
 'use strict';
 
+
+import {routineEnter} from './routine';
 import * as assert from 'assert';
 
 import {
@@ -40,12 +42,16 @@ export class RWLockClient extends Client {
   writeKeys = <{ [key: string]: true }>{}; // keeps track of whether a key has been registered as a write key
 
   constructor(o?: Partial<ClientOpts>, cb?: LMClientCallBack) {
+    const routineId = 'ddl-routine-HAUStQIBK8BntKfI2t';
+    routineEnter(routineId, "RWLockClient.constructor");
     super(o, cb);
     // RWClient implementation - read-preferring RW lock
     // Note: This is a basic implementation and may need further refinement
   }
 
   beginReadp(key: string, opts: any): Promise<any> {
+    const routineId = 'ddl-routine-MMT8q0wxVAlaC-jn_6';
+    routineEnter(routineId, "RWLockClient.beginReadp");
     return new Promise((resolve, reject) => {
       this.beginRead(key, opts, (err, val) => {
         err ? reject(err) : resolve(val);
@@ -54,6 +60,8 @@ export class RWLockClient extends Client {
   }
 
   endReadp(key: string, opts: any): Promise<any> {
+    const routineId = 'ddl-routine-0Ezu-_c2qQYXCAN_ny';
+    routineEnter(routineId, "RWLockClient.endReadp");
     return new Promise((resolve, reject) => {
       this.endRead(key, opts, (err, val) => {
         err ? reject(err) : resolve(val);
@@ -62,6 +70,8 @@ export class RWLockClient extends Client {
   }
 
   beginWritep(key: string, opts?: any): Promise<any> {
+    const routineId = 'ddl-routine-46eKlJWm-E2f1yRdGU';
+    routineEnter(routineId, "RWLockClient.beginWritep");
     return new Promise((resolve, reject) => {
       this.beginWrite(key, opts, (err, val) => {
         err ? reject(err) : resolve(val);
@@ -70,6 +80,8 @@ export class RWLockClient extends Client {
   }
 
   endWritep(key: string, opts?: any): Promise<any> {
+    const routineId = 'ddl-routine-GHpFOwML5ndBfDl9-O';
+    routineEnter(routineId, "RWLockClient.endWritep");
     return new Promise((resolve, reject) => {
       this.endWrite(key, opts, (err, val) => {
         err ? reject(err) : resolve(val);
@@ -78,22 +90,32 @@ export class RWLockClient extends Client {
   }
 
   acquireWriteLock(key: string, opts: any, cb?: any) {
+    const routineId = 'ddl-routine-HO-403o5qvtvsPewsg';
+    routineEnter(routineId, "RWLockClient.acquireWriteLock");
     return this.beginWrite.apply(this, arguments);
   }
 
   acquireReadLock(key: string, opts: any, cb?: any) {
+    const routineId = 'ddl-routine-OMCj5yXe38WIO20ISV';
+    routineEnter(routineId, "RWLockClient.acquireReadLock");
     return this.beginRead.apply(this, arguments);
   }
 
   releaseWriteLock(key: string, opts: any, cb?: any) {
+    const routineId = 'ddl-routine-pow8inMyFGad2boCYv';
+    routineEnter(routineId, "RWLockClient.releaseWriteLock");
     return this.endWrite.apply(this, arguments);
   }
 
   releaseReadLock(key: string, opts: any, cb?: any) {
+    const routineId = 'ddl-routine-2W2OpL6E7hr7OfCMKn';
+    routineEnter(routineId, "RWLockClient.releaseReadLock");
     return this.endRead.apply(this, arguments);
   }
 
   acquireWriteLockp(key: string, opts?: any): Promise<any> {
+    const routineId = 'ddl-routine-tcBY8WTa3HACx50_e0';
+    routineEnter(routineId, "RWLockClient.acquireWriteLockp");
     return new Promise((resolve, reject) => {
       this.beginWrite(key, opts, (err, val) => {
         err ? reject(err) : resolve(val);
@@ -102,6 +124,8 @@ export class RWLockClient extends Client {
   }
 
   acquireReadLockp(key: string, opts?: any): Promise<any> {
+    const routineId = 'ddl-routine-uD1H38hMQL57AQIKFB';
+    routineEnter(routineId, "RWLockClient.acquireReadLockp");
     return new Promise((resolve, reject) => {
       this.beginRead(key, opts, (err, val) => {
         err ? reject(err) : resolve(val);
@@ -110,6 +134,8 @@ export class RWLockClient extends Client {
   }
 
   releaseWriteLockp(key: string, opts?: any): Promise<any> {
+    const routineId = 'ddl-routine-U53tF5VN9tTuyAIKg-';
+    routineEnter(routineId, "RWLockClient.releaseWriteLockp");
     return new Promise((resolve, reject) => {
       this.endWrite(key, opts, (err, val) => {
         err ? reject(err) : resolve(val);
@@ -118,6 +144,8 @@ export class RWLockClient extends Client {
   }
 
   releaseReadLockp(key: string, opts?: any): Promise<any> {
+    const routineId = 'ddl-routine-MyhDqiRJe5YjvxZVfd';
+    routineEnter(routineId, "RWLockClient.releaseReadLockp");
     return new Promise((resolve, reject) => {
       this.endRead(key, opts, (err, val) => {
         err ? reject(err) : resolve(val);
@@ -126,6 +154,8 @@ export class RWLockClient extends Client {
   }
 
   beginWrite(key: string, opts: any, cb?: EVCb<any>) {
+    const routineId = 'ddl-routine-mCAsuqoFMvNEvPQwhH';
+    routineEnter(routineId, "RWLockClient.beginWrite");
 
     try {
       [key, opts, cb] = this.parseLockOpts(key, opts, cb);
@@ -154,6 +184,8 @@ export class RWLockClient extends Client {
   }
 
   endWrite(key: string, opts: any, cb?: EVCb<any>) {
+    const routineId = 'ddl-routine-hj_L-0mMPUY1KJy030';
+    routineEnter(routineId, "RWLockClient.endWrite");
 
     try {
       [key, opts, cb] = this.parseUnlockOpts(key, opts, cb);
@@ -169,6 +201,8 @@ export class RWLockClient extends Client {
   }
 
   beginRead(key: string, opts: any, cb: EVCb<any>) {
+    const routineId = 'ddl-routine-uvCJBQbMnpVPzIU9LO';
+    routineEnter(routineId, "RWLockClient.beginRead");
 
     try {
       [key, opts, cb] = this.parseLockOpts(key, opts, cb);
@@ -270,6 +304,8 @@ export class RWLockClient extends Client {
   }
 
   endRead(key: string, opts: any, cb: EndReadCallback) {
+    const routineId = 'ddl-routine-gVwhk36aRQz2YcLC5o';
+    routineEnter(routineId, "RWLockClient.endRead");
 
     try {
       [key, opts, cb] = this.parseUnlockOpts(key, opts, cb);
@@ -376,6 +412,8 @@ export class RWLockClient extends Client {
    * @param callback Function that receives warning messages/errors
    */
   onWarning(callback: (...args: any[]) => void): void {
+    const routineId = 'ddl-routine-F66hnkMx6HgWRcw7X3';
+    routineEnter(routineId, "RWLockClient.onWarning");
     this.emitter.on('warning', callback);
   }
 
@@ -384,6 +422,8 @@ export class RWLockClient extends Client {
    * @param callback Function that receives error messages
    */
   onError(callback: (...args: any[]) => void): void {
+    const routineId = 'ddl-routine-s0x1QxqrCi3_tj-XbU';
+    routineEnter(routineId, "RWLockClient.onError");
     this.emitter.on('error', callback);
   }
 

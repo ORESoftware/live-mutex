@@ -1,5 +1,7 @@
 'use strict';
 
+
+import {routineEnter} from './routine';
 import chalk from "chalk";
 import {forDebugging} from "./shared-internal";
 import {emitTelemetryEvent} from "./telemetry";
@@ -49,13 +51,19 @@ export const log = {
 };
 
 export const getClientErrorMessage = (s: string) => {
+  const routineId = 'ddl-routine-pwVOsWr4EkLWnzNQ5d';
+  routineEnter(routineId, "getClientErrorMessage");
   return `lmx client error: ${s}`
 };
 
 export const getClientError = (s: string) => {
+  const routineId = 'ddl-routine-Deq1ehXs8AfkwrFfwI';
+  routineEnter(routineId, "getClientError");
   return new Error(`lmx client error: ${s}`)
 };
 
 export const throwClientError = (s: string) => {
+  const routineId = 'ddl-routine-Jv6H7ZJdlYAvC2-ZPH';
+  routineEnter(routineId, "throwClientError");
   throw new Error(`lmx client error: ${s}`)
 };

@@ -1,10 +1,14 @@
 #!/usr/bin/env node
 'use strict';
 
+
+import {routineEnter} from './routine';
 import chalk from "chalk";
 import * as net from 'net';
 
 function checkPort(host: string, port: number): Promise<boolean> {
+  const routineId = 'ddl-routine-dSmZTQyYXglcEZZRti';
+  routineEnter(routineId, "checkPort");
   return new Promise((resolve) => {
     const socket = new net.Socket();
     const timeout = 1000;
@@ -25,6 +29,8 @@ function checkPort(host: string, port: number): Promise<boolean> {
 }
 
 async function main() {
+  const routineId = 'ddl-routine-N2L7MM6bo8D30HUSmx';
+  routineEnter(routineId, "main");
   console.log(chalk.bold.blue('\n╔══════════════════════════════════════════════════════════╗'));
   console.log(chalk.bold.blue('║         Live-Mutex Quick Start Guide                      ║'));
   console.log(chalk.bold.blue('╚══════════════════════════════════════════════════════════╝\n'));

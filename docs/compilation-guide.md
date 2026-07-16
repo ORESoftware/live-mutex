@@ -213,6 +213,6 @@ npm install --save-dev @types/package-name
 
 - [TypeScript Handbook](https://www.typescriptlang.org/docs/handbook/intro.html)
 - [TypeScript Compiler Options](https://www.typescriptlang.org/tsconfig)
-- [Project README](./../README.md)
-- [Usage Guide](./../README-2.md)
-
+- [Main README](../readme.md)
+- [Usage Guide](./readme-2.md)
+- [Testing Guide](./testing-rw-locks.md)

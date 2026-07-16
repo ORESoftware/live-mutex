@@ -1,5 +1,7 @@
 'use strict';
 
+
+import {routineEnter} from './routine';
 //core
 import * as assert from 'assert';
 
@@ -12,6 +14,7 @@ import {Client, ClientOpts, LMClientCallBack, LMClientUnlockCallBack} from "./cl
 import {weAreDebugging} from "./we-are-debugging";
 import {EVCb} from "./shared-internal";
 import {emitTelemetryEvent} from "./telemetry";
+import {LMXRequestType} from "./protocol";
 
 const rwScopeName = 'live-mutex.client.rw-write-preferred';
 
@@ -55,10 +58,14 @@ export class RWLockWritePrefClient extends Client {
   writeKeys = <{ [key: string]: true }>{}; // keeps track of whether a key has been registered as a write key
 
   constructor(o?: Partial<ClientOpts>, cb?: LMClientCallBack) {
+    const routineId = 'ddl-routine-RFeluGBXPX8S3WF5-0';
+    routineEnter(routineId, "RWLockWritePrefClient.constructor");
     super(o, cb);
   }
 
   beginReadp(key: string, opts: any): Promise<any> {
+    const routineId = 'ddl-routine-fWkzJ08QVW1x2ImUXx';
+    routineEnter(routineId, "RWLockWritePrefClient.beginReadp");
     return new Promise((resolve, reject) => {
       this.acquireReadLock(key, opts, (err, val) => {
         err ? reject(err) : resolve(val);
@@ -67,6 +74,8 @@ export class RWLockWritePrefClient extends Client {
   }
 
   endReadp(key: string, opts: any): Promise<any> {
+    const routineId = 'ddl-routine-AcyFMbU-iU6aF9cxLB';
+    routineEnter(routineId, "RWLockWritePrefClient.endReadp");
     return new Promise((resolve, reject) => {
       this.releaseReadLock(key, opts, (err, val) => {
         err ? reject(err) : resolve(val);
@@ -75,6 +84,8 @@ export class RWLockWritePrefClient extends Client {
   }
 
   beginWritep(key: string, opts?: any): Promise<any> {
+    const routineId = 'ddl-routine-uvjj__lQvA4w39ygy1';
+    routineEnter(routineId, "RWLockWritePrefClient.beginWritep");
     return new Promise((resolve, reject) => {
       this.acquireWriteLock(key, opts, (err, val) => {
         err ? reject(err) : resolve(val);
@@ -83,6 +94,8 @@ export class RWLockWritePrefClient extends Client {
   }
 
   endWritep(key: string, opts?: any): Promise<any> {
+    const routineId = 'ddl-routine-g8_xD82jp4ACm0xy5C';
+    routineEnter(routineId, "RWLockWritePrefClient.endWritep");
     return new Promise((resolve, reject) => {
       this.releaseWriteLock(key, opts, (err, val) => {
         err ? reject(err) : resolve(val);
@@ -91,6 +104,8 @@ export class RWLockWritePrefClient extends Client {
   }
 
   acquireWriteLockp(key: string, opts?: any): Promise<any> {
+    const routineId = 'ddl-routine-UILmLOt1cuk-KCzUIj';
+    routineEnter(routineId, "RWLockWritePrefClient.acquireWriteLockp");
     return new Promise((resolve, reject) => {
       this.acquireWriteLock(key, opts, (err, val) => {
         err ? reject(err) : resolve(val);
@@ -99,6 +114,8 @@ export class RWLockWritePrefClient extends Client {
   }
 
   acquireReadLockp(key: string, opts?: any): Promise<any> {
+    const routineId = 'ddl-routine-H3vDaxBhkwK97Hkdiu';
+    routineEnter(routineId, "RWLockWritePrefClient.acquireReadLockp");
     return new Promise((resolve, reject) => {
       this.acquireReadLock(key, opts, (err, val) => {
         err ? reject(err) : resolve(val);
@@ -107,6 +124,8 @@ export class RWLockWritePrefClient extends Client {
   }
 
   releaseWriteLockp(key: string, opts?: any): Promise<any> {
+    const routineId = 'ddl-routine-SbWRlGUkrnvehbHZQL';
+    routineEnter(routineId, "RWLockWritePrefClient.releaseWriteLockp");
     return new Promise((resolve, reject) => {
       this.releaseWriteLock(key, opts, (err, val) => {
         err ? reject(err) : resolve(val);
@@ -115,6 +134,8 @@ export class RWLockWritePrefClient extends Client {
   }
 
   releaseReadLockp(key: string, opts?: any): Promise<any> {
+    const routineId = 'ddl-routine-H0RKKE3Yjmt5yYEAj5';
+    routineEnter(routineId, "RWLockWritePrefClient.releaseReadLockp");
     return new Promise((resolve, reject) => {
       this.releaseReadLock(key, opts, (err, val) => {
         err ? reject(err) : resolve(val);
@@ -123,6 +144,8 @@ export class RWLockWritePrefClient extends Client {
   }
 
   acquireWriteLock(key: string, opts: any, cb?: EVCb<any>) {
+    const routineId = 'ddl-routine-iXDKPxq-_wZJp9q9ls';
+    routineEnter(routineId, "RWLockWritePrefClient.acquireWriteLock");
 
     try {
       [key, opts, cb] = this.parseLockOpts(key, opts, cb);
@@ -177,6 +200,8 @@ export class RWLockWritePrefClient extends Client {
   }
 
   releaseWriteLock(key: string, opts: any, cb: EVCb<any>) {
+    const routineId = 'ddl-routine-apug8gaDGGQEYSdpxD';
+    routineEnter(routineId, "RWLockWritePrefClient.releaseWriteLock");
 
     // Check if opts is actually the bound release function with stored unlock BEFORE parseUnlockOpts
     // because parseUnlockOpts will treat a function as a callback and move it to cb
@@ -268,6 +293,8 @@ export class RWLockWritePrefClient extends Client {
   }
 
   acquireReadLock(key: string, opts: any, cb: EVCb<any>) {
+    const routineId = 'ddl-routine-zfD8dlPlc2E_SuhDrG';
+    routineEnter(routineId, "RWLockWritePrefClient.acquireReadLock");
 
     try {
       [key, opts, cb] = this.parseLockOpts(key, opts, cb);
@@ -343,6 +370,8 @@ export class RWLockWritePrefClient extends Client {
   }
 
   releaseReadLock(key: string, opts: any, cb: EVCb<any>) {
+    const routineId = 'ddl-routine-SSlo3cvRzbFg0ybHEO';
+    routineEnter(routineId, "RWLockWritePrefClient.releaseReadLock");
 
     // Check if opts is actually the bound release function BEFORE parseUnlockOpts
     // because parseUnlockOpts will treat a function as a callback and move it to cb
@@ -441,6 +470,8 @@ export class RWLockWritePrefClient extends Client {
   }
 
   registerWriteFlagCheck(key: string, opts: any, cb: EVCb<any>) {
+    const routineId = 'ddl-routine-14zQkFTXSx1IgbdDJn';
+    routineEnter(routineId, "RWLockWritePrefClient.registerWriteFlagCheck");
 
     const uuid = UUID.v4();
     log.debug(chalk.cyan('[RW] registerWriteFlagCheck START'), {key, uuid});
@@ -475,11 +506,13 @@ export class RWLockWritePrefClient extends Client {
     });
 
     log.debug(chalk.cyan('[RW] registerWriteFlagCheck SENDING REQUEST'), {key, uuid});
-    this.write({key, uuid, type: 'register-write-flag-check'});
+    this.write({key, uuid, type: LMXRequestType.RegisterWriteFlagCheck});
 
   }
 
   registerWriteFlagAndReadersCheck(key: string, opts: any, cb: EVCb<any>) {
+    const routineId = 'ddl-routine-8VLJlrbuqkiMJzb6db';
+    routineEnter(routineId, "RWLockWritePrefClient.registerWriteFlagAndReadersCheck");
 
     const uuid = UUID.v4();
     log.debug(chalk.cyan('[RW] registerWriteFlagAndReadersCheck START'), {key, uuid});
@@ -495,12 +528,14 @@ export class RWLockWritePrefClient extends Client {
     this.write({
       key,
       uuid,
-      type: 'register-write-flag-and-readers-check'
+      type: LMXRequestType.RegisterWriteFlagAndReadersCheck
     });
 
   }
 
   incrementReaders(key: any, cb: any) {
+    const routineId = 'ddl-routine-El9VpZ6eV6Qv7brWwz';
+    routineEnter(routineId, "RWLockWritePrefClient.incrementReaders");
     const uuid = UUID.v4();
     log.debug(chalk.cyan('[RW] incrementReaders START'), {key, uuid});
     this.resolutions.set(uuid, (err, val) => {
@@ -512,12 +547,14 @@ export class RWLockWritePrefClient extends Client {
     log.debug(chalk.cyan('[RW] incrementReaders SENDING REQUEST'), {key, uuid});
     this.write({
       uuid,
-      type: 'increment-readers',
+      type: LMXRequestType.IncrementReaders,
       key
     });
   }
 
   decrementReaders(key: string, cb: EVCb<any>) {
+    const routineId = 'ddl-routine-BVvculPm40pPPUY5Nk';
+    routineEnter(routineId, "RWLockWritePrefClient.decrementReaders");
     const uuid = UUID.v4();
     log.debug(chalk.magenta('decrementReaders: sending request for key:'), key, 'uuid:', uuid);
     this.resolutions.set(uuid, (err, val) => {
@@ -527,12 +564,14 @@ export class RWLockWritePrefClient extends Client {
     });
     this.write({
       uuid,
-      type: 'decrement-readers',
+      type: LMXRequestType.DecrementReaders,
       key
     });
   }
 
   setWriteFlagToFalse(key: string, cb: EVCb<any>) {
+    const routineId = 'ddl-routine-TWDv0jf1RceECPoxnZ';
+    routineEnter(routineId, "RWLockWritePrefClient.setWriteFlagToFalse");
     const uuid = UUID.v4();
     log.debug(chalk.magenta('setWriteFlagToFalse: sending request for key:'), key, 'uuid:', uuid);
     this.resolutions.set(uuid, (err, val) => {
@@ -542,7 +581,7 @@ export class RWLockWritePrefClient extends Client {
     });
     this.write({
       uuid,
-      type: 'set-write-flag-false-and-broadcast',
+      type: LMXRequestType.SetWriteFlagFalseAndBroadcast,
       key
     });
   }
@@ -552,6 +591,8 @@ export class RWLockWritePrefClient extends Client {
    * @param callback Function that receives warning messages/errors
    */
   onWarning(callback: (...args: any[]) => void): void {
+    const routineId = 'ddl-routine-dUFeZhwK1uG1MbCZeD';
+    routineEnter(routineId, "RWLockWritePrefClient.onWarning");
     this.emitter.on('warning', callback);
   }
 
@@ -560,6 +601,8 @@ export class RWLockWritePrefClient extends Client {
    * @param callback Function that receives error messages
    */
   onError(callback: (...args: any[]) => void): void {
+    const routineId = 'ddl-routine--ECm8EsRYgoIo17gie';
+    routineEnter(routineId, "RWLockWritePrefClient.onError");
     this.emitter.on('error', callback);
   }
 

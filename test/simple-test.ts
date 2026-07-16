@@ -90,17 +90,12 @@ Promise.all([
       },
       function (cb) {
 
-        
-
         const c2 = registerClient(new Client({port}));
         c2.ensure().then(function () {
-
-          
 
           c2.lock('z', function (err, {id}) {
 
             
-
             if (err) return cb(err);
             c2.unlock('z', id, cb);
           });

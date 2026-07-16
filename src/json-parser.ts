@@ -1,6 +1,7 @@
 'use strict';
 
 import {StringDecoder} from 'string_decoder';
+import {routineEnter} from './routine';
 import {JSONParser, JSONParserOpts} from "@oresoftware/json-stream-parser";
 
 //////////////////////////////////////////////////
@@ -116,6 +117,9 @@ export class LiveMutexJSONParser<T = any> extends JSONParser<T> {
 }
 
 export const createParser = function (v?: JSONParserOpts) {
+  const routineId = 'ddl-routine-h_gbxCB0EhzFEXy8Oi';
+  routineEnter(routineId, "createParser");
+
   const opts = Object.assign({}, v || {});
 
   if (!('delayEvery' in opts) || opts.delayEvery === undefined) {

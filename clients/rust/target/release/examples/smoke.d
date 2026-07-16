@@ -1,0 +1,1 @@
+/Users/maca5/codes/ores/k8s-cluster/remote/submodules/live-mutex/clients/rust/target/release/examples/smoke: /Users/maca5/codes/ores/k8s-cluster/remote/submodules/live-mutex/clients/rust/examples/smoke.rs /Users/maca5/codes/ores/k8s-cluster/remote/submodules/live-mutex/clients/rust/src/lib.rs

@@ -1,71 +1,72 @@
-# live-mutex clients
+# live-mutex cross-runtime clients
 
-Cross-runtime clients for the `live-mutex` broker. The canonical client is the
-library itself (`src/client.ts` — the published npm `live-mutex` package); the
-folders here are additional-language clients and seeds that speak the same
-JSON-over-TCP wire protocol exposed by the fencing-token-aware `Broker1`
-(`src/broker-1.ts`).
+Reference clients for the `live-mutex` broker. Each client
+speaks the same JSON-over-TCP wire protocol the JS broker exposes (NDJSON;
+one frame per line). They are intentionally minimal — focused on
+**correctness of the new wire protocol features** rather than feature
+parity with the canonical Node.js client (which also covers RW locks,
+`ls`, retries, etc.).
 
-| Language    | Path           | Status        | Smoke command                              |
-|-------------|----------------|---------------|--------------------------------------------|
-| Shell       | `shell/`       | full client   | `./clients/shell/smoke.sh`                 |
-| PowerShell  | `powershell/`  | full client   | `pwsh ./clients/powershell/smoke.ps1`      |
-| F#          | `fsharp/`      | seed          | see `fsharp/README.md`                      |
-| Java        | `java/`        | seed          | —                                          |
-| Python 3    | `python3/`     | seed          | —                                          |
+The native TypeScript client is the library itself (`src/client.ts`), so the
+list below plus TypeScript covers Dart, C++, Python, TypeScript, Go, Gleam,
+Rust, Java, shell, and PowerShell.
 
-The `shell/` (bash/zsh/sh) and `powershell/` clients are dependency-free working
-clients: the shell one uses bash's built-in `/dev/tcp` (no `nc`/`python`/`jq`),
-and the PowerShell one uses `System.Net.Sockets.TcpClient`. Both keep the wire
-`type` values in named constants rather than inline magic strings — the
-structural fix this broker's `if (data.type === '…')` chains lack.
+| Language    | Path                | Acquire | Release | Fencing tokens | acquire-many | Smoke test |
+|-------------|---------------------|:-------:|:-------:|:--------------:|:------------:|:----------:|
+| Rust        | `clients/rust`      | ✅      | ✅      | ✅              | ✅           | `cargo run --example smoke` |
+| Python 3    | `clients/python`    | ✅      | ✅      | ✅              | ✅           | `python -m live_mutex_client.smoke` |
+| Shell       | `clients/shell`     | ✅      | ✅      | ✅              | —            | `./clients/shell/smoke.sh` |
+| PowerShell  | `clients/powershell` | ✅     | ✅      | ✅              | —            | `pwsh ./clients/powershell/smoke.ps1` |
+| Go          | `clients/go`        | ✅      | ✅      | ✅              | ✅           | `go run ./cmd/smoke` |
+| Dart        | `clients/dart`      | ✅      | ✅      | ✅              | ✅           | `dart run example/smoke.dart` |
+| Java 17+    | `clients/java`      | ✅      | ✅      | ✅              | ✅           | `mvn -q exec:java` |
+| C++17       | `clients/cpp`       | ✅      | ✅      | ✅              | ✅           | `make run` / `make test` |
+| Gleam       | `clients/gleam`     | ✅      | ✅      | ✅              | ✅           | `LIVE_MUTEX_SMOKE=1 gleam test` |
+| TypeScript  | `src/client.ts`     | ✅      | ✅      | ✅              | ✅           | `npm test` |
 
-> The `fsharp/`, `java/`, and `python3/` seeds were relocated here from `lib/`
-> so every client lives under `clients/`.
+All clients implement at minimum:
 
-## Wire protocol crib (Broker1)
+- A `connect(host, port)` that sends the version handshake (`{type:"version", value:"0.2.27"}`).
+- An `acquire(key, opts)` that returns `{lockUuid, fencingToken}`.
+- A `release(key, lockUuid, opts)` that returns when the broker confirms.
+- An `acquireMany(keys, opts)` that returns `{lockUuid, fencingTokens}` for the union of `keys`.
+- A `releaseMany(lockUuid)`.
+- A correlation map keyed by request-uuid so a single connection can multiplex.
 
-NDJSON over TCP (`TCP_NODELAY`), one JSON object per line. Every request carries
-a `uuid` the broker echoes on the reply, so one connection multiplexes many
-in-flight requests.
+**Wire format crib sheet** (see also `clients/PROTOCOL.md` for the full
+specification):
 
 ```
-# handshake (fire-and-forget; broker only replies on version-mismatch)
-client → {type:"version", value:"0.2.27"}
+client → broker
+  {type:"version", value:"0.2.27"}
+  {type:"lock", uuid, key, ttl?, max?, pid?}
+  {type:"unlock", uuid, _uuid:<lockUuid>, key, force?}
+  {type:"acquire-many", uuid, keys:[…], ttl?}
+  {type:"release-many", uuid, lockUuid}
 
-# exclusive / semaphore lock — handle for a single key is the request uuid
-client → {type:"lock", uuid, key, pid, keepLocksAfterDeath:false, ttl:<ms|null>, max?}
-broker → {type:"lock", uuid, key, acquired:true,  fencingToken, lockRequestCount}
-       | {type:"lock", uuid, key, acquired:false, error}
-
-# unlock — _uuid is the lock handle (the lock request's uuid)
-client → {type:"unlock", uuid, _uuid:<lockUuid>, key, force?}
-broker → {type:"unlock", uuid, key, unlocked:true,  lockRequestCount}
-
-# atomic multi-key
-client → {type:"acquire-many", uuid, keys:[…], ttl:<ms|null>}
-broker → {type:"acquire-many", uuid, keys, acquired:true, lockUuid, fencingTokens:{key:token,…}}
-client → {type:"release-many", uuid, lockUuid}
-broker → {type:"release-many", uuid, lockUuid, keys, released:true}
+broker → client
+  {type:"lock", uuid, key, acquired:bool, fencingToken?, lockRequestCount, error?}
+  {type:"unlock", uuid, key, unlocked:bool, lockRequestCount, error?}
+  {type:"acquire-many", uuid, keys, acquired:bool, lockUuid?, fencingTokens?, contendedKey?, error?}
+  {type:"release-many", uuid, lockUuid?, keys?, released:bool, error?}
 ```
 
-- `fencingToken` is strictly increasing per key across successive grants.
-- On contention the broker does **not** reply immediately for a single-key
-  `lock`; it enqueues the waiter and sends `acquired:true` only on promotion.
-- `acquire-many` is all-or-nothing and acquires member keys in sorted order, so
-  concurrent multi-key requests cannot deadlock.
+These clients **do not** implement RW locks or the legacy `lock-received`
+ack path — the broker tolerates clients that don't ack (the centralised
+TTL sweeper picks up any stragglers), so for a stateless caller the
+simplified flow is sufficient.
 
-## Smoke tests
+The `shell` and `powershell` clients are intentionally dependency-free working
+clients: the shell implementation uses bash's built-in `/dev/tcp` rather than
+`nc`, `python`, or `jq`, and the PowerShell implementation uses
+`System.Net.Sockets.TcpClient`. Both keep request `type` values in named
+constants so protocol spelling stays centralized.
 
-Start a `Broker1` (defaults to port 6970), then run a client smoke:
+Run the broker (the fencing-token-aware `Broker1`) before running any of the
+smoke tests. Most smokes default to `127.0.0.1:7970`; override with
+`LMX_HOST`/`LMX_PORT`. A quick way to start `Broker1`:
 
-```bash
-# start a broker (build dist first with the repo's build, or use ts-node)
-node -e "const {Broker1}=require('./dist/main'); new Broker1({port:6970,host:'127.0.0.1'}).ensure().then(()=>console.log('up'))"
-
-# then, in another terminal
-./clients/shell/smoke.sh
-pwsh ./clients/powershell/smoke.ps1   # if PowerShell is installed
+```sh
+node -e "const {Broker1}=require('./dist/main.js'); \
+  new Broker1({port:7970,host:'127.0.0.1'}).ensure().then(()=>console.log('up'))"
 ```
-
-Override the endpoint with `LMX_HOST` / `LMX_PORT`.

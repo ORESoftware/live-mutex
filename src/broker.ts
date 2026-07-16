@@ -1,5 +1,7 @@
 'use strict';
 
+
+import {routineEnter} from './routine';
 //core
 import * as assert from 'assert';
 import * as net from 'net';
@@ -204,6 +206,8 @@ export class Broker {
     registeredListeners = <{ [key: string]: Array<RegisteredListener> }>{};
 
     constructor(o?: IBrokerOptsPartial, cb?: IErrorFirstCB) {
+        const routineId = 'ddl-routine-1nhI732BICvYBHQTSq';
+        routineEnter(routineId, "Broker.constructor");
 
         this.isOpen = false;
         const opts = this.opts = o || {};
@@ -607,20 +611,28 @@ export class Broker {
     }
 
     static create(opts: IBrokerOptsPartial): Broker {
+        const routineId = 'ddl-routine-l2FMveCm6tpN3cZoZI';
+        routineEnter(routineId, "Broker.create");
         return new Broker(opts);
     }
 
     private emit(...args: Parameters<EventEmitter['emit']>) {
+        const routineId = 'ddl-routine-TgOMx4EA6TEqrhGcik';
+        routineEnter(routineId, "Broker.emit");
         log.warn('warning:', 'use b.emitter.emit() instead of b.emit()');
         return this.emitter.emit.apply(this.emitter, args);
     }
 
     private on(...args: Parameters<EventEmitter['on']>) {
+        const routineId = 'ddl-routine-sHafL8MFHs5PE6mNsi';
+        routineEnter(routineId, "Broker.on");
         log.warn('warning:', 'use c.emitter.on() instead of c.on()');
         return this.emitter.on.apply(this.emitter, args);
     }
 
     private once(...args: Parameters<EventEmitter['once']>) {
+        const routineId = 'ddl-routine-i_Ebdo8DL2yr-PMYx_';
+        routineEnter(routineId, "Broker.once");
         log.warn('warning:', 'use c.emitter.once() instead of c.once()');
         return this.emitter.once.apply(this.emitter, args);
     }
@@ -630,6 +642,8 @@ export class Broker {
      * @param callback Function that receives warning messages/errors
      */
     onWarning(callback: (...args: any[]) => void): void {
+        const routineId = 'ddl-routine-njXmNTMY9ML3IKO8Ow';
+        routineEnter(routineId, "Broker.onWarning");
         this.emitter.on('warning', callback);
     }
 
@@ -638,10 +652,14 @@ export class Broker {
      * @param callback Function that receives error messages
      */
     onError(callback: (...args: any[]) => void): void {
+        const routineId = 'ddl-routine-C5dbJe_n5oAN3HATm1';
+        routineEnter(routineId, "Broker.onError");
         this.emitter.on('error', callback);
     }
 
     ping(data: any, ws: net.Socket) {
+        const routineId = 'ddl-routine-vSvU5RKxw8bI3iwaEP';
+        routineEnter(routineId, "Broker.ping");
         const uuid = data.uuid;
         const timestamp = data.timestamp || Date.now();
 
@@ -655,6 +673,8 @@ export class Broker {
     }
 
     getSystemStats(data: any, ws: net.Socket) {
+        const routineId = 'ddl-routine-Ty-OH9jDrGCPET8Pdb';
+        routineEnter(routineId, "Broker.getSystemStats");
         const uuid = data.uuid;
 
         // Count all pending lock requests across all locks
@@ -681,6 +701,8 @@ export class Broker {
     }
 
     close(cb: (err: any) => void): void {
+        const routineId = 'ddl-routine-WaWnBHQ25Mfw-g7D54';
+        routineEnter(routineId, "Broker.close");
         // Clean up Unix domain socket file if it exists
         if (this.socketFile) {
             try {
@@ -704,34 +726,48 @@ export class Broker {
     }
 
     getListeningInterface() {
+        const routineId = 'ddl-routine-2zms5c-Qh4xyddmLfH';
+        routineEnter(routineId, "Broker.getListeningInterface");
         return this.socketFile || this.port;
     }
 
     getVersion() {
+        const routineId = 'ddl-routine-5Vcst7VUQ9H_7-PT_o';
+        routineEnter(routineId, "Broker.getVersion");
         return brokerPackage.version;
     }
 
     getPort() {
+        const routineId = 'ddl-routine-5tcA-mjD4bdWzd6sm0';
+        routineEnter(routineId, "Broker.getPort");
         return this.port;
     }
 
     getHost() {
+        const routineId = 'ddl-routine-7SZZ7RLWwADakZoWG7';
+        routineEnter(routineId, "Broker.getHost");
         return this.host;
     }
 
     abruptlyDestroyConnection(ws: LMXSocket) {
+        const routineId = 'ddl-routine-phCOubIkmJMaohGABa';
+        routineEnter(routineId, "Broker.abruptlyDestroyConnection");
         log.error('Connection will be destroyed.');
         ws.destroy();
         ws.removeAllListeners();
     }
 
     abruptlyEndConnection(ws: LMXSocket) {
+        const routineId = 'ddl-routine-hhVSeO2G9wheADUbfD';
+        routineEnter(routineId, "Broker.abruptlyEndConnection");
         log.error('Connection will be ended.');
         ws.end();
         ws.removeAllListeners();
     }
 
     onVersion(data: any, ws: LMXSocket) {
+        const routineId = 'ddl-routine-UZ2AKBzJInUjPg0_1T';
+        routineEnter(routineId, "Broker.onVersion");
 
         const clientVersion = data.value;
         const brokerVersion = brokerPackage.version;
@@ -762,6 +798,8 @@ export class Broker {
     }
 
     cleanupConnection(ws: LMXSocket) {
+        const routineId = 'ddl-routine-jGBbT7CvEh_KXpxuJY';
+        routineEnter(routineId, "Broker.cleanupConnection");
 
         if (ws.lmxClosed === true) {
             return;
@@ -836,10 +874,14 @@ export class Broker {
     }
 
     ls(data: any, ws: LMXSocket) {
+        const routineId = 'ddl-routine-XPTlumdbU3CFXPgk3d';
+        routineEnter(routineId, "Broker.ls");
         return this.send(ws, {ls_result: Object.keys(this.locks), uuid: data.uuid});
     }
 
     broadcast(data: any, ws: LMXSocket) {
+        const routineId = 'ddl-routine-2-98KhzxkD_iq2nVJv';
+        routineEnter(routineId, "Broker.broadcast");
 
         const key = data.key;
         const uuid = data.uuid;
@@ -884,6 +926,8 @@ export class Broker {
     }
 
     incrementReaders(data: any, ws: net.Socket) {
+        const routineId = 'ddl-routine-OC_BTn2Fbdc2Ml6VwZ';
+        routineEnter(routineId, "Broker.incrementReaders");
 
         const key = data.key;
         const uuid = data.uuid;
@@ -905,6 +949,8 @@ export class Broker {
     }
 
     setWriteFlagToFalseAndBroadcast(data: any, ws: net.Socket) {
+        const routineId = 'ddl-routine-8AVUNGfr3hGJaCTBLi';
+        routineEnter(routineId, "Broker.setWriteFlagToFalseAndBroadcast");
 
         const key = data.key;
         const uuid = data.uuid;
@@ -927,6 +973,8 @@ export class Broker {
     }
 
     decrementReaders(data: any, ws: net.Socket) {
+        const routineId = 'ddl-routine-7woEZyImtmFRTsVA9A';
+        routineEnter(routineId, "Broker.decrementReaders");
 
         const key = data.key;
         const uuid = data.uuid;
@@ -960,6 +1008,8 @@ export class Broker {
     }
 
     registerWriteFlagAndReadersCheck(data: any, ws: net.Socket) {
+        const routineId = 'ddl-routine-IqVbMpiSOSqmm5NU7C';
+        routineEnter(routineId, "Broker.registerWriteFlagAndReadersCheck");
 
         const key = data.key;
         const uuid = data.uuid;
@@ -997,6 +1047,8 @@ export class Broker {
     }
 
     getDefaultLockObject(key: string, keepLocksAfterDeath?: boolean, max?: number, maxRead?: number, maxWrite?: number): LockObj {
+        const routineId = 'ddl-routine-mM2t9faRwDs-hq76C8';
+        routineEnter(routineId, "Broker.getDefaultLockObject");
 
         return {
             readers: 0,
@@ -1016,6 +1068,8 @@ export class Broker {
     }
 
     registerWriteFlagCheck(data: any, ws: net.Socket) {
+        const routineId = 'ddl-routine-Tw2m9eGWW6E09D_Rpf';
+        routineEnter(routineId, "Broker.registerWriteFlagCheck");
 
         const key = data.key;
         const uuid = data.uuid;
@@ -1071,6 +1125,8 @@ export class Broker {
     }
 
     inspect(data: any, ws: net.Socket) {
+        const routineId = 'ddl-routine-E_E8Eh-Geb8ZQiFdFE';
+        routineEnter(routineId, "Broker.inspect");
 
         if (typeof data.inspectCommand !== 'string') {
             return this.send(ws, {error: 'inspectCommand was not a string'});
@@ -1095,6 +1151,8 @@ export class Broker {
     }
 
     ensureNewLockHolder(lck: LockObj, data: any) {
+        const routineId = 'ddl-routine-nR5xw-DCO-z8GvENTu';
+        routineEnter(routineId, "Broker.ensureNewLockHolder");
 
         const locks = this.locks;
         const notifyList = lck.notify;
@@ -1288,6 +1346,8 @@ export class Broker {
     }
 
     retrieveLockInfo(data: any, ws: net.Socket) {
+        const routineId = 'ddl-routine-csv6xQJOPu2qgQNHAm';
+        routineEnter(routineId, "Broker.retrieveLockInfo");
 
         const key = data.key;
         const lck = this.locks.get(key);
@@ -1313,6 +1373,8 @@ export class Broker {
     }
 
     cleanUpLocks(): void {
+        const routineId = 'ddl-routine-lmkfw3QoaNIyeKpjDN';
+        routineEnter(routineId, "Broker.cleanUpLocks");
 
         this.lockCounts = 0;
         const now = Date.now();
@@ -1341,6 +1403,8 @@ export class Broker {
     }
 
     lock(data: any, ws: LMXSocket) {
+        const routineId = 'ddl-routine-ufr4Gp3XNHO5xOHSnJ';
+        routineEnter(routineId, "Broker.lock");
 
         const key = data.key;
         const keepLocksAfterDeath = Boolean(data.keepLocksAfterDeath);
@@ -1644,6 +1708,8 @@ export class Broker {
     }
 
     unlock(data: any, ws?: net.Socket) {
+        const routineId = 'ddl-routine-m90ir3arlrZIGJaBIr';
+        routineEnter(routineId, "Broker.unlock");
 
         const key = data.key;
         const uuid = data.uuid;
