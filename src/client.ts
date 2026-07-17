@@ -35,6 +35,8 @@ import {inspectError} from "./shared-internal";
 import {log} from "./client-utils";
 import {emitEmitterInfoTelemetry, emitEmitterWarningTelemetry} from "./telemetry";
 
+const alreadyUnlocked = Symbol('already.unlocked');
+
 if (weAreDebugging) {
   log.debug('lmx client is in debug mode. Timeouts are turned off.');
 }
