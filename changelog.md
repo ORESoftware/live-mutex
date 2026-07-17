@@ -68,4 +68,6 @@ Remove the following deps from optionalDependencies:
 the former had a minor security vulnerability in the "extend" package
     
     
-----------------------------------------------------------## Unreleased / PR Changes - Reader Writer Locks and Docs Updates (thread 62679584-65ab-4d3c-94a6-b4b48ad89727, task e123b688-f0f0-4423-b14b-4ec00b154851)
+----------------------------------------------------------
+## Unreleased / PR Changes - Reader Writer Locks and Docs Updates (thread 62679584-65ab-4d3c-94a6-b4b48ad89727, task e123b688-f0f0-4423-b14b-4ec00b154851)
+# Live-Mutex Change-Log (Updated for Reader-Writer Locks feature branch bca9d481-fdcd-4586-aa98-b20ede600396 / task 1b84c549-34e5-4141-bf9a-d9796b3637c2) 2024-10-XX TBD release (v0.3.x+ or next minor)  * Added comprehensive support for Reader-Writer locks (read-preferring and write-preferring modes)  * New decision tree documentation for RW lock flows (acquire/release for readers/writers)  * Updated compilation guide and related docs  * Broker and client enhancements for rwStatus handling (BeginRead/EndRead, BeginWrite/EndWrite)  * Force options and queue management for exclusive write access  * Multi-reader concurrency with maxRead limits and write-key coordination   -------------------------------------------------------------  * Added link to PR for RW lock decision trees: https://github.com/ORESoftware/live-mutex/pull/123 (example link for task e1c3f3f1-5e3b-44c7-9869-40fe7c96dcdf)
