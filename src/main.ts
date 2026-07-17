@@ -55,6 +55,34 @@ export type {
     LockInfoRequestReq, PingReq, SystemStatsRequestReq,
 } from './protocol';
 
+// LMX wire-protocol enum + discriminated union. Cross-runtime ports
+// of this protocol (Rust, Go, Dart, Gleam) all expose a request enum
+// as their public type contract; this is the Node analogue. The
+// string values match the legacy wire format byte-for-byte, so older
+// brokers/clients keep interoperating.
+export {
+    LMXRequestType,
+    LMXResponseType,
+    LMXKnownRequestTypes,
+    isLMXRequestType,
+    assertExhaustive,
+} from './protocol';
+export type {
+    LMXRequest,
+    LockReq, UnlockReq, AcquireManyReq, ReleaseManyReq,
+    LsReq, VersionReq, VersionMismatchConfirmedReq,
+    SimulateVersionMismatchReq,
+    EndConnectionFromBrokerForTestingReq,
+    DestroyConnectionFromBrokerForTestingReq,
+    IncrementReadersReq, DecrementReadersReq,
+    RegisterWriteFlagCheckReq, RegisterWriteFlagCheckQueuedReq,
+    RegisterWriteFlagAndReadersCheckReq,
+    SetWriteFlagFalseAndBroadcastReq,
+    LockReceivedReq, LockClientTimeoutReq, LockClientErrorReq,
+    LockReceivedRejectedReq,
+    LockInfoRequestReq, PingReq, SystemStatsRequestReq,
+} from './protocol';
+
 export const r2gSmokeTest = function () {
   const routineId = 'ddl-routine-r2gSmokeTest-Wj6';
   routineEnter(routineId, 'r2gSmokeTest');
