@@ -96,6 +96,7 @@ const SERVICE_NAME_DEFAULT = 'live-mutex';
 
 let otelInitialised = false;
 let cachedTracer: Tracer | null = null;
+let activeOtelProvider: { shutdown(): Promise<void> } | null = null;
 /// Runtime kill-switch for OTel span emission. Toggled by
 /// `setOtelEnabled` (called from the broker's HTTP admin endpoint
 /// `POST /admin/otel`). When `false`, `routineEnter` skips the OTel
@@ -236,7 +237,12 @@ export function initOtel(): void {
   // is configured. Keeps `require('live-mutex')` cheap in test setups
   // that never wire up OTel.
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { Resource } = require('@opentelemetry/resources');
+  const {
+    defaultResource,
+    detectResources,
+    envDetector,
+    resourceFromAttributes,
+  } = require('@opentelemetry/resources');
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const {
     BasicTracerProvider,
@@ -251,20 +257,34 @@ export function initOtel(): void {
 
   const serviceName =
     process.env.OTEL_SERVICE_NAME || SERVICE_NAME_DEFAULT;
-  const resource = new Resource({
-    [semconv.SEMRESATTRS_SERVICE_NAME ||
-      semconv.ATTR_SERVICE_NAME ||
-      'service.name']: serviceName,
-    [semconv.SEMRESATTRS_SERVICE_VERSION ||
-      semconv.ATTR_SERVICE_VERSION ||
-      'service.version']:
+  const serviceNameAttribute =
+    semconv.ATTR_SERVICE_NAME ||
+    semconv.SEMRESATTRS_SERVICE_NAME ||
+    'service.name';
+  const serviceVersionAttribute =
+    semconv.ATTR_SERVICE_VERSION ||
+    semconv.SEMRESATTRS_SERVICE_VERSION ||
+    'service.version';
+  const applicationResource = resourceFromAttributes({
+    [serviceNameAttribute]: serviceName,
+    [serviceVersionAttribute]:
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       require('../package.json').version,
   });
+  const environmentResource = detectResources({
+    detectors: [envDetector],
+  });
+  const resource = defaultResource()
+    .merge(applicationResource)
+    .merge(environmentResource);
+  const effectiveServiceName =
+    resource.attributes[serviceNameAttribute] || serviceName;
 
   const exporter = new OTLPTraceExporter({ url: endpoint });
-  const provider = new BasicTracerProvider({ resource });
-  provider.addSpanProcessor(new BatchSpanProcessor(exporter));
+  const provider = new BasicTracerProvider({
+    resource,
+    spanProcessors: [new BatchSpanProcessor(exporter)],
+  });
 
   // Point the global API at our provider WITHOUT calling
   // `provider.register(...)`. `register()` is the entry point that
@@ -272,7 +292,17 @@ export function initOtel(): void {
   // AsyncLocalStorage) and the W3C trace-context propagator globally —
   // exactly the kind of monkey-patching this module exists to avoid.
   // `setGlobalTracerProvider` only updates the tracer factory pointer.
-  trace.setGlobalTracerProvider(provider);
+  if (!trace.setGlobalTracerProvider(provider)) {
+    void provider.shutdown().catch(() => {});
+    process.stderr.write(
+      'lmx otel: a global tracer provider is already registered; the live-mutex OTLP exporter was not installed.\n',
+    );
+    otelInitialised = true;
+    otelEnabled = false;
+    return;
+  }
+  activeOtelProvider = provider;
+  cachedTracer = null;
 
   otelInitialised = true;
   // Default the runtime kill-switch to ON now that an exporter is
@@ -282,7 +312,7 @@ export function initOtel(): void {
   otelEnabled = true;
 
   process.stdout.write(
-    `lmx otel: OTLP exporter installed -> ${endpoint} (service=${serviceName}, no-monkey-patch mode, runtime kill-switch=on)\n`,
+    `lmx otel: OTLP exporter installed -> ${endpoint} (service=${effectiveServiceName}, no-monkey-patch mode, runtime kill-switch=on)\n`,
   );
 }
 
@@ -294,18 +324,17 @@ export function initOtel(): void {
 export async function shutdownOtel(): Promise<void> {
   const routineId = 'ddl-routine-shutdownOtel-Hl3';
   routineEnter(routineId, 'shutdownOtel');
-  if (!otelInitialised) return;
-  // Recover the registered provider and call `shutdown()` if available.
-  const provider: any = (trace as any).getTracerProvider();
-  if (provider && typeof provider.shutdown === 'function') {
-    try {
-      await provider.shutdown();
-    } catch (err) {
-      process.stderr.write(
-        `lmx otel: error shutting down tracer provider: ${
-          (err as Error)?.message || err
-        }\n`,
-      );
-    }
+  if (!otelInitialised || !activeOtelProvider) return;
+  const provider = activeOtelProvider;
+  activeOtelProvider = null;
+  otelEnabled = false;
+  try {
+    await provider.shutdown();
+  } catch (err) {
+    process.stderr.write(
+      `lmx otel: error shutting down tracer provider: ${
+        (err as Error)?.message || err
+      }\n`,
+    );
   }
 }
