@@ -1,6 +1,6 @@
 /**
  * Utility to capture broker and client logs for testing
- * Uses the new onWarning() method for clean log capture
+ * Uses the new onWarning() and onError() methods for clean log capture
  * Usage: import { attachToBroker, attachToClient, attachToRWClient } from './capture-logs';
  */
 
@@ -64,10 +64,10 @@ function addLog(type: LogEntry['type'], source: LogEntry['source'], message: str
 }
 
 /**
- * Helper to attach warning listener using the clean onWarning() method
+ * Helper to attach warning and error listeners using the clean onWarning() and onError() methods
  */
 function attachWarningListener(instance: any, type: 'broker' | 'client' | 'rw-client') {
-  if (instance && typeof instance.onWarning === 'function') {
+  if (instance && typeof instance.onWarning === 'function' && typeof instance.onError === 'function') {
     instance.onWarning(function(...args: any[]) {
       const parts = args.map(arg => {
         if (arg instanceof Error) {
@@ -80,8 +80,21 @@ function attachWarningListener(instance: any, type: 'broker' | 'client' | 'rw-cl
       // Add to logs
       addLog('warning', type, message);
     });
+    
+    instance.onError(function(...args: any[]) {
+      const parts = args.map(arg => {
+        if (arg instanceof Error) {
+          return arg.message + (arg.stack ? '\n' + arg.stack : '');
+        }
+        return String(arg);
+      });
+      const message = parts.join(' ');
+      
+      // Add to logs
+      addLog('error', type, message);
+    });
   } else if (instance && instance.emitter) {
-    // Fallback to emitter if onWarning not available
+    // Fallback to emitter if onWarning/onError not available
     instance.emitter.on('warning', (...args: any[]) => {
       const message = args.map(arg => 
         typeof arg === 'string' ? arg : (arg instanceof Error ? arg.message : JSON.stringify(arg))
