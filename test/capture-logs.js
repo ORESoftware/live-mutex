@@ -53,7 +53,7 @@ function addLog(type, source, message) {
     process.stderr.write(`${prefix} ${sourceLabel} ${message}\n`);
 }
 function attachWarningListener(instance, type) {
-    if (instance && typeof instance.onWarning === 'function') {
+    if (instance && typeof instance.onWarning === 'function' && typeof instance.onError === 'function') {
         instance.onWarning(function (...args) {
             const parts = args.map(arg => {
                 if (arg instanceof Error) {
@@ -63,6 +63,16 @@ function attachWarningListener(instance, type) {
             });
             const message = parts.join(' ');
             addLog('warning', type, message);
+        });
+        instance.onError(function (...args) {
+            const parts = args.map(arg => {
+                if (arg instanceof Error) {
+                    return arg.message + (arg.stack ? '\n' + arg.stack : '');
+                }
+                return String(arg);
+            });
+            const message = parts.join(' ');
+            addLog('error', type, message);
         });
     }
     else if (instance && instance.emitter) {
