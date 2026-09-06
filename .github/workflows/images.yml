@@ -4,6 +4,8 @@
 # GCP_WORKLOAD_IDENTITY_PROVIDER, GCP_SERVICE_ACCOUNT (OIDC, no JSON keys).
 name: images
 on:
+  pull_request:
+    paths: ["Dockerfile", "Dockerfile.*.dkf", "src/**", "Cargo.*", "package*.json", "pubspec.*", "go.*", "gleam.toml", "manifest.toml"]
   push:
     branches: [main]
     paths: ["Dockerfile", "Dockerfile.*.dkf", "src/**", "Cargo.*", "package*.json", "pubspec.*", "go.*", "gleam.toml", "manifest.toml"]
@@ -37,6 +39,7 @@ jobs:
           printf '%s  %s\n' "$RENDERER_SHA256" /tmp/render-dkf.mjs | sha256sum --check --strict -
           node /tmp/render-dkf.mjs . --check
   images:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: dkf-drift
     uses: ORESoftware/ores-gha-workflows/.github/workflows/container-images.yml@09317aaf8f89a58b9ee87755db4daa2b242d6cb2
     with:
