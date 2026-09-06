@@ -1,0 +1,32 @@
+# GENERATED from Dockerfile (sha256:757b72e7ef3bc738) by ores-gha-workflows/scripts/render-dkf.mjs — target linux/arm64. Do not edit; edit Dockerfile and re-render.
+FROM --platform=linux/arm64 node:12.3.1-alpine
+ARG TARGETARCH
+
+ENV live_mutex_host "0.0.0.0"
+ENV live_mutex_port 6970
+ENV lmx_in_docker='yes'
+
+ENV FORCE_COLOR=1
+
+USER root
+RUN echo "user is: $USER"
+
+WORKDIR "/app"
+
+COPY package.json .
+COPY package-lock.json .
+COPY assets assets
+
+RUN npm i
+
+COPY . .
+
+ARG CACHEBUST=1
+
+ENV bunion_producer_level='WARN'
+
+EXPOSE 6970:6970
+
+ENTRYPOINT ["node", "dist/lm-start-server.js"]
+CMD []
+
