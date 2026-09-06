@@ -8,6 +8,7 @@ coverage
 .vscode
 dist
 clients/rust/target/
+clients/java/target/
 @target
 test/.suman/.meta
 

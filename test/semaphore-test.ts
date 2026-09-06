@@ -44,14 +44,14 @@ async function testDefaultMaxOne(): Promise<void> {
     const port = getNextPort();
     const broker = new Broker({port});
     await broker.ensure();
-    
+
     const clients: Client[] = [];
     for (let i = 0; i < 5; i++) {
         const client = new Client({port});
         await client.ensure();
         clients.push(client);
     }
-    
+
     const tmpFile = createTempFile();
     writeFile(tmpFile, 0);
     console.log('Using temp file:', tmpFile);

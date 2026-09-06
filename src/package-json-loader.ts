@@ -61,4 +61,3 @@ function loadPackageJson(): any {
 }
 
 export const packageJsonData = loadPackageJson();
-
