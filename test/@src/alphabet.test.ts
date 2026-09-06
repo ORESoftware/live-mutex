@@ -61,6 +61,7 @@ Test.create(['lmUtils', (b, assert, before, describe, it, path, fs, inject, afte
 
     after.cb(h => {
       console.log('closing broker...');
+      client.close();
       return broker.close(h);
     });
 

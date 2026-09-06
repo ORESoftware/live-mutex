@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 'use strict';
 
+
+import {routineEnter} from './routine';
 import {Client} from "./client";
 import chalk from "chalk";
 import * as net from 'net';
@@ -9,6 +11,8 @@ const port = parseInt(process.argv[2] || process.env.live_mutex_port || '6970');
 const host = process.argv[3] || process.env.live_mutex_host || 'localhost';
 
 function checkPort(host: string, port: number): Promise<boolean> {
+  const routineId = 'ddl-routine-m_WkHsuQQ_fwQJ9vH4';
+  routineEnter(routineId, "checkPort");
   return new Promise((resolve) => {
     const socket = new net.Socket();
     const timeout = 2000;
@@ -30,6 +34,8 @@ function checkPort(host: string, port: number): Promise<boolean> {
 }
 
 async function main() {
+  const routineId = 'ddl-routine-JJlhvEjENu_EdiGLQV';
+  routineEnter(routineId, "main");
   console.log(chalk.blue.bold('Live-Mutex Broker Status Check'));
   console.log(chalk.gray(`Checking ${host}:${port}...\n`));
 

@@ -7,6 +7,8 @@ coverage
 .nyc_output
 .vscode
 dist
+clients/rust/target/
+clients/java/target/
 @target
 test/.suman/.meta
 
@@ -14,8 +16,12 @@ test/.suman/.meta
 *.log
 *.tgz
 *.DS_Store
+erl_crash.dump
 src/*.js
 src/*.d.ts
+
+# Don't commit compiled JS files in src/ - they should only be in dist/
+src/**/*.js
 
 ### files
 yarn.lock

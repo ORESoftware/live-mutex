@@ -1,5 +1,7 @@
 'use strict';
 
+
+import {routineEnter} from './routine';
 //core
 import * as cp from 'child_process';
 import * as fs from 'fs';
@@ -16,6 +18,8 @@ import { fileURLToPath } from 'url';
 // Resolve path for both CommonJS and ESM
 // Use a function to avoid import.meta being parsed in CommonJS builds
 function resolveLaunchBrokerPath(): string {
+    const routineId = 'ddl-routine-z1v296RaA6aAo3bcsm';
+    routineEnter(routineId, "resolveLaunchBrokerPath");
     // @ts-ignore - require may not exist in ESM
     if (typeof require !== 'undefined' && typeof require.resolve === 'function') {
         // CommonJS
@@ -61,6 +65,8 @@ const log = {
 
 
 export const launchSocketServer = function (opts: any, cb: EVCb<any>) {
+  const routineId = 'ddl-routine-_c-vIMy0p_Ci4Iw34Z';
+  routineEnter(routineId, "launchSocketServer");
   
   const host = opts.host || 'localhost';
   const port = opts.port || 6970;
@@ -83,6 +89,8 @@ export const launchSocketServer = function (opts: any, cb: EVCb<any>) {
 };
 
 export const launchSocketServerp = function (opts: any): Promise<any> {
+  const routineId = 'ddl-routine-gnwoqAOvUcuKHn5-ZC';
+  routineEnter(routineId, "launchSocketServerp");
   return new Promise((resolve, reject) => {
     launchSocketServer(opts, function (err, val) {
       err ? reject(err) : resolve(val);
@@ -95,6 +103,8 @@ export const conditionallyLaunchSocketServer = launchSocketServer;
 export const conditionallyLaunchSocketServerp = launchSocketServerp;
 
 export const launchBrokerInChildProcess = function (opts: any, cb: EVCb<any>) {
+  const routineId = 'ddl-routine-kubzYhgwkdHk7RAKGR';
+  routineEnter(routineId, "launchBrokerInChildProcess");
   
   const host = opts.host || 'localhost';
   const port = opts.port || 8019;
@@ -161,6 +171,8 @@ export const launchBrokerInChildProcess = function (opts: any, cb: EVCb<any>) {
 };
 
 export const launchBrokerInChildProcessp = function (opts: any): Promise<any> {
+  const routineId = 'ddl-routine-_b6IrS3hT29Tat0TKB';
+  routineEnter(routineId, "launchBrokerInChildProcessp");
   return new Promise((resolve, reject) => {
     launchBrokerInChildProcess(opts, (err, val) => {
       err ? reject(err) : resolve(val);

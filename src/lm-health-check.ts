@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 'use strict';
 
+
+import {routineEnter} from './routine';
 import {Client} from "./client";
 import chalk from "chalk";
 
@@ -9,6 +11,8 @@ const host = process.argv[3] || process.env.live_mutex_host || 'localhost';
 const testKey = process.argv[4] || '__health_check__';
 
 async function main() {
+  const routineId = 'ddl-routine-iqJYcKJK81h35DCU8A';
+  routineEnter(routineId, "main");
   const client = new Client({port, host, lockRequestTimeout: 3000, maxRetries: 2});
   
   try {

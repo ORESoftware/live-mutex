@@ -1,7 +1,9 @@
 'use strict';
 
+
+import {routineEnter} from './routine';
 //core
-import * as assert from 'assert';
+import {strict as assertStrict} from 'assert';
 import * as net from 'net';
 import * as util from 'util';
 import * as fs from 'fs';
@@ -40,12 +42,11 @@ import Timer = NodeJS.Timer;
 import {RWStatus, inspectError} from "./shared-internal";
 import {compareVersions} from "./compare-versions";
 import {joinToStr} from "./shared-internal";
+import {packageJsonData as brokerPackage} from './package-json-loader';
 
 if (weAreDebugging) {
     log.error('Broker is in debug mode. Timeouts are turned off.');
 }
-
-import { packageJsonData as brokerPackage } from './package-json-loader';
 
 if (!(brokerPackage.version && typeof brokerPackage.version === 'string')) {
     throw new Error('Broker NPM package did not have a top-level field that is a string.');
@@ -140,13 +141,13 @@ export type LockholdersType = Map<string, {
 export interface LockObj {
     // current number of lockholders for this lock/key is Object.keys(lockholders).length
     readers?: number;
-    max: number, // max number of lockholders (for normal locks) or current effective max (for RW locks)
-    maxRead?: number, // max number of concurrent readers (RW locks only, default: 10)
-    maxWrite?: number, // max number of concurrent writers (RW locks only, default: 1, always 1 for exclusive)
+    max: number, // max number of lockholders (legacy, kept for backward compatibility)
+    maxRead?: number, // max concurrent readers for RW locks (default: 10)
+    maxWrite?: number, // max concurrent writers for RW locks (default: 1)
     lockholderTimeouts: UuidHash,
     lockholdersAllReleased: UuidHash,
     lockholders: LockholdersType,  // uuid(s) that hold the lock
-    notify: LinkedQueue<NotifyObj>, //Array<NotifyObj>,
+    notify: LinkedQueue<NotifyObj, string>, //Array<NotifyObj>,
     key: string,
     keepLocksAfterDeath: boolean
     writerFlag: boolean,
@@ -205,10 +206,12 @@ export class Broker {
     registeredListeners = <{ [key: string]: Array<RegisteredListener> }>{};
 
     constructor(o?: IBrokerOptsPartial, cb?: IErrorFirstCB) {
+        const routineId = 'ddl-routine-1nhI732BICvYBHQTSq';
+        routineEnter(routineId, "Broker.constructor");
 
         this.isOpen = false;
         const opts = this.opts = o || {};
-        assert.strict(typeof opts === 'object', 'Options argument must be an object.');
+        assertStrict(typeof opts === 'object', 'Options argument must be an object.');
 
         for (const k of Object.keys(opts)) {
             if (!validConstructorOptions[k]) {
@@ -220,32 +223,32 @@ export class Broker {
         }
 
         if (opts['lockExpiresAfter']) {
-            assert.strict(Number.isInteger(opts.lockExpiresAfter),
+            assertStrict(Number.isInteger(opts.lockExpiresAfter),
                 'lmx broker: "expiresAfter" option needs to be an integer (milliseconds)');
-            assert.strict(opts.lockExpiresAfter > 20 && opts.lockExpiresAfter < 4000000,
+            assertStrict(opts.lockExpiresAfter > 20 && opts.lockExpiresAfter < 4000000,
                 'lmx broker: "expiresAfter" is not in range (20 to 4000000 ms).');
         }
 
         if (opts['timeoutToFindNewLockholder']) {
-            assert.strict(Number.isInteger(opts.timeoutToFindNewLockholder),
+            assertStrict(Number.isInteger(opts.timeoutToFindNewLockholder),
                 'lmx broker: "timeoutToFindNewLockholder" option needs to be an integer (milliseconds)');
-            assert.strict(opts.timeoutToFindNewLockholder > 20 && opts.timeoutToFindNewLockholder < 4000000,
+            assertStrict(opts.timeoutToFindNewLockholder > 20 && opts.timeoutToFindNewLockholder < 4000000,
                 'lmx broker: "timeoutToFindNewLockholder" is not in range (20 to 4000000 ms).');
         }
 
         if (opts['host']) {
-            assert.strict(typeof opts.host === 'string', ' => "host" option needs to be a string.');
+            assertStrict(typeof opts.host === 'string', ' => "host" option needs to be a string.');
         }
 
         if (opts['port']) {
-            assert.strict(Number.isInteger(opts.port),
+            assertStrict(Number.isInteger(opts.port),
                 'lmx broker: "port" option needs to be an integer => ' + opts.port);
-            assert.strict(opts.port > 1024 && opts.port < 49152,
+            assertStrict(opts.port > 1024 && opts.port < 49152,
                 'lmx broker: "port" integer needs to be in range (1025-49151).');
         }
 
         if ('noDelay' in opts && opts['noDelay'] !== undefined) {
-            assert.strict(typeof opts.noDelay === 'boolean',
+            assertStrict(typeof opts.noDelay === 'boolean',
                 'lmx broker: "noDelay" option needs to be an integer => ' + opts.noDelay);
             this.noDelay = opts.noDelay;
         }
@@ -257,8 +260,8 @@ export class Broker {
         this.noListen = opts.noListen === true;
 
         if ('udsPath' in opts && opts['udsPath'] !== undefined) {
-            assert.strict(typeof opts.udsPath === 'string', 'lmx broker "udsPath" option must be a string.');
-            assert.strict(path.isAbsolute(path.resolve(opts.udsPath)), 'lmx broker "udsPath" option must be an absolute path.');
+            assertStrict(typeof opts.udsPath === 'string', 'lmx broker "udsPath" option must be a string.');
+            assertStrict(path.isAbsolute(path.resolve(opts.udsPath)), 'lmx broker "udsPath" option must be an absolute path.');
             this.socketFile = path.resolve(opts.udsPath);
         }
 
@@ -608,20 +611,28 @@ export class Broker {
     }
 
     static create(opts: IBrokerOptsPartial): Broker {
+        const routineId = 'ddl-routine-l2FMveCm6tpN3cZoZI';
+        routineEnter(routineId, "Broker.create");
         return new Broker(opts);
     }
 
     private emit(...args: Parameters<EventEmitter['emit']>) {
+        const routineId = 'ddl-routine-TgOMx4EA6TEqrhGcik';
+        routineEnter(routineId, "Broker.emit");
         log.warn('warning:', 'use b.emitter.emit() instead of b.emit()');
         return this.emitter.emit.apply(this.emitter, args);
     }
 
     private on(...args: Parameters<EventEmitter['on']>) {
+        const routineId = 'ddl-routine-sHafL8MFHs5PE6mNsi';
+        routineEnter(routineId, "Broker.on");
         log.warn('warning:', 'use c.emitter.on() instead of c.on()');
         return this.emitter.on.apply(this.emitter, args);
     }
 
     private once(...args: Parameters<EventEmitter['once']>) {
+        const routineId = 'ddl-routine-i_Ebdo8DL2yr-PMYx_';
+        routineEnter(routineId, "Broker.once");
         log.warn('warning:', 'use c.emitter.once() instead of c.once()');
         return this.emitter.once.apply(this.emitter, args);
     }
@@ -631,6 +642,8 @@ export class Broker {
      * @param callback Function that receives warning messages/errors
      */
     onWarning(callback: (...args: any[]) => void): void {
+        const routineId = 'ddl-routine-njXmNTMY9ML3IKO8Ow';
+        routineEnter(routineId, "Broker.onWarning");
         this.emitter.on('warning', callback);
     }
 
@@ -639,10 +652,14 @@ export class Broker {
      * @param callback Function that receives error messages
      */
     onError(callback: (...args: any[]) => void): void {
+        const routineId = 'ddl-routine-C5dbJe_n5oAN3HATm1';
+        routineEnter(routineId, "Broker.onError");
         this.emitter.on('error', callback);
     }
 
     ping(data: any, ws: net.Socket) {
+        const routineId = 'ddl-routine-vSvU5RKxw8bI3iwaEP';
+        routineEnter(routineId, "Broker.ping");
         const uuid = data.uuid;
         const timestamp = data.timestamp || Date.now();
 
@@ -656,6 +673,8 @@ export class Broker {
     }
 
     getSystemStats(data: any, ws: net.Socket) {
+        const routineId = 'ddl-routine-Ty-OH9jDrGCPET8Pdb';
+        routineEnter(routineId, "Broker.getSystemStats");
         const uuid = data.uuid;
 
         // Count all pending lock requests across all locks
@@ -682,6 +701,8 @@ export class Broker {
     }
 
     close(cb: (err: any) => void): void {
+        const routineId = 'ddl-routine-WaWnBHQ25Mfw-g7D54';
+        routineEnter(routineId, "Broker.close");
         // Clean up Unix domain socket file if it exists
         if (this.socketFile) {
             try {
@@ -705,34 +726,48 @@ export class Broker {
     }
 
     getListeningInterface() {
+        const routineId = 'ddl-routine-2zms5c-Qh4xyddmLfH';
+        routineEnter(routineId, "Broker.getListeningInterface");
         return this.socketFile || this.port;
     }
 
     getVersion() {
+        const routineId = 'ddl-routine-5Vcst7VUQ9H_7-PT_o';
+        routineEnter(routineId, "Broker.getVersion");
         return brokerPackage.version;
     }
 
     getPort() {
+        const routineId = 'ddl-routine-5tcA-mjD4bdWzd6sm0';
+        routineEnter(routineId, "Broker.getPort");
         return this.port;
     }
 
     getHost() {
+        const routineId = 'ddl-routine-7SZZ7RLWwADakZoWG7';
+        routineEnter(routineId, "Broker.getHost");
         return this.host;
     }
 
     abruptlyDestroyConnection(ws: LMXSocket) {
+        const routineId = 'ddl-routine-phCOubIkmJMaohGABa';
+        routineEnter(routineId, "Broker.abruptlyDestroyConnection");
         log.error('Connection will be destroyed.');
         ws.destroy();
         ws.removeAllListeners();
     }
 
     abruptlyEndConnection(ws: LMXSocket) {
+        const routineId = 'ddl-routine-hhVSeO2G9wheADUbfD';
+        routineEnter(routineId, "Broker.abruptlyEndConnection");
         log.error('Connection will be ended.');
         ws.end();
         ws.removeAllListeners();
     }
 
     onVersion(data: any, ws: LMXSocket) {
+        const routineId = 'ddl-routine-UZ2AKBzJInUjPg0_1T';
+        routineEnter(routineId, "Broker.onVersion");
 
         const clientVersion = data.value;
         const brokerVersion = brokerPackage.version;
@@ -763,6 +798,8 @@ export class Broker {
     }
 
     cleanupConnection(ws: LMXSocket) {
+        const routineId = 'ddl-routine-jGBbT7CvEh_KXpxuJY';
+        routineEnter(routineId, "Broker.cleanupConnection");
 
         if (ws.lmxClosed === true) {
             return;
@@ -837,10 +874,14 @@ export class Broker {
     }
 
     ls(data: any, ws: LMXSocket) {
+        const routineId = 'ddl-routine-XPTlumdbU3CFXPgk3d';
+        routineEnter(routineId, "Broker.ls");
         return this.send(ws, {ls_result: Object.keys(this.locks), uuid: data.uuid});
     }
 
     broadcast(data: any, ws: LMXSocket) {
+        const routineId = 'ddl-routine-2-98KhzxkD_iq2nVJv';
+        routineEnter(routineId, "Broker.broadcast");
 
         const key = data.key;
         const uuid = data.uuid;
@@ -885,6 +926,8 @@ export class Broker {
     }
 
     incrementReaders(data: any, ws: net.Socket) {
+        const routineId = 'ddl-routine-OC_BTn2Fbdc2Ml6VwZ';
+        routineEnter(routineId, "Broker.incrementReaders");
 
         const key = data.key;
         const uuid = data.uuid;
@@ -906,6 +949,8 @@ export class Broker {
     }
 
     setWriteFlagToFalseAndBroadcast(data: any, ws: net.Socket) {
+        const routineId = 'ddl-routine-8AVUNGfr3hGJaCTBLi';
+        routineEnter(routineId, "Broker.setWriteFlagToFalseAndBroadcast");
 
         const key = data.key;
         const uuid = data.uuid;
@@ -928,6 +973,8 @@ export class Broker {
     }
 
     decrementReaders(data: any, ws: net.Socket) {
+        const routineId = 'ddl-routine-7woEZyImtmFRTsVA9A';
+        routineEnter(routineId, "Broker.decrementReaders");
 
         const key = data.key;
         const uuid = data.uuid;
@@ -961,6 +1008,8 @@ export class Broker {
     }
 
     registerWriteFlagAndReadersCheck(data: any, ws: net.Socket) {
+        const routineId = 'ddl-routine-IqVbMpiSOSqmm5NU7C';
+        routineEnter(routineId, "Broker.registerWriteFlagAndReadersCheck");
 
         const key = data.key;
         const uuid = data.uuid;
@@ -997,12 +1046,15 @@ export class Broker {
 
     }
 
-    getDefaultLockObject(key: string, keepLocksAfterDeath?: boolean, max?: number): LockObj {
+    getDefaultLockObject(key: string, keepLocksAfterDeath?: boolean, max?: number, maxRead?: number, maxWrite?: number): LockObj {
+        const routineId = 'ddl-routine-mM2t9faRwDs-hq76C8';
+        routineEnter(routineId, "Broker.getDefaultLockObject");
 
         return {
             readers: 0,
-            max: max || 1, // default max for normal locks
-            // maxRead and maxWrite are only set for RW locks, not initialized here
+            max: max || 1, // Legacy field, kept for backward compatibility
+            maxRead: maxRead !== undefined ? maxRead : undefined, // Will be set to 10 default when first read lock arrives
+            maxWrite: maxWrite !== undefined ? maxWrite : undefined, // Will be set to 1 default when first write lock arrives
             lockholders: new Map(),
             lockholdersAllReleased: {},
             keepLocksAfterDeath,
@@ -1016,6 +1068,8 @@ export class Broker {
     }
 
     registerWriteFlagCheck(data: any, ws: net.Socket) {
+        const routineId = 'ddl-routine-Tw2m9eGWW6E09D_Rpf';
+        routineEnter(routineId, "Broker.registerWriteFlagCheck");
 
         const key = data.key;
         const uuid = data.uuid;
@@ -1071,6 +1125,8 @@ export class Broker {
     }
 
     inspect(data: any, ws: net.Socket) {
+        const routineId = 'ddl-routine-E_E8Eh-Geb8ZQiFdFE';
+        routineEnter(routineId, "Broker.inspect");
 
         if (typeof data.inspectCommand !== 'string') {
             return this.send(ws, {error: 'inspectCommand was not a string'});
@@ -1095,6 +1151,8 @@ export class Broker {
     }
 
     ensureNewLockHolder(lck: LockObj, data: any) {
+        const routineId = 'ddl-routine-nR5xw-DCO-z8GvENTu';
+        routineEnter(routineId, "Broker.ensureNewLockHolder");
 
         const locks = this.locks;
         const notifyList = lck.notify;
@@ -1280,7 +1338,7 @@ export class Broker {
                     }
 
                     // get the first 5, ideally we'd mix requests from different clients/ws
-                    notifyList.deq(5).forEach((lqv: [string, NotifyObj] | [typeof IsVoid] | { value: NotifyObj }) => {
+                    (notifyList.deq(5) as Array<[string, NotifyObj] | [unknown] | { value: NotifyObj }>).forEach((lqv) => {
                         // deq returns [K, V] tuples from dequeue() (despite type definition saying LinkedQueueValue)
                         let obj: NotifyObj;
                         if (Array.isArray(lqv) && !IsVoid.check(lqv[0])) {
@@ -1309,6 +1367,8 @@ export class Broker {
     }
 
     retrieveLockInfo(data: any, ws: net.Socket) {
+        const routineId = 'ddl-routine-csv6xQJOPu2qgQNHAm';
+        routineEnter(routineId, "Broker.retrieveLockInfo");
 
         const key = data.key;
         const lck = this.locks.get(key);
@@ -1334,6 +1394,8 @@ export class Broker {
     }
 
     cleanUpLocks(): void {
+        const routineId = 'ddl-routine-lmkfw3QoaNIyeKpjDN';
+        routineEnter(routineId, "Broker.cleanUpLocks");
 
         this.lockCounts = 0;
         const now = Date.now();
@@ -1362,6 +1424,8 @@ export class Broker {
     }
 
     lock(data: any, ws: LMXSocket) {
+        const routineId = 'ddl-routine-ufr4Gp3XNHO5xOHSnJ';
+        routineEnter(routineId, "Broker.lock");
 
         const key = data.key;
         const keepLocksAfterDeath = Boolean(data.keepLocksAfterDeath);
@@ -1378,9 +1442,13 @@ export class Broker {
 
         const uuid = data.uuid;
         const pid = data.pid;
-        const max = data.max;  // max lockholders
+        const max = data.max;  // max lockholders (legacy)
+        const maxRead = data.maxRead;  // max concurrent readers
+        const maxWrite = data.maxWrite;  // max concurrent writers
         const beginRead = data.rwStatus === RWStatus.BeginRead;
+        const beginWrite = data.rwStatus === RWStatus.BeginWrite;
         const endRead = data.rwStatus === RWStatus.EndRead;
+        const isRWLockOperation = beginRead || beginWrite;
 
         const force = data.force;
         const retryCount = data.retryCount;
@@ -1411,37 +1479,50 @@ export class Broker {
 
             // lock object with given key exists
 
+            // Update max fields BEFORE checking count
+            // For RW locks: use maxRead/maxWrite if provided, with the legacy
+            // max field as the compatibility input used by older clients.
+            // For regular locks: use max
+            if (isRWLockOperation && beginRead) {
+                // RW read lock: accept the explicit maxRead field first, then
+                // the legacy max field used by current clients, otherwise use
+                // the documented default of 10 readers.
+                const requestedMaxRead = Number.isInteger(maxRead)
+                    ? maxRead
+                    : Number.isInteger(max) ? max : undefined;
+                if (requestedMaxRead !== undefined) {
+                    lck.maxRead = requestedMaxRead;
+                } else if (lck.maxRead === undefined) {
+                    lck.maxRead = 10; // Default for read locks
+                }
+                // Update legacy max for backward compatibility (only if not already set by regular lock)
+                if (Number.isInteger(max)) {
+                    lck.max = max;
+                }
+            } else if (isRWLockOperation && !beginRead) {
+                // RW write lock: accept the explicit maxWrite field first,
+                // then the legacy max field, otherwise default to one writer.
+                const requestedMaxWrite = Number.isInteger(maxWrite)
+                    ? maxWrite
+                    : Number.isInteger(max) ? max : undefined;
+                if (requestedMaxWrite !== undefined) {
+                    lck.maxWrite = requestedMaxWrite;
+                } else if (lck.maxWrite === undefined) {
+                    lck.maxWrite = 1; // Default for write locks
+                }
+                // Update legacy max for backward compatibility
+                if (Number.isInteger(max)) {
+                    lck.max = max;
+                }
+            } else {
+                // Regular lock (not RW): use max only
+                if (Number.isInteger(max)) {
+                    lck.max = max;
+                }
+            }
+
             const ln = lck.notify.length;
             const count = lck.lockholders.size;
-            const beginRead = data.rwStatus === RWStatus.BeginRead;
-            const beginWrite = data.rwStatus === RWStatus.BeginWrite;
-
-            // Update max based on operation type
-            // For RW read operations: update maxRead (default: 10)
-            // For RW write operations: update maxWrite (default: 1, always 1 for exclusive)
-            // For normal lock operations: update max only
-            if (beginRead) {
-                // RW read lock - initialize/update maxRead
-                // Always ensure maxRead is set - default to 10 if not provided
-                // This must happen BEFORE effectiveMax calculation
-                if (lck.maxRead === undefined) {
-                    // First read lock for this key - use provided max or default to 10
-                    lck.maxRead = Number.isInteger(max) ? max : 10;
-                } else if (Number.isInteger(max)) {
-                    // Update maxRead if max is explicitly provided
-                    lck.maxRead = max;
-                }
-                // Note: Don't update lck.max here - it may be 1 from a previous write lock
-                // effectiveMax will use maxRead for read operations, not max
-            } else if (beginWrite) {
-                // RW write lock - use maxWrite (always 1 for exclusive)
-                lck.maxWrite = 1;
-                // Also update max field for consistency
-                lck.max = 1;
-            } else if (Number.isInteger(max)) {
-                // Normal lock operation - only update max (not maxRead/maxWrite)
-                lck.max = max;
-            }
 
             // For RW read locks, check readers count (accounting for the increment that will happen)
             // because readers are tracked separately and we need to check before incrementing
@@ -1609,7 +1690,14 @@ export class Broker {
 
         this.wsToKeys.get(ws)[key] = true;
 
-        const lckTemp = this.getDefaultLockObject(key, keepLocksAfterDeath, max);
+        // Determine maxRead and maxWrite based on operation type
+        const maxReadForNewLock = beginRead
+            ? (Number.isInteger(maxRead) ? maxRead : (Number.isInteger(max) ? max : 10))
+            : undefined;
+        const maxWriteForNewLock = beginWrite
+            ? (Number.isInteger(maxWrite) ? maxWrite : (Number.isInteger(max) ? max : 1))
+            : undefined;
+        const lckTemp = this.getDefaultLockObject(key, keepLocksAfterDeath, max, maxReadForNewLock, maxWriteForNewLock);
         this.locks.set(key, lckTemp);
 
         if (beginRead) {
@@ -1669,6 +1757,8 @@ export class Broker {
     }
 
     unlock(data: any, ws?: net.Socket) {
+        const routineId = 'ddl-routine-m90ir3arlrZIGJaBIr';
+        routineEnter(routineId, "Broker.unlock");
 
         const key = data.key;
         const uuid = data.uuid;

@@ -8,9 +8,7 @@
  */
 
 import * as assert from 'assert';
-import { Broker1 } from '../dist/broker-1';
-import { Client } from '../dist/client';
-import { RWLockWritePrefClient } from '../dist/rw-write-preferred-client';
+import { Broker1, Client, RWLockWritePrefClient } from '../dist/main';
 
 interface MemorySnapshot {
     heapUsed: number;
@@ -134,7 +132,7 @@ function analyzeMemoryGrowth() {
 
 // Test configuration
 const TEST_CONFIG = {
-    port: 8888,
+    port: process.env.LMX_TEST_PORT ? parseInt(process.env.LMX_TEST_PORT, 10) : 8888,
     duration: 120000, // 2 minutes
     clientCount: 20,
     operationsPerSecond: 10,
@@ -458,4 +456,3 @@ if (require.main === module) {
 }
 
 export { runMemoryLeakTest };
-

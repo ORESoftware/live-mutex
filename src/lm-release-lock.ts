@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 'use strict';
 
+
+import {routineEnter} from './routine';
 import {Client, validConstructorOptions, validUnlockOptions} from "./client";
 import {log} from "./client-utils";
 import chalk from "chalk";
@@ -52,6 +54,8 @@ process.once('uncaughtException', function (err) {
 });
 
 const getSelectable = function (selectable: object, original: any) {
+  const routineId = 'ddl-routine-xk0AoJN7y811oFE5_A';
+  routineEnter(routineId, "getSelectable");
   return Object.keys(selectable).reduce((a, b) => (a[b] = original[b], a), {} as any);
 };
 

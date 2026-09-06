@@ -13,7 +13,7 @@ const { RWLockWritePrefClient } = require('../dist/rw-write-preferred-client');
 const TEST_DURATION = 300000; // 5 minutes
 const CLIENT_COUNT = 50;
 const OPERATIONS_PER_SECOND = 20;
-const PORT = 5555;
+const PORT = process.env.LMX_TEST_PORT ? parseInt(process.env.LMX_TEST_PORT, 10) : 5555;
 
 const memorySnapshots = [];
 let operationCount = 0;
@@ -390,4 +390,3 @@ async function runExtendedMemoryTest() {
 
 // Run the test
 runExtendedMemoryTest();
-

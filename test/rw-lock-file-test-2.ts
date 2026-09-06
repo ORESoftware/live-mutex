@@ -10,8 +10,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { Broker1 } from '../dist/broker-1';
-import { RWLockWritePrefClient } from '../dist/rw-write-preferred-client';
+import { Broker1, RWLockWritePrefClient } from '../dist/main';
 
 const PORT = 4444;
 const TEST_FILE = path.join(os.tmpdir(), 'lmx-rw-test.txt');

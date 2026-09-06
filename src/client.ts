@@ -1,8 +1,10 @@
 'use strict';
 
+
+import {routineEnter} from './routine';
 //core
 import * as util from 'util';
-import * as assert from 'assert';
+import {equal as assertEqual, strict as assertStrict, strictEqual as assertStrictEqual} from 'assert';
 import * as net from 'net';
 
 //npm
@@ -13,6 +15,7 @@ import chalk from "chalk";
 import {createParser} from "./json-parser";
 import * as cu from './client-utils';
 import { packageJsonData as clientPackage } from './package-json-loader';
+import {LMXRequestType, LMXResponseType} from './protocol';
 
 if (!(clientPackage.version && typeof clientPackage.version === 'string')) {
   throw new Error('Client NPM package did not have a top-level field that is a string.');
@@ -30,6 +33,9 @@ import {LMXClientException} from "./exceptions";
 import {LMXClientError} from "./shared-internal";
 import {inspectError} from "./shared-internal";
 import {log} from "./client-utils";
+import {emitEmitterInfoTelemetry, emitEmitterWarningTelemetry} from "./telemetry";
+
+const alreadyUnlocked = Symbol('already.unlocked');
 
 if (weAreDebugging) {
   log.debug('lmx client is in debug mode. Timeouts are turned off.');
@@ -95,9 +101,7 @@ export interface IUuidTimeoutBool {
   [key: string]: boolean
 }
 
-export interface IClientResolution {
-  [key: string]: EVCb<any>
-}
+export type IClientResolution = Map<string, EVCb<any>>;
 
 export type LMClientCallBack = (err: any, c?: Client) => void;
 export type Ensure = (cb?: LMClientCallBack) => Promise<Client>;
@@ -114,6 +118,8 @@ export interface LMXClientLockOpts {
   force?: boolean,
   semaphore?: number,
   max?: number,
+  maxRead?: number, // max concurrent readers (for RW locks)
+  maxWrite?: number, // max concurrent writers (for RW locks)
   retry?: boolean,
   maxRetry?: number,
   retryMax?: number,
@@ -134,13 +140,19 @@ export interface LMXClientUnlockOpts {
 
 export interface LMLockSuccessData {
   (fn?: LMClientUnlockCallBack): void
-  
+
   acquired: true,
   key: string,
   unlock: LMLockSuccessData,
   lockUuid: string,
   readersCount: number,
-  id: string
+  id: string,
+  /// Per-key monotonic fencing token assigned by the broker on grant.
+  /// `null` when talking to a broker that pre-dates fencing-token
+  /// support (any older broker — the field has been added in this
+  /// improvement series). Strictly greater than every previous token
+  /// for the same key, so callers can detect stale handoffs.
+  fencingToken: number | null
 }
 
 export interface LMUnlockSuccessData {
@@ -198,13 +210,15 @@ export class Client {
   recovering = false;
   
   constructor(o?: Partial<ClientOpts>, cb?: LMClientCallBack) {
+    const routineId = 'ddl-routine-cJX87kyewufP2RKyfQ';
+    routineEnter(routineId, "Client.constructor");
     
     this.isOpen = false;
     const opts = this.opts = o || {};
-    assert.strict(typeof opts === 'object', 'Bad arguments to lmx client constructor - options must be an object.');
+    assertStrict(typeof opts === 'object', 'Bad arguments to lmx client constructor - options must be an object.');
     
     if (cb) {
-      assert.strict(typeof cb === 'function', 'optional second argument to lmx Client constructor must be a function.');
+      assertStrict(typeof cb === 'function', 'optional second argument to lmx Client constructor must be a function.');
     }
     
     for (const key of Object.keys(opts)) {
@@ -215,75 +229,75 @@ export class Client {
     }
     
     if ('host' in opts && opts.host !== undefined) {
-      assert.strict(typeof opts.host === 'string', 'lmx: "host" option needs to be a string.');
+      assertStrict(typeof opts.host === 'string', 'lmx: "host" option needs to be a string.');
       this.host = opts.host;
     }
     
     if ('port' in opts && opts.port !== undefined) {
-      assert.strict(Number.isInteger(opts.port),
+      assertStrict(Number.isInteger(opts.port),
         cu.getClientErrorMessage(`the "port" option needs to be an integer.`));
-      assert.strict(opts.port >= 80 && opts.port < 49152,
+      assertStrict(opts.port >= 80 && opts.port < 49152,
         cu.getClientErrorMessage('the "port" option needs to be an integer in the range (1025-49151).'));
       this.port = opts.port;
     }
     
     if ('listener' in opts && opts.listener !== undefined) {
-      assert.strict(typeof opts.listener === 'function',
+      assertStrict(typeof opts.listener === 'function',
         cu.getClientErrorMessage('the "listener" option should be a function.'));
-      assert.strict(typeof opts.key === 'string',
+      assertStrict(typeof opts.key === 'string',
         cu.getClientErrorMessage('you must pass in a key to use listener functionality.'));
     }
   
     if ('connectTimeout' in opts && opts.connectTimeout !== undefined) {
-      assert.strict(Number.isInteger(opts.connectTimeout),
+      assertStrict(Number.isInteger(opts.connectTimeout),
         cu.getClientErrorMessage('the "connectTimeout" option must be an integer.'));
-      assert.strict(opts.connectTimeout > 10 && opts.connectTimeout < 20000,
+      assertStrict(opts.connectTimeout > 10 && opts.connectTimeout < 20000,
         cu.getClientErrorMessage('the "connectTimeout" option must be between 10 and 20000 ms.'));
       this.connectTimeout = opts.connectTimeout;
     }
     
     if ('lockRetryMax' in opts && opts.lockRetryMax !== undefined) {
-      assert.strict(Number.isInteger(opts.lockRetryMax),
+      assertStrict(Number.isInteger(opts.lockRetryMax),
         cu.getClientErrorMessage('the "lockRetryMax" option needs to be an integer.'));
-      assert.strict(opts.lockRetryMax >= 0 && opts.lockRetryMax <= 100,
+      assertStrict(opts.lockRetryMax >= 0 && opts.lockRetryMax <= 100,
         cu.getClientErrorMessage('the "lockRetryMax" integer needs to be in range (0-100).'));
     }
     
     if (opts['retryMax']) {
-      assert.strict(Number.isInteger(opts.retryMax),
+      assertStrict(Number.isInteger(opts.retryMax),
         cu.getClientErrorMessage('the "retryMax" option needs to be an integer.'));
-      assert.strict(opts.retryMax >= 0 && opts.retryMax <= 100,
+      assertStrict(opts.retryMax >= 0 && opts.retryMax <= 100,
         cu.getClientErrorMessage('the "retryMax" integer needs to be in range (0-100).'));
     }
     
     if (opts['unlockRequestTimeout']) {
-      assert.strict(Number.isInteger(opts.unlockRequestTimeout),
+      assertStrict(Number.isInteger(opts.unlockRequestTimeout),
         cu.getClientErrorMessage('the "unlockRequestTimeout" option needs to be an integer (representing milliseconds).'));
-      assert.strict(opts.unlockRequestTimeout >= 20 && opts.unlockRequestTimeout <= 800000,
+      assertStrict(opts.unlockRequestTimeout >= 20 && opts.unlockRequestTimeout <= 800000,
         cu.getClientErrorMessage('the "unlockRequestTimeout" needs to be integer between 20 and 800000 millis.'));
     }
     
     if (opts['lockRequestTimeout']) {
-      assert.strict(Number.isInteger(opts.lockRequestTimeout),
+      assertStrict(Number.isInteger(opts.lockRequestTimeout),
         cu.getClientErrorMessage('the "lockRequestTimeout" option needs to be an integer (representing milliseconds).'));
-      assert.strict(opts.lockRequestTimeout >= 20 && opts.lockRequestTimeout <= 800000,
+      assertStrict(opts.lockRequestTimeout >= 20 && opts.lockRequestTimeout <= 800000,
         cu.getClientErrorMessage('the "lockRequestTimeout" needs to be integer between 20 and 800000 millis.'));
     }
     
     if (opts['ttl']) {
-      assert.strict(Number.isInteger(opts.ttl),
+      assertStrict(Number.isInteger(opts.ttl),
         cu.getClientErrorMessage('the "ttl" option needs to be an integer (representing milliseconds).'));
-      assert.strict(opts.ttl >= 3 && opts.ttl <= 800000,
+      assertStrict(opts.ttl >= 3 && opts.ttl <= 800000,
         cu.getClientErrorMessage('the "ttl" needs to be integer between 3 and 800000 millis.'));
     }
     
     if ('keepLocksAfterDeath' in opts) {
-      assert.strict(typeof opts.keepLocksAfterDeath === 'boolean',
+      assertStrict(typeof opts.keepLocksAfterDeath === 'boolean',
         cu.getClientErrorMessage('the "keepLocksAfterDeath" option needs to be a boolean.'));
     }
     
     if ('keepLocksOnExit' in opts) {
-      assert.strict(typeof opts.keepLocksOnExit === 'boolean',
+      assertStrict(typeof opts.keepLocksOnExit === 'boolean',
         cu.getClientErrorMessage('the "keepLocksOnExit" option needs to be a boolean.'));
     }
     
@@ -292,14 +306,14 @@ export class Client {
     }
     
     if ('noDelay' in opts && opts['noDelay'] !== undefined) {
-      assert.strict(typeof opts.noDelay === 'boolean',
+      assertStrict(typeof opts.noDelay === 'boolean',
         'lmx: "noDelay" option needs to be an integer => ' + opts.noDelay);
       this.noDelay = opts.noDelay;
     }
     
     if ('udsPath' in opts && opts['udsPath'] !== undefined) {
-      assert.strict(typeof opts.udsPath === 'string', '"udsPath" option must be a string.');
-      assert.strict(path.isAbsolute(opts.udsPath), '"udsPath" option must be an absolute path.');
+      assertStrict(typeof opts.udsPath === 'string', '"udsPath" option must be a string.');
+      assertStrict(path.isAbsolute(opts.udsPath), '"udsPath" option must be an absolute path.');
       this.socketFile = path.resolve(opts.udsPath);
     }
     
@@ -313,12 +327,25 @@ export class Client {
     let ws: net.Socket | null = null;
     let connectPromise: Promise<Client> | null = null;
     const self = this;
+
+    this.emitter.on('info', function () {
+      emitEmitterInfoTelemetry('live-mutex.client', Array.from(arguments), {
+        'lmx.component': 'client'
+      });
+    });
+
+    this.emitter.on('warning', function () {
+      emitEmitterWarningTelemetry('live-mutex.client', Array.from(arguments), {
+        'lmx.component': 'client'
+      });
+    });
     
     this.emitter.on('warning', function () {
-      if (self.emitter.listenerCount('warning') < 2) {
-        log.warn('No "warning" event handler(s) attached by end-user to client.emitter, therefore logging these errors from LMX library:');
-        log.warn(...Array.from(arguments).map(v => (typeof v === 'string' ? v : util.inspect(v))));
-        log.warn('Add a "warning" event listener to the lmx client to get rid of this message.');
+      if (self.emitter.listenerCount('warning') < 3) {
+        const prefix = chalk.magenta.bold('lmx client warning:');
+        console.error(prefix, 'No "warning" event handler(s) attached by end-user to client.emitter, therefore logging these errors from LMX library:');
+        console.error(prefix, ...Array.from(arguments).map(v => (typeof v === 'string' ? v : util.inspect(v))));
+        console.error(prefix, 'Add a "warning" event listener to the lmx client to get rid of this message.');
       }
     });
     
@@ -328,7 +355,7 @@ export class Client {
         throw new Error('please call ensure()/connect() on this lmx client, before using the lock/unlock methods.');
       }
       
-      if (!ws.writable) {
+      if (!ws.writable || ws.destroyed || (ws as any).writableEnded) {
         return this.ensure((err, val) => {
           if (err) {
             throw new Error('Could not reconnect.');
@@ -338,6 +365,13 @@ export class Client {
       }
       
       data.max = data.max || null;
+      // Forward maxRead and maxWrite if provided (for RW locks)
+      if (data.maxRead !== undefined) {
+        data.maxRead = data.maxRead;
+      }
+      if (data.maxWrite !== undefined) {
+        data.maxWrite = data.maxWrite;
+      }
       data.pid = process.pid;
       
       if (data.ttl === Infinity) {
@@ -371,11 +405,11 @@ export class Client {
         this.emitter.emit('warning', data.warning);
       }
       
-      if (data.type === 'version-mismatch') {
+      if (data.type === LMXResponseType.VersionMismatch) {
         this.emitter.emit('error', data);
         log.error(data);
         this.cannotContinue = true;
-        this.write({type: 'version-mismatch-confirmed'});
+        this.write({type: LMXRequestType.VersionMismatchConfirmed});
         this._fireCallbacksPrematurely(new Error('lmx version-match:' + util.inspect(data)));
         return;
       }
@@ -386,7 +420,7 @@ export class Client {
         );
       }
       
-      const fn = this.resolutions[uuid];
+      const fn = this.resolutions.get(uuid);
       const to = this.timeouts[uuid];
       
       // Debug logging for RW lock operations
@@ -395,13 +429,13 @@ export class Client {
       }
       
       delete this.timeouts[uuid];
-      // delete self.resolutions[uuid]; // don't do this here, the same resolution fn might need to be called more than once
+      // Don't delete the resolution here; some request types need more than one broker response.
       
       if (this.giveups[uuid]) {
         log.debug(chalk.yellow('[CLIENT] Request was given up'), {uuid, type: data.type});
         clearTimeout(this.timers[uuid]);
         delete this.giveups[uuid];
-        delete this.resolutions[uuid];
+        this.resolutions.delete(uuid);
         return;
       }
       
@@ -412,8 +446,8 @@ export class Client {
       if (to) {
         log.debug(chalk.yellow('[CLIENT] Request timed out'), {uuid, type: data.type});
         this.emitter.emit('warning', 'Client side lock/unlock request timed-out.');
-        if (data.acquired === true && data.type === 'lock') {
-          self.write({uuid: uuid, _uuid, key: data.key, type: 'lock-received-rejected'});
+        if (data.acquired === true && data.type === LMXResponseType.Lock) {
+          self.write({uuid: uuid, _uuid, key: data.key, type: LMXRequestType.LockReceivedRejected});
         }
         return;
       }
@@ -428,7 +462,7 @@ export class Client {
       this.emitter.emit('warning', 'lmx implementation warning, ' +
         'no fn with that uuid in the resolutions hash => ' + util.inspect(data, {breakLength: Infinity}));
       
-      if (data.acquired === true && data.type === 'lock') {
+      if (data.acquired === true && data.type === LMXResponseType.Lock) {
         
         // this most likely occurs when a retry request gets sent before the previous lock request gets resolved
         
@@ -437,7 +471,7 @@ export class Client {
         this.write({
           uuid: uuid,
           key: data.key,
-          type: 'lock-received-rejected'
+          type: LMXRequestType.LockReceivedRejected
         });
       }
       
@@ -446,7 +480,7 @@ export class Client {
     this.ensure = this.connect = (cb?: (err: any, v?: Client) => void) => {
       
       if (cb) {
-        assert.strict(typeof cb === 'function', 'Optional argument to ensure/connect must be a function.');
+        assertStrict(typeof cb === 'function', 'Optional argument to ensure/connect must be a function.');
         if (process.domain) {
           cb = process.domain.bind(cb);
         }
@@ -498,7 +532,7 @@ export class Client {
           self.isOpen = true;
           clearTimeout(to);
           ws.removeListener('error', onFirstErr);
-          this.write({type: 'version', value: clientPackage.version});
+          this.write({type: LMXRequestType.Version, value: clientPackage.version});
           resolve(this);
         });
         
@@ -528,9 +562,10 @@ export class Client {
             ws.removeAllListeners();
           }
           
-          for (const [k, v] of Object.entries(this.resolutions)) {
+          for (const [k, v] of Array.from(this.resolutions.entries())) {
             this.giveups[k] = true;
             clearTimeout(this.timers[k]);
+            this.resolutions.delete(k);
             v('lmx connection ended/closed. ' +
               'A new connection will be created but all locking requests' +
               ' in-flight should get receive errors in the callbacks.', {});
@@ -575,11 +610,15 @@ export class Client {
     // Connection cleanup is handled in close() and cleanupConnection methods
     
     this.endCurrentConnection = () => {
+      this._fireCallbacksPrematurely(new Error('lmx client connection was ended by endCurrentConnection().'));
+      this.isOpen = false;
+      connectPromise = null;
       return ws && ws.end();
     };
     
     this.close = () => {
       this.noRecover = true;
+      this._fireCallbacksPrematurely(new Error('lmx client was closed.'));
       // Clean up all timers to prevent memory leaks
       for (const k of Object.keys(this.timers)) {
         clearTimeout(this.timers[k]);
@@ -588,7 +627,7 @@ export class Client {
       // Clean up all timeouts
       this.timeouts = {};
       // Clean up resolutions
-      this.resolutions = {};
+      this.resolutions.clear();
       // Clean up giveups
       this.giveups = {};
       // Remove all event listeners from emitter
@@ -606,7 +645,7 @@ export class Client {
     };
     
     this.timeouts = {};
-    this.resolutions = {};
+    this.resolutions = new Map();
     this.giveups = {};
     this.timers = {};
     
@@ -617,22 +656,32 @@ export class Client {
   };
   
   private onSocketDestroy(err: any) {
+    const routineId = 'ddl-routine-VDHbcd4GWBPB5UkEbO';
+    routineEnter(routineId, "Client.onSocketDestroy");
     log.info('Socket destroy callback error:', err);
   }
   
   static create(opts?: Partial<ClientOpts>): Client {
+    const routineId = 'ddl-routine-houXYhJwF3HUXlrAP1';
+    routineEnter(routineId, "Client.create");
     return new Client(opts);
   }
   
   getConnectionInterface() {
+    const routineId = 'ddl-routine-qTLVY207Rg_Fo_8Fel';
+    routineEnter(routineId, "Client.getConnectionInterface");
     return this.socketFile || this.port;
   }
   
   getConnectionInterfaceStr() {
+    const routineId = 'ddl-routine-hqRGNbmVMiWwp_-JXS';
+    routineEnter(routineId, "Client.getConnectionInterfaceStr");
     return this.socketFile ? `socket-file: ${this.socketFile}` : `host:port '${this.getHost()}:${this.getPort()}'`
   }
   
   private _fireCallbacksPrematurely(originalErr: any) {
+    const routineId = 'ddl-routine-YmHcsp3bXPZGFzzKyn';
+    routineEnter(routineId, "Client._fireCallbacksPrematurely");
     
     for (const k of Object.keys(this.timers)) {
       clearTimeout(this.timers[k]);
@@ -641,16 +690,15 @@ export class Client {
     this.timers = {};
     const err = new Error('Unknown error - firing resolution callbacks prematurely.');
     
-    for (let k of Object.keys(this.resolutions)) {
+    for (const [k, fn] of Array.from(this.resolutions.entries())) {
       
-      const fn = this.resolutions[k];
-      delete this.resolutions[k];
+      this.resolutions.delete(k);
       
       const e = {
         message: err.message,
         stack: err.stack,
         forcePrematureCallback: true,
-        originalErrorString: inspectError(err)
+        originalErrorString: inspectError(originalErr)
       };
       
       fn.call(this, e, e);
@@ -659,14 +707,18 @@ export class Client {
   }
   
   setNoRecover() {
+    const routineId = 'ddl-routine-DZJgWzWcwQQ1gk8Kzr';
+    routineEnter(routineId, "Client.setNoRecover");
     this.noRecover = true;
   }
   
   requestLockInfo(key: string, cb: EVCb<any>): void;
   requestLockInfo(key: string, opts: any, cb: EVCb<any>): void;
   requestLockInfo(key: string, opts: any | EVCb<any>, cb?: EVCb<any>) {
+    const routineId = 'ddl-routine-Gmfh1lWNESF4Mw1rKH';
+    routineEnter(routineId, "Client.requestLockInfo");
     
-    assert.equal(typeof key, 'string', 'Key passed to lmx#lock needs to be a string.');
+    assertEqual(typeof key, 'string', 'Key passed to lmx#lock needs to be a string.');
     
     if (typeof opts === 'function') {
       cb = opts;
@@ -676,7 +728,7 @@ export class Client {
     opts = opts || {};
     const uuid = opts._uuid || UUID.v4();
     
-    this.resolutions[uuid] = (err, data) => {
+    this.resolutions.set(uuid, (err, data) => {
       
       clearTimeout(this.timers[uuid]);
       delete this.timeouts[uuid];
@@ -692,7 +744,7 @@ export class Client {
       }
       
       if (String(key) !== String(data.key)) {
-        delete this.resolutions[uuid];
+        this.resolutions.delete(uuid);
         throw new Error('lmx implementation error => bad key.');
       }
       
@@ -705,20 +757,22 @@ export class Client {
       }
       
       if (data.lockInfo === true) {
-        delete this.resolutions[uuid];
+        this.resolutions.delete(uuid);
         cb(null, {data});
       }
-    };
+    });
     
     this.write({
       uuid: uuid,
       key: key,
-      type: 'lock-info-request',
+      type: LMXRequestType.LockInfoRequest,
     });
     
   }
   
   acquire(key: string, opts?: Partial<LMXClientLockOpts>): Promise<LMLockSuccessData> {
+    const routineId = 'ddl-routine-hqVI_DRtfkb16cfMU2';
+    routineEnter(routineId, "Client.acquire");
   
     return new Promise((resolve, reject) => {
       try {
@@ -736,6 +790,8 @@ export class Client {
   }
   
   release(key: string, opts?: string | boolean | Partial<LMXClientUnlockOpts>): Promise<LMUnlockSuccessData> {
+    const routineId = 'ddl-routine-F2rCOwh5gJ--taGlQu';
+    routineEnter(routineId, "Client.release");
 
     return new Promise((resolve, reject) => {
       try {
@@ -752,24 +808,34 @@ export class Client {
   }
   
   lockp(key: string, opts?: Partial<LMXClientLockOpts>): Promise<LMLockSuccessData> {
+    const routineId = 'ddl-routine-LYUCbmrC2IYbWswhku';
+    routineEnter(routineId, "Client.lockp");
     log.warn('lockp is deprecated because it is a confusing method name, use aliases acquire/acquireLock instead.');
     return this.acquire.apply(this, <any>arguments);
   }
   
   unlockp(key: string, opts?: string | boolean | Partial<LMXClientUnlockOpts>): Promise<LMUnlockSuccessData> {
+    const routineId = 'ddl-routine-LUSwjyw8cjfDZluBtz';
+    routineEnter(routineId, "Client.unlockp");
     log.warn('unlockp is deprecated because it is a confusing method name, use aliases release/releaseLock instead.');
     return this.release.apply(this, <any>arguments);
   }
   
   acquireLock(key: string, opts?: boolean | number | Partial<LMXClientLockOpts>): Promise<LMLockSuccessData> {
+    const routineId = 'ddl-routine-GaQi9J7j73mynXf0JQ';
+    routineEnter(routineId, "Client.acquireLock");
     return this.acquire.apply(this, <any>arguments);
   }
   
   releaseLock(key: string, opts: Partial<LMXClientUnlockOpts>): Promise<LMUnlockSuccessData> {
+    const routineId = 'ddl-routine-LluuH-JwBQYk7OH7vZ';
+    routineEnter(routineId, "Client.releaseLock");
     return this.release.apply(this, <any>arguments);
   }
   
   run(fn: LMLockSuccessData) {
+    const routineId = 'ddl-routine-G60fFu_gUUSWGFtnhV';
+    routineEnter(routineId, "Client.run");
     return new Promise((resolve, reject) => {
       fn((err, val) => {
         err ? reject(err) : resolve(val);
@@ -778,21 +844,29 @@ export class Client {
   }
   
   runUnlock(fn: LMLockSuccessData): Promise<any> {
+    const routineId = 'ddl-routine-JgtiE3iS6ZERb7ZA_h';
+    routineEnter(routineId, "Client.runUnlock");
     return this.run.apply(this, arguments);
   }
   
   execUnlock(fn: LMLockSuccessData): Promise<any> {
+    const routineId = 'ddl-routine-Ki_wKeoF6honAUBaQ9';
+    routineEnter(routineId, "Client.execUnlock");
     return this.run.apply(this, arguments);
   }
   
   protected cleanUp(uuid: string) {
+    const routineId = 'ddl-routine-JbESUQtknxRBjHVzhw';
+    routineEnter(routineId, "Client.cleanUp");
     clearTimeout(this.timers[uuid]);
     delete this.timers[uuid];
     delete this.timeouts[uuid];
-    delete this.resolutions[uuid];
+    this.resolutions.delete(uuid);
   }
   
   protected fireUnlockCallbackWithError(cb: LMClientUnlockCallBack, isNextTick: boolean, err: LMXClientUnlockException) {
+    const routineId = 'ddl-routine-s3NqgEpvd5Mtr7bi83';
+    routineEnter(routineId, "Client.fireUnlockCallbackWithError");
     const uuid = err.id;
     const key = err.key; // unused
     this.cleanUp(uuid);
@@ -807,6 +881,8 @@ export class Client {
   }
   
   protected fireLockCallbackWithError(cb: LMClientLockCallBack, isNextTick: boolean, err: LMXClientLockException) {
+    const routineId = 'ddl-routine-pvtgTr9CPkfs-gORoi';
+    routineEnter(routineId, "Client.fireLockCallbackWithError");
     const uuid = err.id;
     const key = err.key;  // unused
     this.cleanUp(uuid);
@@ -820,6 +896,8 @@ export class Client {
   }
   
   protected fireCallbackWithError(cb: EVCb<any>, isNextTick: boolean, err: LMXClientException) {
+    const routineId = 'ddl-routine-DNQg3e4m4wIEsS9VAF';
+    routineEnter(routineId, "Client.fireCallbackWithError");
     const uuid = err.id;
     const key = err.key;  // unused
     this.cleanUp(uuid);
@@ -836,6 +914,8 @@ export class Client {
   ls(opts: any, cb?: EVCb<any>): void;
   
   ls(opts: any, cb?: EVCb<any>) {
+    const routineId = 'ddl-routine-raSapijwcQc1NV2VfA';
+    routineEnter(routineId, "Client.ls");
     
     if (typeof opts === 'function') {
       cb = opts;
@@ -849,12 +929,12 @@ export class Client {
     opts = opts || {};
     const id = UUID.v4();
     
-    this.resolutions[id] = cb;
+    this.resolutions.set(id, cb);
     
     this.write({
       keepLocksAfterDeath: opts.keepLocksAfterDeath,
       uuid: id,
-      type: 'ls',
+      type: LMXRequestType.Ls,
     });
     
   }
@@ -863,6 +943,8 @@ export class Client {
     key: string,
     opts: LMXClientLockOpts
   ): [string, LMXClientLockOpts] {
+    const routineId = 'ddl-routine-BePZ3_w02e-SqGACRs';
+    routineEnter(routineId, "Client.preParseLockOptsForPromises");
     
     if (typeof opts === 'boolean') {
       opts = {force: opts};
@@ -881,6 +963,8 @@ export class Client {
     opts: number | boolean | LMXClientLockOpts | LMClientLockCallBack,
     cb?: LMClientLockCallBack
   ): [string, LMXClientLockOpts, LMClientLockCallBack] {
+    const routineId = 'ddl-routine-ybI3LPgy_iCeE6gFLy';
+    routineEnter(routineId, "Client.parseLockOpts");
     
     if (typeof opts === 'function') {
       cb = opts;
@@ -893,31 +977,39 @@ export class Client {
       opts = {ttl: opts};
     }
     
-    assert.strict(typeof cb === 'function', 'Please use a callback as the last argument to the lock method.');
+    assertStrict(typeof cb === 'function', 'Please use a callback as the last argument to the lock method.');
     opts = opts || {} as LMXClientLockOpts;
     return [key, opts, cb];
     
   }
   
   _simulateVersionMismatch() {
+    const routineId = 'ddl-routine-VkOvqkyBPfR-62DWEW';
+    routineEnter(routineId, "Client._simulateVersionMismatch");
     this.write({
-      type: 'simulate-version-mismatch',
+      type: LMXRequestType.SimulateVersionMismatch,
     });
   }
   
   _invokeBrokerSideEndCall() {
+    const routineId = 'ddl-routine-XL8VpEteX8oL8Y72qT';
+    routineEnter(routineId, "Client._invokeBrokerSideEndCall");
     this.write({
-      type: 'end-connection-from-broker-for-testing-purposes'
+      type: LMXRequestType.EndConnectionFromBrokerForTesting
     });
   }
   
   _invokeBrokerSideDestroyCall() {
+    const routineId = 'ddl-routine-10XAkTlm9X8O-cYVnX';
+    routineEnter(routineId, "Client._invokeBrokerSideDestroyCall");
     this.write({
-      type: 'destroy-connection-from-broker-for-testing-purposes'
+      type: LMXRequestType.DestroyConnectionFromBrokerForTesting
     });
   }
   
   _makeClientSideError() {
+    const routineId = 'ddl-routine-3HpZhhVaqfJLmqoi8K';
+    routineEnter(routineId, "Client._makeClientSideError");
     this.close();
   }
   
@@ -927,6 +1019,8 @@ export class Client {
   lock(key: string, ttl: number, cb: LMClientLockCallBack): void;
   lock(key: string, opts: number | boolean | Partial<LMXClientLockOpts>, cb: LMClientLockCallBack): void;
   lock(key: string, opts: number | boolean | Partial<LMXClientLockOpts> | LMClientLockCallBack, cb?: LMClientLockCallBack): void {
+    const routineId = 'ddl-routine-5M0jY1khDck4OqTgSc';
+    routineEnter(routineId, "Client.lock");
     
     try {
       [key, opts, cb] = this.parseLockOpts(key, opts, cb);
@@ -943,56 +1037,56 @@ export class Client {
     
     try {
       
-      assert.equal(typeof key, 'string', 'Key passed to lmx #lock needs to be a string.');
-      assert.strict(typeof cb === 'function', 'callback function must be passed to Client lock() method; use lockp() or acquire() for promise API.');
+      assertEqual(typeof key, 'string', 'Key passed to lmx #lock needs to be a string.');
+      assertStrict(typeof cb === 'function', 'callback function must be passed to Client lock() method; use lockp() or acquire() for promise API.');
       
       if ('max' in opts) {
-        assert.strict(Number.isInteger(opts['max']), '"max" options property must be a positive integer.');
-        assert.strict(opts['max'] > 0, '"max" options property must be a positive integer.');
+        assertStrict(Number.isInteger(opts['max']), '"max" options property must be a positive integer.');
+        assertStrict(opts['max'] > 0, '"max" options property must be a positive integer.');
       }
       
       if ('semaphore' in opts) {
-        assert.strict(Number.isInteger(opts['semaphore']), '"semaphore" options property must be a positive integer.');
-        assert.strict(opts['semaphore'] > 0, '"semaphore" options property must be a positive integer.');
+        assertStrict(Number.isInteger(opts['semaphore']), '"semaphore" options property must be a positive integer.');
+        assertStrict(opts['semaphore'] > 0, '"semaphore" options property must be a positive integer.');
       }
       
       if ('force' in opts) {
-        assert.equal(typeof opts.force, 'boolean', 'lmx usage error => ' +
+        assertEqual(typeof opts.force, 'boolean', 'lmx usage error => ' +
           '"force" option must be a boolean value. Coerce it on your side, for safety.');
       }
       
       if ('retry' in opts) {
-        assert.equal(typeof opts.retry, 'boolean', 'lmx usage error => ' +
+        assertEqual(typeof opts.retry, 'boolean', 'lmx usage error => ' +
           '"retry" option must be a boolean value. Coerce it on your side, for safety.');
         opts.__maxRetries = 0;
       }
       
       if ('maxRetries' in opts) {
-        assert.strict(Number.isInteger(opts.maxRetries), '"maxRetries" option must be an integer.');
-        assert.strict(opts.maxRetries >= 0 && opts.maxRetries <= 20,
+        assertStrict(Number.isInteger(opts.maxRetries), '"maxRetries" option must be an integer.');
+        assertStrict(opts.maxRetries >= 0 && opts.maxRetries <= 20,
           '"maxRetries" option must be an integer between 0 and 20 inclusive.');
         if ('__maxRetries' in opts) {
-          assert.strictEqual(opts.__maxRetries, opts.maxRetries, 'maxRetries values do not match.');
+          assertStrictEqual(opts.__maxRetries, opts.maxRetries, 'maxRetries values do not match.');
         }
         opts.__maxRetries = opts.maxRetries;
       }
       
       if ('maxRetry' in opts) {
-        assert.strict(Number.isInteger(opts.maxRetry), '"maxRetry" option must be an integer.');
-        assert.strict(opts.maxRetry >= 0 && opts.maxRetry <= 20,
+        assertStrict(Number.isInteger(opts.maxRetry), '"maxRetry" option must be an integer.');
+        assertStrict(opts.maxRetry >= 0 && opts.maxRetry <= 20,
           '"maxRetry" option must be an integer between 0 and 20 inclusive.');
         if ('__maxRetries' in opts) {
-          assert.strictEqual(opts.__maxRetries, opts.maxRetry, 'maxRetries values do not match.');
+          assertStrictEqual(opts.__maxRetries, opts.maxRetry, 'maxRetries values do not match.');
         }
         opts.__maxRetries = opts.maxRetry;
       }
       
       if ('retryMax' in opts) {
-        assert.strict(Number.isInteger(opts.retryMax), '"retryMax" option must be an integer.');
-        assert.strict(opts.retryMax >= 0 && opts.retryMax <= 20,
+        assertStrict(Number.isInteger(opts.retryMax), '"retryMax" option must be an integer.');
+        assertStrict(opts.retryMax >= 0 && opts.retryMax <= 20,
           '"retryMax" option must be an integer between 0 and 20 inclusive.');
         if ('__maxRetries' in opts) {
-          assert.strictEqual(opts.__maxRetries, opts.retryMax, 'maxRetries values do not match.');
+          assertStrictEqual(opts.__maxRetries, opts.retryMax, 'maxRetries values do not match.');
         }
         opts.__maxRetries = opts.retryMax;
       }
@@ -1001,12 +1095,12 @@ export class Client {
         opts.__maxRetries = this.lockRetryMax;
       }
       
-      assert.strict(Number.isInteger(opts.__maxRetries), '__maxRetries value must be an integer.');
+      assertStrict(Number.isInteger(opts.__maxRetries), '__maxRetries value must be an integer.');
       
       if (opts['ttl']) {
-        assert.strict(Number.isInteger(opts.ttl),
+        assertStrict(Number.isInteger(opts.ttl),
           'lmx usage error => Please pass an integer representing milliseconds as the value for "ttl".');
-        assert.strict(opts.ttl >= 3 && opts.ttl <= 800000,
+        assertStrict(opts.ttl >= 3 && opts.ttl <= 800000,
           'lmx usage error => "ttl" for a lock needs to be integer between 3 and 800000 millis.');
       }
       
@@ -1016,16 +1110,16 @@ export class Client {
       }
       
       if (opts['lockRequestTimeout']) {
-        assert.strict(Number.isInteger(opts.lockRequestTimeout),
+        assertStrict(Number.isInteger(opts.lockRequestTimeout),
           'lmx: Please pass an integer representing milliseconds as the value for "ttl".');
-        assert.strict(opts.lockRequestTimeout >= 20 && opts.lockRequestTimeout <= 800000,
+        assertStrict(opts.lockRequestTimeout >= 20 && opts.lockRequestTimeout <= 800000,
           'lmx: "ttl" for a lock needs to be integer between 3 and 800000 millis.');
       }
       
       opts.__retryCount = opts.__retryCount || 0;
       
       if (opts.__retryCount > 0) {
-        assert.strict(opts._uuid, 'lmx internal error: no _uuid past to retry call.');
+        assertStrict(opts._uuid, 'lmx internal error: no _uuid past to retry call.');
       }
       
     }
@@ -1052,16 +1146,22 @@ export class Client {
   }
   
   on() {
+    const routineId = 'ddl-routine-HqtrLGGxwSa-b7dzsS';
+    routineEnter(routineId, "Client.on");
     log.warn('warning:', 'use c.emitter.on() instead of c.on()');
     return this.emitter.on.apply(this.emitter, arguments);
   }
   
   once() {
+    const routineId = 'ddl-routine--3Ym2jK8VCVy_pugxl';
+    routineEnter(routineId, "Client.once");
     log.warn('warning:', 'use c.emitter.once() instead of c.once()');
     return this.emitter.once.apply(this.emitter, arguments);
   }
   
   private lockInternal(key: string, opts: any, cb: LMClientLockCallBack) {
+    const routineId = 'ddl-routine-sRIwTZPqVr5qPOax2G';
+    routineEnter(routineId, "Client.lockInternal");
     
     const uuid = opts._uuid = opts._uuid || UUID.v4();
     const ttl = opts.ttl || this.ttl;
@@ -1117,14 +1217,14 @@ export class Client {
       
       timedOut = true;
       delete this.timers[uuid];
-      delete this.resolutions[uuid];
+      this.resolutions.delete(uuid);
       
       const currentRetryCount = opts.__retryCount;
       const newRetryCount = ++opts.__retryCount;
       
       if (!this.isOpen) {
         this.timeouts[uuid] = true;
-        this.write({uuid, key, type: 'lock-client-error'});
+        this.write({uuid, key, type: LMXRequestType.LockClientError});
         
         return this.fireLockCallbackWithError(cb, false, new LMXClientLockException(
           key,
@@ -1138,7 +1238,7 @@ export class Client {
       if (newRetryCount >= maxRetries) {
         
         this.timeouts[uuid] = true;
-        this.write({uuid, key, type: 'lock-client-timeout'});
+        this.write({uuid, key, type: LMXRequestType.LockClientTimeout});
         
         return this.fireLockCallbackWithError(cb, false, new LMXClientLockException(
           key,
@@ -1160,7 +1260,7 @@ export class Client {
       
     }, lrt);
     
-    this.resolutions[uuid] = (err, data) => {
+    this.resolutions.set(uuid, (err, data) => {
       
       if (timedOut) {
         return;
@@ -1214,13 +1314,18 @@ export class Client {
       if (data.acquired === true) {
         // lock was acquired for the given key, yippee
         this.cleanUp(uuid);
-        this.write({uuid, key, type: 'lock-received'}); // we let the broker know that we received the lock
+        this.write({uuid, key, type: LMXRequestType.LockReceived}); // we let the broker know that we received the lock
         const boundUnlock = this.unlock.bind(this, key, {_uuid: uuid, rwStatus, force: forceUnlock});
         boundUnlock.acquired = true;
         boundUnlock.readersCount = Number.isInteger(data.readersCount) ? data.readersCount : null;
         boundUnlock.key = key;
         boundUnlock.unlock = boundUnlock.release = boundUnlock;
         boundUnlock.lockUuid = boundUnlock.id = uuid;
+        // Pass through the broker-minted fencing token so downstream
+        // callers can compare-and-swap on it. Older brokers don't
+        // include this field — surface `null` rather than `undefined`
+        // so the absence is unambiguous.
+        boundUnlock.fencingToken = Number.isInteger(data.fencingToken) ? data.fencingToken : null;
         return cb(null, boundUnlock);
       }
       
@@ -1264,7 +1369,7 @@ export class Client {
         `Implementation error, please report, fallthrough in condition [1]`
       ));
       
-    };
+    });
     
     {
       
@@ -1275,7 +1380,7 @@ export class Client {
         retryCount,
         uuid: uuid,
         key: key,
-        type: 'lock',
+        type: LMXRequestType.Lock,
         ttl: ttl,
         rwStatus,
         max
@@ -1285,16 +1390,22 @@ export class Client {
   }
   
   noop(err?: any) {
+    const routineId = 'ddl-routine-5Veh3OLLBVcfW2tet9';
+    routineEnter(routineId, "Client.noop");
     // this is a no-operation, obviously
     // no ref to this, so can't use "this" here
     err && log.error(err);
   }
   
   getPort() {
+    const routineId = 'ddl-routine-1I6v_qVcrBRLRWK7Ew';
+    routineEnter(routineId, "Client.getPort");
     return this.port;
   }
   
   getHost() {
+    const routineId = 'ddl-routine-aCZPnUyQ3A9MGn3hf2';
+    routineEnter(routineId, "Client.getHost");
     return this.host;
   }
   
@@ -1303,6 +1414,8 @@ export class Client {
    * @param callback Function that receives warning messages/errors
    */
   onWarning(callback: (...args: any[]) => void): void {
+    const routineId = 'ddl-routine-ajvrO2_KC4vt2Sq18F';
+    routineEnter(routineId, "Client.onWarning");
     this.emitter.on('warning', callback);
   }
 
@@ -1311,6 +1424,8 @@ export class Client {
    * @param callback Function that receives error messages
    */
   onError(callback: (...args: any[]) => void): void {
+    const routineId = 'ddl-routine-T4gapnmdw_CU_iSHnW';
+    routineEnter(routineId, "Client.onError");
     this.emitter.on('error', callback);
   }
   
@@ -1318,6 +1433,8 @@ export class Client {
     key: string,
     opts?: string | boolean | LMXClientUnlockOpts,
   ): [string, LMXClientUnlockOpts] {
+    const routineId = 'ddl-routine-y8mTeBtmBntpHUFdFP';
+    routineEnter(routineId, "Client.preParseUnlockOptsForPromise");
     
     if (typeof opts === 'boolean') {
       opts = {force: opts};
@@ -1336,6 +1453,8 @@ export class Client {
     opts?: string | boolean | LMXClientUnlockOpts | LMClientUnlockCallBack,
     cb?: LMClientUnlockCallBack
   ): [string, LMXClientUnlockOpts, LMClientUnlockCallBack] {
+    const routineId = 'ddl-routine-8ZAHv135RULGRDbne7';
+    routineEnter(routineId, "Client.parseUnlockOpts");
     
     if (typeof opts === 'function') {
       cb = opts;
@@ -1351,7 +1470,7 @@ export class Client {
     opts = opts || {};
     
     if (cb) {
-      assert.strict(typeof cb === 'function', 'Please use a callback as the last argument to the client unlock method.');
+      assertStrict(typeof cb === 'function', 'Please use a callback as the last argument to the client unlock method.');
     }
     else {
       cb = this.noop;
@@ -1367,6 +1486,8 @@ export class Client {
   unlock(key: string, opts: string | boolean | LMXClientUnlockOpts, cb: LMClientUnlockCallBack): void;
   
   unlock(key: string, opts?: string | boolean | LMXClientUnlockOpts | LMClientUnlockCallBack, cb?: LMClientUnlockCallBack) {
+    const routineId = 'ddl-routine-ZeGRfjvHWE2yt5TUXw';
+    routineEnter(routineId, "Client.unlock");
     
     try {
       [key, opts, cb] = this.parseUnlockOpts(key, opts, cb);
@@ -1393,17 +1514,17 @@ export class Client {
     cb = cb || this.noop;
     
     try {
-      assert.equal(typeof key, 'string', 'Key passed to lmx #unlock needs to be a string.');
+      assertEqual(typeof key, 'string', 'Key passed to lmx #unlock needs to be a string.');
       
       if (opts['force']) {
-        assert.equal(typeof opts.force, 'boolean', 'lmx usage error => ' +
+        assertEqual(typeof opts.force, 'boolean', 'lmx usage error => ' +
           '"force" option must be a boolean value. Coerce it on your side, for safety.');
       }
       
       if (opts['unlockRequestTimeout']) {
-        assert.strict(Number.isInteger(opts.unlockRequestTimeout),
+        assertStrict(Number.isInteger(opts.unlockRequestTimeout),
           'lmx: Please pass an integer representing milliseconds as the value for "ttl".');
-        assert.strict(opts.unlockRequestTimeout >= 20 && opts.unlockRequestTimeout <= 800000,
+        assertStrict(opts.unlockRequestTimeout >= 20 && opts.unlockRequestTimeout <= 800000,
           'lmx: "ttl" for a lock needs to be integer between 3 and 800000 millis.');
       }
     }
@@ -1429,7 +1550,7 @@ export class Client {
       
     }, urt);
     
-    this.resolutions[uuid] = (err, data) => {
+    this.resolutions.set(uuid, (err, data) => {
       
       log.debug(chalk.cyan('unlock resolution called for key:'), key, 'uuid:', uuid, 'err:', err, 'data type:', data?.type, 'unlocked:', data?.unlocked);
       
@@ -1514,7 +1635,7 @@ export class Client {
         'lmx internal/implementation error: fallthrough in unlock resolution routine.'
       ));
       
-    };
+    });
     
     let force: boolean = (opts.__retryCount > 0) || Boolean(opts.force);
     
@@ -1525,12 +1646,14 @@ export class Client {
       key: key,
       rwStatus,
       force: force,
-      type: 'unlock'
+      type: LMXRequestType.Unlock
     });
     log.debug(chalk.cyan('unlock: unlock request sent for key:'), key, 'uuid:', uuid);
   }
 
   ping(cb?: EVCb<any>) : Promise<any>{
+    const routineId = 'ddl-routine-9ekSAHkN982vJUIngi';
+    routineEnter(routineId, "Client.ping");
     if (cb && typeof cb !== 'function') {
       throw new Error('Optional callback must be a function.');
     }
@@ -1544,8 +1667,8 @@ export class Client {
       const uuid = UUID.v4();
       const clientTimestamp = Date.now();
 
-      this.resolutions[uuid] = (err, data) => {
-        delete this.resolutions[uuid];
+      this.resolutions.set(uuid, (err, data) => {
+        this.resolutions.delete(uuid);
 
         if (err) {
           return reject( new Error(`Ping error: ${util.inspect(err)}`));
@@ -1561,11 +1684,11 @@ export class Client {
               serverTime: data.serverTimestamp,
               timestamp: data.timestamp
             });
-      };
+      });
 
       this.write({
         uuid: uuid,
-        type: 'ping',
+        type: LMXRequestType.Ping,
         timestamp: clientTimestamp
       });
     })
@@ -1579,6 +1702,8 @@ export class Client {
   }
 
   getSystemStats(cb?: EVCb<any>): Promise<any> {
+    const routineId = 'ddl-routine-Btl0L48yLLCwN_zZJb';
+    routineEnter(routineId, "Client.getSystemStats");
 
     if (cb && typeof cb !== 'function') {
       throw new Error('Optional callback must be a function.');
@@ -1591,8 +1716,8 @@ export class Client {
 
       const uuid = UUID.v4();
 
-      this.resolutions[uuid] = (err, data) => {
-        delete this.resolutions[uuid];
+      this.resolutions.set(uuid, (err, data) => {
+        this.resolutions.delete(uuid);
 
         if (err) {
           return reject(new Error(`System stats error: ${util.inspect(err)}`));
@@ -1616,11 +1741,11 @@ export class Client {
         };
 
         resolve(result);
-      };
+      });
 
       this.write({
         uuid: uuid,
-        type: 'system-stats-request'
+        type: LMXRequestType.SystemStatsRequest
       });
     }).then(val => {
       cb && cb(null, val);

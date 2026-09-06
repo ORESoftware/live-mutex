@@ -10,8 +10,19 @@ const path = require('path');
 const fs = require('fs');
 
 const BASE_PORT = 9000;
-const TEST_TIMEOUT_MS = 60 * 1000; // 60 seconds per test (increased for long-running tests)
-const INACTIVITY_TIMEOUT_MS = 30 * 1000; // 30 seconds of inactivity
+
+function durationFromEnv(name, fallbackMs) {
+  const raw = process.env[name];
+  if (!raw) {
+    return fallbackMs;
+  }
+  const value = Number(raw);
+  return Number.isInteger(value) && value > 0 ? value : fallbackMs;
+}
+
+const TEST_TIMEOUT_MS = durationFromEnv('LMX_TEST_TIMEOUT_MS', 8 * 60 * 1000);
+const INACTIVITY_TIMEOUT_MS = durationFromEnv('LMX_TEST_INACTIVITY_TIMEOUT_MS', 2 * 60 * 1000);
+const TEST_PORT_STRIDE = durationFromEnv('LMX_TEST_PORT_STRIDE', 100);
 let currentPort = BASE_PORT;
 
 // Test files to run (in order) - prefer .ts files
@@ -52,7 +63,9 @@ function findTestFiles() {
 }
 
 function getNextPort() {
-  return currentPort++;
+  const port = currentPort;
+  currentPort += TEST_PORT_STRIDE;
+  return port;
 }
 
 function runTest(testFile, testNumber, totalTests) {
@@ -358,12 +371,6 @@ function runTest(testFile, testNumber, totalTests) {
     proc.on('error', (err) => {
       if (!resolved) {
         resolved = true;
-        if (heartbeatInterval) {
-          clearInterval(heartbeatInterval);
-        }
-        if (noOutputTimeout) {
-          clearTimeout(noOutputTimeout);
-        }
         if (completionTimeout) {
           clearTimeout(completionTimeout);
         }
@@ -502,4 +509,3 @@ main().catch(err => {
   console.error('Fatal error:', err);
   process.exit(1);
 });
-

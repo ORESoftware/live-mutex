@@ -1,0 +1,36 @@
+{
+  "packageName": "live-mutex",
+  "smokeExport": "r2gSmokeTest",
+  "phases": [
+    "phase-Z",
+    "phase-S",
+    "phase-T"
+  ],
+  "executionOrder": [
+    "phase-Z",
+    "phase-S",
+    "phase-T"
+  ],
+  "skipFlags": [
+    "z",
+    "s",
+    "t"
+  ],
+  "phaseCommands": {
+    "z": "package.json:r2g.test",
+    "s": "r2gSmokeTest",
+    "t": ".r2g/tests"
+  },
+  "features": {
+    "config": ".r2g/config.js",
+    "fixtures": ".r2g/fixtures",
+    "tests": ".r2g/tests",
+    "customActions": ".r2g/custom.actions.js",
+    "packageOverride": ".r2g/package.override.js",
+    "fullLocalDependencies": [
+      "@oresoftware/json-stream-parser",
+      "@oresoftware/linked-queue",
+      "suman"
+    ]
+  }
+}

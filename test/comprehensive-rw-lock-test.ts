@@ -14,8 +14,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { Broker1 } from '../dist/broker-1';
-import { RWLockWritePrefClient } from '../dist/rw-write-preferred-client';
+import { Broker1, RWLockWritePrefClient } from '../dist/main';
 
 const PORT = process.env.LMX_TEST_PORT ? parseInt(process.env.LMX_TEST_PORT) : 3333;
 const TEST_FILE = path.join(os.tmpdir(), 'lmx-rw-comprehensive-test.txt');
