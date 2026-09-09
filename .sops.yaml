@@ -1,0 +1,21 @@
+# Public age recipients only. Private identities never enter Git.
+# Bootstrap fleet recipients; split dev/prod recipients before production rollout.
+keys:
+  - &operator age1qrnva7lnv2jzww6ah5au0cqm4wkvkm5shpzflekdcm4nlu6wnyfqgfaxft
+  - &recovery age1txv6jzlds2s03advmdtnm5l93qh4rkqs50nwvzk9yfvsartzue8se8t7jv
+
+creation_rules:
+  - path_regex: ^env/enc/dev\.env\.enc$
+    input_type: dotenv
+    output_type: dotenv
+    key_groups:
+      - age:
+          - *operator
+          - *recovery
+  - path_regex: ^env/enc/prod\.env\.enc$
+    input_type: dotenv
+    output_type: dotenv
+    key_groups:
+      - age:
+          - *operator
+          - *recovery
