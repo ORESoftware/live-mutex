@@ -28,3 +28,7 @@ yarn.lock
 
 ### matching
 !dist/README.md
+
+# Local temporary directories and repository-owned worktrees
+tmp/
+temp/
