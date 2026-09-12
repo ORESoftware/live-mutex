@@ -38,6 +38,40 @@ function formatBytes(bytes: number): string {
 // Helper to create a delay
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+/**
+ * Check if an error is a release timeout error (non-fatal)
+ * Timeout errors have code 'bad_or_mismatched_id' and message containing "timed out"
+ */
+function isReleaseTimeoutError(err: any): boolean {
+    if (!err) return false;
+    // Timeout errors have code 'bad_or_mismatched_id' and message containing "timed out"
+    return err.code === 'bad_or_mismatched_id' && 
+           err.message && 
+           typeof err.message === 'string' && 
+           err.message.toLowerCase().includes('timed out');
+}
+
+/**
+ * Helper to handle release errors - log but don't fail on timeouts
+ * Returns true if it's a real error (should reject), false if timeout (non-fatal)
+ * @param releaseErr The error from the release callback
+ * @param operation Operation name for error messages (e.g., 'releaseWriteLock', 'releaseReadLock')
+ */
+function handleReleaseError(releaseErr: any, operation: string = 'release'): boolean {
+    if (releaseErr) {
+        if (isReleaseTimeoutError(releaseErr)) {
+            // Timeout is not a real error - lock may have already been released
+            console.warn(`${operation} timeout (non-fatal):`, releaseErr.message);
+            return false; // Not a real error
+        } else {
+            // Real error - log it
+            console.error(`${operation} error:`, releaseErr);
+            return true; // Real error, should reject
+        }
+    }
+    return false; // No error
+}
+
 // Track memory snapshots
 const memorySnapshots: MemorySnapshot[] = [];
 
@@ -225,7 +259,7 @@ async function runSemaphoreOperation(client: Client, key: string, max: number): 
 
 // Run an RW lock operation
 async function runRWOperation(client: RWLockWritePrefClient, key: string, isWrite: boolean): Promise<void> {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
         if (isWrite) {
             client.acquireWriteLock(key, {}, (err, release) => {
                 if (err) {
@@ -233,6 +267,9 @@ async function runRWOperation(client: RWLockWritePrefClient, key: string, isWrit
                 }
                 setTimeout(() => {
                     release((releaseErr: any) => {
+                        if (handleReleaseError(releaseErr, 'releaseWriteLock')) {
+                            return reject(releaseErr);
+                        }
                         resolve();
                     });
                 }, 50 + Math.random() * 100);
@@ -244,6 +281,9 @@ async function runRWOperation(client: RWLockWritePrefClient, key: string, isWrit
                 }
                 setTimeout(() => {
                     release((releaseErr: any) => {
+                        if (handleReleaseError(releaseErr, 'releaseReadLock')) {
+                            return reject(releaseErr);
+                        }
                         resolve();
                     });
                 }, 50 + Math.random() * 100);

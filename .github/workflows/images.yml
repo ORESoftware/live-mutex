@@ -1,0 +1,55 @@
+# Caller: copy to <repo>/.github/workflows/images.yml. Builds Dockerfile.arm64.dkf + Dockerfile.x86-64.dkf
+# (or Dockerfile) and pushes to GHCR, GCP Artifact Registry (<gcp-project> = this org's project) and the
+# private Docker Hub namespace. Secrets are org-level: DOCKERHUB_USERNAME, DOCKERHUB_TOKEN,
+# GCP_WORKLOAD_IDENTITY_PROVIDER, GCP_SERVICE_ACCOUNT (OIDC, no JSON keys).
+name: images
+on:
+  pull_request:
+    paths: ["Dockerfile", "Dockerfile.*.dkf", "src/**", "Cargo.*", "package*.json", "pubspec.*", "go.*", "gleam.toml", "manifest.toml"]
+  push:
+    branches: [main]
+    paths: ["Dockerfile", "Dockerfile.*.dkf", "src/**", "Cargo.*", "package*.json", "pubspec.*", "go.*", "gleam.toml", "manifest.toml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+concurrency:
+  group: images-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  dkf-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with: { node-version: 22 }
+      - name: Verify derived Dockerfiles with the pinned renderer
+        shell: bash
+        env:
+          POLICY_REVISION: 09317aaf8f89a58b9ee87755db4daa2b242d6cb2
+          RENDERER_SHA256: 5224d54745f5f04b043897530f0b2d820e4985df1b961e71d71f4a1e4017876a
+        run: |
+          set -euo pipefail
+          curl --proto '=https' --tlsv1.2 --fail --location --silent --show-error \
+            "https://raw.githubusercontent.com/ORESoftware/ores-gha-workflows/${POLICY_REVISION}/scripts/render-dkf.mjs" \
+            --output /tmp/render-dkf.mjs
+          printf '%s  %s\n' "$RENDERER_SHA256" /tmp/render-dkf.mjs | sha256sum --check --strict -
+          node /tmp/render-dkf.mjs . --check
+  images:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: dkf-drift
+    uses: ORESoftware/ores-gha-workflows/.github/workflows/container-images.yml@09317aaf8f89a58b9ee87755db4daa2b242d6cb2
+    with:
+      image-name: oresoftware/live-mutex
+      push: ${{ github.ref == 'refs/heads/main' }}
+      gcp-project: 
+      dockerhub-namespace: oresoftware
+    secrets:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+      GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+      BUILD_SECRET_GITHUB_TOKEN: ${{ secrets.SHARED_AUTH_READ_TOKEN }}

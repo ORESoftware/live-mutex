@@ -8,8 +8,8 @@ const path = require('path');
 const conf = Object.freeze({udsPath: path.resolve(process.env.HOME + '/uds_live_mutex')});
 import util = require('util');
 
-process.on('unhandledRejection', function (e) {
-  console.error('unhandledRejection => ', e.stack || e);
+process.on('unhandledRejection', function (e: unknown) {
+  console.error('unhandledRejection => ', e instanceof Error ? e.stack || e : e);
 });
 
 ///////////////////////////////////////////////////////////////////
@@ -53,7 +53,6 @@ Promise.all([
     });
     
   });
-
 
 
 

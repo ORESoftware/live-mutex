@@ -1,197 +1,154 @@
-
 import {Client, Broker} from '../dist/main';
-import * as async from 'async';
 import * as assert from "assert";
 import * as domain from "domain";
 
 // Prefer the serial runner's assigned port, with a random fallback for manual runs.
-const port = process.env.LMX_TEST_PORT ? parseInt(process.env.LMX_TEST_PORT, 10) : 8000 + Math.floor(Math.random() * 1000);
+const port = process.env.LMX_TEST_PORT
+  ? parseInt(process.env.LMX_TEST_PORT, 10)
+  : 8000 + Math.floor(Math.random() * 1000);
 
-Promise.all([
-  new Broker({port}).ensure(),
-  new Client({port}).connect()
-])
-.then(function ([b, c]) {
+function release(unlock: any): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (typeof unlock !== 'function') {
+      return reject(new Error('Client lock did not return an unlock function.'));
+    }
+    unlock((err: any) => {
+      if (err) {
+        return reject(err);
+      }
+      resolve();
+    });
+  });
+}
 
-  const clients: Client[] = [c];
+async function lockAndRelease(client: Client): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    client.lock('z', (err: any, unlock: any) => {
+      if (err) {
+        return reject(err);
+      }
+      if (!unlock || unlock.acquired !== true) {
+        return reject(new Error('Client lock did not report acquired=true.'));
+      }
+      release(unlock).then(resolve, reject);
+    });
+  });
+}
 
-  const registerClient = function (client: Client) {
+async function closeBroker(broker: Broker): Promise<void> {
+  await new Promise<void>((resolve) => {
+    let finished = false;
+    const finish = () => {
+      if (finished) {
+        return;
+      }
+      finished = true;
+      resolve();
+    };
+    const timeout = setTimeout(finish, 2000);
+    broker.close((err: any) => {
+      clearTimeout(timeout);
+      if (err) {
+        console.error('Broker close error:', err);
+      }
+      finish();
+    });
+  });
+}
+
+async function runSimpleTests(broker: Broker, initialClient: Client): Promise<void> {
+  const clients: Client[] = [initialClient];
+  const registerClient = (client: Client): Client => {
     clients.push(client);
     return client;
   };
 
-  b.emitter.on('warning', function (v) {
-    if (!String(v).match(/no lock with key/)) {
+  try {
+    // Callback API through Client.create().
+    const c1 = registerClient(Client.create({port}));
+    const ready1 = await c1.ensure();
+    assert.ok(ready1, 'Client.ensure() must return a connected client.');
+    await lockAndRelease(ready1);
+
+    // Promise-based ensure followed by the callback lock API.
+    const c2 = registerClient(new Client({port}));
+    const ready2 = await c2.ensure();
+    assert.ok(ready2, 'Client.ensure() must return a connected client.');
+    await lockAndRelease(ready2);
+
+    // Static factory plus promise-based ensure.
+    const c3 = registerClient(Client.create({port}));
+    const ready3 = await c3.ensure();
+    assert.ok(ready3, 'Client.ensure() must return a connected client.');
+    await lockAndRelease(ready3);
+
+    // Deprecated lockp() remains compatible with the promise API while
+    // callers migrate to acquire()/release().
+    const c4 = registerClient(Client.create({port}));
+    const ready4 = await c4.ensure();
+    assert.ok(ready4, 'Client.ensure() must return a connected client.');
+    const result: any = await ready4.lockp('z');
+    const unlock = result?.unlock ?? result;
+    assert.strictEqual(unlock?.acquired, true);
+    await release(unlock);
+  } finally {
+    for (const client of clients) {
+      try {
+        client.close();
+      } catch (err) {
+        // Cleanup is best effort; the original test error remains authoritative.
+      }
+    }
+    await closeBroker(broker);
+  }
+}
+
+Promise.all([
+  new Broker({port}).ensure(),
+  new Client({port}).connect(),
+]).then(([broker, client]) => {
+  broker.emitter.on('warning', function (value) {
+    if (!String(value).match(/no lock with key/)) {
       console.error('broker warning:', ...arguments);
     }
   });
 
-  c.emitter.on('warning', function (v) {
-    if (!String(v).match(/no lock with key/)) {
+  client.emitter.on('warning', function (value) {
+    if (!String(value).match(/no lock with key/)) {
       console.error('client warning:', ...arguments);
     }
   });
 
-  b.emitter.on('error', function (v) {
-    if (!String(v).match(/no lock with key/)) {
+  broker.emitter.on('error', function (value) {
+    if (!String(value).match(/no lock with key/)) {
       console.error('broker error:', ...arguments);
     }
   });
 
-  c.emitter.on('error', function (v) {
-    if (!String(v).match(/no lock with key/)) {
+  client.emitter.on('error', function (value) {
+    if (!String(value).match(/no lock with key/)) {
       console.error('client error:', ...arguments);
     }
   });
 
-
-  const d = domain.create();
-
-  d.once('error', function (err) {
-    console.error('domain caught error:',err);
+  const testDomain = domain.create();
+  testDomain.once('error', (err) => {
+    console.error('domain caught error:', err);
     process.exit(1);
   });
 
-  d.run(function(){
-
-
-    async.series([
-
-      function(cb){
-
-        const client = registerClient(Client.create({port}));
-        client.ensure((err, readyClient) => {
-
-          if (err) {
-            return cb(err);
-          }
-
-          if (!readyClient) {
-            return cb(new Error('Client ensure returned undefined'));
-          }
-
-          
-
-          readyClient.lock('z', function (err, v) {
-            if (err) {
-              return cb(err);
-            }
-            console.log('the error:', err);
-            console.log('the v:', v);
-            console.log('the id:', v.id);
-            readyClient.unlock('z', v.id, function (err, v) {
-              
-              console.log(err,v);
-                cb(err, v);
-            });
-          });
-
-        });
-      },
-      function (cb) {
-
-        const c2 = registerClient(new Client({port}));
-        c2.ensure().then(function () {
-
-          c2.lock('z', function (err, {id}) {
-
-            
-            if (err) return cb(err);
-            c2.unlock('z', id, cb);
-          });
-        });
-      },
-      function (cb) {
-
-        
-
-        const c3 = registerClient(Client.create({port}));
-
-        c3.ensure().then(client => {
-          client.lock('z', function (err, {id}) {
-
-            
-            if (err) return cb(err);
-            client.unlock('z', id, cb);
-          });
-
-        });
-      },
-      function (cb) {
-
-         const c4 = registerClient(Client.create({port}));
-         c4.ensure().then(c => {
-
-          
-
-           c.lockp('z').then(function ({unlock}) {
-
-             
-            if (unlock.acquired !== true) {
-              return Promise.reject('acquired was not true.');
-            }
-
-            
-
-            unlock((err, result) => {
-              cb(err, result);
-            });
-          });
-        });
-      }
-
-
-    ], (err) => {
-
-      
-
-      // Cleanup: close client and broker
-      const cleanup = () => {
-        clients.forEach(client => {
-          try {
-            client.close();
-          } catch (e) {
-            // Ignore cleanup errors
-          }
-        });
-        
-        let finished = false;
-
-        const finish = (closeErr?: any) => {
-          if (finished) {
-            return;
-          }
-
-          finished = true;
-
-          if (closeErr) {
-            console.error('Broker close error:', closeErr);
-          }
-          
-          if(err){
-            console.error('final error:',err);
-            process.exit(1);
-          } else {
-            console.log('all done.');
-            process.exit(0);
-          }
-        };
-
-        const closeTimeout = setTimeout(() => finish(), 2000);
-
-        b.close((closeErr) => {
-          clearTimeout(closeTimeout);
-          finish(closeErr);
-        });
-      };
-      
-      cleanup();
-    });
-    
+  testDomain.run(() => {
+    runSimpleTests(broker, client)
+      .then(() => {
+        console.log('all done.');
+        process.exit(0);
+      })
+      .catch((err) => {
+        console.error('final error:', err);
+        process.exit(1);
+      });
   });
-
-
-
-
-
+}).catch((err) => {
+  console.error('setup error:', err);
+  process.exit(1);
 });

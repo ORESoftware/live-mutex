@@ -7,8 +7,8 @@ const port = process.env.lmx_port ? parseInt(process.env.lmx_port) : (7000 + par
 const conf = Object.freeze({port});
 import util = require('util');
 
-process.on('unhandledRejection', function (e) {
-  console.error('unhandledRejection => ', e.stack || e);
+process.on('unhandledRejection', function (e: unknown) {
+  console.error('unhandledRejection => ', e instanceof Error ? e.stack || e : e);
 });
 
 ///////////////////////////////////////////////////////////////////
@@ -74,7 +74,6 @@ Promise.all([
   });
 
 });
-
 
 
 

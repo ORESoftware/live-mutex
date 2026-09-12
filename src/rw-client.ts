@@ -2,7 +2,7 @@
 
 
 import {routineEnter} from './routine';
-import * as assert from 'assert';
+import {strict as assertStrict} from 'assert';
 
 import {
   Client,
@@ -208,7 +208,7 @@ export class RWLockClient extends Client {
       [key, opts, cb] = this.parseLockOpts(key, opts, cb);
     }
     catch (err) {
-      assert.strict(typeof cb === 'function', 'Must include a callback to the beginRead method.');
+      assertStrict(typeof cb === 'function', 'Must include a callback to the beginRead method.');
       return process.nextTick(cb, err);
     }
 
@@ -224,8 +224,8 @@ export class RWLockClient extends Client {
     const writeKey = opts.writeKey;
 
     try {
-      assert.strict(writeKey && typeof writeKey === 'string', '"writeKey" must be a string.');
-      assert.strict(key !== writeKey, 'writeKey and readKey cannot be the same string.');
+      assertStrict(writeKey && typeof writeKey === 'string', '"writeKey" must be a string.');
+      assertStrict(key !== writeKey, 'writeKey and readKey cannot be the same string.');
     }
     catch (err) {
       return process.nextTick(cb, err);
@@ -317,8 +317,8 @@ export class RWLockClient extends Client {
     const writeKey = opts.writeKey;
 
     try {
-      assert.strict(writeKey && typeof writeKey === 'string', '"writeKey" must be a string.');
-      assert.strict(key !== writeKey, 'writeKey and readKey cannot be the same string.');
+      assertStrict(writeKey && typeof writeKey === 'string', '"writeKey" must be a string.');
+      assertStrict(key !== writeKey, 'writeKey and readKey cannot be the same string.');
     }
     catch (err) {
       return process.nextTick(cb, err);

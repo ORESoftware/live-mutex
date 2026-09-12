@@ -3,7 +3,7 @@
 
 import {routineEnter} from './routine';
 //core
-import * as assert from 'assert';
+import {strict as assertStrict} from 'assert';
 import * as net from 'net';
 import * as util from 'util';
 import * as fs from 'fs';
@@ -210,7 +210,7 @@ export class Broker {
     
     this.isOpen = false;
     const opts = this.opts = o || {};
-    assert.strict(typeof opts === 'object', 'Options argument must be an object.');
+    assertStrict(typeof opts === 'object', 'Options argument must be an object.');
     
     for (const k of Object.keys(opts)) {
       if (!validConstructorOptions[k]) {
@@ -222,32 +222,32 @@ export class Broker {
     }
     
     if (opts['lockExpiresAfter']) {
-      assert.strict(Number.isInteger(opts.lockExpiresAfter),
+      assertStrict(Number.isInteger(opts.lockExpiresAfter),
         'lmx broker: "expiresAfter" option needs to be an integer (milliseconds)');
-      assert.strict(opts.lockExpiresAfter > 20 && opts.lockExpiresAfter < 4000000,
+      assertStrict(opts.lockExpiresAfter > 20 && opts.lockExpiresAfter < 4000000,
         'lmx broker: "expiresAfter" is not in range (20 to 4000000 ms).');
     }
     
     if (opts['timeoutToFindNewLockholder']) {
-      assert.strict(Number.isInteger(opts.timeoutToFindNewLockholder),
+      assertStrict(Number.isInteger(opts.timeoutToFindNewLockholder),
         'lmx broker: "timeoutToFindNewLockholder" option needs to be an integer (milliseconds)');
-      assert.strict(opts.timeoutToFindNewLockholder > 20 && opts.timeoutToFindNewLockholder < 4000000,
+      assertStrict(opts.timeoutToFindNewLockholder > 20 && opts.timeoutToFindNewLockholder < 4000000,
         'lmx broker: "timeoutToFindNewLockholder" is not in range (20 to 4000000 ms).');
     }
     
     if (opts['host']) {
-      assert.strict(typeof opts.host === 'string', ' => "host" option needs to be a string.');
+      assertStrict(typeof opts.host === 'string', ' => "host" option needs to be a string.');
     }
     
     if (opts['port']) {
-      assert.strict(Number.isInteger(opts.port),
+      assertStrict(Number.isInteger(opts.port),
         'lmx broker: "port" option needs to be an integer => ' + opts.port);
-      assert.strict(opts.port > 1024 && opts.port < 49152,
+      assertStrict(opts.port > 1024 && opts.port < 49152,
         'lmx broker: "port" integer needs to be in range (1025-49151).');
     }
     
     if ('noDelay' in opts && opts['noDelay'] !== undefined) {
-      assert.strict(typeof opts.noDelay === 'boolean',
+      assertStrict(typeof opts.noDelay === 'boolean',
         'lmx broker: "noDelay" option needs to be an integer => ' + opts.noDelay);
       this.noDelay = opts.noDelay;
     }
@@ -259,8 +259,8 @@ export class Broker {
     this.noListen = opts.noListen === true;
     
     if ('udsPath' in opts && opts['udsPath'] !== undefined) {
-      assert.strict(typeof opts.udsPath === 'string', 'lmx broker "udsPath" option must be a string.');
-      assert.strict(path.isAbsolute(path.resolve(opts.udsPath)), 'lmx broker "udsPath" option must be an absolute path.');
+      assertStrict(typeof opts.udsPath === 'string', 'lmx broker "udsPath" option must be a string.');
+      assertStrict(path.isAbsolute(path.resolve(opts.udsPath)), 'lmx broker "udsPath" option must be an absolute path.');
       this.socketFile = path.resolve(opts.udsPath);
     }
     

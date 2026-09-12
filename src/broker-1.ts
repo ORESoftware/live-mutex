@@ -3,7 +3,7 @@
 
 import {routineEnter} from './routine';
 //core
-import * as assert from 'assert';
+import {strict as assertStrict} from 'assert';
 import * as net from 'net';
 import * as util from 'util';
 import * as fs from 'fs';
@@ -177,6 +177,10 @@ export type LockholdersType = Map<string, {
     /// `acquire-many` grant. `null` for ordinary single-key holds.
     /// All members of the same composite share the same value.
     compositeLockUuid?: string | null,
+    /// Legacy per-holder timer retained for shutdown compatibility with
+    /// callers/tests that construct lockholder records directly. New
+    /// grants use the broker-wide deadline index below instead.
+    timer?: NodeJS.Timeout
     /// Wall-clock millisecond deadline for this hold. `Infinity` means
     /// "never expire". Used by the centralised sweeper —
     /// see `Broker1.startTtlSweeper`.
@@ -187,8 +191,8 @@ export interface LockObj {
     // current number of lockholders for this lock/key is Object.keys(lockholders).length
     readers?: number;
     max: number, // max number of lockholders (legacy, kept for backward compatibility)
-    maxRead?: number, // max number of concurrent readers (default: 10)
-    maxWrite?: number, // max number of concurrent writers (default: 1)
+    maxRead?: number, // max concurrent readers for RW locks (default: 10)
+    maxWrite?: number, // max concurrent writers for RW locks (default: 1)
     /// Counter used to mint per-key fencing tokens. Increments on every
     /// successful grant (single-key or via `acquire-many`). Never resets
     /// while the `LockObj` is alive, so each holder gets a strictly
@@ -304,7 +308,7 @@ export class Broker1 {
 
         this.isOpen = false;
         const opts = this.opts = o || {};
-        assert.strict(typeof opts === 'object', 'Options argument must be an object.');
+        assertStrict(typeof opts === 'object', 'Options argument must be an object.');
 
         for (const k of Object.keys(opts)) {
             if (!validConstructorOptions[k]) {
@@ -316,32 +320,32 @@ export class Broker1 {
         }
 
         if (opts['lockExpiresAfter']) {
-            assert.strict(Number.isInteger(opts.lockExpiresAfter),
+            assertStrict(Number.isInteger(opts.lockExpiresAfter),
                 'lmx broker: "expiresAfter" option needs to be an integer (milliseconds)');
-            assert.strict(opts.lockExpiresAfter > 20 && opts.lockExpiresAfter < 4000000,
+            assertStrict(opts.lockExpiresAfter > 20 && opts.lockExpiresAfter < 4000000,
                 'lmx broker: "expiresAfter" is not in range (20 to 4000000 ms).');
         }
 
         if (opts['timeoutToFindNewLockholder']) {
-            assert.strict(Number.isInteger(opts.timeoutToFindNewLockholder),
+            assertStrict(Number.isInteger(opts.timeoutToFindNewLockholder),
                 'lmx broker: "timeoutToFindNewLockholder" option needs to be an integer (milliseconds)');
-            assert.strict(opts.timeoutToFindNewLockholder > 20 && opts.timeoutToFindNewLockholder < 4000000,
+            assertStrict(opts.timeoutToFindNewLockholder > 20 && opts.timeoutToFindNewLockholder < 4000000,
                 'lmx broker: "timeoutToFindNewLockholder" is not in range (20 to 4000000 ms).');
         }
 
         if (opts['host']) {
-            assert.strict(typeof opts.host === 'string', ' => "host" option needs to be a string.');
+            assertStrict(typeof opts.host === 'string', ' => "host" option needs to be a string.');
         }
 
         if (opts['port']) {
-            assert.strict(Number.isInteger(opts.port),
+            assertStrict(Number.isInteger(opts.port),
                 'lmx broker: "port" option needs to be an integer => ' + opts.port);
-            assert.strict(opts.port > 1024 && opts.port < 49152,
+            assertStrict(opts.port > 1024 && opts.port < 49152,
                 'lmx broker: "port" integer needs to be in range (1025-49151).');
         }
 
         if ('noDelay' in opts && opts['noDelay'] !== undefined) {
-            assert.strict(typeof opts.noDelay === 'boolean',
+            assertStrict(typeof opts.noDelay === 'boolean',
                 'lmx broker: "noDelay" option needs to be an integer => ' + opts.noDelay);
             this.noDelay = opts.noDelay;
         }
@@ -353,8 +357,8 @@ export class Broker1 {
         this.noListen = opts.noListen === true;
 
         if ('udsPath' in opts && opts['udsPath'] !== undefined) {
-            assert.strict(typeof opts.udsPath === 'string', 'lmx broker "udsPath" option must be a string.');
-            assert.strict(path.isAbsolute(path.resolve(opts.udsPath)), 'lmx broker "udsPath" option must be an absolute path.');
+            assertStrict(typeof opts.udsPath === 'string', 'lmx broker "udsPath" option must be a string.');
+            assertStrict(path.isAbsolute(path.resolve(opts.udsPath)), 'lmx broker "udsPath" option must be an absolute path.');
             this.socketFile = path.resolve(opts.udsPath);
         }
 
@@ -792,6 +796,16 @@ export class Broker1 {
         this.stopTtlSweeper();
         this.holderDeadlines.clear();
 
+        // Older integrations may still have a per-holder timer on a
+        // lockholder record even though new grants use the centralised
+        // deadline index. Clear both representations so close() never
+        // leaves callbacks running against a discarded broker.
+        for (const lockObj of this.locks.values()) {
+            for (const holder of lockObj.lockholders.values()) {
+                if (holder.timer) clearTimeout(holder.timer);
+            }
+        }
+
         // Close all client connections
         for (const client of this.connectedClients) {
             try {
@@ -804,6 +818,7 @@ export class Broker1 {
         this.locks.clear();
         this.wsToKeys.clear();
         this.wsToUUIDs.clear();
+        this.compositeLocks.clear();
         this.rejected = {};
         this.registeredListeners = {};
         
@@ -1539,7 +1554,16 @@ export class Broker1 {
         // Use a more defensive check to prevent race conditions
         while (notifyList.length > 0) {
             // Double-check capacity before granting to prevent exceeding max
-            if (lck.lockholders.size >= lck.max) {
+            // For normal locks: use max
+            // For RW locks: use the maximum of maxRead and maxWrite
+            const maxCapacity1 = (lck.maxRead !== undefined || lck.maxWrite !== undefined)
+                ? Math.max(
+                    lck.maxRead !== undefined ? lck.maxRead : 0,
+                    lck.maxWrite !== undefined ? lck.maxWrite : 0,
+                    lck.max || 1
+                )
+                : lck.max || 1;
+            if (lck.lockholders.size >= maxCapacity1) {
                 break;
             }
 
@@ -1563,7 +1587,16 @@ export class Broker1 {
             }
 
             // Triple-check capacity immediately before granting to prevent race conditions
-            if (lck.lockholders.size >= lck.max) {
+            // For normal locks: use max
+            // For RW locks: use the maximum of maxRead and maxWrite
+            const maxCapacity2 = (lck.maxRead !== undefined || lck.maxWrite !== undefined)
+                ? Math.max(
+                    lck.maxRead !== undefined ? lck.maxRead : 0,
+                    lck.maxWrite !== undefined ? lck.maxWrite : 0,
+                    lck.max || 1
+                )
+                : lck.max || 1;
+            if (lck.lockholders.size >= maxCapacity2) {
                 // Put this client back in the notify queue
                 notifyList.enqueue(n.uuid, n);
                 break;
@@ -2259,7 +2292,9 @@ export class Broker1 {
         const maxRead = data.maxRead;  // max concurrent readers
         const maxWrite = data.maxWrite;  // max concurrent writers
         const beginRead = data.rwStatus === RWStatus.BeginRead;
+        const beginWrite = data.rwStatus === RWStatus.BeginWrite;
         const endRead = data.rwStatus === RWStatus.EndRead;
+        const isRWLockOperation = beginRead || beginWrite;
 
         const force = data.force;
         const retryCount = data.retryCount;
@@ -2291,15 +2326,18 @@ export class Broker1 {
             // lock object with given key exists
 
             // Update max fields BEFORE checking count
-            // For RW locks: use maxRead/maxWrite if provided
+            // For RW locks: use maxRead/maxWrite if provided, with the legacy
+            // max field as the compatibility input used by older clients.
             // For regular locks: use max
-            // Note: beginRead is undefined for regular locks, defined for RW locks
-            const isRWLockOperation = beginRead !== undefined; // RW locks have beginRead/endRead status
-            
             if (isRWLockOperation && beginRead) {
-                // RW read lock: use maxRead if provided, otherwise keep existing or default to 10
-                if (Number.isInteger(maxRead)) {
-                    lck.maxRead = maxRead;
+                // RW read lock: accept the explicit maxRead field first, then
+                // the legacy max field used by current clients, otherwise use
+                // the documented default of 10 readers.
+                const requestedMaxRead = Number.isInteger(maxRead)
+                    ? maxRead
+                    : Number.isInteger(max) ? max : undefined;
+                if (requestedMaxRead !== undefined) {
+                    lck.maxRead = requestedMaxRead;
                 } else if (lck.maxRead === undefined) {
                     lck.maxRead = 10; // Default for read locks
                 }
@@ -2307,10 +2345,14 @@ export class Broker1 {
                 if (Number.isInteger(max)) {
                     lck.max = max;
                 }
-            } else if (isRWLockOperation && !beginRead) {
-                // RW write lock: use maxWrite if provided, otherwise keep existing or default to 1
-                if (Number.isInteger(maxWrite)) {
-                    lck.maxWrite = maxWrite;
+            } else if (isRWLockOperation && beginWrite) {
+                // RW write lock: accept the explicit maxWrite field first,
+                // then the legacy max field, otherwise default to one writer.
+                const requestedMaxWrite = Number.isInteger(maxWrite)
+                    ? maxWrite
+                    : Number.isInteger(max) ? max : undefined;
+                if (requestedMaxWrite !== undefined) {
+                    lck.maxWrite = requestedMaxWrite;
                 } else if (lck.maxWrite === undefined) {
                     lck.maxWrite = 1; // Default for write locks
                 }
@@ -2324,7 +2366,6 @@ export class Broker1 {
                     lck.max = max;
                 }
             }
-
             const ln = lck.notify.length;
             const count = lck.lockholders.size;
 
@@ -2335,15 +2376,26 @@ export class Broker1 {
             // because read locks share the same lockholders map but have separate reader tracking
             const effectiveCount = beginRead ? (lck.readers + 1) : count;
             
-            // Use the appropriate max based on lock type
-            // RW read locks: use maxRead, fall back to max
-            // RW write locks: use maxWrite, fall back to max
-            // Regular locks: use max only
-            const effectiveMax = isRWLockOperation && beginRead
-                ? (lck.maxRead !== undefined ? lck.maxRead : lck.max)
-                : isRWLockOperation && !beginRead
-                ? (lck.maxWrite !== undefined ? lck.maxWrite : lck.max)
-                : lck.max; // Regular lock
+            // Use the appropriate max based on operation type
+            // For RW read operations: use maxRead (should always be set now)
+            // For RW write operations: use maxWrite (should always be set now)
+            // For normal lock operations: use max only
+            let effectiveMax: number;
+            if (beginRead) {
+                // RW read lock - use maxRead (must be initialized above)
+                // Defensive: if somehow maxRead is still undefined, default to 10
+                if (lck.maxRead === undefined) {
+                    log.warn(`maxRead was undefined for read lock on key "${key}", defaulting to 10`);
+                    lck.maxRead = 10;
+                }
+                effectiveMax = lck.maxRead;
+            } else if (beginWrite) {
+                // RW write lock - use maxWrite (always 1 for exclusive)
+                effectiveMax = lck.maxWrite !== undefined ? lck.maxWrite : 1;
+            } else {
+                // Normal lock - use max only
+                effectiveMax = Number.isInteger(max) ? max : lck.max;
+            }
 
             // Strictly enforce max lock holders - prevent race conditions
             // For read operations, check if adding this reader would exceed max
@@ -2353,8 +2405,8 @@ export class Broker1 {
                 // Only warn if we actually exceed the limit due to a race condition
                 // Don't warn for write locks queuing behind readers (expected behavior)
                 // Don't warn for read locks at the limit (expected when max is reached)
-                // With separate maxRead/maxWrite fields, we no longer need the upgrade workaround
-                const isWriteLockQueuing = !beginRead && lck.readers > 0 && effectiveMax === 1;
+                // With separate maxRead/maxWrite, we can properly distinguish between read and write limits
+                const isWriteLockQueuing = beginWrite && lck.readers > 0 && effectiveMax === 1;
                 
                 // Only warn if:
                 // 1. Count exceeds effectiveMax, AND
@@ -2458,8 +2510,12 @@ export class Broker1 {
         this.wsToKeys.get(ws)[key] = true;
 
         // Determine maxRead and maxWrite based on operation type
-        const maxReadForNewLock = beginRead ? (Number.isInteger(maxRead) ? maxRead : (Number.isInteger(max) ? max : 10)) : undefined;
-        const maxWriteForNewLock = !beginRead ? (Number.isInteger(maxWrite) ? maxWrite : (Number.isInteger(max) ? max : 1)) : undefined;
+        const maxReadForNewLock = beginRead
+            ? (Number.isInteger(maxRead) ? maxRead : (Number.isInteger(max) ? max : 10))
+            : undefined;
+        const maxWriteForNewLock = beginWrite
+            ? (Number.isInteger(maxWrite) ? maxWrite : (Number.isInteger(max) ? max : 1))
+            : undefined;
         const lckTemp = this.getDefaultLockObject(key, keepLocksAfterDeath, max, maxReadForNewLock, maxWriteForNewLock);
         this.locks.set(key, lckTemp);
 
