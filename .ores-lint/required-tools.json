@@ -1,0 +1,30 @@
+{
+  "_comment": "Tool versions ores-lint expects. These are DECLARATIONS, not dependencies - nothing here is ever installed into a repo's node_modules. Install them once, globally. The rollout script mirrors this block into each package.json under the `oresLint` key so the requirement travels with the repo.",
+  "eslint": {
+    "minMajor": 9,
+    "range": ">=9",
+    "install": "npm i -g eslint",
+    "why": "flat config (eslint.config.mjs) requires ESLint 9 or newer"
+  },
+  "typescript-eslint": {
+    "minMajor": 8,
+    "range": ">=8",
+    "install": "npm i -g typescript-eslint",
+    "why": "optional; without it .ts/.tsx files are skipped rather than linted"
+  },
+  "clippy": {
+    "range": "any",
+    "install": "rustup component add clippy",
+    "why": "the Rust half is a clippy wrapper"
+  },
+  "dart": {
+    "range": "any",
+    "install": "install the Dart SDK or Flutter",
+    "why": "optional; dart analyze is the Dart/Flutter linter. Without it Dart source is skipped."
+  },
+  "gleam": {
+    "range": "any",
+    "install": "see https://gleam.run/getting-started/installing/",
+    "why": "optional; gleam format --check and gleam check. Without it Gleam source is skipped."
+  }
+}
