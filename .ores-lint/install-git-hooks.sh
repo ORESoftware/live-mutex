@@ -12,8 +12,11 @@ case "$HOOKS_PATH" in
   /*)
     HOOK_DIR="$HOOKS_PATH"
     ;;
-  ~/*)
-    HOOK_DIR="$HOME/${HOOKS_PATH#~/}"
+  '~/'*)
+    # Git stores a literal ~/ prefix; POSIX sh does not expand it after the
+    # value is read from config. The branch match above proves the first two
+    # bytes are exactly "~/", so strip exactly those bytes.
+    HOOK_DIR="$HOME/${HOOKS_PATH#??}"
     ;;
   *)
     # Git runs ordinary client-side hooks from the worktree root, so a relative
