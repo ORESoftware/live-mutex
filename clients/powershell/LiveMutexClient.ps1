@@ -41,10 +41,13 @@ class LiveMutexClient {
         $c.Stream.ReadTimeout = $c.TimeoutMs
         $c.Reader = [System.IO.StreamReader]::new($c.Stream, [System.Text.Encoding]::UTF8)
         $c.Send(@{ type = $script:LmxReq.Version; value = $c.Version })  # fire-and-forget
+
         return $c
     }
 
-    static [string] NewUuid() { return [guid]::NewGuid().ToString() }
+    static [string] NewUuid() {
+        return [guid]::NewGuid().ToString()
+    }
 
     hidden [void] Send([hashtable] $frame) {
         $json = ($frame | ConvertTo-Json -Compress -Depth 6) + "`n"
@@ -57,12 +60,26 @@ class LiveMutexClient {
     hidden [object] ReadReply([string] $want) {
         while ($true) {
             $line = $this.Reader.ReadLine()
-            if ($null -eq $line) { throw 'connection closed by broker' }
-            if ($line -eq '') { continue }
+
+            if ($null -eq $line) {
+                throw 'connection closed by broker'
+            }
+
+            if ($line -eq '') {
+                continue
+            }
+
             $obj = $line | ConvertFrom-Json
-            if ($obj.type -eq $script:LmxVersionMismatch) { throw "version mismatch: $line" }
-            if ($obj.uuid -eq $want) { return $obj }
+
+            if ($obj.type -eq $script:LmxVersionMismatch) {
+                throw "version mismatch: $line"
+            }
+
+            if ($obj.uuid -eq $want) {
+                return $obj
+            }
         }
+
         throw 'unreachable'
     }
 
@@ -70,39 +87,102 @@ class LiveMutexClient {
     # acquired:true on promotion (or acquired:false WITH an error on rejection).
     [pscustomobject] Acquire([string] $key, [int] $ttlMs) {
         $u = [LiveMutexClient]::NewUuid()
-        $ttl = if ($ttlMs -gt 0) { $ttlMs } else { $null }
-        $this.Send(@{ type = $script:LmxReq.Lock; uuid = $u; key = $key; pid = $PID; keepLocksAfterDeath = $false; ttl = $ttl })
+        $ttl = if ($ttlMs -gt 0) {
+            $ttlMs
+        } else {
+            $null
+        }
+        $processId = [System.Diagnostics.Process]::GetCurrentProcess().Id
+
+        $this.Send(@{
+            type = $script:LmxReq.Lock
+            uuid = $u
+            key = $key
+            pid = $processId
+            keepLocksAfterDeath = $false
+            ttl = $ttl
+        })
+
         $r = $this.ReadReply($u)
-        if ($r.acquired -ne $true) { throw "acquire($key) failed: $($r | ConvertTo-Json -Compress)" }
+
+        if ($r.acquired -ne $true) {
+            throw "acquire($key) failed: $($r | ConvertTo-Json -Compress)"
+        }
+
         # The single-key lock handle is the request uuid.
-        return [pscustomobject]@{ Key = $key; LockUuid = $u; FencingToken = $r.fencingToken }
+        return [pscustomobject]@{
+            Key = $key
+            LockUuid = $u
+            FencingToken = $r.fencingToken
+        }
     }
 
     [void] Release([string] $key, [string] $lockUuid) {
         $u = [LiveMutexClient]::NewUuid()
-        $this.Send(@{ type = $script:LmxReq.Unlock; uuid = $u; '_uuid' = $lockUuid; key = $key })
+        $this.Send(@{
+            type = $script:LmxReq.Unlock
+            uuid = $u
+            '_uuid' = $lockUuid
+            key = $key
+        })
+
         $r = $this.ReadReply($u)
-        if ($r.unlocked -ne $true) { throw "release($key) failed: $($r | ConvertTo-Json -Compress)" }
+
+        if ($r.unlocked -ne $true) {
+            throw "release($key) failed: $($r | ConvertTo-Json -Compress)"
+        }
     }
 
     [pscustomobject] AcquireMany([string[]] $keys, [int] $ttlMs) {
         $u = [LiveMutexClient]::NewUuid()
-        $ttl = if ($ttlMs -gt 0) { $ttlMs } else { $null }
-        $this.Send(@{ type = $script:LmxReq.AcquireMany; uuid = $u; keys = $keys; ttl = $ttl })
+        $ttl = if ($ttlMs -gt 0) {
+            $ttlMs
+        } else {
+            $null
+        }
+
+        $this.Send(@{
+            type = $script:LmxReq.AcquireMany
+            uuid = $u
+            keys = $keys
+            ttl = $ttl
+        })
+
         $r = $this.ReadReply($u)
-        if ($r.acquired -ne $true) { throw "acquire_many failed: $($r | ConvertTo-Json -Compress)" }
-        return [pscustomobject]@{ Keys = $keys; LockUuid = $r.lockUuid; FencingTokens = $r.fencingTokens }
+
+        if ($r.acquired -ne $true) {
+            throw "acquire_many failed: $($r | ConvertTo-Json -Compress)"
+        }
+
+        return [pscustomobject]@{
+            Keys = $keys
+            LockUuid = $r.lockUuid
+            FencingTokens = $r.fencingTokens
+        }
     }
 
     [void] ReleaseMany([string] $lockUuid) {
         $u = [LiveMutexClient]::NewUuid()
-        $this.Send(@{ type = $script:LmxReq.ReleaseMany; uuid = $u; lockUuid = $lockUuid })
+        $this.Send(@{
+            type = $script:LmxReq.ReleaseMany
+            uuid = $u
+            lockUuid = $lockUuid
+        })
+
         $r = $this.ReadReply($u)
-        if ($r.released -ne $true) { throw "release_many failed: $($r | ConvertTo-Json -Compress)" }
+
+        if ($r.released -ne $true) {
+            throw "release_many failed: $($r | ConvertTo-Json -Compress)"
+        }
     }
 
     [void] Disconnect() {
-        if ($this.Reader) { $this.Reader.Dispose() }
-        if ($this.Tcp) { $this.Tcp.Close() }
+        if ($this.Reader) {
+            $this.Reader.Dispose()
+        }
+
+        if ($this.Tcp) {
+            $this.Tcp.Close()
+        }
     }
 }
