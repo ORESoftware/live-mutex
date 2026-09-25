@@ -11,28 +11,16 @@ language = "nodejs"
 vcs = "git"
 url = "https://github.com/ORESoftware/live-mutex"
 
+# This is intentionally a single Zed source package for the whole repository.
+# Broker source, polyglot clients, and formal contracts are installed together;
+# npm remains an optional native mirror rather than a second source authority.
 [install]
 dir = ".vendor/.zed"
-
-[targets.nodejs]
-dir = "."
-name = "live-mutex"
-adapter = "node"
-
-[targets.clients]
-dir = "clients"
-name = "live-mutex-clients"
-adapter = "none"
-
-[targets.formal]
-dir = "formal"
-name = "live-mutex-formal"
-adapter = "none"
 
 [publish]
 include_readme = true
 tag_format = "v{version}"
-smoke_test = 'test -f "$ZED_PKG_TEST_TARGET/package.json" && test -f "$ZED_PKG_TEST_TARGET/formal/README.md" && test -d "$ZED_PKG_TEST_TARGET/clients"'
+smoke_test = 'test -f "$ZED_PKG_TEST_TARGET/package.json" && test -f "$ZED_PKG_TEST_TARGET/src/main.ts" && test -f "$ZED_PKG_TEST_TARGET/formal/README.md" && test -d "$ZED_PKG_TEST_TARGET/clients"'
 exclude = [
   ".env",
   ".env.*",
