@@ -1,5 +1,7 @@
 'use strict';
 
+import * as fs from 'fs';
+import * as path from 'path';
 import {
   Broker1 as BaseBroker1,
   log,
@@ -16,12 +18,41 @@ export type {IBrokerOptsPartial, IErrorFirstCB, LockObj, LMXSocket};
 export const MAX_FENCING_TOKEN = Number.MAX_SAFE_INTEGER;
 /** Broker1 caps acquire-many requests at 64 keys. Reserve that much headroom when draining queues. */
 const MAX_COMPOSITE_KEYS = 64;
+const FENCING_STATE_SCHEMA = 'live-mutex.fencing-watermark/v1';
+const FENCING_STATE_PATH_ENV = 'LMX_FENCING_TOKEN_STATE_PATH';
 
 export class FencingTokenExhaustedError extends Error {
+  readonly code = 'fencing_token_exhausted';
+
   constructor() {
     super(`live-mutex fencing-token authority exhausted at ${MAX_FENCING_TOKEN}; refusing to reuse or round authority`);
     this.name = 'FencingTokenExhaustedError';
   }
+}
+
+export class FencingTokenPersistenceError extends Error {
+  readonly code = 'fencing_token_persistence_failed';
+
+  constructor(message: string, cause?: unknown) {
+    super(message);
+    this.name = 'FencingTokenPersistenceError';
+    if (cause !== undefined) {
+      (this as any).cause = cause;
+    }
+  }
+}
+
+function parseWatermarkText(raw: unknown, source: string): number {
+  if (typeof raw !== 'string' || !/^(0|[1-9][0-9]*)$/.test(raw)) {
+    throw new FencingTokenPersistenceError(`${source} must contain a canonical non-negative decimal fencing watermark`);
+  }
+
+  const value = Number(raw);
+  if (!Number.isSafeInteger(value) || value < 0 || value > MAX_FENCING_TOKEN) {
+    throw new FencingTokenPersistenceError(`${source} fencing watermark must be in 0..${MAX_FENCING_TOKEN}`);
+  }
+
+  return value;
 }
 
 function configuredFloor(): number {
@@ -29,14 +60,99 @@ function configuredFloor(): number {
   if (!raw) {
     return 0;
   }
-  if (!/^(0|[1-9][0-9]*)$/.test(raw)) {
-    throw new Error('LMX_FENCING_TOKEN_FLOOR must be canonical non-negative decimal text');
+
+  return parseWatermarkText(raw, 'LMX_FENCING_TOKEN_FLOOR');
+}
+
+function configuredStatePath(): string | null {
+  const raw = process.env[FENCING_STATE_PATH_ENV];
+  if (!raw) {
+    return null;
   }
-  const value = Number(raw);
-  if (!Number.isSafeInteger(value) || value < 0 || value > MAX_FENCING_TOKEN) {
-    throw new Error(`LMX_FENCING_TOKEN_FLOOR must be in 0..${MAX_FENCING_TOKEN}`);
+
+  return path.resolve(raw);
+}
+
+function readPersistedWatermark(statePath: string | null): number {
+  if (!statePath) {
+    return 0;
   }
-  return value;
+
+  if (!fs.existsSync(statePath)) {
+    return 0;
+  }
+
+  let parsed: any;
+  try {
+    parsed = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+  }
+  catch (error) {
+    throw new FencingTokenPersistenceError(`could not read durable fencing state at ${statePath}`, error);
+  }
+
+  if (!parsed || parsed.schema !== FENCING_STATE_SCHEMA) {
+    throw new FencingTokenPersistenceError(`durable fencing state at ${statePath} has an unsupported schema`);
+  }
+
+  return parseWatermarkText(parsed.watermark, `durable fencing state at ${statePath}`);
+}
+
+function fsyncDirectoryBestEffort(directoryPath: string): void {
+  let directoryFd: number | null = null;
+  try {
+    directoryFd = fs.openSync(directoryPath, 'r');
+    fs.fsyncSync(directoryFd);
+  }
+  catch (error: any) {
+    if (error && (error.code === 'EINVAL' || error.code === 'ENOTSUP' || error.code === 'EPERM' || error.code === 'EISDIR')) {
+      return;
+    }
+    throw error;
+  }
+  finally {
+    if (directoryFd !== null) {
+      fs.closeSync(directoryFd);
+    }
+  }
+}
+
+function persistWatermarkAtomically(statePath: string, watermark: number): void {
+  const directoryPath = path.dirname(statePath);
+  fs.mkdirSync(directoryPath, {recursive: true, mode: 0o700});
+
+  const tempPath = `${statePath}.${process.pid}.tmp`;
+  const payload = JSON.stringify({
+    schema: FENCING_STATE_SCHEMA,
+    watermark: String(watermark),
+  }) + '\n';
+
+  let fd: number | null = null;
+  try {
+    fd = fs.openSync(tempPath, 'w', 0o600);
+    fs.writeFileSync(fd, payload, 'utf8');
+    fs.fsyncSync(fd);
+    fs.closeSync(fd);
+    fd = null;
+    fs.renameSync(tempPath, statePath);
+    fsyncDirectoryBestEffort(directoryPath);
+  }
+  catch (error) {
+    if (fd !== null) {
+      try {
+        fs.closeSync(fd);
+      }
+      catch {
+        // Preserve the original persistence failure.
+      }
+    }
+    try {
+      fs.unlinkSync(tempPath);
+    }
+    catch {
+      // Preserve the original persistence failure.
+    }
+    throw new FencingTokenPersistenceError(`could not persist fencing watermark ${watermark} at ${statePath}`, error);
+  }
 }
 
 /**
@@ -47,14 +163,16 @@ function configuredFloor(): number {
  * sufficiently busy key or a clock rollback could therefore regress authority.
  * This facade keeps a broker-wide high-watermark that survives LockObj GC and
  * makes every newly materialized key start at max(clock, configured floor,
- * process watermark). All writes to `nextFencingToken` go through a Proxy that
- * rejects non-monotonic, non-safe, or exhausted values before a holder record is
- * installed or an acquired response is emitted.
+ * process watermark, durable watermark). All writes to `nextFencingToken` go
+ * through a Proxy that rejects non-monotonic, non-safe, or exhausted values
+ * before a holder record is installed or an acquired response is emitted.
  *
- * Cross-process restart safety cannot be invented from wall clock. Deployments
- * that restart a standalone broker must persist the last reported watermark and
- * feed it back through `LMX_FENCING_TOKEN_FLOOR`; clustered/consensus deployments
- * should restore a committed watermark from replicated state instead.
+ * Set `LMX_FENCING_TOKEN_STATE_PATH` to enable durable standalone-broker mode.
+ * Every higher watermark is fsync'd to a temporary file and atomically renamed
+ * into place BEFORE the in-memory authority advances. Crashes may therefore
+ * create harmless gaps, but a restarted broker cannot regress below an already
+ * persisted token. `LMX_FENCING_TOKEN_FLOOR` remains a manual/consensus restore
+ * input and is combined with the durable file using max().
  */
 export class Broker1 extends BaseBroker1 {
   // BaseBroker1 installs these callback/promise properties in its constructor.
@@ -64,7 +182,11 @@ export class Broker1 extends BaseBroker1 {
   declare start: (cb?: any) => Promise<Broker1>;
 
   private fencingTokenFloor = configuredFloor();
-  private fencingWatermark = this.fencingTokenFloor;
+  private fencingStatePath = configuredStatePath();
+  private fencingWatermark = Math.max(
+    this.fencingTokenFloor,
+    readPersistedWatermark(this.fencingStatePath),
+  );
 
   static create(opts: IBrokerOptsPartial): Broker1 {
     return new Broker1(opts);
@@ -74,6 +196,18 @@ export class Broker1 extends BaseBroker1 {
     return this.fencingWatermark;
   }
 
+  isDurableFencingMode(): boolean {
+    return this.fencingStatePath !== null;
+  }
+
+  private persistFencingWatermark(value: number): void {
+    if (!this.fencingStatePath) {
+      return;
+    }
+
+    persistWatermarkAtomically(this.fencingStatePath, value);
+  }
+
   private hasHeadroom(requiredTokens: number): boolean {
     return Number.isSafeInteger(requiredTokens)
       && requiredTokens >= 0
@@ -81,7 +215,12 @@ export class Broker1 extends BaseBroker1 {
       && this.fencingWatermark <= MAX_FENCING_TOKEN - requiredTokens;
   }
 
-  private emitExhausted(ws: LMXSocket, data: any, type: 'lock' | 'acquire-many'): void {
+  private emitAuthorityFailure(
+    ws: LMXSocket,
+    data: any,
+    type: 'lock' | 'acquire-many',
+    error: FencingTokenExhaustedError | FencingTokenPersistenceError,
+  ): void {
     this.send(ws, {
       type,
       uuid: data?.uuid,
@@ -89,9 +228,9 @@ export class Broker1 extends BaseBroker1 {
         ? {key: data?.key}
         : {keys: Array.isArray(data?.keys) ? data.keys : []}),
       acquired: false,
-      error: 'fencing_token_exhausted',
+      error: error.code,
     });
-    this.emitter.emit('warning', new FencingTokenExhaustedError().message);
+    this.emitter.emit('warning', error.message);
   }
 
   getDefaultLockObject(
@@ -108,6 +247,7 @@ export class Broker1 extends BaseBroker1 {
     }
     target.nextFencingToken = seed;
     if (seed > this.fencingWatermark) {
+      this.persistFencingWatermark(seed);
       this.fencingWatermark = seed;
     }
 
@@ -125,6 +265,7 @@ export class Broker1 extends BaseBroker1 {
             throw new FencingTokenExhaustedError();
           }
           if (value > self.fencingWatermark) {
+            self.persistFencingWatermark(value);
             self.fencingWatermark = value;
           }
         }
@@ -139,6 +280,7 @@ export class Broker1 extends BaseBroker1 {
       fencingWatermark: this.fencingWatermark,
       fencingTokenFloor: this.fencingTokenFloor,
       maxFencingToken: MAX_FENCING_TOKEN,
+      durableFencingMode: this.isDurableFencingMode(),
     };
   }
 
@@ -150,21 +292,26 @@ export class Broker1 extends BaseBroker1 {
       + `lmx_fencing_watermark ${this.fencingWatermark}\n`
       + '# HELP lmx_fencing_token_floor Restart floor supplied by durable/consensus state.\n'
       + '# TYPE lmx_fencing_token_floor gauge\n'
-      + `lmx_fencing_token_floor ${this.fencingTokenFloor}\n`;
+      + `lmx_fencing_token_floor ${this.fencingTokenFloor}\n`
+      + '# HELP lmx_fencing_durable_mode 1 when the broker persists the watermark before grants.\n'
+      + '# TYPE lmx_fencing_durable_mode gauge\n'
+      + `lmx_fencing_durable_mode ${this.isDurableFencingMode() ? 1 : 0}\n`;
   }
 
   lock(data: any, ws: LMXSocket) {
     if (!this.hasHeadroom(1)) {
-      this.emitExhausted(ws, data, 'lock');
+      this.emitAuthorityFailure(ws, data, 'lock', new FencingTokenExhaustedError());
       return;
     }
     try {
       return super.lock(data, ws);
-    } catch (error) {
-      if (!(error instanceof FencingTokenExhaustedError)) {
-        throw error;
+    }
+    catch (error) {
+      if (error instanceof FencingTokenExhaustedError || error instanceof FencingTokenPersistenceError) {
+        this.emitAuthorityFailure(ws, data, 'lock', error);
+        return;
       }
-      this.emitExhausted(ws, data, 'lock');
+      throw error;
     }
   }
 
@@ -173,16 +320,18 @@ export class Broker1 extends BaseBroker1 {
       ? new Set(data.keys.filter((k: unknown) => typeof k === 'string')).size
       : 1;
     if (!this.hasHeadroom(required)) {
-      this.emitExhausted(ws, data, 'acquire-many');
+      this.emitAuthorityFailure(ws, data, 'acquire-many', new FencingTokenExhaustedError());
       return;
     }
     try {
       return super.acquireMany(data, ws);
-    } catch (error) {
-      if (!(error instanceof FencingTokenExhaustedError)) {
-        throw error;
+    }
+    catch (error) {
+      if (error instanceof FencingTokenExhaustedError || error instanceof FencingTokenPersistenceError) {
+        this.emitAuthorityFailure(ws, data, 'acquire-many', error);
+        return;
       }
-      this.emitExhausted(ws, data, 'acquire-many');
+      throw error;
     }
   }
 
@@ -196,12 +345,13 @@ export class Broker1 extends BaseBroker1 {
     }
     try {
       return super.ensureNewLockHolder(lck, data);
-    } catch (error) {
-      if (!(error instanceof FencingTokenExhaustedError)) {
-        throw error;
+    }
+    catch (error) {
+      if (error instanceof FencingTokenExhaustedError || error instanceof FencingTokenPersistenceError) {
+        this.emitter.emit('warning', error.message);
+        return;
       }
-      this.emitter.emit('warning', error.message);
-      return;
+      throw error;
     }
   }
 }
