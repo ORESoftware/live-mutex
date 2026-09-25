@@ -70,6 +70,10 @@ export enum LMXRequestType {
     /// `{ uuid, key, _uuid?, force?, keepLocksAfterDeath? }`.
     Unlock = 'unlock',
 
+    /// Extend one exact current holder without changing its fencing token.
+    /// Payload: `{ uuid, key, lockUuid, ttl }`.
+    Renew = 'renew',
+
     /// All-or-nothing acquire across N keys ("composite lock").
     /// Payload: `{ uuid, keys, ttl, pid, keepLocksAfterDeath? }`.
     AcquireMany = 'acquire-many',
@@ -159,6 +163,7 @@ export enum LMXRequestType {
 export enum LMXResponseType {
     Lock = 'lock',
     Unlock = 'unlock',
+    Renew = 'renew',
     LockInfoResponse = 'lock-info-response',
     Pong = 'pong',
     SystemStatsResponse = 'system-stats-response',
@@ -207,6 +212,15 @@ export interface UnlockReq {
     _uuid?: string;
     force?: boolean;
     keepLocksAfterDeath?: boolean;
+    [extra: string]: any;
+}
+
+export interface RenewReq {
+    type: LMXRequestType.Renew;
+    uuid: string;
+    key: string;
+    lockUuid: string;
+    ttl: number;
     [extra: string]: any;
 }
 
@@ -354,6 +368,7 @@ export interface SystemStatsRequestReq {
 export type LMXRequest =
     | LockReq
     | UnlockReq
+    | RenewReq
     | AcquireManyReq
     | ReleaseManyReq
     | LsReq
