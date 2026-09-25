@@ -1,0 +1,56 @@
+name: formal lock refinement
+
+on:
+  pull_request:
+    paths:
+      - 'formal/**'
+      - 'src/**'
+      - 'test/**'
+      - 'assets/cli/**'
+      - 'package.json'
+      - '.github/workflows/formal-model.yml'
+  push:
+    branches: [dev]
+    paths:
+      - 'formal/**'
+      - 'src/**'
+      - 'test/**'
+      - 'assets/cli/**'
+      - 'package.json'
+      - '.github/workflows/formal-model.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bounded-model:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: node formal/model.mjs
+      - name: deterministic replay smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          output=$(printf '%s\n' '{"actions":[{"kind":"acquire","client":"a","requestId":"a-1"},{"kind":"acquire","client":"b","requestId":"b-1"},{"kind":"release","client":"a","fence":1}]}' | node formal/model.mjs --json-stdin)
+          node -e 'const x=JSON.parse(process.argv[1]); if(!x.ok || x.state.holder!=="b" || x.state.fence!==2) process.exit(1)' "$output"
+
+  node-refinement:
+    needs: bounded-model
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run compile:check
+      - run: npm test
