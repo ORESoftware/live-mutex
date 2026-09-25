@@ -4,11 +4,16 @@ import * as lmUtils from './utils';
 import {routineEnter} from './routine';
 
 export {lmUtils};
-export {RWLockClient, RWLockReadPrefClient} from './rw-client';
-export {RWLockWritePrefClient} from './rw-write-preferred-client';
-export {Client, LMXClient, LvMtxClient} from './client';
+export {RWLockClient, RWLockReadPrefClient} from './rw-client-hardened';
+export {RWLockWritePrefClient} from './rw-write-preferred-client-hardened';
+export {Client, LMXClient, LvMtxClient, InvalidFencingTokenError, assertFencingToken} from './client-hardened';
 export {Broker, LMXBroker, LvMtxBroker} from './broker';
-export {Broker1, LMXBroker as LMXBroker1, LvMtxBroker as LvMtxBroker1} from './broker-1';
+// Broker1 is the recommended broker. Export the hardened facade so public and
+// packaged server entry points get high-watermark fencing and fail-closed
+// token exhaustion by default. The historical implementation remains an
+// internal base class in broker-1.ts.
+export {Broker1, LMXBroker as LMXBroker1, LvMtxBroker as LvMtxBroker1} from './broker-1-hardened';
+export {MAX_FENCING_TOKEN, FencingTokenExhaustedError} from './broker-1-hardened';
 export {LMXHttpServer} from './http-server';
 export {InProcessBridge, VirtualSocket} from './in-process-bridge';
 export {routineEnter, initOtel, shutdownOtel, setOtelEnabled, isOtelEnabled} from './routine';
@@ -27,11 +32,6 @@ export {
   LMXTelemetrySeverity
 } from "./telemetry";
 
-// LMX wire-protocol enum + discriminated union. Cross-runtime ports
-// of this protocol (Rust, Go, Dart, Gleam) all expose a request enum
-// as their public type contract; this is the Node analogue. The
-// string values match the legacy wire format byte-for-byte, so older
-// brokers/clients keep interoperating.
 export {
     LMXRequestType,
     LMXResponseType,

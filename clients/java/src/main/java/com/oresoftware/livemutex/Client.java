@@ -11,6 +11,7 @@ import java.io.OutputStream;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -19,24 +20,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-/**
- * Java client for the live-mutex broker.
- *
- * <p>Speaks the broker's NDJSON-over-TCP wire protocol. A single
- * Client instance multiplexes many concurrent acquire/release/
- * acquire-many requests over one connection by correlating on a
- * per-request UUID.
- *
- * <p>Minimal by design — covers the new wire features (fencing tokens,
- * acquire-many, broker-side max validation) and the basic lock/unlock
- * flow. RW-lock support and the legacy {@code lock-received} ack are
- * intentionally not re-implemented; the broker's centralised TTL
- * sweeper handles clients that skip the ack.
- */
+/** Java client for the fenced Broker1 NDJSON protocol. */
 public final class Client implements AutoCloseable {
 
     public static final String PROTOCOL_VERSION = "0.2.25";
-
+    public static final long MAX_FENCING_TOKEN = 9_007_199_254_740_991L;
     private static final ObjectMapper M = new ObjectMapper();
 
     private final Socket socket;
@@ -56,7 +44,6 @@ public final class Client implements AutoCloseable {
         this.reader.setDaemon(true);
     }
 
-    /** Connects, sends version handshake, returns a usable Client. */
     public static Client connect(String host, int port) throws IOException {
         return connect(host, port, TimeUnit.SECONDS.toMillis(60));
     }
@@ -74,7 +61,26 @@ public final class Client implements AutoCloseable {
         return c;
     }
 
-    /** Acquire an exclusive lock (or a semaphore slot if {@code max > 1}). */
+    private static long fencingToken(JsonNode node, String field) throws LiveMutexException {
+        if (node == null || node.isNull() || (!node.isIntegralNumber() && !node.isTextual())) {
+            throw new LiveMutexException(field + " must be a positive exact integer fencing token");
+        }
+        String text = node.asText();
+        if (!text.matches("[1-9][0-9]*")) {
+            throw new LiveMutexException(field + " must be canonical positive decimal text/integer");
+        }
+        final long token;
+        try {
+            token = Long.parseLong(text);
+        } catch (NumberFormatException e) {
+            throw new LiveMutexException(field + " is outside the supported fencing-token range");
+        }
+        if (token < 1 || token > MAX_FENCING_TOKEN) {
+            throw new LiveMutexException(field + " must be in 1.." + MAX_FENCING_TOKEN);
+        }
+        return token;
+    }
+
     public LockGrant acquire(String key, Long ttlMs, Integer max) throws Exception {
         String reqUuid = UUID.randomUUID().toString();
         ObjectNode payload = M.createObjectNode();
@@ -83,21 +89,16 @@ public final class Client implements AutoCloseable {
         payload.put("key", key);
         payload.put("pid", (int) ProcessHandle.current().pid());
         payload.put("keepLocksAfterDeath", false);
-        if (ttlMs != null) payload.put("ttl", ttlMs);
-        else payload.putNull("ttl");
+        if (ttlMs != null) payload.put("ttl", ttlMs); else payload.putNull("ttl");
         if (max != null) payload.put("max", max);
 
         JsonNode reply = awaitReply(reqUuid, payload);
         if (!reply.path("acquired").asBoolean(false)) {
-            String err = reply.path("error").asText("lock not acquired");
-            throw new LiveMutexException(err);
+            throw new LiveMutexException(reply.path("error").asText("lock not acquired"));
         }
-        Long token = reply.has("fencingToken") && !reply.get("fencingToken").isNull()
-                ? reply.get("fencingToken").asLong()
-                : null;
-        Long lrc = reply.has("lockRequestCount") && !reply.get("lockRequestCount").isNull()
-                ? reply.get("lockRequestCount").asLong()
-                : null;
+        long token = fencingToken(reply.get("fencingToken"), "fencingToken");
+        Long lrc = reply.has("lockRequestCount") && reply.get("lockRequestCount").isIntegralNumber()
+                ? reply.get("lockRequestCount").longValue() : null;
         return new LockGrant(key, reqUuid, token, lrc);
     }
 
@@ -122,29 +123,33 @@ public final class Client implements AutoCloseable {
         payload.put("type", "acquire-many");
         payload.put("uuid", reqUuid);
         payload.set("keys", M.valueToTree(keys));
-        if (ttlMs != null) payload.put("ttl", ttlMs);
-        else payload.putNull("ttl");
+        if (ttlMs != null) payload.put("ttl", ttlMs); else payload.putNull("ttl");
 
         JsonNode reply = awaitReply(reqUuid, payload);
         if (!reply.path("acquired").asBoolean(false)) {
             String why = reply.path("error").asText("");
-            if (why.isEmpty() && reply.has("contendedKey")) {
-                why = "contended on " + reply.get("contendedKey").asText();
-            }
+            if (why.isEmpty() && reply.has("contendedKey")) why = "contended on " + reply.get("contendedKey").asText();
             if (why.isEmpty()) why = "acquire-many rejected";
             throw new LiveMutexException(why);
         }
-        Map<String, Long> tokens = new HashMap<>();
-        JsonNode tnode = reply.path("fencingTokens");
-        if (tnode.isObject()) {
-            tnode.fields().forEachRemaining(e -> tokens.put(e.getKey(), e.getValue().asLong()));
-        }
+
         List<String> grantedKeys = new java.util.ArrayList<>();
         JsonNode keysNode = reply.path("keys");
-        if (keysNode.isArray()) {
-            keysNode.forEach(n -> grantedKeys.add(n.asText()));
-        } else {
-            grantedKeys.addAll(keys);
+        if (keysNode.isArray()) keysNode.forEach(n -> grantedKeys.add(n.asText()));
+        else grantedKeys.addAll(keys);
+
+        JsonNode tnode = reply.get("fencingTokens");
+        if (tnode == null || !tnode.isObject()) {
+            throw new LiveMutexException("acquire-many omitted fencingTokens");
+        }
+        Map<String, Long> tokens = new HashMap<>();
+        for (String key : grantedKeys) {
+            JsonNode raw = tnode.get(key);
+            if (raw == null) throw new LiveMutexException("missing fencing token for key " + key);
+            tokens.put(key, fencingToken(raw, "fencingTokens[" + key + "]"));
+        }
+        if (tokens.size() != grantedKeys.size() || tnode.size() != grantedKeys.size()) {
+            throw new LiveMutexException("fencing token/key cardinality mismatch");
         }
         return new AcquireManyGrant(grantedKeys, reply.path("lockUuid").asText(""), tokens);
     }
@@ -166,14 +171,11 @@ public final class Client implements AutoCloseable {
         if (closed) return;
         closed = true;
         try { socket.close(); } catch (IOException ignore) {}
-        // Wake any pending callers.
         for (CompletableFuture<JsonNode> f : inflight.values()) {
             f.completeExceptionally(new LiveMutexException("connection closed"));
         }
         inflight.clear();
     }
-
-    // ---- internals ----
 
     private synchronized void send(ObjectNode payload) throws IOException {
         byte[] bytes = (M.writeValueAsString(payload) + "\n").getBytes(StandardCharsets.UTF_8);
@@ -200,11 +202,7 @@ public final class Client implements AutoCloseable {
             String line;
             while (!closed && (line = in.readLine()) != null) {
                 JsonNode msg;
-                try {
-                    msg = M.readTree(line);
-                } catch (IOException ignore) {
-                    continue;
-                }
+                try { msg = M.readTree(line); } catch (IOException ignore) { continue; }
                 if (!msg.isObject()) continue;
                 JsonNode uuidNode = msg.get("uuid");
                 if (uuidNode == null || !uuidNode.isTextual()) continue;

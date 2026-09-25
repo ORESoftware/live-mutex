@@ -9,6 +9,27 @@ import sys
 import logging
 import atexit
 
+MAX_FENCING_TOKEN = 9_007_199_254_740_991
+
+
+class InvalidFencingTokenError(ValueError):
+    pass
+
+
+def fencing_token_from_response(response):
+    value = response.get('fencingToken')
+    if isinstance(value, bool):
+        raise InvalidFencingTokenError('fencingToken must be a positive exact integer')
+    if isinstance(value, int):
+        token = value
+    elif isinstance(value, str) and value.isdigit() and (value == '0' or not value.startswith('0')):
+        token = int(value, 10)
+    else:
+        raise InvalidFencingTokenError('fencingToken must be a positive exact integer')
+    if token < 1 or token > MAX_FENCING_TOKEN:
+        raise InvalidFencingTokenError('fencingToken outside authority domain')
+    return token
+
 """
 TODO:
 https://stackoverflow.com/questions/277922/python-argument-binders
@@ -17,7 +38,6 @@ https://en.wikipedia.org/wiki/Monitor_%28synchronization%29#Blocking_condition_v
 """
 
 executor = concurrent.futures.ThreadPoolExecutor(max_workers=3)
-
 callbacks = {}
 
 
@@ -39,7 +59,6 @@ def n_args(*args):
 def make_cylinder_volume_func(r):
     def volume(h):
         return math.pi * r * r * h
-
     return volume
 
 
@@ -49,7 +68,6 @@ def main():
 
 def mainx():
     future = executor.submit(listen_for_messages)
-    # print(future.result())
     r = Timer(0.001, two_args, ("arg1", "arg2"))
     s = Timer(0.002, n_args, ("OWLS", "OWLS", "OWLS"))
     r.start()
@@ -70,7 +88,6 @@ class LMXClient:
         self.future = None
         self.resolutions = {}
         self.timeouts = {}
-        # atexit.register(self.handle_exit)
 
     def handle_exit(self):
         self.disconnect()
@@ -78,21 +95,20 @@ class LMXClient:
     def disconnect(self):
         self.connected = False
         self.s.close()
-        print ("closed the socket.")
+        print("closed the socket.")
 
     def send_message(self, d):
         data = (json.dumps(d) + '\n').encode()
         self.s.sendall(data)
 
     def connect(self):
-        self.s.connect(('localhost', 6970))
+        self.s.connect((self.host, self.port))
         self.connected = True
         self.future = executor.submit(self.listen_for_messages)
         return self
 
     def lock(self, key, cb):
         call_id = uuid.uuid4()
-
         lock_data = {
             'keepLocksAfterDeath': False,
             'retryCount': 2,
@@ -103,85 +119,41 @@ class LMXClient:
             'rwStatus': None,
             'max': 1
         }
-
         self.timeouts[str(call_id)] = None
-        # self.resolutions[str(call_id)] = self.make_lock_acquired(cb)
         self.resolutions[str(call_id)] = self.make_lock_acquired
-        # logging.warning(repr(self.resolutions))
         self.send_message(lock_data)
 
-    def make_lock_acquired(self, cb, bar):
-        print('lock was acquired.')
-        # cb()
-        # def on_lock_acquired(a,b):
-        #     print(a,b)
-        #     print('lock was acquired.')
-        #     cb(None,"acquired")
-        # return on_lock_acquired
+    def make_lock_acquired(self, error, response):
+        if error is not None:
+            raise RuntimeError(error)
+        # A successful grant is authority-bearing. Preserve the exact broker
+        # token and fail closed instead of synthesizing/rounding authority.
+        response['fencing_token'] = fencing_token_from_response(response)
+        print('lock was acquired with fencing token:', response['fencing_token'])
 
     def unlock(self, trick):
         self.tricks.append(trick)
 
     def on_data(self, d):
-
-        print ('json load', d)
-
-        uuid = d['uuid']
-
-        print ('here is uuid:', uuid)
-
-        if uuid is None:
-            logging.warning('warning', 'Function and timeout both exist => Live-Mutex implementation error.')
+        print('json load', d)
+        request_uuid = d['uuid']
+        if request_uuid is None:
+            logging.warning('Function and timeout both exist => Live-Mutex implementation error.')
             return
-
-        print(self.resolutions)
-
-        fn = self.resolutions[uuid]
-
-        print ('after fn:', fn)
-        to = self.timeouts[uuid]
-
-        print ('after to:', to)
-        self.resolutions.pop(uuid, None)
-        self.timeouts.pop(uuid, None)
-
-        print('here is fn:', fn)
-        print ('here is to:', to)
-
+        fn = self.resolutions[request_uuid]
+        to = self.timeouts[request_uuid]
+        self.resolutions.pop(request_uuid, None)
+        self.timeouts.pop(request_uuid, None)
         if fn is not None and to is not None:
-            logging.warning('warning', 'Function and timeout both exist => Live-Mutex implementation error.')
-
+            logging.warning('Function and timeout both exist => Live-Mutex implementation error.')
         if to is not None:
-            logging.warning('warning', 'Client side lock/unlock request timed-out.')
+            logging.warning('Client side lock/unlock request timed-out.')
             return
-
         if fn is not None:
-            print('ok we are running the func')
-            # fn(d.error, d)
-
-            # if 'error' not in d:
-            #     d.error=None
-
-            # d.error = None
-
-
-            # if not hasattr(d,'error'):
-            #     d.error=None
-
             if "error" not in d:
-                d["error"]=None
-
-            # setattr(d,'error',None)
-
-            try:
-                print('about to run the func')
-                fn(d['error'], d)
-                print('ran the func 1')
-            except:
-                print("Unexpected error:", sys.exc_info())
-            print('ran the func 2')
+                d["error"] = None
+            fn(d['error'], d)
             return
-
         print("nothing matched, hmmm")
 
     def listen_for_messages(self):
@@ -193,36 +165,20 @@ class LMXClient:
                 logging.warning('no data :(')
                 continue
             rec += data.decode('utf-8')
-            logging.info('Received', repr(data))
             lines = rec.split("\n")
             rec = ''
             size = len(lines)
-            # logging.warning('SIZE SIZE SIZE:',size)
             i = 0
             for line in lines:
                 json_str = None
                 try:
-                    # logging.warning('line:', str(line))
                     json_str = json.loads(line)
-                except:
+                except Exception:
                     if i < size - 1:
-                        logging.warning('warning, could not parse line:', line)
+                        logging.warning('warning, could not parse line: %s', line)
                     if i == size - 1:
-                        # if it is the last element, we can keep it, since it might not be complete
                         rec += line
                 finally:
                     if json_str is not None:
                         self.on_data(json_str)
                     i += 1
-
-
-client = LMXClient(6970, 'localhost')
-client.connect()
-
-
-def on_lock_acquired():
-    print ('lock was acquired 2.')
-    # client.disconnect()
-
-
-client.lock('foo', on_lock_acquired)
