@@ -29,7 +29,9 @@ jobs:
         run: |
           set -euo pipefail
           export ORES_LINT_GLOBAL_ROOT="$(npm root --global)"
-          eslint . --fix
+          # Apply every safe autofix even if unrelated, non-fixable legacy errors remain.
+          # The regular ores-lint workflow still reports those separately.
+          eslint . --fix || true
 
       - name: Commit style-only changes
         shell: bash
