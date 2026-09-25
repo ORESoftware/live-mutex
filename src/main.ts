@@ -4,9 +4,9 @@ import * as lmUtils from './utils';
 import {routineEnter} from './routine';
 
 export {lmUtils};
-export {RWLockClient, RWLockReadPrefClient} from './rw-client';
-export {RWLockWritePrefClient} from './rw-write-preferred-client';
-export {Client, LMXClient, LvMtxClient} from './client';
+export {RWLockClient, RWLockReadPrefClient} from './rw-client-hardened';
+export {RWLockWritePrefClient} from './rw-write-preferred-client-hardened';
+export {Client, LMXClient, LvMtxClient, InvalidFencingTokenError, assertFencingToken} from './client-hardened';
 export {Broker, LMXBroker, LvMtxBroker} from './broker';
 // Broker1 is the recommended broker. Export the hardened facade so public and
 // packaged server entry points get high-watermark fencing and fail-closed
