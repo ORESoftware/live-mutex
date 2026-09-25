@@ -143,10 +143,18 @@ export class VirtualSocket extends EventEmitter {
      * code (or a future debugger) that introspects the socket.
      */
     get readyState(): 'open' | 'readOnly' | 'writeOnly' | 'closed' | 'opening' {
-        if (this.destroyed) return 'closed';
-        if (this.writable && this.readable) return 'open';
-        if (this.writable) return 'writeOnly';
-        if (this.readable) return 'readOnly';
+        if (this.destroyed) {
+          return 'closed';
+        }
+        if (this.writable && this.readable) {
+          return 'open';
+        }
+        if (this.writable) {
+          return 'writeOnly';
+        }
+        if (this.readable) {
+          return 'readOnly';
+        }
         return 'closed';
     }
 
@@ -186,7 +194,9 @@ export class VirtualSocket extends EventEmitter {
                 new Error('Cannot call write after a stream was destroyed'),
                 {code: 'ERR_STREAM_DESTROYED'},
             );
-            if (callback) NEXT_TICK(callback, err);
+            if (callback) {
+              NEXT_TICK(callback, err);
+            }
             return false;
         }
 
@@ -201,7 +211,9 @@ export class VirtualSocket extends EventEmitter {
             const err = new TypeError(
                 `VirtualSocket.write: unsupported data type ${typeof data}`,
             );
-            if (callback) NEXT_TICK(callback, err);
+            if (callback) {
+              NEXT_TICK(callback, err);
+            }
             return false;
         }
 
@@ -209,7 +221,9 @@ export class VirtualSocket extends EventEmitter {
         const text = buf.toString('utf8');
 
         for (const line of text.split('\n')) {
-            if (line.length === 0) continue;
+            if (line.length === 0) {
+              continue;
+            }
             let frame: any;
             try {
                 frame = JSON.parse(line);
@@ -226,7 +240,9 @@ export class VirtualSocket extends EventEmitter {
             // FIFO order across frames is preserved because
             // process.nextTick is a queue.
             NEXT_TICK(() => {
-                if (this.destroyed) return;
+                if (this.destroyed) {
+                  return;
+                }
                 try {
                     this.onFrame(captured);
                 } catch (err) {
@@ -235,7 +251,9 @@ export class VirtualSocket extends EventEmitter {
             });
         }
 
-        if (callback) NEXT_TICK(callback, null);
+        if (callback) {
+          NEXT_TICK(callback, null);
+        }
         return true;
     }
 
@@ -274,7 +292,9 @@ export class VirtualSocket extends EventEmitter {
         }
 
         if (this.destroyed) {
-            if (endCb) NEXT_TICK(endCb);
+            if (endCb) {
+              NEXT_TICK(endCb);
+            }
             return this;
         }
 
@@ -298,7 +318,9 @@ export class VirtualSocket extends EventEmitter {
                     this.closeEmitted = true;
                     this.emit('close', false);
                 }
-                if (endCb) endCb();
+                if (endCb) {
+                  endCb();
+                }
             });
         };
 
@@ -321,13 +343,17 @@ export class VirtualSocket extends EventEmitter {
     destroy(err?: Error | null): this {
         const routineId = 'ddl-routine-BWbtmhL8y5oFTERAvH';
         routineEnter(routineId, "VirtualSocket.destroy");
-        if (this.destroyed) return this;
+        if (this.destroyed) {
+          return this;
+        }
         this.writable = false;
         this.readable = false;
         this.destroyed = true;
         this.lmxClosed = true;
         NEXT_TICK(() => {
-            if (err) this.emit('error', err);
+            if (err) {
+              this.emit('error', err);
+            }
             if (!this.closeEmitted) {
                 this.closeEmitted = true;
                 this.emit('close', !!err);
@@ -385,7 +411,9 @@ export class VirtualSocket extends EventEmitter {
         // there's no real I/O to time out. If a caller needs that
         // behavior they can install the listener directly.
         this.timeout = timeout;
-        if (callback) this.once('timeout', callback);
+        if (callback) {
+          this.once('timeout', callback);
+        }
         return this;
     }
 
@@ -471,7 +499,9 @@ export class InProcessBridge {
             key: data.key,
             force: data.force ?? false,
         };
-        if (data.lockUuid) payload._uuid = data.lockUuid;
+        if (data.lockUuid) {
+          payload._uuid = data.lockUuid;
+        }
         return this.dispatch(uuid, () => this.broker.unlock(payload, this.socket as unknown as LMXSocket));
     }
 
@@ -504,7 +534,9 @@ export class InProcessBridge {
     shutdown(): void {
         const routineId = 'ddl-routine-WDP4tMm8MVv3-hNgpO';
         routineEnter(routineId, "InProcessBridge.shutdown");
-        if (this.closed) return;
+        if (this.closed) {
+          return;
+        }
         this.closed = true;
         // Flush any pending requests with a clear error.
         for (const [, pending] of this.inflight) {
@@ -544,7 +576,9 @@ export class InProcessBridge {
                 }
             }, this.defaultTimeoutMs);
             // Don't keep the event loop alive solely for this timer.
-            if (typeof timer.unref === 'function') timer.unref();
+            if (typeof timer.unref === 'function') {
+              timer.unref();
+            }
             this.inflight.set(uuid, {resolve, reject, timer});
             try {
                 send();
@@ -559,11 +593,17 @@ export class InProcessBridge {
     private onBrokerFrame(frame: any): void {
         const routineId = 'ddl-routine-WlHkfye8_YVOVioEwo';
         routineEnter(routineId, "InProcessBridge.onBrokerFrame");
-        if (!frame || typeof frame !== 'object') return;
+        if (!frame || typeof frame !== 'object') {
+          return;
+        }
         const uuid = frame.uuid;
-        if (typeof uuid !== 'string') return;
+        if (typeof uuid !== 'string') {
+          return;
+        }
         const pending = this.inflight.get(uuid);
-        if (!pending) return;
+        if (!pending) {
+          return;
+        }
         // For `lock` requests the broker can emit multiple frames
         // (initial `acquired:false` queued, later `acquired:true` on
         // re-grant). The bridge resolves on the first frame for a

@@ -84,7 +84,9 @@ export class LMXHttpServer {
     async start(): Promise<void> {
         const routineId = 'ddl-routine-pANjd-iYiExsCEkbVU';
         routineEnter(routineId, "LMXHttpServer.start");
-        if (this.server) return;
+        if (this.server) {
+          return;
+        }
 
         // Wire the bridge synchronously — no broker round-trip, no
         // sockets. The bridge survives until `stop()` and owns every
@@ -169,22 +171,30 @@ export class LMXHttpServer {
         // the broker via the bridge. No TCP loopback.
         if (method === 'POST' && path === '/v1/lock') {
             const body = await this.readJsonBody(req, res);
-            if (!body) return;
+            if (!body) {
+              return;
+            }
             return this.handleLock(body, res);
         }
         if (method === 'POST' && path === '/v1/unlock') {
             const body = await this.readJsonBody(req, res);
-            if (!body) return;
+            if (!body) {
+              return;
+            }
             return this.handleUnlock(body, res);
         }
         if (method === 'POST' && path === '/v1/acquire-many') {
             const body = await this.readJsonBody(req, res);
-            if (!body) return;
+            if (!body) {
+              return;
+            }
             return this.handleAcquireMany(body, res);
         }
         if (method === 'POST' && path === '/v1/release-many') {
             const body = await this.readJsonBody(req, res);
-            if (!body) return;
+            if (!body) {
+              return;
+            }
             return this.handleReleaseMany(body, res);
         }
 
@@ -200,13 +210,17 @@ export class LMXHttpServer {
         // we reply with an HTML snippet that HTMX swaps into a target
         // span; everyone else still gets JSON.
         if (path === '/admin/otel') {
-            if (!this.checkAdminAuth(req, res)) return;
+            if (!this.checkAdminAuth(req, res)) {
+              return;
+            }
             if (method === 'GET') {
                 return this.respondJson(res, 200, {enabled: isOtelEnabled()});
             }
             if (method === 'POST') {
                 const body = await this.readPostBody(req, res);
-                if (!body) return;
+                if (!body) {
+                  return;
+                }
                 const enabled = coerceBool((body as any).enabled);
                 if (enabled === null) {
                     return this.respondAdmin(req, res, 400, 'otel', {
@@ -230,13 +244,17 @@ export class LMXHttpServer {
         // `routineEnter` stdout writes that are emitted on every
         // function entry across the broker.
         if (path === '/admin/log-level') {
-            if (!this.checkAdminAuth(req, res)) return;
+            if (!this.checkAdminAuth(req, res)) {
+              return;
+            }
             if (method === 'GET') {
                 return this.respondJson(res, 200, {level: getLogLevel()});
             }
             if (method === 'POST') {
                 const body = await this.readPostBody(req, res);
-                if (!body) return;
+                if (!body) {
+                  return;
+                }
                 const rawLevel = (body as any).level;
                 if (typeof rawLevel !== 'string') {
                     return this.respondAdmin(req, res, 400, 'log-level', {
@@ -271,13 +289,17 @@ export class LMXHttpServer {
         // intentionally limits itself to NODELAY to match the API
         // Node ships out of the box.
         if (path === '/admin/tcp') {
-            if (!this.checkAdminAuth(req, res)) return;
+            if (!this.checkAdminAuth(req, res)) {
+              return;
+            }
             if (method === 'GET') {
                 return this.respondJson(res, 200, {nodelay: this.broker.noDelay});
             }
             if (method === 'POST') {
                 const body = await this.readPostBody(req, res);
-                if (!body) return;
+                if (!body) {
+                  return;
+                }
                 const nodelay = coerceBool((body as any).nodelay);
                 if (nodelay === null) {
                     return this.respondAdmin(req, res, 400, 'tcp', {
@@ -344,7 +366,9 @@ export class LMXHttpServer {
             chunks.push(buf);
         }
         const text = Buffer.concat(chunks as unknown as Uint8Array[]).toString('utf8');
-        if (text.length === 0) return {};
+        if (text.length === 0) {
+          return {};
+        }
         const ctype = String(req.headers['content-type'] || '').toLowerCase();
         if (ctype.includes('application/x-www-form-urlencoded')) {
             const out: Record<string, string> = {};
@@ -495,7 +519,9 @@ export class LMXHttpServer {
             chunks.push(buf);
         }
         const text = Buffer.concat(chunks as unknown as Uint8Array[]).toString('utf8');
-        if (text.length === 0) return {};
+        if (text.length === 0) {
+          return {};
+        }
         try {
             return JSON.parse(text);
         } catch (err) {
@@ -507,7 +533,9 @@ export class LMXHttpServer {
     private respondJson(res: http.ServerResponse, status: number, body: any): void {
         const routineId = 'ddl-routine-Is4S-zamAoeJ10AWpS';
         routineEnter(routineId, "LMXHttpServer.respondJson");
-        if (res.headersSent) return;
+        if (res.headersSent) {
+          return;
+        }
         res.writeHead(status, {'Content-Type': 'application/json; charset=utf-8'});
         res.end(JSON.stringify(body));
     }
@@ -685,12 +713,16 @@ function renderStatusHtml(broker: Broker1): string {
   // isn't shoulder-surf-visible.
   document.addEventListener('DOMContentLoaded', function () {
     var input = document.getElementById('lmx-admin-token-input');
-    if (input) input.value = getToken();
+    if (input) {
+      input.value = getToken();
+    }
   });
 
   document.body.addEventListener('htmx:configRequest', function (e) {
     var t = getToken();
-    if (t) e.detail.headers['x-admin-token'] = t;
+    if (t) {
+      e.detail.headers['x-admin-token'] = t;
+    }
   });
 
   document.getElementById('lmx-save-token').addEventListener('click', function () {
@@ -698,11 +730,17 @@ function renderStatusHtml(broker: Broker1): string {
     var v = (input && input.value || '').trim();
     var statusEl = document.getElementById('lmx-save-status');
     try {
-      if (v) window.localStorage.setItem(TOKEN_KEY, v);
+      if (v) {
+        window.localStorage.setItem(TOKEN_KEY, v);
+      }
       else window.localStorage.removeItem(TOKEN_KEY);
-      if (statusEl) statusEl.textContent = v ? 'saved' : 'cleared';
+      if (statusEl) {
+        statusEl.textContent = v ? 'saved' : 'cleared';
+      }
     } catch (err) {
-      if (statusEl) statusEl.textContent = 'localStorage unavailable';
+      if (statusEl) {
+        statusEl.textContent = 'localStorage unavailable';
+      }
     }
   });
 })();
@@ -731,11 +769,17 @@ function esc(s: any): string {
 /// for anything that doesn't unambiguously map; callers turn that
 /// into a 400.
 function coerceBool(v: any): boolean | null {
-    if (typeof v === 'boolean') return v;
+    if (typeof v === 'boolean') {
+      return v;
+    }
     if (typeof v === 'string') {
         const s = v.trim().toLowerCase();
-        if (s === 'true') return true;
-        if (s === 'false') return false;
+        if (s === 'true') {
+          return true;
+        }
+        if (s === 'false') {
+          return false;
+        }
     }
     return null;
 }

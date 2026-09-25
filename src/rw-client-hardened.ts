@@ -13,10 +13,14 @@ export class RWLockClient extends BaseRWLockClient {
   lock(...args: any[]): void {
     const cbIndex = args.length - 1;
     const cb = args[cbIndex] as LMClientLockCallBack;
-    if (typeof cb !== 'function') return (super.lock as any)(...args);
+    if (typeof cb !== 'function') {
+      return (super.lock as any)(...args);
+    }
     const forwarded = args.slice();
     forwarded[cbIndex] = (err: any, value: LMLockSuccessData) => {
-      if (err) return cb(err, value);
+      if (err) {
+        return cb(err, value);
+      }
       try {
         assertFencingToken(value?.fencingToken);
       } catch (cause) {

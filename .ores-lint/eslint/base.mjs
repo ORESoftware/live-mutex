@@ -34,7 +34,9 @@ function tryResolve(id) {
 async function coreSemiAvailable() {
   for (const id of ['eslint/use-at-your-own-risk']) {
     const resolved = tryResolve(id);
-    if (!resolved) continue;
+    if (!resolved) {
+      continue;
+    }
     try {
       const { builtinRules } = await import(pathToFileURL(resolved).href);
       return builtinRules.has('semi');
@@ -47,13 +49,19 @@ async function coreSemiAvailable() {
 async function loadTsSupport() {
   for (const id of ['typescript-eslint', '@typescript-eslint/parser']) {
     const resolved = tryResolve(id);
-    if (!resolved) continue;
+    if (!resolved) {
+      continue;
+    }
     try {
       // Import by resolved path: a bare specifier would not find a global install.
       const mod = await import(pathToFileURL(resolved).href);
       const m = mod.default || mod;
-      if (id === 'typescript-eslint' && m.parser) return { parser: m.parser, source: id };
-      if (m.parseForESLint || m.parse) return { parser: m, source: id };
+      if (id === 'typescript-eslint' && m.parser) {
+        return { parser: m.parser, source: id };
+      }
+      if (m.parseForESLint || m.parse) {
+        return { parser: m, source: id };
+      }
     } catch { /* fall through to the next candidate */ }
   }
   return null;
@@ -117,6 +125,7 @@ export default async function oresConfig(opts = {}) {
   const correctness = {
     'ores/require-send': ['warn', opts.requireSend || {}],
     'no-unused-vars': ['warn', { args: 'after-used', argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrors: 'none' }],
+    curly: ['warn', 'all'],
     eqeqeq: ['warn', 'smart'],
     'no-fallthrough': 'warn',
     'no-unreachable': 'warn',
