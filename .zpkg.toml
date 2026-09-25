@@ -1,0 +1,54 @@
+[package]
+org = "oresoftware"
+name = "live-mutex"
+version = "0.2.27"
+description = "Node.js distributed mutex broker and polyglot clients with fencing-token safety contracts"
+license = "MIT"
+keywords = ["mutex", "distributed-lock", "fencing", "nodejs", "polyglot"]
+language = "nodejs"
+
+[package.repository]
+vcs = "git"
+url = "https://github.com/ORESoftware/live-mutex"
+
+[install]
+dir = ".vendor/.zed"
+
+[targets.nodejs]
+dir = "."
+name = "live-mutex"
+adapter = "node"
+
+[targets.clients]
+dir = "clients"
+name = "live-mutex-clients"
+adapter = "none"
+
+[targets.formal]
+dir = "formal"
+name = "live-mutex-formal"
+adapter = "none"
+
+[publish]
+include_readme = true
+tag_format = "v{version}"
+smoke_test = 'test -f "$ZED_PKG_TEST_TARGET/package.json" && test -f "$ZED_PKG_TEST_TARGET/formal/README.md" && test -d "$ZED_PKG_TEST_TARGET/clients"'
+exclude = [
+  ".env",
+  ".env.*",
+  ".direnv/**",
+  ".zed/**",
+  ".zed-pack/**",
+  ".vendor/.zed/**",
+  "node_modules/**",
+  "tmp/**",
+  "**/*.log",
+  ".DS_Store",
+]
+
+[publish.native]
+registry = "npm"
+package = "live-mutex"
+
+[scripts]
+test = "npm test"
