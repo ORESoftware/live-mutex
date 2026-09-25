@@ -1,0 +1,140 @@
+name: nine-client broker e2e
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - '.github/workflows/nine-client-e2e.yml'
+      - 'src/**'
+      - 'clients/**'
+      - 'package.json'
+      - 'package-lock.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: live-mutex-nine-client-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cross-language-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      LMX_HOST: 127.0.0.1
+      LMX_PORT: '6970'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87
+        with:
+          toolchain: stable
+
+      - name: Setup Go
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: '1.23.x'
+
+      - name: Setup Java
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Dart
+        uses: dart-lang/setup-dart@6afc89df92d6eb3834022f73cd65adc8cdfcb92d # v1
+
+      - name: Setup Erlang and Gleam
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
+        with:
+          otp-version: '27'
+          gleam-version: '1.16.0'
+
+      - name: Require all nine client toolchains
+        shell: bash
+        run: |
+          set -euo pipefail
+          for tool in bash cargo c++ dart gleam go java mvn node npm pwsh python3 rustc; do
+            command -v "$tool" >/dev/null || {
+              echo "missing required toolchain: $tool" >&2
+              exit 1
+            }
+          done
+
+      - name: Build broker
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --ignore-scripts
+          npm run compile
+
+      - name: Start broker and prove readiness
+        shell: bash
+        run: |
+          set -euo pipefail
+          node -e 'const {Broker1}=require("./dist/main.js"); new Broker1({port:6970,host:"127.0.0.1"}).ensure().then(()=>console.log("broker-ready"));' > broker.log 2>&1 &
+          echo $! > broker.pid
+          for attempt in $(seq 1 40); do
+            if bash -c 'exec 3<>/dev/tcp/127.0.0.1/6970' 2>/dev/null; then
+              exit 0
+            fi
+            sleep 0.25
+          done
+          cat broker.log >&2 || true
+          exit 1
+
+      - name: Client 1/9 - Rust
+        shell: bash
+        run: cd clients/rust && cargo run --example smoke
+
+      - name: Client 2/9 - Python
+        shell: bash
+        run: cd clients/python && python3 -m live_mutex_client.smoke
+
+      - name: Client 3/9 - Shell
+        shell: bash
+        run: ./clients/shell/smoke.sh
+
+      - name: Client 4/9 - PowerShell
+        shell: bash
+        run: pwsh ./clients/powershell/smoke.ps1
+
+      - name: Client 5/9 - Go
+        shell: bash
+        run: cd clients/go && go run ./cmd/smoke
+
+      - name: Client 6/9 - Dart
+        shell: bash
+        run: cd clients/dart && dart pub get && dart run example/smoke.dart
+
+      - name: Client 7/9 - Java
+        shell: bash
+        run: cd clients/java && mvn -q exec:java
+
+      - name: Client 8/9 - C++
+        shell: bash
+        run: cd clients/cpp && make test && make run
+
+      - name: Client 9/9 - Gleam
+        shell: bash
+        run: cd clients/gleam && LIVE_MUTEX_SMOKE=1 gleam test
+
+      - name: Broker diagnostics and cleanup
+        if: always()
+        shell: bash
+        run: |
+          cat broker.log || true
+          if test -f broker.pid; then
+            kill "$(cat broker.pid)" 2>/dev/null || true
+          fi
