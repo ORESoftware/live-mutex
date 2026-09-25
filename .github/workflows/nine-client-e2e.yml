@@ -100,7 +100,7 @@ jobs:
 
       - name: Client 2/9 - Python
         shell: bash
-        run: cd clients/python && python3 -m live_mutex_client.smoke
+        run: cd clients/python && PYTHONPATH=src python3 -m live_mutex_client.smoke
 
       - name: Client 3/9 - Shell
         shell: bash
