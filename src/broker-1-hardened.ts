@@ -26,7 +26,9 @@ export class FencingTokenExhaustedError extends Error {
 
 function configuredFloor(): number {
   const raw = process.env.LMX_FENCING_TOKEN_FLOOR;
-  if (!raw) return 0;
+  if (!raw) {
+    return 0;
+  }
   if (!/^(0|[1-9][0-9]*)$/.test(raw)) {
     throw new Error('LMX_FENCING_TOKEN_FLOOR must be canonical non-negative decimal text');
   }
@@ -105,7 +107,9 @@ export class Broker1 extends BaseBroker1 {
       throw new FencingTokenExhaustedError();
     }
     target.nextFencingToken = seed;
-    if (seed > this.fencingWatermark) this.fencingWatermark = seed;
+    if (seed > this.fencingWatermark) {
+      this.fencingWatermark = seed;
+    }
 
     const self = this;
     return new Proxy(target, {
@@ -120,7 +124,9 @@ export class Broker1 extends BaseBroker1 {
           ) {
             throw new FencingTokenExhaustedError();
           }
-          if (value > self.fencingWatermark) self.fencingWatermark = value;
+          if (value > self.fencingWatermark) {
+            self.fencingWatermark = value;
+          }
         }
         return Reflect.set(obj, prop, value, receiver);
       },
@@ -155,7 +161,9 @@ export class Broker1 extends BaseBroker1 {
     try {
       return super.lock(data, ws);
     } catch (error) {
-      if (!(error instanceof FencingTokenExhaustedError)) throw error;
+      if (!(error instanceof FencingTokenExhaustedError)) {
+        throw error;
+      }
       this.emitExhausted(ws, data, 'lock');
     }
   }
@@ -171,7 +179,9 @@ export class Broker1 extends BaseBroker1 {
     try {
       return super.acquireMany(data, ws);
     } catch (error) {
-      if (!(error instanceof FencingTokenExhaustedError)) throw error;
+      if (!(error instanceof FencingTokenExhaustedError)) {
+        throw error;
+      }
       this.emitExhausted(ws, data, 'acquire-many');
     }
   }
@@ -187,7 +197,9 @@ export class Broker1 extends BaseBroker1 {
     try {
       return super.ensureNewLockHolder(lck, data);
     } catch (error) {
-      if (!(error instanceof FencingTokenExhaustedError)) throw error;
+      if (!(error instanceof FencingTokenExhaustedError)) {
+        throw error;
+      }
       this.emitter.emit('warning', error.message);
       return;
     }
