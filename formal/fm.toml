@@ -1,0 +1,43 @@
+schema_version = 1
+id = "live-mutex-lock-refinement-v1"
+repository = "ORESoftware/live-mutex"
+model = "formal/model.mjs"
+runner = "node"
+adapter_protocol = "jsonl-actions/v1"
+command = ["node", "formal/model.mjs"]
+replay_command = ["node", "formal/model.mjs", "--json-stdin"]
+claim = "finite-exhaustive-abstraction"
+timeout_seconds = 30
+
+[limits]
+clients = 2
+max_time = 5
+max_fence = 4
+lease_ttl = 2
+
+[[invariants]]
+id = "exclusive-live-holder"
+description = "At most one client is the live exclusive holder for a key."
+[[invariants]]
+id = "fifo-waiter-order"
+description = "Release or expiry grants the oldest queued request first."
+[[invariants]]
+id = "unique-request-id"
+description = "A request id is queued or resolved at most once."
+[[invariants]]
+id = "monotonic-fencing-token"
+description = "Every new grant advances the fencing token."
+[[invariants]]
+id = "renew-preserves-fence"
+description = "Renewal never changes the fencing token."
+[[invariants]]
+id = "stale-release-side-effect-free"
+description = "A stale/non-owner release cannot mutate the current grant."
+[[invariants]]
+id = "ttl-expiry-progress"
+description = "Expiry clears authority and lets the oldest waiter progress."
+
+[refinement]
+status = "required"
+production_paths = ["src", "assets/cli", "test", "dist"]
+notes = "The Node implementation and its published client surface must keep native tests green after the bounded model passes."
