@@ -11,27 +11,17 @@ const SKIP_DIRS = new Set(['target', 'build', 'dist', 'node_modules', '.git']);
 const collectSource = (root: string): { text: string; files: number } => {
   let text = '';
   let files = 0;
-
   const visit = (entryPath: string): void => {
     const stat = fs.statSync(entryPath);
     if (stat.isDirectory()) {
-      if (SKIP_DIRS.has(path.basename(entryPath))) {
-        return;
-      }
-      for (const child of fs.readdirSync(entryPath)) {
-        visit(path.join(entryPath, child));
-      }
+      if (SKIP_DIRS.has(path.basename(entryPath))) return;
+      for (const child of fs.readdirSync(entryPath)) visit(path.join(entryPath, child));
       return;
     }
-
-    if (!SOURCE_EXTENSIONS.has(path.extname(entryPath))) {
-      return;
-    }
-    text += fs.readFileSync(entryPath, 'utf8');
-    text += '\n';
+    if (!SOURCE_EXTENSIONS.has(path.extname(entryPath))) return;
+    text += fs.readFileSync(entryPath, 'utf8') + '\n';
     files += 1;
   };
-
   visit(root);
   return { text, files };
 };
@@ -46,14 +36,18 @@ const clientDirs = fs.readdirSync(clientsRoot)
 
 assert.ok(clientDirs.length >= 8, `expected broad polyglot client matrix, found ${clientDirs.length}`);
 
+const noSource: string[] = [];
+const missingFencing: string[] = [];
 for (const { name, fullPath } of clientDirs) {
   const { text, files } = collectSource(fullPath);
-  assert.ok(files > 0, `client ${name} has no implementation source files to audit`);
-  const normalized = normalizeAuthoritySurface(text);
-  assert.ok(
-    normalized.includes('fencingtoken'),
-    `client ${name} does not expose/preserve a fencing-token field in implementation source`,
-  );
+  if (files === 0) {
+    noSource.push(name);
+    continue;
+  }
+  if (!normalizeAuthoritySurface(text).includes('fencingtoken')) missingFencing.push(name);
 }
-
+noSource.sort();
+missingFencing.sort();
+assert.deepStrictEqual(noSource, [], `client directories with no implementation source: ${noSource.join(', ')}`);
+assert.deepStrictEqual(missingFencing, [], `clients that do not expose/preserve a fencing-token field: ${missingFencing.join(', ')}`);
 console.log(`formal client fencing surface OK: ${clientDirs.length} client implementations checked`);
