@@ -13,7 +13,11 @@ export {Broker, LMXBroker, LvMtxBroker} from './broker';
 // token exhaustion by default. The historical implementation remains an
 // internal base class in broker-1.ts.
 export {Broker1, LMXBroker as LMXBroker1, LvMtxBroker as LvMtxBroker1} from './broker-1-hardened';
-export {MAX_FENCING_TOKEN, FencingTokenExhaustedError} from './broker-1-hardened';
+export {
+  MAX_FENCING_TOKEN,
+  FencingTokenExhaustedError,
+  FencingTokenPersistenceError,
+} from './broker-1-hardened';
 export {LMXHttpServer} from './http-server';
 export {InProcessBridge, VirtualSocket} from './in-process-bridge';
 export {routineEnter, initOtel, shutdownOtel, setOtelEnabled, isOtelEnabled} from './routine';
