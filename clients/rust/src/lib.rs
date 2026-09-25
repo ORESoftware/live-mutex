@@ -34,7 +34,7 @@ use uuid::Uuid;
 
 /// Wire protocol version. Must match the broker. The broker only
 /// rejects strictly-older clients, so revving this is forward-safe.
-pub const PROTOCOL_VERSION: &str = "0.2.25";
+pub const PROTOCOL_VERSION: &str = "0.2.27";
 
 #[derive(thiserror::Error, Debug)]
 pub enum ClientError {
