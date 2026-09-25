@@ -22,4 +22,4 @@ class Shuffler {
 
 const s = new Shuffler();
 
-console.log(s.shuffleDeck([new Card(12,'Spades'), new Card(13,'Hearts'), new Card(1,'Clubs'), new Card(3,'Diamonds')]))
+console.log(s.shuffleDeck([new Card(12,'Spades'), new Card(13,'Hearts'), new Card(1,'Clubs'), new Card(3,'Diamonds')]));

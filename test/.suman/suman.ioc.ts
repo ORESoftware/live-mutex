@@ -30,7 +30,7 @@ module.exports = data => {  //load async deps for any of your suman tests
       },
 
       'lmUtils': function () {
-        return import('../../dist/utils')
+        return import('../../dist/utils');
       },
 
       'Promise': function () {
@@ -45,6 +45,6 @@ module.exports = data => {  //load async deps for any of your suman tests
 
     }
 
-  }
+  };
 
 };

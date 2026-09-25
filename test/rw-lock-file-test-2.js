@@ -168,9 +168,9 @@ async function runRWLockFileTest() {
     console.log(`Log file: ${LOG_FILE}\n`);
     try {
         if (fs.existsSync(TEST_FILE))
-            fs.unlinkSync(TEST_FILE);
+            {fs.unlinkSync(TEST_FILE);}
         if (fs.existsSync(LOG_FILE))
-            fs.unlinkSync(LOG_FILE);
+            {fs.unlinkSync(LOG_FILE);}
     }
     catch (err) {
     }

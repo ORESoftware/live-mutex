@@ -86,7 +86,7 @@ function httpReq(
             },
         );
         req.on('error', reject);
-        if (rawBody !== undefined) req.write(rawBody);
+        if (rawBody !== undefined) {req.write(rawBody);}
         req.end();
     });
 }
@@ -114,7 +114,7 @@ function httpForm(
     fields: Record<string, string>,
 ): Promise<HttpReply> {
     const params = new URLSearchParams();
-    for (const k of Object.keys(fields)) params.append(k, fields[k]);
+    for (const k of Object.keys(fields)) {params.append(k, fields[k]);}
     const rawBody = params.toString();
     const finalHeaders: Record<string, string> = {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -136,7 +136,7 @@ async function main() {
     });
     await httpServer.start();
     const port: number = (httpServer as any).server.address().port;
-    if (!port) fail('HTTP server did not bind a port');
+    if (!port) {fail('HTTP server did not bind a port');}
 
     try {
         // --- /admin/log-level (legacy JSON path) --------------------
@@ -373,7 +373,7 @@ async function main() {
                         : Buffer.isBuffer(chunk) ? chunk.toString('utf8') : String(chunk);
                     captured.push(s);
                 } catch { /* ignore */ }
-                if (typeof encoding === 'function') return (origWrite as any)(chunk, encoding);
+                if (typeof encoding === 'function') {return (origWrite as any)(chunk, encoding);}
                 return (origWrite as any)(chunk, encoding, cb);
             };
             try {

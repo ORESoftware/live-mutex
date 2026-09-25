@@ -47,7 +47,7 @@ if (useUDS || v.udsPath) {
     process.exit(1);
   }
   try{
-    fs.unlinkSync(v.udsPath)
+    fs.unlinkSync(v.udsPath);
   }
   catch(err){
      // ignore

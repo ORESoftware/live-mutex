@@ -34,7 +34,7 @@ function resolveLaunchBrokerPath(): string {
     }
     const cwd = process.cwd();
     const srcPath = path.resolve(cwd, 'src', 'launch-broker-child.js');
-    if (fs.existsSync(srcPath)) return srcPath;
+    if (fs.existsSync(srcPath)) {return srcPath;}
     return path.resolve(cwd, 'dist', 'launch-broker-child.js');
 }
 const p = resolveLaunchBrokerPath();
@@ -50,8 +50,8 @@ export const launchSocketServer = function (opts: any, cb: EVCb<any>) {
   const host = opts.host || 'localhost';
   const port = opts.port || 6970;
   ping.probe(host, port, function (err, available) {
-    if (err) return cb(err, {});
-    if (available) return cb(null, 'available');
+    if (err) {return cb(err, {});}
+    if (available) {return cb(null, 'available');}
     return new Broker1({host: host, port: port}).ensure(cb as any);
   });
 };
@@ -76,7 +76,7 @@ export const launchBrokerInChildProcess = function (opts: any, cb: EVCb<any>) {
   const port = opts.port || 8019;
   const detached = Boolean(opts.detached);
   ping.probe(host, port, function (err, available) {
-    if (err) return cb(err, {});
+    if (err) {return cb(err, {});}
     if (available) {
       log.info(`live-mutex broker/server was already live at ${host}:${port}.`);
       return cb(null, {host, port, alreadyRunning: true});
@@ -86,9 +86,9 @@ export const launchBrokerInChildProcess = function (opts: any, cb: EVCb<any>) {
       detached,
       env: Object.assign({}, process.env, {LIVE_MUTEX_PORT: port})
     });
-    if (detached) n.unref();
+    if (detached) {n.unref();}
     process.once('exit', function () {
-      if (!detached) n.kill('SIGINT');
+      if (!detached) {n.kill('SIGINT');}
     });
     n.stderr.setEncoding('utf8');
     n.stdout.setEncoding('utf8');
@@ -99,7 +99,7 @@ export const launchBrokerInChildProcess = function (opts: any, cb: EVCb<any>) {
       stdout += String(d);
       if (stdout.match(/live-mutex broker is listening/i)) {
         n.stdout.removeAllListeners();
-        if (detached) n.unref();
+        if (detached) {n.unref();}
         cb(null, {liveMutexProcess: n, host, port, detached});
       }
     });

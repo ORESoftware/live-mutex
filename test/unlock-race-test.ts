@@ -90,7 +90,7 @@ class FakeSocket extends EventEmitter {
 
     write(data: any, _enc?: any, cb?: (err?: Error | null) => void): boolean {
         if (this.destroyed) {
-            if (cb) process.nextTick(cb, Object.assign(new Error('destroyed'), {code: 'ERR_STREAM_DESTROYED'}));
+            if (cb) {process.nextTick(cb, Object.assign(new Error('destroyed'), {code: 'ERR_STREAM_DESTROYED'}));}
             return false;
         }
         const text = typeof data === 'string' ? data
@@ -98,14 +98,14 @@ class FakeSocket extends EventEmitter {
             : String(data);
         this.bytesWritten += Buffer.byteLength(text);
         for (const line of text.split('\n')) {
-            if (!line) continue;
+            if (!line) {continue;}
             try {
                 this.framesIn.push(JSON.parse(line));
             } catch {
                 // ignore
             }
         }
-        if (cb) process.nextTick(cb, null);
+        if (cb) {process.nextTick(cb, null);}
         return true;
     }
 
@@ -144,8 +144,8 @@ class FakeSocket extends EventEmitter {
     cork(): void {}
     uncork(): void {}
     get readyState() {
-        if (this.destroyed) return 'closed';
-        if (this.writable && this.readable) return 'open';
+        if (this.destroyed) {return 'closed';}
+        if (this.writable && this.readable) {return 'open';}
         return 'closed';
     }
 }

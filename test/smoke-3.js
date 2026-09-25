@@ -31,7 +31,7 @@ Promise.all([
       console.log('acquired write lock', release);
       return c.run(release).then(v => {
         console.log('all done writing/released write lock:', Object.assign({}, val));
-      })
+      });
     });
   };
 
@@ -56,7 +56,7 @@ Promise.all([
   for (let v = 0; v < 100; v++) {
     p = p.then(function () {
       console.log('running.');
-      return Promise.all(new Array(10).fill(null).map(v => x()))
+      return Promise.all(new Array(10).fill(null).map(v => x()));
     });
   }
 

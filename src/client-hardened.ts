@@ -63,7 +63,7 @@ export class Client extends BaseClient {
       return (super.lock as any)(...args);
     }
     const wrapped = (err: any, value: LMLockSuccessData) => {
-      if (err) return cb(err, value);
+      if (err) {return cb(err, value);}
       try {
         assertFencingToken(value?.fencingToken);
       } catch (cause) {

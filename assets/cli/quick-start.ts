@@ -142,7 +142,7 @@ Environment Variables:
       process.exit(0);
     } catch (err: any) {
       console.error(`❌ Test failed:`, err.message || err);
-      if (client) client.close();
+      if (client) {client.close();}
       process.exit(1);
     }
   }

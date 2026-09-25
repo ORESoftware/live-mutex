@@ -118,7 +118,7 @@ class Oracle {
     }
 
     fencingUnique(key: string, token: number | null | undefined) {
-        if (token == null) return;
+        if (token == null) {return;}
         const set = this.getOrInit(this.seenFencing, key);
         if (set.has(token)) {
             this.check(`duplicate-fencing-token key=${key} token=${token}`);
@@ -138,43 +138,43 @@ class Oracle {
                     this.check(`semaphore-cap-exceeded key=${key} count=${set.size} max=${cap} holders=[${[...set].join(',')}]`);
                 }
                 if ((this.writers.get(key)?.size ?? 0) > 0)
-                    this.check(`exclusive-while-writer key=${key}`);
+                    {this.check(`exclusive-while-writer key=${key}`);}
                 if ((this.readers.get(key)?.size ?? 0) > 0)
-                    this.check(`exclusive-while-readers key=${key}`);
+                    {this.check(`exclusive-while-readers key=${key}`);}
                 if ((this.composites.get(key)?.size ?? 0) > 0)
-                    this.check(`exclusive-while-composite key=${key}`);
+                    {this.check(`exclusive-while-composite key=${key}`);}
             } else if (holder.kind === 'read') {
                 if ((this.writers.get(key)?.size ?? 0) > 0)
-                    this.check(`read-while-writer key=${key}`);
+                    {this.check(`read-while-writer key=${key}`);}
                 if ((this.exclusive.get(key)?.size ?? 0) > 0)
-                    this.check(`read-while-exclusive key=${key}`);
+                    {this.check(`read-while-exclusive key=${key}`);}
                 this.getOrInit(this.readers, key).add(holder.lockUuid);
             } else if (holder.kind === 'write') {
                 if ((this.readers.get(key)?.size ?? 0) > 0)
-                    this.check(`write-while-readers key=${key} readers=${[...(this.readers.get(key) || [])]} new=${holder.lockUuid}`);
+                    {this.check(`write-while-readers key=${key} readers=${[...(this.readers.get(key) || [])]} new=${holder.lockUuid}`);}
                 if ((this.writers.get(key)?.size ?? 0) > 0)
-                    this.check(`write-while-writer key=${key} existing=${[...(this.writers.get(key) || [])]} new=${holder.lockUuid}`);
+                    {this.check(`write-while-writer key=${key} existing=${[...(this.writers.get(key) || [])]} new=${holder.lockUuid}`);}
                 if ((this.exclusive.get(key)?.size ?? 0) > 0)
-                    this.check(`write-while-exclusive key=${key}`);
+                    {this.check(`write-while-exclusive key=${key}`);}
                 this.getOrInit(this.writers, key).add(holder.lockUuid);
             } else {
                 if ((this.exclusive.get(key)?.size ?? 0) > 0)
-                    this.check(`composite-while-exclusive key=${key}`);
+                    {this.check(`composite-while-exclusive key=${key}`);}
                 if ((this.readers.get(key)?.size ?? 0) > 0)
-                    this.check(`composite-while-readers key=${key}`);
+                    {this.check(`composite-while-readers key=${key}`);}
                 if ((this.writers.get(key)?.size ?? 0) > 0)
-                    this.check(`composite-while-writer key=${key}`);
+                    {this.check(`composite-while-writer key=${key}`);}
                 if ((this.composites.get(key)?.size ?? 0) > 0)
-                    this.check(`composite-while-composite key=${key}`);
+                    {this.check(`composite-while-composite key=${key}`);}
                 this.getOrInit(this.composites, key).add(holder.lockUuid);
             }
         }
         // Fencing uniqueness.
-        if (fencing == null) return;
+        if (fencing == null) {return;}
         if (typeof fencing === 'number') {
-            for (const k of holder.keys) this.fencingUnique(k, fencing);
+            for (const k of holder.keys) {this.fencingUnique(k, fencing);}
         } else {
-            for (const k of holder.keys) this.fencingUnique(k, fencing[k]);
+            for (const k of holder.keys) {this.fencingUnique(k, fencing[k]);}
         }
     }
 
@@ -194,10 +194,10 @@ class Oracle {
         if (this.violations.length > 0) {
             return `${this.violations.length} violation(s): ${JSON.stringify(this.violations)}`;
         }
-        for (const [k, s] of this.exclusive) if (s.size) return `leaked exclusive ${k}: ${[...s]}`;
-        for (const [k, s] of this.readers) if (s.size) return `leaked readers ${k}: ${[...s]}`;
-        for (const [k, s] of this.writers) if (s.size) return `leaked writers ${k}: ${[...s]}`;
-        for (const [k, s] of this.composites) if (s.size) return `leaked composites ${k}: ${[...s]}`;
+        for (const [k, s] of this.exclusive) {if (s.size) {return `leaked exclusive ${k}: ${[...s]}`;}}
+        for (const [k, s] of this.readers) {if (s.size) {return `leaked readers ${k}: ${[...s]}`;}}
+        for (const [k, s] of this.writers) {if (s.size) {return `leaked writers ${k}: ${[...s]}`;}}
+        for (const [k, s] of this.composites) {if (s.size) {return `leaked composites ${k}: ${[...s]}`;}}
         return null;
     }
 }
@@ -224,7 +224,7 @@ async function pickPort(): Promise<number> {
                 server.close(() => resolve(true));
             });
         });
-        if (ok) return candidate;
+        if (ok) {return candidate;}
     }
     throw new Error('pickPort: could not bind any candidate port');
 }
@@ -297,16 +297,16 @@ function startBrokerSampler(broker: any, keys: string[]) {
     const id = setInterval(() => {
         for (const k of keys) {
             const lck = broker.locks?.get?.(k);
-            if (!lck) continue;
+            if (!lck) {continue;}
             const holders = lck.lockholders?.size ?? 0;
-            if (holders > (maxHolders.get(k) ?? 0)) maxHolders.set(k, holders);
+            if (holders > (maxHolders.get(k) ?? 0)) {maxHolders.set(k, holders);}
             const readers = lck.readers ?? 0;
-            if (readers > (maxReaders.get(k) ?? 0)) maxReaders.set(k, readers);
+            if (readers > (maxReaders.get(k) ?? 0)) {maxReaders.set(k, readers);}
             // Look for any holder whose recorded rwStatus indicated a
             // writer. We don't have direct access to per-holder rw
             // status, but the broker tracks `writerFlag` in a separate
             // map; if it ever becomes truthy, a writer was acknowledged.
-            if (lck.writerFlag) writerSeen.set(k, true);
+            if (lck.writerFlag) {writerSeen.set(k, true);}
         }
     }, 1);
     return {
@@ -323,7 +323,7 @@ async function withTimeout<T>(label: string, ms: number, p: Promise<T>): Promise
     try {
         return await Promise.race([p, timer]);
     } finally {
-        if (to) clearTimeout(to);
+        if (to) {clearTimeout(to);}
     }
 }
 
@@ -376,7 +376,7 @@ async function s1_exclusive_no_double_grant() {
         sampler.stop();
         for (const k of keys) {
             const m = sampler.maxHolders.get(k) ?? 0;
-            if (m > 1) fail(label, `[seed=${seed}] broker held ${m} concurrent exclusive holders on ${k}`);
+            if (m > 1) {fail(label, `[seed=${seed}] broker held ${m} concurrent exclusive holders on ${k}`);}
         }
         if (fencingDuplicates.length > 0) {
             fail(label, `[seed=${seed}] duplicate fencing tokens: ${fencingDuplicates.join(', ')}`);
@@ -411,7 +411,7 @@ async function s2_semaphore_cap_invariant() {
         const sampler = setInterval(() => {
             const lck = broker.locks?.get?.(key);
             const sz = lck?.lockholders?.size ?? 0;
-            if (sz > brokerMaxHolders) brokerMaxHolders = sz;
+            if (sz > brokerMaxHolders) {brokerMaxHolders = sz;}
         }, 1);
         const tasks: Promise<void>[] = [];
         for (let i = 0; i < clientCount; i++) {
@@ -437,7 +437,7 @@ async function s2_semaphore_cap_invariant() {
                         try {
                             const lock = await c.acquire(key, {ttl: 800, max, maxRetries: 1});
                             const ms = rng.range(0, 3);
-                            if (ms > 0) await new Promise(r => setTimeout(r, ms));
+                            if (ms > 0) {await new Promise(r => setTimeout(r, ms));}
                             await c.release(key, lock.id);
                         } catch {}
                     }
@@ -530,7 +530,7 @@ async function s3_rw_lock_safety() {
             sampler.stop();
             for (const k of keys) {
                 const m = sampler.maxHolders.get(k) ?? 0;
-                if (m > 1) fail(label, `[seed=${seed}] 3a broker held ${m} concurrent writers on ${k}`);
+                if (m > 1) {fail(label, `[seed=${seed}] 3a broker held ${m} concurrent writers on ${k}`);}
             }
             ok(label, `3a writer-vs-writer exclusion held (broker max holders: ${[...sampler.maxHolders.entries()].map(([k,v]) => `${k}=${v}`).join(', ')})`);
         }
@@ -604,7 +604,7 @@ async function s4_acquire_many_atomicity_via_bridge() {
     const bridge = new InProcessBridge(broker);
     try {
         const keys = ['s4-k0', 's4-k1', 's4-k2', 's4-k3', 's4-k4'];
-        for (const k of keys) oracle.setMax(k, 1);
+        for (const k of keys) {oracle.setMax(k, 1);}
 
         // We need many concurrent acquireMany requests against overlapping
         // key subsets. Each request goes through the bridge; the bridge
@@ -621,7 +621,7 @@ async function s4_acquire_many_atomicity_via_bridge() {
                 for (let n = 0; n < opsPer; n++) {
                     const cnt = 1 + rng.range(0, 4);
                     const idx = new Set<number>();
-                    while (idx.size < cnt) idx.add(rng.range(0, keys.length));
+                    while (idx.size < cnt) {idx.add(rng.range(0, keys.length));}
                     const ks = [...idx].map(i => keys[i]);
                     let reply: any;
                     try {
@@ -629,7 +629,7 @@ async function s4_acquire_many_atomicity_via_bridge() {
                     } catch {
                         continue;
                     }
-                    if (!reply || reply.acquired !== true) continue;
+                    if (!reply || reply.acquired !== true) {continue;}
                     const lockUuid = reply.lockUuid;
                     const fencings: Record<string, number> = reply.fencingTokens || {};
                     const holder: Holder = {kind: 'composite', lockUuid, keys: ks};
@@ -641,7 +641,7 @@ async function s4_acquire_many_atomicity_via_bridge() {
         }
         await withTimeout(label, 60_000, Promise.all(tasks));
         const v = oracle.assertClean();
-        if (v) fail(label, `[seed=${seed}] ${v}`);
+        if (v) {fail(label, `[seed=${seed}] ${v}`);}
         ok(label, 'acquireMany atomic + union semantics + fencing uniqueness held');
     } finally {
         bridge.shutdown();
@@ -825,7 +825,7 @@ async function s7_mixed_workload_exclusive_rw_composite() {
                         try {
                             const lock = await c.acquire(key, {ttl: 1_500, maxRetries: 1});
                             const ms = rng.range(0, 3);
-                            if (ms > 0) await new Promise(r => setTimeout(r, ms));
+                            if (ms > 0) {await new Promise(r => setTimeout(r, ms));}
                             await c.release(key, lock.id);
                         } catch {}
                     }
@@ -838,7 +838,7 @@ async function s7_mixed_workload_exclusive_rw_composite() {
         sampler.stop();
         for (const k of keys) {
             const m = sampler.maxHolders.get(k) ?? 0;
-            if (m > 1) fail(label, `[seed=${seed}] broker held ${m} concurrent exclusive holders on ${k}`);
+            if (m > 1) {fail(label, `[seed=${seed}] broker held ${m} concurrent exclusive holders on ${k}`);}
         }
         ok(label, `dense exclusive workload (${clientCount}\u00D7${opsPer}) held all invariants (broker max holders: ${[...sampler.maxHolders.entries()].map(([k,v]) => `${k}=${v}`).join(', ')})`);
     } finally {

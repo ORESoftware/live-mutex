@@ -72,7 +72,7 @@ Promise.all([
 
   }, function (err) {
 
-    if (err) throw err;
+    if (err) {throw err;}
 
     console.log('all done I guess:', Date.now() - start);
 

@@ -37,10 +37,10 @@ async function testComprehensive(): Promise<void> {
         console.log('2. Testing write lock (uses LinkedQueue.enqueue)...');
         await new Promise<void>((resolve, reject) => {
             client.acquireWriteLock('test-key-1', {}, (err: any, release: any) => {
-                if (err) return reject(err);
+                if (err) {return reject(err);}
                 console.log('   ✓ Write lock acquired (enqueue worked)');
                 release((err: any) => {
-                    if (err) return reject(err);
+                    if (err) {return reject(err);}
                     console.log('   ✓ Write lock released\n');
                     resolve();
                 });
@@ -53,7 +53,7 @@ async function testComprehensive(): Promise<void> {
         for (let i = 0; i < 3; i++) {
             await new Promise<void>((resolve, reject) => {
                 client.acquireReadLock('test-key-2', {}, (err: any, release: any) => {
-                    if (err) return reject(err);
+                    if (err) {return reject(err);}
                     readLocks.push(release);
                     console.log(`   ✓ Read lock ${i + 1} acquired`);
                     resolve();
@@ -65,7 +65,7 @@ async function testComprehensive(): Promise<void> {
         for (let i = 0; i < readLocks.length; i++) {
             await new Promise<void>((resolve, reject) => {
                 readLocks[i]((err: any) => {
-                    if (err) return reject(err);
+                    if (err) {return reject(err);}
                     console.log(`   ✓ Read lock ${i + 1} released`);
                     resolve();
                 });
@@ -79,10 +79,10 @@ async function testComprehensive(): Promise<void> {
         for (let i = 0; i < 5; i++) {
             promises.push(new Promise<void>((resolve, reject) => {
                 client.acquireWriteLock(`concurrent-key-${i}`, {}, (err: any, release: any) => {
-                    if (err) return reject(err);
+                    if (err) {return reject(err);}
                     setTimeout(() => {
                         release((err: any) => {
-                            if (err) return reject(err);
+                            if (err) {return reject(err);}
                             resolve();
                         });
                     }, 10);
@@ -101,7 +101,7 @@ async function testComprehensive(): Promise<void> {
         console.log('6. Cleaning up...');
         await new Promise<void>((resolve, reject) => {
             broker.close((err: any) => {
-                if (err) return reject(err);
+                if (err) {return reject(err);}
                 resolve();
             });
         });

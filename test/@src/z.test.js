@@ -25,7 +25,7 @@ Test.create({ mode: 'parallel' }, ['lmUtils', function (b, assert, before, it) {
             const client = new main_1.Client(conf, (err, c) => {
                 c.lock('z', function (err, v) {
                     if (err)
-                        return t(err);
+                        {return t(err);}
                     c.unlock('z', v.id, t);
                 });
             });
@@ -37,12 +37,12 @@ Test.create({ mode: 'parallel' }, ['lmUtils', function (b, assert, before, it) {
                 }
                 c.lock('z', {}, function (err, unlock) {
                     if (err)
-                        return t(err);
+                        {return t(err);}
                     unlock(t.done);
                 });
                 c.lock('z', function (err, unlock) {
                     if (err)
-                        return t(err);
+                        {return t(err);}
                     unlock(t.done);
                 });
             });
@@ -51,10 +51,10 @@ Test.create({ mode: 'parallel' }, ['lmUtils', function (b, assert, before, it) {
             const client = new main_1.Client(conf);
             return client.ensure(function (err, c) {
                 if (err)
-                    return t(err);
+                    {return t(err);}
                 c.lock('z', function (err, v) {
                     if (err)
-                        return t(err);
+                        {return t(err);}
                     c.unlock('z', v.id, t);
                 });
             });
@@ -64,7 +64,7 @@ Test.create({ mode: 'parallel' }, ['lmUtils', function (b, assert, before, it) {
             return client.ensure().then(function (c) {
                 c.lock('z', function (err, v) {
                     if (err)
-                        return t(err);
+                        {return t(err);}
                     c.unlock('z', v.id, t.done);
                 });
             });

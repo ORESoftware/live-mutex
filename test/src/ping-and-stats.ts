@@ -49,7 +49,7 @@ Options:
 
 // Helper function to format bytes to human-readable format
 function formatBytes(bytes: number): string {
-    if (bytes === 0) return '0 Bytes';
+    if (bytes === 0) {return '0 Bytes';}
 
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
@@ -66,10 +66,10 @@ function formatDuration(seconds: number): string {
     const secs = Math.floor(seconds % 60);
 
     const parts = [];
-    if (days > 0) parts.push(`${days}d`);
-    if (hours > 0) parts.push(`${hours}h`);
-    if (minutes > 0) parts.push(`${minutes}m`);
-    if (secs > 0 || parts.length === 0) parts.push(`${secs}s`);
+    if (days > 0) {parts.push(`${days}d`);}
+    if (hours > 0) {parts.push(`${hours}h`);}
+    if (minutes > 0) {parts.push(`${minutes}m`);}
+    if (secs > 0 || parts.length === 0) {parts.push(`${secs}s`);}
 
     return parts.join(' ');
 }

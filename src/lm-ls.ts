@@ -45,7 +45,7 @@ process.once('uncaughtException', function (e: any) {
 const getSelectable = function (selectable: object, original:any) {
   const routineId = 'ddl-routine-IBBZdfFeHG3EgKIsH4';
   routineEnter(routineId, "getSelectable");
-  return Object.keys(selectable).reduce((a, b) => (a[b] = original[b], a), {} as any)
+  return Object.keys(selectable).reduce((a, b) => (a[b] = original[b], a), {} as any);
 };
 
 const clientOpts = getSelectable(validConstructorOptions, v);
@@ -54,7 +54,7 @@ new Client(clientOpts).ensure().then(function (c) {
   
   c.ls(function (err, results) {
     
-    if (err) throw err;
+    if (err) {throw err;}
     console.log(chalk.blueBright('Number of locks:'), chalk.bold(results.ls_result.length));
     console.log(chalk.blueBright('Lock keys list:'), results.ls_result);
     process.exit(0);

@@ -41,7 +41,7 @@ function printCapturedLogs() {
 }
 function addLog(type, source, message) {
     if (!captureEnabled)
-        return;
+        {return;}
     logs.push({
         type,
         source,
@@ -103,7 +103,7 @@ function captureClientLogs(client) {
 }
 function captureLogs(broker, client) {
     if (broker)
-        attachToBroker(broker);
+        {attachToBroker(broker);}
     if (client)
-        attachToClient(client);
+        {attachToClient(client);}
 }

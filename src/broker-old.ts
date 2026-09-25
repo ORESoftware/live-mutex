@@ -551,13 +551,13 @@ export class Broker {
         return brokerPromise =
           Promise.resolve(this)
                  .then(onResolve)
-                 .catch(onRejected)
+                 .catch(onRejected);
       }
       
       return brokerPromise = new Promise((resolve, reject) => {
         
         let to = setTimeout(function () {
-          reject('lmx broker error: listening action timed out.')
+          reject('lmx broker error: listening action timed out.');
         }, 3000);
         
         wss.once('error', reject);
@@ -1350,7 +1350,7 @@ export class Broker {
       
       if (beginRead) {
         // lck.readers = Math.max(20, lck.readers++);
-        lck.readers++
+        lck.readers++;
       }
       
       if (endRead) {
@@ -1429,7 +1429,7 @@ export class Broker {
     
     if (beginRead) {
       // lck.readers = Math.max(20, lck.readers++);
-      lckTemp.readers++
+      lckTemp.readers++;
     }
     
     if (endRead) {
