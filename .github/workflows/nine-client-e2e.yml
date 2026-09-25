@@ -120,7 +120,7 @@ jobs:
 
       - name: Client 7/9 - Java
         shell: bash
-        run: cd clients/java && mvn -q exec:java
+        run: cd clients/java && mvn -q compile exec:java
 
       - name: Client 8/9 - C++
         shell: bash
