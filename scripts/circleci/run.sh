@@ -5,24 +5,18 @@ set -euo pipefail
 node --version
 npm --version
 
-npm ci
-
-echo
+# The historical Suman dev dependency pulls sqlite3@3, whose native install
+# scripts cannot build on modern Node/V8. live-mutex does not use sqlite3 at
+# runtime, and the maintained test entrypoint is `npm test`, not the legacy
+# Suman CLI. Keep the lockfile deterministic while preventing unused dependency
+# lifecycle scripts from compiling native addons during CI.
+npm ci --ignore-scripts
 
 npm run compile
 
-echo
-
 ./test/setup-test.sh
 
-echo
-
-npx --no-install suman --default | cat
-
-echo
+npm test
 
 echo "Here is the contents of test/@target:"
-
-echo
-
 ls -a 'test/@target'
