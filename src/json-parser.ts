@@ -126,5 +126,5 @@ export const createParser = function (v?: JSONParserOpts) {
     opts.delayEvery = getJSONParseDelayEvery();
   }
 
-  return new LiveMutexJSONParser(opts)
+  return new LiveMutexJSONParser(opts);
 };

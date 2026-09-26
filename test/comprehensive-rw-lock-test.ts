@@ -42,7 +42,7 @@ function readFile(): string {
     try {
         return fs.readFileSync(TEST_FILE, 'utf8').trim();
     } catch (err: any) {
-        if (err.code === 'ENOENT') return '';
+        if (err.code === 'ENOENT') {return '';}
         throw err;
     }
 }
@@ -60,7 +60,7 @@ function appendToFile(content: string): void {
  * Timeout errors have code 'bad_or_mismatched_id' and message containing "timed out"
  */
 function isReleaseTimeoutError(err: any): boolean {
-    if (!err) return false;
+    if (!err) {return false;}
     // Timeout errors have code 'bad_or_mismatched_id' and message containing "timed out"
     return err.code === 'bad_or_mismatched_id' && 
            err.message && 
@@ -100,7 +100,7 @@ async function test1_ConcurrentReaders(broker: Broker1, clients: RWLockWritePref
             readers.push(
                 new Promise<void>((resolve, reject) => {
                     clients[i].acquireReadLock(key, {}, (err: any, release: any) => {
-                        if (err) return reject(err);
+                        if (err) {return reject(err);}
                         const content = readFile();
                         if (content !== 'TEST1') {
                             return reject(new Error(`Reader ${i} read wrong value: ${content}`));
@@ -141,7 +141,7 @@ async function test2_WriterExclusive(broker: Broker1, clients: RWLockWritePrefCl
         const writer = new Promise<void>((resolve, reject) => {
             const writerStartTime = Date.now();
             clients[0].acquireWriteLock(key, {}, (err: any, release: any) => {
-                if (err) return reject(err);
+                if (err) {return reject(err);}
                 writerAcquired = true;
                 log('Writer acquired');
                 
@@ -208,7 +208,7 @@ async function test3_SequentialWrites(broker: Broker1, clients: RWLockWritePrefC
         for (let i = 1; i <= 5; i++) {
             await new Promise<void>((resolve, reject) => {
                 clients[i % clients.length].acquireWriteLock(key, {}, (err: any, release: any) => {
-                    if (err) return reject(err);
+                    if (err) {return reject(err);}
                     const value = `WRITE-${i}`;
                     const before = readFile();
                     writeFile(value);
@@ -401,7 +401,7 @@ async function test6_FileConsistency(broker: Broker1, clients: RWLockWritePrefCl
         for (let i = 0; i < 10; i++) {
             await new Promise<void>((resolve, reject) => {
                 clients[i % clients.length].acquireWriteLock(key, {}, (err: any, release: any) => {
-                    if (err) return reject(err);
+                    if (err) {return reject(err);}
                     const line = `LINE-${i}\n`;
                     appendToFile(line);
                     expected.push(`LINE-${i}`);
@@ -514,7 +514,7 @@ async function runComprehensiveTests(): Promise<void> {
         
         // Clean up test file
         try {
-            if (fs.existsSync(TEST_FILE)) fs.unlinkSync(TEST_FILE);
+            if (fs.existsSync(TEST_FILE)) {fs.unlinkSync(TEST_FILE);}
         } catch (err) {
             // Ignore
         }

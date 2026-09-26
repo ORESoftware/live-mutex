@@ -61,7 +61,7 @@ Promise.all([
 
         setTimeout(function () {
           unlock(cb);
-        }, randomTime)
+        }, randomTime);
         
       });
       

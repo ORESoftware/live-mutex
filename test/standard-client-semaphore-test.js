@@ -32,7 +32,7 @@ async function test1_DefaultMaxIsOne(broker, clients) {
                     concurrentHolders--;
                     unlock((unlockErr) => {
                         if (unlockErr)
-                            log(`Client ${index} unlock error:`, unlockErr.message);
+                            {log(`Client ${index} unlock error:`, unlockErr.message);}
                         resolve();
                     });
                 }, 100);
@@ -88,7 +88,7 @@ async function test2_SemaphoreMaxThree(broker, clients) {
                     completedCount++;
                     unlock((unlockErr) => {
                         if (unlockErr)
-                            log(`Client ${index} unlock error:`, unlockErr.message);
+                            {log(`Client ${index} unlock error:`, unlockErr.message);}
                         resolve();
                     });
                 }, 50 + Math.random() * 100);
@@ -148,7 +148,7 @@ async function test3_SemaphoreMaxTen(broker, clients) {
                     completedCount++;
                     unlock((unlockErr) => {
                         if (unlockErr)
-                            log(`Client ${index} unlock error:`, unlockErr.message);
+                            {log(`Client ${index} unlock error:`, unlockErr.message);}
                         resolve();
                     });
                 }, 30 + Math.random() * 70);

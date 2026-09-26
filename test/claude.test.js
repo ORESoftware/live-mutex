@@ -60,9 +60,9 @@ async function runAllTests() {
             await new Promise((resolve, reject) => {
                 broker.close((err) => {
                     if (err)
-                        reject(err);
+                        {reject(err);}
                     else
-                        resolve();
+                        {resolve();}
                 });
             });
             console.log('✓ Broker closed');
@@ -88,7 +88,7 @@ async function testMultipleClientsForSameLock(port, allClients) {
             setTimeout(() => {
                 unlock((unlockErr) => {
                     if (unlockErr)
-                        console.error('  Error releasing lock:', unlockErr.message);
+                        {console.error('  Error releasing lock:', unlockErr.message);}
                     resolve();
                 });
             }, 100);
@@ -122,7 +122,7 @@ async function testSemaphoreWithMultipleHolders(port, allClients) {
                 completedCount++;
                 unlock((unlockErr) => {
                     if (unlockErr)
-                        console.error('  Error releasing semaphore:', unlockErr.message);
+                        {console.error('  Error releasing semaphore:', unlockErr.message);}
                     resolve();
                 });
             }, 50 + Math.random() * 150);
@@ -176,7 +176,7 @@ async function testLockExpiration(port, allClients) {
     await new Promise((resolve, reject) => {
         client1.lock(lockKey, { ttl: 500 }, (err) => {
             if (err)
-                return reject(err);
+                {return reject(err);}
             console.log('  First client acquired lock (will expire)');
             resolve();
         });
@@ -192,7 +192,7 @@ async function testLockExpiration(port, allClients) {
             lockAcquiredBySecond = true;
             unlock2((unlockErr) => {
                 if (unlockErr)
-                    console.error('  Error releasing lock by second client:', unlockErr.message);
+                    {console.error('  Error releasing lock by second client:', unlockErr.message);}
                 resolve();
             });
         });
@@ -212,7 +212,7 @@ async function testClientDisconnection(port, allClients) {
     await new Promise((resolve, reject) => {
         disposableClient.lock(lockKey, (err) => {
             if (err)
-                return reject(err);
+                {return reject(err);}
             console.log('  Disposable client acquired lock');
             resolve();
         });
@@ -235,7 +235,7 @@ async function testClientDisconnection(port, allClients) {
             lockAcquiredBySecond = true;
             unlock2((unlockErr) => {
                 if (unlockErr)
-                    console.error('  Error releasing lock by second client:', unlockErr.message);
+                    {console.error('  Error releasing lock by second client:', unlockErr.message);}
                 resolve();
             });
         });
@@ -254,7 +254,7 @@ async function testForcedUnlocks(port, allClients) {
     await new Promise((resolve, reject) => {
         client1.lock(lockKey, (err) => {
             if (err)
-                return reject(err);
+                {return reject(err);}
             lockAcquiredByFirst = true;
             console.log('  First client acquired lock');
             resolve();
@@ -281,7 +281,7 @@ async function testForcedUnlocks(port, allClients) {
     await new Promise((resolve, reject) => {
         client2.unlock(lockKey, { force: true }, (err) => {
             if (err)
-                return reject(err);
+                {return reject(err);}
             console.log('  Second client force-unlocked the lock');
             resolve();
         });
@@ -289,12 +289,12 @@ async function testForcedUnlocks(port, allClients) {
     await new Promise((resolve, reject) => {
         client2.lock(lockKey, (err, unlock2) => {
             if (err)
-                return reject(err);
+                {return reject(err);}
             lockAcquiredBySecond = true;
             console.log('  Second client acquired lock after force-unlock');
             unlock2((unlockErr) => {
                 if (unlockErr)
-                    console.error('  Error releasing lock by second client:', unlockErr.message);
+                    {console.error('  Error releasing lock by second client:', unlockErr.message);}
                 resolve();
             });
         });

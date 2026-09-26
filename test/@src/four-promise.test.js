@@ -21,7 +21,7 @@ Test.create({ mode: 'series' }, ['Client', 'lmUtils', 'Promise', function (b, as
                 }
                 c.lock('z', function (err, { id }) {
                     if (err)
-                        return t(err);
+                        {return t(err);}
                     c.unlock('z', id, t);
                 });
             });
@@ -31,7 +31,7 @@ Test.create({ mode: 'series' }, ['Client', 'lmUtils', 'Promise', function (b, as
             c.ensure().then(function () {
                 c.lock('z', function (err, { id }) {
                     if (err)
-                        return t(err);
+                        {return t(err);}
                     c.unlock('z', id, t);
                 });
             });
@@ -43,7 +43,7 @@ Test.create({ mode: 'series' }, ['Client', 'lmUtils', 'Promise', function (b, as
                 c.lock('z', function (err, { id }) {
                     t.log('acquired lock on z.');
                     if (err)
-                        return t(err);
+                        {return t(err);}
                     c.unlock('z', id, t);
                 });
             });

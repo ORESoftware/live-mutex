@@ -4,11 +4,11 @@ package com.oresoftware.livemutex;
 public final class LockGrant {
     public final String key;
     public final String lockUuid;
-    /** Per-key monotonic fencing token. {@code null} if the broker pre-dates fencing-token support. */
-    public final Long fencingToken;
+    /** Positive exact per-key fencing authority; successful grants never omit it. */
+    public final long fencingToken;
     public final Long lockRequestCount;
 
-    public LockGrant(String key, String lockUuid, Long fencingToken, Long lockRequestCount) {
+    public LockGrant(String key, String lockUuid, long fencingToken, Long lockRequestCount) {
         this.key = key;
         this.lockUuid = lockUuid;
         this.fencingToken = fencingToken;

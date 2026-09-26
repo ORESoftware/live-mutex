@@ -58,7 +58,7 @@ const client = new Client({port}, function (err, c) {
 
       setTimeout(function () {
         unlock(cb);
-      }, randomTime)
+      }, randomTime);
 
     });
 

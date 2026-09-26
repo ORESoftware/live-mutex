@@ -30,7 +30,7 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps, path) 
   inject(() => {
     return {
       broker: new Broker1(conf).ensure().then(handleEvents)
-    }
+    };
   });
 
 

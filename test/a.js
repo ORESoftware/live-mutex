@@ -31,7 +31,7 @@ lmUtils.launchBrokerInChildProcess(conf, function () {
         lockCount++;
         
         if(lockCount > 1){
-          throw 'too many lockholders.'
+          throw 'too many lockholders.';
         }
 
         console.log('unlocking...' + i++);

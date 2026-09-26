@@ -52,7 +52,7 @@ async function pickPort(): Promise<number> {
                 server.close(() => resolve(true));
             });
         });
-        if (ok) return candidate;
+        if (ok) {return candidate;}
     }
     throw new Error('pickPort: could not bind any candidate port');
 }
@@ -91,7 +91,7 @@ async function withTimeout<T>(label: string, ms: number, p: Promise<T>): Promise
     try {
         return await Promise.race([p, timer]);
     } finally {
-        if (to) clearTimeout(to);
+        if (to) {clearTimeout(to);}
     }
 }
 
@@ -236,7 +236,7 @@ async function s9_high_contention_fifo() {
             while (true) {
                 const lck = broker.locks.get(key);
                 const sz = lck?.notify?.size ?? 0;
-                if (sz >= target) break;
+                if (sz >= target) {break;}
                 if (Date.now() > enqDeadline) {
                     fail(label, `waiter ${waiter} did not enqueue: notify.size=${sz} after 10s`);
                 }
@@ -264,7 +264,7 @@ async function s9_high_contention_fifo() {
             await new Promise(r => setTimeout(r, 2));
         }
         // Trigger any remaining (in case grantOrder grew but we missed it).
-        for (const r of releasers) r();
+        for (const r of releasers) {r();}
         await withTimeout(label, 20_000, Promise.all(tasks));
 
         const expected = Array.from({length: nWaiters}, (_, i) => i);

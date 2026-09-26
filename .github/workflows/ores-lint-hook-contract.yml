@@ -1,0 +1,37 @@
+name: ores-lint hook contract
+
+on:
+  pull_request:
+    paths:
+      - '.ores-lint/install-git-hooks.sh'
+      - '.ores-lint/test-install-git-hooks.sh'
+      - '.github/workflows/ores-lint-hook-contract.yml'
+  push:
+    branches: [dev]
+    paths:
+      - '.ores-lint/install-git-hooks.sh'
+      - '.ores-lint/test-install-git-hooks.sh'
+      - '.github/workflows/ores-lint-hook-contract.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ores-lint-hook-contract-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Syntax
+        run: |
+          sh -n .ores-lint/install-git-hooks.sh
+          sh -n .ores-lint/test-install-git-hooks.sh
+      - name: Installer contract
+        run: sh .ores-lint/test-install-git-hooks.sh

@@ -43,7 +43,7 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
  * Timeout errors have code 'bad_or_mismatched_id' and message containing "timed out"
  */
 function isReleaseTimeoutError(err: any): boolean {
-    if (!err) return false;
+    if (!err) {return false;}
     // Timeout errors have code 'bad_or_mismatched_id' and message containing "timed out"
     return err.code === 'bad_or_mismatched_id' && 
            err.message && 
@@ -410,8 +410,8 @@ async function runMemoryLeakTest() {
         if (broker) {
             await new Promise<void>((resolve, reject) => {
                 broker!.close((err) => {
-                    if (err) reject(err);
-                    else resolve();
+                    if (err) {reject(err);}
+                    else {resolve();}
                 });
             });
             console.log('✓ Broker closed\n');

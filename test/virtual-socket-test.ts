@@ -103,15 +103,15 @@ async function main() {
         const frames: any[] = [];
         const sock = new VirtualSocket(f => frames.push(f));
         const writeReturned = sock.write('{"a":1}\n');
-        if (writeReturned !== true) fail(`write should return true; got ${writeReturned}`);
+        if (writeReturned !== true) {fail(`write should return true; got ${writeReturned}`);}
         const lenBeforeTick = frames.length;
         if (lenBeforeTick !== 0) {
             fail(`onFrame fired synchronously inside write() — saw ${lenBeforeTick} frames`);
         }
         await nextTick();
         const lenAfterTick = frames.length;
-        if (lenAfterTick !== 1) fail(`expected 1 frame after one tick; got ${lenAfterTick}`);
-        if (frames[0].a !== 1) fail(`bad frame payload: ${JSON.stringify(frames[0])}`);
+        if (lenAfterTick !== 1) {fail(`expected 1 frame after one tick; got ${lenAfterTick}`);}
+        if (frames[0].a !== 1) {fail(`bad frame payload: ${JSON.stringify(frames[0])}`);}
         ok('onFrame deferred to next tick (not sync)');
     }
 
@@ -124,12 +124,12 @@ async function main() {
         const sock = new VirtualSocket(f => frames.push(f));
         sock.write('{"i":0}\n{"i":1}\n{"i":2}\n');
         const lenBefore = frames.length;
-        if (lenBefore !== 0) fail('frames delivered synchronously');
+        if (lenBefore !== 0) {fail('frames delivered synchronously');}
         await tickTwice();
         const lenAfter = frames.length;
-        if (lenAfter !== 3) fail(`expected 3 frames; got ${lenAfter}`);
+        if (lenAfter !== 3) {fail(`expected 3 frames; got ${lenAfter}`);}
         for (let i = 0; i < 3; i++) {
-            if (frames[i].i !== i) fail(`frame order broken at ${i}: ${JSON.stringify(frames)}`);
+            if (frames[i].i !== i) {fail(`frame order broken at ${i}: ${JSON.stringify(frames)}`);}
         }
         ok(`3 frames arrived in order: ${frames.map(f => f.i).join(',')}`);
     }
@@ -149,7 +149,7 @@ async function main() {
         }
         await tickTwice();
         // bytesRead counts each delivered frame's parsed line.length + 1 (newline).
-        if (sock.bytesRead === 0) fail('bytesRead never incremented');
+        if (sock.bytesRead === 0) {fail('bytesRead never incremented');}
         ok(`bytesWritten=${sock.bytesWritten}, bytesRead=${sock.bytesRead}`);
     }
 
@@ -162,9 +162,9 @@ async function main() {
         sock.destroy();
         let cbErr: any = 'NOT-CALLED';
         const ret = sock.write('{"a":1}\n', 'utf8', err => { cbErr = err; });
-        if (ret !== false) fail(`write after destroy should return false; got ${ret}`);
+        if (ret !== false) {fail(`write after destroy should return false; got ${ret}`);}
         await nextTick();
-        if (!cbErr || cbErr === 'NOT-CALLED') fail('write callback was not invoked after destroy');
+        if (!cbErr || cbErr === 'NOT-CALLED') {fail('write callback was not invoked after destroy');}
         if ((cbErr as any).code !== 'ERR_STREAM_DESTROYED') {
             fail(`expected ERR_STREAM_DESTROYED, got code=${(cbErr as any).code} msg=${(cbErr as any).message}`);
         }
@@ -183,7 +183,7 @@ async function main() {
         // Plain Uint8Array (NOT a Buffer) to exercise the third branch.
         const u8src = '{"src":"u8"}\n';
         const u8 = new Uint8Array(Buffer.byteLength(u8src));
-        for (let i = 0; i < u8src.length; i++) u8[i] = u8src.charCodeAt(i);
+        for (let i = 0; i < u8src.length; i++) {u8[i] = u8src.charCodeAt(i);}
         sock.write(u8);
         await tickTwice();
         const sources = frames.map(f => f.src).sort();
@@ -203,11 +203,11 @@ async function main() {
         sock.destroy(); // second call must NOT re-emit close
         await tickTwice();
         const observed = closeCount;
-        if (observed !== 1) fail(`expected 1 close emit; got ${observed}`);
-        if (!sock.destroyed) fail('destroyed flag not set');
-        if (sock.writable !== false) fail('writable should be false after destroy');
-        if (sock.readable !== false) fail('readable should be false after destroy');
-        if (sock.lmxClosed !== true) fail('lmxClosed should be true (LMX-extension contract)');
+        if (observed !== 1) {fail(`expected 1 close emit; got ${observed}`);}
+        if (!sock.destroyed) {fail('destroyed flag not set');}
+        if (sock.writable !== false) {fail('writable should be false after destroy');}
+        if (sock.readable !== false) {fail('readable should be false after destroy');}
+        if (sock.lmxClosed !== true) {fail('lmxClosed should be true (LMX-extension contract)');}
         ok('second destroy() was a no-op; close fired exactly once');
     }
 
@@ -224,14 +224,14 @@ async function main() {
         sock.destroy(myErr);
         // SYNC observation: nothing emitted yet.
         const beforeLen = events.length;
-        if (beforeLen !== 0) fail(`events fired sync inside destroy(): ${JSON.stringify(events)}`);
+        if (beforeLen !== 0) {fail(`events fired sync inside destroy(): ${JSON.stringify(events)}`);}
         await nextTick();
         const afterLen = events.length;
-        if (afterLen !== 2) fail(`expected 2 events; got ${afterLen}: ${events.map(e => e.name).join(',')}`);
-        if (events[0].name !== 'error') fail(`first event should be error; got ${events[0].name}`);
-        if (events[0].payload !== myErr) fail('error event did not carry the supplied Error instance');
-        if (events[1].name !== 'close') fail(`second event should be close; got ${events[1].name}`);
-        if (events[1].payload !== true) fail(`close hadError should be true; got ${events[1].payload}`);
+        if (afterLen !== 2) {fail(`expected 2 events; got ${afterLen}: ${events.map(e => e.name).join(',')}`);}
+        if (events[0].name !== 'error') {fail(`first event should be error; got ${events[0].name}`);}
+        if (events[0].payload !== myErr) {fail('error event did not carry the supplied Error instance');}
+        if (events[1].name !== 'close') {fail(`second event should be close; got ${events[1].name}`);}
+        if (events[1].payload !== true) {fail(`close hadError should be true; got ${events[1].payload}`);}
         ok('error -> close(true) order preserved');
     }
 
@@ -247,12 +247,12 @@ async function main() {
         sock.on('close', hadError => events.push(`close(${hadError})`));
         sock.end();
         const lenA = events.length;
-        if (lenA !== 0) fail(`end() emitted events synchronously: ${events}`);
+        if (lenA !== 0) {fail(`end() emitted events synchronously: ${events}`);}
         // Wait enough ticks for finalize (2 nextTicks: finalize body + close).
         await tickTwice();
         await nextTick();
         const lenB = events.length;
-        if (lenB !== 3) fail(`expected 3 events; got ${lenB}: ${events}`);
+        if (lenB !== 3) {fail(`expected 3 events; got ${lenB}: ${events}`);}
         assert.deepStrictEqual(events, ['finish', 'end', 'close(false)'],
             `expected lifecycle order; got ${JSON.stringify(events)}`);
         ok(`got ${events.join(' -> ')}`);
@@ -273,8 +273,8 @@ async function main() {
         sock.end();   // third end() either
         await tickTwice();
         await nextTick();
-        if (finishCount !== 1) fail(`finish fired ${finishCount} times`);
-        if (closeCount !== 1) fail(`close fired ${closeCount} times`);
+        if (finishCount !== 1) {fail(`finish fired ${finishCount} times`);}
+        if (closeCount !== 1) {fail(`close fired ${closeCount} times`);}
         ok('finish + close each fired exactly once across 3 end() calls');
     }
 
@@ -285,9 +285,9 @@ async function main() {
     {
         const sock = new VirtualSocket(() => {});
         const a = sock.address();
-        if (typeof a.address !== 'string') fail('address.address must be string');
-        if (typeof a.family !== 'string') fail('address.family must be string');
-        if (typeof a.port !== 'number') fail('address.port must be number');
+        if (typeof a.address !== 'string') {fail('address.address must be string');}
+        if (typeof a.family !== 'string') {fail('address.family must be string');}
+        if (typeof a.port !== 'number') {fail('address.port must be number');}
         ok(`address()=${JSON.stringify(a)}`);
     }
 
@@ -298,10 +298,10 @@ async function main() {
     {
         const sock = new VirtualSocket(() => {});
         const initial: string = sock.readyState;
-        if (initial !== 'open') fail(`initial readyState: ${initial}`);
+        if (initial !== 'open') {fail(`initial readyState: ${initial}`);}
         sock.destroy();
         const final: string = sock.readyState;
-        if (final !== 'closed') fail(`post-destroy readyState: ${final}`);
+        if (final !== 'closed') {fail(`post-destroy readyState: ${final}`);}
         ok('open -> closed');
     }
 
@@ -324,9 +324,9 @@ async function main() {
             ['setEncoding', r4], ['unref', r5], ['ref', r6],
             ['pause', r7], ['resume', r8],
         ] as const) {
-            if (ret !== sock) fail(`${name}() should return this; got ${ret}`);
+            if (ret !== sock) {fail(`${name}() should return this; got ${ret}`);}
         }
-        if (sock.timeout !== 5000) fail(`setTimeout did not capture value; got ${sock.timeout}`);
+        if (sock.timeout !== 5000) {fail(`setTimeout did not capture value; got ${sock.timeout}`);}
         ok('all 8 tuning methods returned this; setTimeout captured value');
     }
 
@@ -338,7 +338,7 @@ async function main() {
         const sock = new VirtualSocket(() => {});
         const fakeParser = {parserId: 'p1'};
         const out = sock.pipe(fakeParser);
-        if (out !== fakeParser) fail('pipe did not return its argument');
+        if (out !== fakeParser) {fail('pipe did not return its argument');}
         ok('pipe returns its target so .pipe(parser).on(...) chaining works');
     }
 
@@ -348,8 +348,8 @@ async function main() {
     console.log('\n[14] LMX extension fields are present');
     {
         const sock = new VirtualSocket(() => {});
-        if (sock.lmxClosed !== false) fail(`lmxClosed initial: ${sock.lmxClosed}`);
-        if (typeof sock.destroyTimeout !== 'undefined') fail(`destroyTimeout initial: ${sock.destroyTimeout}`);
+        if (sock.lmxClosed !== false) {fail(`lmxClosed initial: ${sock.lmxClosed}`);}
+        if (typeof sock.destroyTimeout !== 'undefined') {fail(`destroyTimeout initial: ${sock.destroyTimeout}`);}
         // Broker code mutates these.
         sock.destroyTimeout = setTimeout(() => {}, 60_000) as any;
         sock.destroyTimeout && clearTimeout(sock.destroyTimeout);
@@ -389,7 +389,7 @@ async function main() {
         });
 
         const reply: any = await p;
-        if (reply.acquired !== true) fail(`expected acquired:true, got ${JSON.stringify(reply)}`);
+        if (reply.acquired !== true) {fail(`expected acquired:true, got ${JSON.stringify(reply)}`);}
         if (observedAtAwaiter !== true) {
             fail(`bridge awaiter resumed BEFORE broker.lock fully returned (handlerFinished=${observedAtAwaiter})`);
         }
@@ -413,10 +413,10 @@ async function main() {
             sock.write(`{"i":${i}}\n`);
         }
         const lenA = frames.length;
-        if (lenA !== 0) fail(`frames delivered sync inside write loop (got ${lenA})`);
+        if (lenA !== 0) {fail(`frames delivered sync inside write loop (got ${lenA})`);}
         await new Promise<void>(r => setImmediate(r));
         const lenB = frames.length;
-        if (lenB !== 25) fail(`expected 25 frames; got ${lenB}`);
+        if (lenB !== 25) {fail(`expected 25 frames; got ${lenB}`);}
         for (let i = 0; i < 25; i++) {
             if (frames[i].i !== i) {
                 fail(`order broken at index ${i}; got ${JSON.stringify(frames.map(f => f.i))}`);
@@ -446,9 +446,9 @@ async function main() {
             err => { cbErr = err; },
         );
         await new Promise<void>(r => setImmediate(r));
-        if (cbErr !== null) fail(`write cb should fire with null on success; got ${cbErr}`);
-        if (errs.length !== 0) fail(`unexpected 'error' emit: ${errs.map(e => e.message).join(', ')}`);
-        if (frames.length !== 2) fail(`expected 2 valid frames; got ${frames.length}`);
+        if (cbErr !== null) {fail(`write cb should fire with null on success; got ${cbErr}`);}
+        if (errs.length !== 0) {fail(`unexpected 'error' emit: ${errs.map(e => e.message).join(', ')}`);}
+        if (frames.length !== 2) {fail(`expected 2 valid frames; got ${frames.length}`);}
         if (frames[0].valid !== 1 || frames[1].valid !== 2) {
             fail(`bad valid frames: ${JSON.stringify(frames)}`);
         }
@@ -470,8 +470,8 @@ async function main() {
         sock.write('\n');
         sock.write('\n\n\n\n');
         await new Promise<void>(r => setImmediate(r));
-        if (frames.length !== 0) fail(`expected 0 frames; got ${frames.length}`);
-        if (errs.length !== 0) fail(`unexpected error emits: ${errs.map(e => e.message).join(', ')}`);
+        if (frames.length !== 0) {fail(`expected 0 frames; got ${frames.length}`);}
+        if (errs.length !== 0) {fail(`unexpected error emits: ${errs.map(e => e.message).join(', ')}`);}
         ok('no frames delivered, no errors emitted');
     }
 
@@ -495,7 +495,7 @@ async function main() {
         sock.write('{"a":1}\n');  // this one throws inside onFrame
         sock.write('{"a":2}\n');  // this one is fine
         await new Promise<void>(r => setImmediate(r));
-        if (errs.length !== 1) fail(`expected 1 error emit; got ${errs.length}`);
+        if (errs.length !== 1) {fail(`expected 1 error emit; got ${errs.length}`);}
         if (!errs[0] || !String(errs[0].message).includes('boom-in-onFrame')) {
             fail(`unexpected error: ${errs[0]?.message}`);
         }
@@ -527,9 +527,9 @@ async function main() {
         await new Promise<void>(r => setImmediate(r));
         await new Promise<void>(r => setImmediate(r)); // an extra macrotask for safety
 
-        if (!endCbFired) fail('end() callback did not fire');
-        if (frames.length !== 1) fail(`expected 1 trailing frame; got ${frames.length}`);
-        if (frames[0].n !== 1) fail(`bad trailing frame: ${JSON.stringify(frames[0])}`);
+        if (!endCbFired) {fail('end() callback did not fire');}
+        if (frames.length !== 1) {fail(`expected 1 trailing frame; got ${frames.length}`);}
+        if (frames[0].n !== 1) {fail(`bad trailing frame: ${JSON.stringify(frames[0])}`);}
         // Frame must arrive BEFORE finish/end/close.
         const frameIdx = events.indexOf('frame#1');
         const finishIdx = events.indexOf('finish');
@@ -540,7 +540,7 @@ async function main() {
         if (!(frameIdx < finishIdx && finishIdx < closeIdx)) {
             fail(`out-of-order: ${events}`);
         }
-        if (sock.destroyed !== true) fail('socket should be destroyed after end()');
+        if (sock.destroyed !== true) {fail('socket should be destroyed after end()');}
         ok(`trailing frame -> finish -> end -> close in order: ${events}`);
     }
 
@@ -560,8 +560,8 @@ async function main() {
         sock.emit('a');
         sock.emit('a');
         sock.emit('b');
-        if (aCount !== 0) fail(`'a' listeners should be gone; saw aCount=${aCount}`);
-        if (bCount !== 1) fail(`'b' listener should fire once; saw bCount=${bCount}`);
+        if (aCount !== 0) {fail(`'a' listeners should be gone; saw aCount=${aCount}`);}
+        if (bCount !== 1) {fail(`'b' listener should fire once; saw bCount=${bCount}`);}
         ok(`'a' listeners removed; 'b' listener intact`);
     }
 
@@ -573,13 +573,13 @@ async function main() {
     console.log('\n[22] destroyTimeout LMX extension behaves');
     {
         const sock = new VirtualSocket(() => {});
-        if (sock.destroyTimeout !== undefined) fail(`initial destroyTimeout: ${sock.destroyTimeout}`);
+        if (sock.destroyTimeout !== undefined) {fail(`initial destroyTimeout: ${sock.destroyTimeout}`);}
         const t = setTimeout(() => {}, 60_000);
         sock.destroyTimeout = t;
-        if (sock.destroyTimeout !== t) fail('destroyTimeout assignment did not stick');
+        if (sock.destroyTimeout !== t) {fail('destroyTimeout assignment did not stick');}
         clearTimeout(sock.destroyTimeout);
         sock.destroyTimeout = undefined;
-        if (sock.destroyTimeout !== undefined) fail('destroyTimeout reset failed');
+        if (sock.destroyTimeout !== undefined) {fail('destroyTimeout reset failed');}
         ok('destroyTimeout: undefined -> Timer -> undefined transitions');
     }
 
@@ -630,7 +630,7 @@ async function main() {
                 fail(`promise[${i}] rejected with non-shutdown error: ${msg}`);
             }
         }
-        if (bridge.pendingCount !== 0) fail(`pendingCount=${bridge.pendingCount} after shutdown`);
+        if (bridge.pendingCount !== 0) {fail(`pendingCount=${bridge.pendingCount} after shutdown`);}
         ok(`all ${promises.length} pending awaiters rejected with 'shutdown' error; pendingCount=0`);
 
         // Sanity: a NEW dispatch on a closed bridge should reject

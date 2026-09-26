@@ -11,12 +11,12 @@ public final class Smoke {
         try (Client c = Client.connect(host, port)) {
             LockGrant g1 = c.acquire("java-smoke", 5_000L, null);
             System.out.println("acquire #1: " + g1);
-            require(g1.fencingToken != null && g1.fencingToken >= 1, "missing fencing token");
+            require(g1.fencingToken >= 1, "missing fencing token");
             c.release("java-smoke", g1.lockUuid, false);
 
             LockGrant g2 = c.acquire("java-smoke", null, null);
             System.out.println("acquire #2: " + g2);
-            require(g2.fencingToken != null && g2.fencingToken > g1.fencingToken,
+            require(g2.fencingToken > g1.fencingToken,
                     "fencing tokens must be strictly monotonic per key");
             c.release("java-smoke", g2.lockUuid, false);
 

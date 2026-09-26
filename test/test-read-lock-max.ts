@@ -29,7 +29,7 @@ function readFile(): string {
     try {
         return fs.readFileSync(TEST_FILE, 'utf8').trim();
     } catch (err: any) {
-        if (err.code === 'ENOENT') return '';
+        if (err.code === 'ENOENT') {return '';}
         throw err;
     }
 }
@@ -62,7 +62,7 @@ async function testDefaultMax10(): Promise<boolean> {
             promises.push(
                 new Promise<void>((resolve, reject) => {
                     clients[i].acquireReadLock(key, {}, (err: any, release: any) => {
-                        if (err) return reject(err);
+                        if (err) {return reject(err);}
                         
                         concurrentCount++;
                         maxConcurrent = Math.max(maxConcurrent, concurrentCount);
@@ -115,7 +115,7 @@ async function testExplicitMax1(): Promise<boolean> {
             promises.push(
                 new Promise<void>((resolve, reject) => {
                     clients[i].acquireReadLock(key, {max: 1}, (err: any, release: any) => {
-                        if (err) return reject(err);
+                        if (err) {return reject(err);}
                         
                         concurrentCount++;
                         maxConcurrent = Math.max(maxConcurrent, concurrentCount);
@@ -174,7 +174,7 @@ async function testExplicitMax5(): Promise<boolean> {
             promises.push(
                 new Promise<void>((resolve, reject) => {
                     clients[i].acquireReadLock(key, {max: 5}, (err: any, release: any) => {
-                        if (err) return reject(err);
+                        if (err) {return reject(err);}
                         
                         concurrentCount++;
                         maxConcurrent = Math.max(maxConcurrent, concurrentCount);
@@ -231,7 +231,7 @@ async function runTests(): Promise<void> {
     } finally {
         // Clean up test file
         try {
-            if (fs.existsSync(TEST_FILE)) fs.unlinkSync(TEST_FILE);
+            if (fs.existsSync(TEST_FILE)) {fs.unlinkSync(TEST_FILE);}
         } catch (err) {
             // Ignore
         }

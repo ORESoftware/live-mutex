@@ -4,69 +4,60 @@
 // multiplexes many concurrent acquire/release/acquire-many requests
 // over one connection by correlating on a per-request UUID.
 //
-// Minimal by design — covers the new wire features (fencing tokens,
-// acquire-many, broker-side max validation) and the basic
-// lock/unlock flow, but not RW locks or the legacy lock-received
-// ack (the broker's centralised TTL sweeper handles clients that
-// skip the ack).
+// This client targets Broker1 and therefore treats a successful grant without
+// a positive, exact fencing token as a protocol error. Authority values are
+// decoded with json.Number rather than float64 so they can never be silently
+// rounded before validation.
 package livemutex
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
 )
 
-// ProtocolVersion is the wire-protocol version sent in the version
-// handshake. Must match the broker; the broker only rejects strictly-
-// older clients, so revving this is forward-safe.
+// ProtocolVersion is the wire-protocol version sent in the version handshake.
 const ProtocolVersion = "0.2.25"
 
+// MaxFencingToken is the largest authority token the Broker1 JSON protocol may
+// mint. It matches JavaScript's exact integer domain. Servers must fail closed
+// instead of issuing a larger numeric JSON value.
+const MaxFencingToken uint64 = 9007199254740991
+
 var (
-	// ErrConnectionClosed is returned when an in-flight request is
-	// interrupted by the underlying socket closing.
 	ErrConnectionClosed = errors.New("livemutex: connection closed")
-	// ErrTimeout is returned when a request hasn't received a reply
-	// within the configured request timeout.
-	ErrTimeout = errors.New("livemutex: request timed out")
+	ErrTimeout          = errors.New("livemutex: request timed out")
+	ErrInvalidFence     = errors.New("livemutex: invalid or missing fencing token")
 )
 
-// LockGrant is the result of a successful acquire.
 type LockGrant struct {
 	Key              string
 	LockUUID         string
-	FencingToken     uint64 // 0 if the broker pre-dates fencing-token support.
+	FencingToken     uint64
 	LockRequestCount uint64
 }
 
-// AcquireManyGrant is the result of a successful acquire-many.
 type AcquireManyGrant struct {
 	Keys          []string
 	LockUUID      string
 	FencingTokens map[string]uint64
 }
 
-// LockOpts customises an acquire call.
 type LockOpts struct {
-	// TTLMs is the lock TTL in milliseconds. Zero means "use broker
-	// default" (lockExpiresAfter, default 5s).
 	TTLMs uint64
-	// Max is the per-key concurrency level. Zero means "leave broker
-	// default in place" (mutex, max=1). Values < 1 are rejected by
-	// the broker and surface as an error here.
-	Max uint32
+	Max   uint32
 }
 
-// Client is a thread-safe live-mutex client. The zero value is not
-// usable — call Connect.
 type Client struct {
 	conn           net.Conn
 	writer         *bufio.Writer
@@ -77,20 +68,16 @@ type Client struct {
 	closed         chan struct{}
 }
 
-// Connect dials the broker and sends the version handshake.
 func Connect(addr string) (*Client, error) {
 	return ConnectWithTimeout(addr, 60*time.Second)
 }
 
-// ConnectWithTimeout is like Connect but uses a custom per-request
-// timeout (the underlying TCP dial uses 30s).
 func ConnectWithTimeout(addr string, requestTimeout time.Duration) (*Client, error) {
 	conn, err := net.DialTimeout("tcp", addr, 30*time.Second)
 	if err != nil {
 		return nil, fmt.Errorf("livemutex: dial %s: %w", addr, err)
 	}
 	if tcp, ok := conn.(*net.TCPConn); ok {
-		// TCP_NODELAY mirrors the canonical broker default.
 		_ = tcp.SetNoDelay(true)
 	}
 	c := &Client{
@@ -108,7 +95,6 @@ func ConnectWithTimeout(addr string, requestTimeout time.Duration) (*Client, err
 	return c, nil
 }
 
-// Close terminates the connection. Safe to call from multiple goroutines.
 func (c *Client) Close() error {
 	select {
 	case <-c.closed:
@@ -117,7 +103,6 @@ func (c *Client) Close() error {
 	}
 	close(c.closed)
 	err := c.conn.Close()
-	// Wake up any in-flight callers.
 	c.inflight.Range(func(k, v any) bool {
 		ch := v.(chan map[string]any)
 		select {
@@ -129,8 +114,48 @@ func (c *Client) Close() error {
 	return err
 }
 
-// Acquire takes an exclusive lock on key (or a semaphore slot if
-// opts.Max > 1).
+// exactUint accepts only canonical non-negative integer JSON/string values.
+// For fencing tokens callers additionally require 1..MaxFencingToken.
+func exactUint(value any) (uint64, bool) {
+	var text string
+	switch v := value.(type) {
+	case json.Number:
+		text = v.String()
+	case string:
+		text = v
+	case uint64:
+		return v, true
+	case int:
+		if v < 0 {
+			return 0, false
+		}
+		return uint64(v), true
+	default:
+		return 0, false
+	}
+	if text == "" {
+		return 0, false
+	}
+	if len(text) > 1 && text[0] == '0' {
+		return 0, false
+	}
+	for _, r := range text {
+		if r < '0' || r > '9' {
+			return 0, false
+		}
+	}
+	u, err := strconv.ParseUint(text, 10, 64)
+	return u, err == nil
+}
+
+func exactFence(value any) (uint64, error) {
+	u, ok := exactUint(value)
+	if !ok || u == 0 || u > MaxFencingToken {
+		return 0, ErrInvalidFence
+	}
+	return u, nil
+}
+
 func (c *Client) Acquire(ctx context.Context, key string, opts LockOpts) (*LockGrant, error) {
 	requestUUID := uuid.NewString()
 	payload := map[string]any{
@@ -155,20 +180,17 @@ func (c *Client) Acquire(ctx context.Context, key string, opts LockOpts) (*LockG
 	if acquired, _ := reply["acquired"].(bool); !acquired {
 		return nil, fmt.Errorf("livemutex: lock not acquired: %v", reply["error"])
 	}
-	g := &LockGrant{
-		Key:      key,
-		LockUUID: requestUUID,
+	fence, err := exactFence(reply["fencingToken"])
+	if err != nil {
+		return nil, fmt.Errorf("%w on acquired key %q", err, key)
 	}
-	if v, ok := reply["fencingToken"].(float64); ok {
-		g.FencingToken = uint64(v)
-	}
-	if v, ok := reply["lockRequestCount"].(float64); ok {
-		g.LockRequestCount = uint64(v)
+	g := &LockGrant{Key: key, LockUUID: requestUUID, FencingToken: fence}
+	if v, ok := exactUint(reply["lockRequestCount"]); ok {
+		g.LockRequestCount = v
 	}
 	return g, nil
 }
 
-// Release frees a previously-acquired lock.
 func (c *Client) Release(ctx context.Context, key, lockUUID string, force bool) error {
 	requestUUID := uuid.NewString()
 	payload := map[string]any{
@@ -188,19 +210,12 @@ func (c *Client) Release(ctx context.Context, key, lockUUID string, force bool) 
 	return nil
 }
 
-// AcquireMany takes a union-style hold on every key. Either every
-// key is granted or none is — failure is surfaced as an error,
-// optionally including the contended key in the message.
 func (c *Client) AcquireMany(ctx context.Context, keys []string, ttlMs uint64) (*AcquireManyGrant, error) {
 	if len(keys) == 0 {
 		return nil, errors.New("livemutex: AcquireMany requires at least one key")
 	}
 	requestUUID := uuid.NewString()
-	payload := map[string]any{
-		"type": "acquire-many",
-		"uuid": requestUUID,
-		"keys": keys,
-	}
+	payload := map[string]any{"type": "acquire-many", "uuid": requestUUID, "keys": keys}
 	if ttlMs > 0 {
 		payload["ttl"] = ttlMs
 	} else {
@@ -219,7 +234,7 @@ func (c *Client) AcquireMany(ctx context.Context, keys []string, ttlMs uint64) (
 		}
 		return nil, fmt.Errorf("livemutex: acquire-many %s", why)
 	}
-	g := &AcquireManyGrant{LockUUID: ""}
+	g := &AcquireManyGrant{LockUUID: "", FencingTokens: map[string]uint64{}}
 	if s, ok := reply["lockUuid"].(string); ok {
 		g.LockUUID = s
 	}
@@ -233,25 +248,26 @@ func (c *Client) AcquireMany(ctx context.Context, keys []string, ttlMs uint64) (
 	if g.Keys == nil {
 		g.Keys = append([]string(nil), keys...)
 	}
-	g.FencingTokens = map[string]uint64{}
-	if m, ok := reply["fencingTokens"].(map[string]any); ok {
-		for k, v := range m {
-			if f, ok := v.(float64); ok {
-				g.FencingTokens[k] = uint64(f)
-			}
+	m, ok := reply["fencingTokens"].(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("%w: acquire-many omitted fencingTokens", ErrInvalidFence)
+	}
+	for _, key := range g.Keys {
+		fence, err := exactFence(m[key])
+		if err != nil {
+			return nil, fmt.Errorf("%w for acquire-many key %q", err, key)
 		}
+		g.FencingTokens[key] = fence
+	}
+	if len(g.FencingTokens) != len(g.Keys) {
+		return nil, fmt.Errorf("%w: acquire-many token/key cardinality mismatch", ErrInvalidFence)
 	}
 	return g, nil
 }
 
-// ReleaseMany releases an acquire-many grant by its lock UUID.
 func (c *Client) ReleaseMany(ctx context.Context, lockUUID string) error {
 	requestUUID := uuid.NewString()
-	payload := map[string]any{
-		"type":     "release-many",
-		"uuid":     requestUUID,
-		"lockUuid": lockUUID,
-	}
+	payload := map[string]any{"type": "release-many", "uuid": requestUUID, "lockUuid": lockUUID}
 	reply, err := c.awaitReply(ctx, requestUUID, payload)
 	if err != nil {
 		return err
@@ -261,8 +277,6 @@ func (c *Client) ReleaseMany(ctx context.Context, lockUUID string) error {
 	}
 	return nil
 }
-
-// --- internals ---
 
 func (c *Client) send(payload any) error {
 	data, err := json.Marshal(payload)
@@ -284,14 +298,11 @@ func (c *Client) awaitReply(ctx context.Context, requestUUID string, payload map
 	ch := make(chan map[string]any, 1)
 	c.inflight.Store(requestUUID, ch)
 	defer c.inflight.Delete(requestUUID)
-
 	if err := c.send(payload); err != nil {
 		return nil, err
 	}
-
 	timeout := time.NewTimer(c.requestTimeout)
 	defer timeout.Stop()
-
 	select {
 	case reply := <-ch:
 		if reply == nil {
@@ -312,7 +323,9 @@ func (c *Client) readLoop() {
 	scanner.Buffer(make([]byte, 64*1024), 1024*1024)
 	for scanner.Scan() {
 		var msg map[string]any
-		if err := json.Unmarshal(scanner.Bytes(), &msg); err != nil {
+		dec := json.NewDecoder(bytes.NewReader(scanner.Bytes()))
+		dec.UseNumber()
+		if err := dec.Decode(&msg); err != nil {
 			continue
 		}
 		requestUUID, _ := msg["uuid"].(string)

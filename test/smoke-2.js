@@ -28,19 +28,19 @@ Promise.all([
 
   c.acquireReadLock('foo', (err, release) => {
 
-    if (err) throw err;
+    if (err) {throw err;}
 
     release((err, val) => {
 
-      if (err) throw err;
+      if (err) {throw err;}
 
       c.acquireWriteLock('foo', (err, release) => {
 
-        if (err) throw err;
+        if (err) {throw err;}
 
         release((err, val) => {
 
-          if (err) throw err;
+          if (err) {throw err;}
 
           console.log('all done');
           console.log('all done after:', Date.now() - start);

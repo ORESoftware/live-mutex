@@ -114,10 +114,10 @@ class FakeSocket extends EventEmitter {
     write(data: any, _enc?: any, cb?: any): boolean {
         const text = typeof data === 'string' ? data : Buffer.isBuffer(data) ? data.toString('utf8') : String(data);
         for (const line of text.split('\n')) {
-            if (!line) continue;
+            if (!line) {continue;}
             try { this.framesIn.push(JSON.parse(line)); } catch {/* ignore */}
         }
-        if (cb) process.nextTick(cb, null);
+        if (cb) {process.nextTick(cb, null);}
         return true;
     }
     end(): this { this.writable = false; return this; }
@@ -163,10 +163,10 @@ async function main() {
             fail(`set sizes differ: known=${LMXKnownRequestTypes.size}, expected=${expected.size}`);
         }
         for (const v of expected) {
-            if (!LMXKnownRequestTypes.has(v)) fail(`expected '${v}' in LMXKnownRequestTypes`);
+            if (!LMXKnownRequestTypes.has(v)) {fail(`expected '${v}' in LMXKnownRequestTypes`);}
         }
         for (const v of LMXKnownRequestTypes) {
-            if (!expected.has(v)) fail(`unexpected member '${v}' in LMXKnownRequestTypes`);
+            if (!expected.has(v)) {fail(`unexpected member '${v}' in LMXKnownRequestTypes`);}
         }
         ok(`LMXKnownRequestTypes membership = ${LMXKnownRequestTypes.size} entries, no extras`);
     }
@@ -177,11 +177,11 @@ async function main() {
     console.log('\n[p3] isLMXRequestType narrows to LMXRequestType for every member; rejects unknowns');
     {
         for (const v of Object.values(EXPECTED_STRINGS)) {
-            if (!isLMXRequestType(v)) fail(`isLMXRequestType('${v}') = false; expected true`);
+            if (!isLMXRequestType(v)) {fail(`isLMXRequestType('${v}') = false; expected true`);}
         }
         const negatives = ['', 'unknown', 'LOCK', 'lock ', ' lock', 'flock', 'release', 'pingg', null, undefined, 42, {}];
         for (const v of negatives) {
-            if (isLMXRequestType(v as any)) fail(`isLMXRequestType(${JSON.stringify(v)}) = true; expected false`);
+            if (isLMXRequestType(v as any)) {fail(`isLMXRequestType(${JSON.stringify(v)}) = true; expected false`);}
         }
         ok(`accepts ${Object.keys(EXPECTED_STRINGS).length} valid; rejects ${negatives.length} invalid`);
     }
@@ -261,7 +261,7 @@ async function main() {
         } catch (err: any) {
             threw = err;
         }
-        if (!threw) fail('dispatchRequest did not throw for an unknown `type`');
+        if (!threw) {fail('dispatchRequest did not throw for an unknown `type`');}
         if (!String(threw.message).includes('non-exhaustive switch')) {
             fail(`unexpected error message: ${threw.message}`);
         }
@@ -317,7 +317,7 @@ async function main() {
         const enumValues: string[] = Object.values(LMXRequestType) as string[];
         for (const t of enumValues) {
             const payload = minimalPayloads[t];
-            if (!payload) fail(`p6: missing minimal payload for enum member '${t}'`);
+            if (!payload) {fail(`p6: missing minimal payload for enum member '${t}'`);}
             try {
                 (broker as any).dispatchRequest(payload, ws as any);
             } catch (err: any) {

@@ -26,21 +26,26 @@ int main() {
     std::cout << "[smoke-cpp] connected " << host << ":" << port << "\n";
 
     auto a = client->acquire("smoke-cpp-1", 5000);
-    if (a.fencing_token < 1) throw lmx::LiveMutexError("missing fencing token");
+    if (a.fencing_token < 1) {
+      throw lmx::LiveMutexError("missing fencing token");
+    }
     std::cout << "[smoke-cpp] acquire #1: lockUuid=" << a.lock_uuid
               << " fencing=" << a.fencing_token << "\n";
     client->release(a);
 
     auto b = client->acquire("smoke-cpp-1", 5000);
-    if (b.fencing_token <= a.fencing_token)
+    if (b.fencing_token <= a.fencing_token) {
       throw lmx::LiveMutexError("fencing token did not increase across handoff");
+    }
     std::cout << "[smoke-cpp] acquire #2: fencing=" << b.fencing_token
               << " (> " << a.fencing_token << ")\n";
     client->release(b);
 
     auto comp = client->acquire_many({"smoke-cpp-a", "smoke-cpp-b", "smoke-cpp-c"}, 5000);
     std::cout << "[smoke-cpp] acquire_many: lockUuid=" << comp.lock_uuid << " tokens={";
-    for (const auto& [k, v] : comp.fencing_tokens) std::cout << k << ":" << v << " ";
+    for (const auto& [k, v] : comp.fencing_tokens) {
+      std::cout << k << ":" << v << " ";
+    }
     std::cout << "}\n";
     client->release_many(comp);
     std::cout << "[smoke-cpp] released composite\n";
@@ -55,7 +60,9 @@ int main() {
       ts.emplace_back([&] {
         for (int j = 0; j < 5; ++j) {
           auto h = client->acquire("smoke-cpp-hot", 5000);
-          if (in_section.fetch_add(1) != 0) overlap = true;
+          if (in_section.fetch_add(1) != 0) {
+            overlap = true;
+          }
           std::this_thread::sleep_for(std::chrono::microseconds(200));
           in_section.fetch_sub(1);
           grants.fetch_add(1);
@@ -63,8 +70,12 @@ int main() {
         }
       });
     }
-    for (auto& t : ts) t.join();
-    if (overlap) throw lmx::LiveMutexError("mutual exclusion violated under contention");
+    for (auto& t : ts) {
+      t.join();
+    }
+    if (overlap) {
+      throw lmx::LiveMutexError("mutual exclusion violated under contention");
+    }
     std::cout << "[smoke-cpp] mutual exclusion held across " << grants.load()
               << " grants on a hot key\n";
 

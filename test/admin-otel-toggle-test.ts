@@ -79,7 +79,7 @@ function httpJson(
             },
         );
         req.on('error', reject);
-        if (body) req.write(JSON.stringify(body));
+        if (body) {req.write(JSON.stringify(body));}
         req.end();
     });
 }
@@ -94,7 +94,7 @@ async function main() {
     const httpServer = new LMXHttpServer(broker, {port: 0, host: '127.0.0.1', enableHtmlStatus: false});
     await httpServer.start();
     const port: number = (httpServer as any).server.address().port;
-    if (!port) fail('HTTP server did not bind a port');
+    if (!port) {fail('HTTP server did not bind a port');}
 
     try {
         // [1] Unauthenticated requests are rejected.

@@ -21,6 +21,8 @@
 //! client.release("my-key", &grant.lock_uuid, false).await?;
 //! # Ok(()) }
 //! ```
+#![allow(clippy::needless_return)]
+
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -34,7 +36,7 @@ use uuid::Uuid;
 
 /// Wire protocol version. Must match the broker. The broker only
 /// rejects strictly-older clients, so revving this is forward-safe.
-pub const PROTOCOL_VERSION: &str = "0.2.25";
+pub const PROTOCOL_VERSION: &str = "0.2.27";
 
 #[derive(thiserror::Error, Debug)]
 pub enum ClientError {
@@ -98,7 +100,7 @@ pub struct Client {
 
 impl Client {
     pub async fn connect(addr: &str) -> Result<Self, ClientError> {
-        Self::connect_with_timeout(addr, Duration::from_secs(60)).await
+        return Self::connect_with_timeout(addr, Duration::from_secs(60)).await;
     }
 
     pub async fn connect_with_timeout(addr: &str, request_timeout: Duration) -> Result<Self, ClientError> {
@@ -173,12 +175,12 @@ impl Client {
             }
         });
 
-        Ok(Self {
+        return Ok(Self {
             inflight,
             writer: Arc::new(Mutex::new(tx)),
             pid: std::process::id(),
             request_timeout,
-        })
+        });
     }
 
     /// Internal: register an inflight row, write the payload, and
@@ -202,7 +204,7 @@ impl Client {
             return Err(ClientError::Closed);
         }
         drop(writer);
-        Ok(rx)
+        return Ok(rx);
     }
 
     async fn finalize(&self, uuid: Uuid) {
@@ -221,7 +223,7 @@ impl Client {
             Err(_) => Err(ClientError::Timeout(self.request_timeout)),
         };
         self.finalize(uuid).await;
-        result
+        return result;
     }
 
     pub async fn acquire(&self, key: &str, opts: Option<LockOpts>) -> Result<LockGrant, ClientError> {
@@ -237,7 +239,7 @@ impl Client {
             "keepLocksAfterDeath": false,
         });
         let reply = self.await_acquired(uuid, payload).await?;
-        Ok(LockGrant {
+        return Ok(LockGrant {
             key: key.to_string(),
             lock_uuid: reply
                 .get("lockUuid")
@@ -249,7 +251,7 @@ impl Client {
                 .unwrap_or_else(|| uuid.to_string()),
             fencing_token: reply.get("fencingToken").and_then(|v| v.as_u64()),
             lock_request_count: reply.get("lockRequestCount").and_then(|v| v.as_u64()),
-        })
+        });
     }
 
     pub async fn release(&self, key: &str, lock_uuid: &str, force: bool) -> Result<(), ClientError> {
@@ -277,7 +279,7 @@ impl Client {
                 reply.get("error").and_then(|v| v.as_str()).unwrap_or("unlock rejected").to_string(),
             ));
         }
-        Ok(())
+        return Ok(());
     }
 
     pub async fn acquire_many(&self, keys: &[&str], ttl_ms: Option<u64>) -> Result<AcquireManyGrant, ClientError> {
@@ -299,7 +301,7 @@ impl Client {
         let granted_keys = reply.get("keys").and_then(|v| v.as_array())
             .map(|arr| arr.iter().filter_map(|v| v.as_str().map(str::to_string)).collect())
             .unwrap_or_else(|| keys.iter().map(|s| s.to_string()).collect());
-        Ok(AcquireManyGrant { keys: granted_keys, lock_uuid, fencing_tokens: tokens })
+        return Ok(AcquireManyGrant { keys: granted_keys, lock_uuid, fencing_tokens: tokens });
     }
 
     pub async fn release_many(&self, lock_uuid: &str) -> Result<(), ClientError> {
@@ -315,7 +317,7 @@ impl Client {
                 reply.get("error").and_then(|v| v.as_str()).unwrap_or("release-many rejected").to_string(),
             ));
         }
-        Ok(())
+        return Ok(());
     }
 
     /// Send an acquire-shaped request and wait for a terminal reply.
@@ -355,7 +357,7 @@ impl Client {
             }
         };
         self.finalize(uuid).await;
-        result
+        return result;
     }
 }
 

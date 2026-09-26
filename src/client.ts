@@ -592,7 +592,7 @@ export class Client {
             recover(e);
           })
           .pipe(createParser())
-          .on('data', onData)
+          .on('data', onData);
         
       })
         // if the user passes a callback, we fire the callback here
@@ -653,7 +653,7 @@ export class Client {
     // on behalf of the user
     cb && this.connect(cb);
     
-  };
+  }
   
   private onSocketDestroy(err: any) {
     const routineId = 'ddl-routine-VDHbcd4GWBPB5UkEbO';
@@ -676,7 +676,7 @@ export class Client {
   getConnectionInterfaceStr() {
     const routineId = 'ddl-routine-hqRGNbmVMiWwp_-JXS';
     routineEnter(routineId, "Client.getConnectionInterfaceStr");
-    return this.socketFile ? `socket-file: ${this.socketFile}` : `host:port '${this.getHost()}:${this.getPort()}'`
+    return this.socketFile ? `socket-file: ${this.socketFile}` : `host:port '${this.getHost()}:${this.getPort()}'`;
   }
   
   private _fireCallbacksPrematurely(originalErr: any) {

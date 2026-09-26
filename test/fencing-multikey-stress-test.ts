@@ -86,7 +86,7 @@ function makeSocket(label: string): FakeSocket {
         write(chunk: any): boolean {
             try {
                 const lines = chunk.toString().trim().split('\n').filter(Boolean);
-                for (const line of lines) sent.push(JSON.parse(line));
+                for (const line of lines) {sent.push(JSON.parse(line));}
             } catch {
                 /* best-effort capture */
             }
@@ -204,7 +204,7 @@ function noWaitModelFuzz(broker: Broker1, seed: number, ops: number) {
             }
         } else {
             // release a random held lock
-            if (held[ci].length === 0) continue;
+            if (held[ci].length === 0) {continue;}
             const idx = rng.below(held[ci].length);
             const lock = held[ci].splice(idx, 1)[0];
             seq++;
@@ -214,7 +214,7 @@ function noWaitModelFuzz(broker: Broker1, seed: number, ops: number) {
                 broker.releaseMany({uuid: `u${seq}`, lockUuid: lock.id} as any, ws as any);
             }
             newFrames(ws);
-            for (const k of lock.keys) heldByKey.delete(k);
+            for (const k of lock.keys) {heldByKey.delete(k);}
         }
     }
 
@@ -250,7 +250,7 @@ function promoteGrants(clients: FakeSocket[], agents: Agent[]) {
     for (let i = 0; i < clients.length; i++) {
         const frames = newFrames(clients[i]);
         const a = agents[i];
-        if (a.state !== 'waiting') continue;
+        if (a.state !== 'waiting') {continue;}
         for (const m of frames) {
             if (m.acquired === true && m.uuid === a.reqUuid &&
                 (m.type === 'lock' || m.type === 'acquire-many')) {
@@ -264,7 +264,7 @@ function promoteGrants(clients: FakeSocket[], agents: Agent[]) {
 
 function releaseAgent(broker: Broker1, clients: FakeSocket[], agents: Agent[], i: number) {
     const a = agents[i];
-    if (a.state !== 'holding') return;
+    if (a.state !== 'holding') {return;}
     if (a.kind === 'single') {
         broker.unlock({uuid: uuidV4(), key: a.keys[0], _uuid: a.id} as any, clients[i] as any);
     } else {
@@ -323,9 +323,9 @@ function waitLivenessFuzz(broker: Broker1, seed: number, rounds: number, opsPerR
         // DRAIN-TO-EMPTY: release every full holder, cascading.
         let guard = 0;
         while (true) {
-            if (++guard > 100_000) throw new Error(`seed=${seed} round=${round}: drain runaway`);
+            if (++guard > 100_000) {throw new Error(`seed=${seed} round=${round}: drain runaway`);}
             const idx = agents.findIndex(a => a.state === 'holding');
-            if (idx < 0) break;
+            if (idx < 0) {break;}
             releaseAgent(broker, clients, agents, idx);
         }
 

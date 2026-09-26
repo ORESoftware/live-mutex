@@ -24,7 +24,7 @@ async function testLinkedQueueUpgrade() {
         await new Promise((resolve, reject) => {
             broker.close((err) => {
                 if (err)
-                    return reject(err);
+                    {return reject(err);}
                 resolve();
             });
         });
