@@ -6,6 +6,9 @@ import oresConfig from './.ores-lint/eslint/base.mjs';
 
 export default await oresConfig({
   // requireSend: { loggerNames: ['myLogger'], terminalMethods: ['send', 'flush'] },
-  // rules: { 'no-console': 'warn' },
+  rules: {
+    curly: ['warn', 'all'],
+    'max-statements-per-line': ['warn', {max: 1}],
+  },
   // ignores: ['**/generated/**'],
 });
