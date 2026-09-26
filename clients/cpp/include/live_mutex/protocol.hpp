@@ -52,20 +52,34 @@ struct Response {
     r.contended_key = r.raw.str_or("contendedKey");
 
     if (const json::Value* ks = r.raw.find("keys"); ks && ks->type() == json::Type::Array) {
-      for (const auto& v : ks->as_array())
-        if (v.type() == json::Type::String) r.keys.push_back(v.as_string());
+      for (const auto& v : ks->as_array()) {
+        if (v.type() == json::Type::String) {
+          r.keys.push_back(v.as_string());
+        }
+      }
     }
     if (const json::Value* ft = r.raw.find("fencingTokens"); ft && ft->type() == json::Type::Object) {
-      for (const auto& [k, v] : ft->as_object())
-        if (v.type() == json::Type::Number) r.fencing_tokens[k] = v.as_u64();
+      for (const auto& [k, v] : ft->as_object()) {
+        if (v.type() == json::Type::Number) {
+          r.fencing_tokens[k] = v.as_u64();
+        }
+      }
     }
 
-    if (r.raw_type == "lock") r.type = ResponseType::Lock;
-    else if (r.raw_type == "unlock" || r.raw.contains("unlocked")) r.type = ResponseType::Unlock;
-    else if (r.raw_type == "version-mismatch") r.type = ResponseType::VersionMismatch;
-    else if (r.raw.contains("released")) r.type = ResponseType::ReleaseMany;
-    else if (r.raw.contains("fencingTokens") || (r.raw.contains("lockUuid") && r.raw.contains("acquired")))
+    if (r.raw_type == "lock") {
+      r.type = ResponseType::Lock;
+    } else if (r.raw_type == "unlock" || r.raw.contains("unlocked")) {
+      r.type = ResponseType::Unlock;
+    } else if (r.raw_type == "version-mismatch") {
+      r.type = ResponseType::VersionMismatch;
+    } else if (r.raw.contains("released")) {
+      r.type = ResponseType::ReleaseMany;
+    } else if (
+      r.raw.contains("fencingTokens") ||
+      (r.raw.contains("lockUuid") && r.raw.contains("acquired"))
+    ) {
       r.type = ResponseType::AcquireMany;
+    }
     return r;
   }
 };
@@ -85,9 +99,14 @@ inline std::string lock_request(const std::string& uuid, const std::string& key,
   o["key"] = key;
   o["pid"] = static_cast<int64_t>(pid);
   o["keepLocksAfterDeath"] = false;
-  if (ttl_ms > 0) o["ttl"] = static_cast<uint64_t>(ttl_ms);
-  else o["ttl"] = nullptr;
-  if (max_holders) o["max"] = static_cast<uint64_t>(*max_holders);
+  if (ttl_ms > 0) {
+    o["ttl"] = static_cast<uint64_t>(ttl_ms);
+  } else {
+    o["ttl"] = nullptr;
+  }
+  if (max_holders) {
+    o["max"] = static_cast<uint64_t>(*max_holders);
+  }
   return json::Value(std::move(o)).dump();
 }
 
@@ -105,13 +124,18 @@ inline std::string unlock_request(const std::string& uuid, const std::string& ke
 inline std::string acquire_many_request(const std::string& uuid,
                                         const std::vector<std::string>& keys, uint64_t ttl_ms) {
   json::Array arr;
-  for (const auto& k : keys) arr.push_back(json::Value(k));
+  for (const auto& k : keys) {
+    arr.push_back(json::Value(k));
+  }
   json::Object o;
   o["type"] = std::string("acquire-many");
   o["uuid"] = uuid;
   o["keys"] = json::Value(std::move(arr));
-  if (ttl_ms > 0) o["ttl"] = static_cast<uint64_t>(ttl_ms);
-  else o["ttl"] = nullptr;
+  if (ttl_ms > 0) {
+    o["ttl"] = static_cast<uint64_t>(ttl_ms);
+  } else {
+    o["ttl"] = nullptr;
+  }
   return json::Value(std::move(o)).dump();
 }
 
