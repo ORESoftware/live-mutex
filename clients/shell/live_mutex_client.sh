@@ -40,7 +40,7 @@ lmx_uuid() {
   elif [ -r /proc/sys/kernel/random/uuid ]; then
     cat /proc/sys/kernel/random/uuid
   else
-    printf '%s-%s-%s-%s' "$RANDOM$RANDOM" "$RANDOM" "$" "$(date +%s)"
+    printf '%s-%s-%s-%s' "$RANDOM$RANDOM" "$RANDOM" "$$" "$(date +%s)"
   fi
 }
 
