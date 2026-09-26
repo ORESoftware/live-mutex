@@ -35,9 +35,13 @@ LMX_FENCE=""        # fencing token from the last single-key grant
 LMX_FENCES=""       # raw fencingTokens object from the last acquire-many
 
 lmx_uuid() {
-  if command -v uuidgen >/dev/null 2>&1; then uuidgen | tr '[:upper:]' '[:lower:]'
-  elif [ -r /proc/sys/kernel/random/uuid ]; then cat /proc/sys/kernel/random/uuid
-  else printf '%s-%s-%s-%s' "$RANDOM$RANDOM" "$RANDOM" "$$" "$(date +%s)"; fi
+  if command -v uuidgen >/dev/null 2>&1; then
+    uuidgen | tr '[:upper:]' '[:lower:]'
+  elif [ -r /proc/sys/kernel/random/uuid ]; then
+    cat /proc/sys/kernel/random/uuid
+  else
+    printf '%s-%s-%s-%s' "$RANDOM$RANDOM" "$RANDOM" "$" "$(date +%s)"
+  fi
 }
 
 # Escape a value for safe embedding inside a JSON string literal (backslash,
@@ -53,11 +57,18 @@ lmx_json_escape() {
   printf '%s' "$s"
 }
 
-lmx_json_str() { sed -n "s/.*\"$1\":\"\([^\"]*\)\".*/\1/p"; }
-lmx_json_num() { sed -n "s/.*\"$1\":\([0-9][0-9]*\).*/\1/p"; }
+lmx_json_str() {
+  sed -n "s/.*\"$1\":\"\([^\"]*\)\".*/\1/p"
+}
+
+lmx_json_num() {
+  sed -n "s/.*\"$1\":\([0-9][0-9]*\).*/\1/p"
+}
 lmx_json_array() {
   local out="" k
-  for k in "$@"; do out="$out,\"$(lmx_json_escape "$k")\""; done
+  for k in "$@"; do
+    out="$out,\"$(lmx_json_escape "$k")\""
+  done
   printf '[%s]' "${out:1}"
 }
 
@@ -68,9 +79,15 @@ lmx_connect() {
   _lmx_send "$(printf '{"type":"%s","value":"%s"}' "$LMX_REQ_VERSION" "$(lmx_json_escape "$LMX_VERSION")")"
 }
 
-lmx_disconnect() { exec 3>&- 2>/dev/null; exec 3<&- 2>/dev/null; return 0; }
+lmx_disconnect() {
+  exec 3>&- 2>/dev/null
+  exec 3<&- 2>/dev/null
+  return 0
+}
 
-_lmx_send() { printf '%s\n' "$1" >&3; }
+_lmx_send() {
+  printf '%s\n' "$1" >&3
+}
 
 # Read frames until one carries our uuid; stash it in LMX_REPLY.
 _lmx_read_reply() {
