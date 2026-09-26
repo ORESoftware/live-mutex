@@ -171,7 +171,9 @@ class Parser {
   size_t i_ = 0;
 
   void skip_ws() {
-    while (i_ < s_.size() && (s_[i_] == ' ' || s_[i_] == '\t' || s_[i_] == '\n' || s_[i_] == '\r')) ++i_;
+    while (i_ < s_.size() && (s_[i_] == ' ' || s_[i_] == '\t' || s_[i_] == '\n' || s_[i_] == '\r')) {
+      ++i_;
+    }
   }
 
   char peek() {
