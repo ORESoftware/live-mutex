@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 
-set -e;
+set -euo pipefail
 
-env | sort;
+node --version
+npm --version
 
-npm i
+npm ci
 
 echo
 
-tsc
+npm run compile
 
 echo
 
@@ -16,7 +17,7 @@ echo
 
 echo
 
-suman --default | cat
+npx --no-install suman --default | cat
 
 echo
 
