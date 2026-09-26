@@ -10,7 +10,7 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Detect project types
         id: detect
@@ -26,7 +26,7 @@ jobs:
 
       # Node is the runner for ESLint and for the cross-language require-send
       # scanner, so it is installed whenever any supported language is present.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         if: steps.detect.outputs.js == 'true' || steps.detect.outputs.rs == 'true' || steps.detect.outputs.dart == 'true' || steps.detect.outputs.gleam == 'true'
         with:
           node-version: '22'
@@ -43,7 +43,7 @@ jobs:
 
       # Dart/Gleam SDKs are optional. When absent, dart.sh / gleam.sh skip
       # with an actionable message; require-send.mjs still runs via Node.
-      - uses: dart-lang/setup-dart@v1
+      - uses: dart-lang/setup-dart@6afc89df92d6eb3834022f73cd65adc8cdfcb92d # v1
         if: steps.detect.outputs.dart == 'true'
         continue-on-error: true
 
