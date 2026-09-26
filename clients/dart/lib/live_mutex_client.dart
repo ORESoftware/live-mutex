@@ -84,34 +84,56 @@ class Client {
   }
 
   void _onLine(String line) {
-    if (line.isEmpty) return;
+    if (line.isEmpty) {
+      return;
+    }
     final dynamic decoded;
     try {
       decoded = jsonDecode(line);
     } catch (_) {
       return;
     }
-    if (decoded is! Map<String, dynamic>) return;
+    if (decoded is! Map<String, dynamic>) {
+      return;
+    }
     final uuid = decoded['uuid'];
-    if (uuid is! String) return;
+    if (uuid is! String) {
+      return;
+    }
     final completer = _inflight.remove(uuid);
-    if (completer != null && !completer.isCompleted) completer.complete(decoded);
+    if (completer != null && !completer.isCompleted) {
+      completer.complete(decoded);
+    }
   }
 
   void _closeWithError() {
-    if (_closed) return;
+    if (_closed) {
+      return;
+    }
     _closed = true;
     for (final c in _inflight.values) {
-      if (!c.isCompleted) c.completeError(LiveMutexException('connection closed'));
+      if (!c.isCompleted) {
+        c.completeError(LiveMutexException('connection closed'));
+      }
     }
     _inflight.clear();
   }
 
   Future<void> close() async {
-    if (_closed) return;
+    if (_closed) {
+      return;
+    }
     _closed = true;
-    try { await _socket.flush(); } catch (_) {}
-    try { await _socket.close(); } catch (_) {}
+    try {
+      await _socket.flush();
+    } catch (_) {
+      // Best-effort shutdown.
+    }
+    try {
+      await _socket.close();
+    } catch (_) {
+      // Best-effort shutdown.
+    }
     _closeWithError();
   }
 
@@ -131,7 +153,9 @@ class Client {
       'type': 'lock', 'uuid': reqUuid, 'key': key, 'ttl': ttlMs,
       'pid': pid, 'keepLocksAfterDeath': false,
     };
-    if (max != null) payload['max'] = max;
+    if (max != null) {
+      payload['max'] = max;
+    }
     final reply = await _awaitReply(reqUuid, payload);
     if (reply['acquired'] != true) {
       throw LiveMutexException(reply['error']?.toString() ?? 'lock not acquired');
@@ -157,7 +181,9 @@ class Client {
   }
 
   Future<AcquireManyGrant> acquireMany(List<String> keys, {int? ttlMs}) async {
-    if (keys.isEmpty) throw ArgumentError('acquireMany requires at least one key');
+    if (keys.isEmpty) {
+      throw ArgumentError('acquireMany requires at least one key');
+    }
     final reqUuid = _uuid.v4();
     final reply = await _awaitReply(reqUuid, {
       'type': 'acquire-many', 'uuid': reqUuid, 'keys': keys, 'ttl': ttlMs,
@@ -171,10 +197,14 @@ class Client {
         ? (reply['keys'] as List).map((e) => e.toString()).toList()
         : List<String>.from(keys);
     final raw = reply['fencingTokens'];
-    if (raw is! Map) throw LiveMutexException('acquire-many omitted fencingTokens');
+    if (raw is! Map) {
+      throw LiveMutexException('acquire-many omitted fencingTokens');
+    }
     final tokens = <String, int>{};
     for (final key in returnedKeys) {
-      if (!raw.containsKey(key)) throw LiveMutexException('missing fencing token for key $key');
+      if (!raw.containsKey(key)) {
+        throw LiveMutexException('missing fencing token for key $key');
+      }
       tokens[key] = _fence(raw[key], 'fencingTokens[$key]');
     }
     if (tokens.length != returnedKeys.length) {

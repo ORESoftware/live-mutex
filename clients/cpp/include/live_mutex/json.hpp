@@ -60,7 +60,9 @@ class Value {
     return type_ == Type::Object && obj_.find(key) != obj_.end();
   }
   const Value* find(const std::string& key) const {
-    if (type_ != Type::Object) return nullptr;
+    if (type_ != Type::Object) {
+      return nullptr;
+    }
     auto it = obj_.find(key);
     return it == obj_.end() ? nullptr : &it->second;
   }
@@ -93,7 +95,9 @@ class Value {
       case Type::Array: {
         os << '[';
         for (size_t i = 0; i < arr_.size(); ++i) {
-          if (i) os << ',';
+          if (i) {
+            os << ',';
+          }
           arr_[i].write(os);
         }
         os << ']';
@@ -103,7 +107,9 @@ class Value {
         os << '{';
         bool first = true;
         for (const auto& [k, v] : obj_) {
-          if (!first) os << ',';
+          if (!first) {
+            os << ',';
+          }
           first = false;
           write_string(os, k);
           os << ':';
@@ -165,11 +171,15 @@ class Parser {
   size_t i_ = 0;
 
   void skip_ws() {
-    while (i_ < s_.size() && (s_[i_] == ' ' || s_[i_] == '\t' || s_[i_] == '\n' || s_[i_] == '\r')) ++i_;
+    while (i_ < s_.size() && (s_[i_] == ' ' || s_[i_] == '\t' || s_[i_] == '\n' || s_[i_] == '\r')) {
+      ++i_;
+    }
   }
 
   char peek() {
-    if (i_ >= s_.size()) throw ParseError("unexpected end of JSON");
+    if (i_ >= s_.size()) {
+      throw ParseError("unexpected end of JSON");
+    }
     return s_[i_];
   }
 
@@ -189,19 +199,30 @@ class Parser {
     Object obj;
     ++i_;  // {
     skip_ws();
-    if (peek() == '}') { ++i_; return Value(std::move(obj)); }
+    if (peek() == '}') {
+      ++i_;
+      return Value(std::move(obj));
+    }
     while (true) {
       skip_ws();
       std::string key = parse_string();
       skip_ws();
-      if (peek() != ':') throw ParseError("expected ':'");
+      if (peek() != ':') {
+        throw ParseError("expected ':'");
+      }
       ++i_;
       skip_ws();
       obj[key] = parse_value();
       skip_ws();
       char c = peek();
-      if (c == ',') { ++i_; continue; }
-      if (c == '}') { ++i_; break; }
+      if (c == ',') {
+        ++i_;
+        continue;
+      }
+      if (c == '}') {
+        ++i_;
+        break;
+      }
       throw ParseError("expected ',' or '}'");
     }
     return Value(std::move(obj));
@@ -211,28 +232,43 @@ class Parser {
     Array arr;
     ++i_;  // [
     skip_ws();
-    if (peek() == ']') { ++i_; return Value(std::move(arr)); }
+    if (peek() == ']') {
+      ++i_;
+      return Value(std::move(arr));
+    }
     while (true) {
       skip_ws();
       arr.push_back(parse_value());
       skip_ws();
       char c = peek();
-      if (c == ',') { ++i_; continue; }
-      if (c == ']') { ++i_; break; }
+      if (c == ',') {
+        ++i_;
+        continue;
+      }
+      if (c == ']') {
+        ++i_;
+        break;
+      }
       throw ParseError("expected ',' or ']'");
     }
     return Value(std::move(arr));
   }
 
   std::string parse_string() {
-    if (peek() != '"') throw ParseError("expected string");
+    if (peek() != '"') {
+      throw ParseError("expected string");
+    }
     ++i_;
     std::string out;
     while (i_ < s_.size()) {
       char c = s_[i_++];
-      if (c == '"') return out;
+      if (c == '"') {
+        return out;
+      }
       if (c == '\\') {
-        if (i_ >= s_.size()) throw ParseError("bad escape");
+        if (i_ >= s_.size()) {
+          throw ParseError("bad escape");
+        }
         char e = s_[i_++];
         switch (e) {
           case '"': out.push_back('"'); break;
@@ -244,7 +280,9 @@ class Parser {
           case 'b': out.push_back('\b'); break;
           case 'f': out.push_back('\f'); break;
           case 'u': {
-            if (i_ + 4 > s_.size()) throw ParseError("bad \\u escape");
+            if (i_ + 4 > s_.size()) {
+              throw ParseError("bad \\u escape");
+            }
             unsigned code = std::stoul(s_.substr(i_, 4), nullptr, 16);
             i_ += 4;
             if (code < 0x80) {
@@ -269,13 +307,22 @@ class Parser {
   }
 
   Value parse_bool() {
-    if (s_.compare(i_, 4, "true") == 0) { i_ += 4; return Value(true); }
-    if (s_.compare(i_, 5, "false") == 0) { i_ += 5; return Value(false); }
+    if (s_.compare(i_, 4, "true") == 0) {
+      i_ += 4;
+      return Value(true);
+    }
+    if (s_.compare(i_, 5, "false") == 0) {
+      i_ += 5;
+      return Value(false);
+    }
     throw ParseError("invalid literal");
   }
 
   Value parse_null() {
-    if (s_.compare(i_, 4, "null") == 0) { i_ += 4; return Value(nullptr); }
+    if (s_.compare(i_, 4, "null") == 0) {
+      i_ += 4;
+      return Value(nullptr);
+    }
     throw ParseError("invalid literal");
   }
 
@@ -289,7 +336,9 @@ class Parser {
         break;
       }
     }
-    if (i_ == start) throw ParseError("invalid number");
+    if (i_ == start) {
+      throw ParseError("invalid number");
+    }
     return Value::number_raw(s_.substr(start, i_ - start));
   }
 };
