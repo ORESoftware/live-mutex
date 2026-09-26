@@ -102,6 +102,10 @@ jobs:
         shell: bash
         run: cd clients/python && PYTHONPATH=src python3 -m live_mutex_client.smoke
 
+      - name: Shell syntax checks
+        shell: bash
+        run: bash -n ./clients/shell/live_mutex_client.sh ./clients/shell/smoke.sh
+
       - name: Shell source contract
         shell: bash
         run: bash ./clients/shell/source-contract.sh
