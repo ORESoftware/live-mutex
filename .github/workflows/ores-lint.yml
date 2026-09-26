@@ -47,6 +47,9 @@ jobs:
         if: steps.detect.outputs.dart == 'true'
         continue-on-error: true
 
+      - name: Run ores-lint self-test
+        run: sh .ores-lint/selftest.sh
+
       - name: Run ores-lint
         run: sh .ores-lint/lint.sh
         env:
