@@ -4,7 +4,6 @@
     "skipLibCheck": true,
     "outDir": "dist",
     "declaration": true,
-    "baseUrl": ".",
     "target": "ESNext",
     "rootDir": "src",
     "module": "commonjs",
