@@ -138,20 +138,33 @@ lmx_acquire() {
 # lmx_release <key> <lock_uuid> [force]
 lmx_release() {
   local key="$1" lock="$2" force="${3:-}" uuid; uuid="$(lmx_uuid)"
-  local forcef=""; [ -n "$force" ] && forcef=",\"force\":true"
+  local forcef=""
+  if [ -n "$force" ]; then
+    forcef=",\"force\":true"
+  fi
   _lmx_send "$(printf '{"type":"%s","uuid":"%s","_uuid":"%s","key":"%s"%s}' \
     "$LMX_REQ_UNLOCK" "$uuid" "$(lmx_json_escape "$lock")" "$(lmx_json_escape "$key")" "$forcef")"
-  _lmx_read_reply "$uuid" || { LMX_ERROR="release($key): timeout"; return 1; }
+  if ! _lmx_read_reply "$uuid"; then
+    LMX_ERROR="release($key): timeout"
+    return 1
+  fi
   case "$LMX_REPLY" in *'"unlocked":true'*) return 0 ;; *) LMX_ERROR="release($key): $LMX_REPLY"; return 1 ;; esac
 }
 
 # lmx_acquire_many [ttl_ms] -- <key>...  -> sets LMX_LOCK_UUID / LMX_FENCES (atomic union)
 lmx_acquire_many() {
-  local ttl="$1"; shift; [ "${1:-}" = "--" ] && shift
+  local ttl="$1"
+  shift
+  if [ "${1:-}" = "--" ]; then
+    shift
+  fi
   local uuid; uuid="$(lmx_uuid)"
   _lmx_send "$(printf '{"type":"%s","uuid":"%s","keys":%s,"ttl":%s}' \
     "$LMX_REQ_ACQUIRE_MANY" "$uuid" "$(lmx_json_array "$@")" "$ttl")"
-  _lmx_read_reply "$uuid" || { LMX_ERROR="acquire_many: ${LMX_ERROR:-timeout}"; return 1; }
+  if ! _lmx_read_reply "$uuid"; then
+    LMX_ERROR="acquire_many: ${LMX_ERROR:-timeout}"
+    return 1
+  fi
   case "$LMX_REPLY" in *'"acquired":true'*) ;; *) LMX_ERROR="acquire_many: $LMX_REPLY"; return 1 ;; esac
   LMX_LOCK_UUID="$(lmx_json_str lockUuid <<<"$LMX_REPLY")"
   LMX_FENCES="$(sed -n 's/.*\("fencingTokens":{[^}]*}\).*/\1/p' <<<"$LMX_REPLY")"
@@ -162,6 +175,9 @@ lmx_release_many() {
   local lock="$1" uuid; uuid="$(lmx_uuid)"
   _lmx_send "$(printf '{"type":"%s","uuid":"%s","lockUuid":"%s"}' \
     "$LMX_REQ_RELEASE_MANY" "$uuid" "$(lmx_json_escape "$lock")")"
-  _lmx_read_reply "$uuid" || { LMX_ERROR="release_many: timeout"; return 1; }
+  if ! _lmx_read_reply "$uuid"; then
+    LMX_ERROR="release_many: timeout"
+    return 1
+  fi
   case "$LMX_REPLY" in *'"released":true'*) return 0 ;; *) LMX_ERROR="release_many: $LMX_REPLY"; return 1 ;; esac
 }
