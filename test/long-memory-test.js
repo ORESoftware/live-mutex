@@ -118,7 +118,7 @@ const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 async function runLockOperation(client, key) {
     return new Promise((resolve) => {
         client.lock(key, { ttl: 2000 }, (err, unlock) => {
-            if (err) return resolve();
+            if (err) {return resolve();}
             setTimeout(() => {
                 unlock(() => resolve());
             }, 50 + Math.random() * 150);
@@ -129,7 +129,7 @@ async function runLockOperation(client, key) {
 async function runSemaphoreOperation(client, key, max) {
     return new Promise((resolve) => {
         client.lock(key, { max, ttl: 2000 }, (err, unlock) => {
-            if (err) return resolve();
+            if (err) {return resolve();}
             setTimeout(() => {
                 unlock(() => resolve());
             }, 100 + Math.random() * 200);
@@ -141,14 +141,14 @@ async function runRWOperation(client, key, isWrite) {
     return new Promise((resolve) => {
         if (isWrite) {
             client.acquireWriteLock(key, {}, (err, release) => {
-                if (err) return resolve();
+                if (err) {return resolve();}
                 setTimeout(() => {
                     release(() => resolve());
                 }, 50 + Math.random() * 100);
             });
         } else {
             client.acquireReadLock(key, {}, (err, release) => {
-                if (err) return resolve();
+                if (err) {return resolve();}
                 setTimeout(() => {
                     release(() => resolve());
                 }, 50 + Math.random() * 100);

@@ -6,7 +6,7 @@ const TTL = 2;
 const MAX_TIME = 5;
 const MAX_FENCE = 4;
 const fail = (ok, message, context) => {
-  if (!ok) throw new Error(`formal invariant failed: ${message}\n${JSON.stringify(context ?? {})}`);
+  if (!ok) {throw new Error(`formal invariant failed: ${message}\n${JSON.stringify(context ?? {})}`);}
 };
 const initial = () => ({now:0, holder:null, fence:0, lastFence:0, expiresAt:0, queue:[], requestResult:{}});
 const clone = (s) => ({...s, queue:[...s.queue], requestResult:{...s.requestResult}});
@@ -32,7 +32,7 @@ function checkState(s) {
   fail(Number.isInteger(s.now) && s.now >= 0 && s.now <= MAX_TIME, "time bounded", s);
   fail(Number.isInteger(s.lastFence) && s.lastFence >= 0 && s.lastFence <= MAX_FENCE, "fence bounded", s);
   fail(new Set(s.queue.map(x => x.requestId)).size === s.queue.length, "queued request ids unique", s);
-  if (s.holder === null) fail(s.fence === 0 && s.expiresAt === 0, "free lock has no grant metadata", s);
+  if (s.holder === null) {fail(s.fence === 0 && s.expiresAt === 0, "free lock has no grant metadata", s);}
   else {
     fail(CLIENTS.includes(s.holder), "holder is known", s);
     fail(s.fence > 0 && s.fence === s.lastFence, "live holder owns newest fence", s);
@@ -66,25 +66,25 @@ function step(input, action) {
     if (active(s) && s.holder === action.client && action.fence === s.fence) {
       s.holder = null; s.fence = 0; s.expiresAt = 0; s = expireAndGrant(s);
       accepted = true; reason = "released";
-    } else reason = "stale-or-not-owner";
+    } else {reason = "stale-or-not-owner";}
   } else if (action.kind === "renew" && CLIENTS.includes(action.client)) {
     if (active(s) && s.holder === action.client && action.fence === s.fence) {
       s.expiresAt = Math.min(MAX_TIME + TTL, s.expiresAt + 1);
       accepted = true; reason = "renewed";
-    } else reason = "stale-or-not-owner";
+    } else {reason = "stale-or-not-owner";}
   }
   checkState(s);
   fail(s.lastFence >= input.lastFence, "fencing tokens never regress", {input,action,next:s});
-  if (action.kind === "renew" && accepted) fail(s.fence === before.fence, "renew never mints fence", {before,action,s});
-  if (action.kind === "release" && !accepted) fail(s.holder === before.holder && s.fence === before.fence, "stale release is side-effect free", {before,action,s});
+  if (action.kind === "renew" && accepted) {fail(s.fence === before.fence, "renew never mints fence", {before,action,s});}
+  if (action.kind === "release" && !accepted) {fail(s.holder === before.holder && s.fence === before.fence, "stale release is side-effect free", {before,action,s});}
   return {accepted,reason,next:s};
 }
 
 function allActions() {
   const out = [{kind:"tick"}];
   for (const client of CLIENTS) {
-    for (const requestId of [`${client}-1`, `${client}-2`]) out.push({kind:"acquire",client,requestId});
-    for (const fence of [1,2,3,4]) out.push({kind:"release",client,fence},{kind:"renew",client,fence});
+    for (const requestId of [`${client}-1`, `${client}-2`]) {out.push({kind:"acquire",client,requestId});}
+    for (const fence of [1,2,3,4]) {out.push({kind:"release",client,fence},{kind:"renew",client,fence});}
   }
   return out;
 }
@@ -124,4 +124,4 @@ if (process.argv.includes("--json-stdin")) {
     try { console.log(JSON.stringify(replay(JSON.parse(line)))); }
     catch(e){ console.log(JSON.stringify({ok:false,error:String(e?.message ?? e)})); process.exitCode=1; }
   }
-} else explore();
+} else {explore();}

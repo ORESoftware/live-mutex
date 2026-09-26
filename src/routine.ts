@@ -109,7 +109,7 @@ let otelEnabled = false;
 /** Internal: lazy tracer accessor. Falls back to the no-op tracer if OTel isn't configured. */
 function getTracer(): Tracer {
   const fnRoutineId = 'ddl-routine-getTracer-Bn7';
-  if (cachedTracer) return cachedTracer;
+  if (cachedTracer) {return cachedTracer;}
   cachedTracer = trace.getTracer(SERVICE_NAME_DEFAULT);
   return cachedTracer;
 }
@@ -216,7 +216,7 @@ export function isOtelEnabled(): boolean {
 export function initOtel(): void {
   const routineId = 'ddl-routine-initOtel-Vq8wzKp';
   routineEnter(routineId, 'initOtel');
-  if (otelInitialised) return;
+  if (otelInitialised) {return;}
 
   const endpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
   if (!endpoint || !endpoint.trim()) {
@@ -324,7 +324,7 @@ export function initOtel(): void {
 export async function shutdownOtel(): Promise<void> {
   const routineId = 'ddl-routine-shutdownOtel-Hl3';
   routineEnter(routineId, 'shutdownOtel');
-  if (!otelInitialised || !activeOtelProvider) return;
+  if (!otelInitialised || !activeOtelProvider) {return;}
   const provider = activeOtelProvider;
   activeOtelProvider = null;
   otelEnabled = false;

@@ -299,7 +299,7 @@ export class VirtualSocket extends EventEmitter {
         }
 
         const finalize = () => {
-            if (!this.writable) return; // re-entrancy guard
+            if (!this.writable) {return;} // re-entrancy guard
             this.writable = false;
             if (!this.finishEmitted) {
                 this.finishEmitted = true;

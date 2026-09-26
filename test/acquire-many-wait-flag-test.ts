@@ -46,7 +46,7 @@ function makeSocket(label: string): FakeSocket {
         write(chunk: any): boolean {
             try {
                 const lines = chunk.toString().trim().split('\n').filter(Boolean);
-                for (const line of lines) sent.push(JSON.parse(line));
+                for (const line of lines) {sent.push(JSON.parse(line));}
             } catch {
                 // best-effort capture
             }
@@ -68,7 +68,7 @@ function tick(n = 4): Promise<void> {
 
 function holderUuidForKey(broker: Broker1, key: string): string | null {
     const lck = broker.locks.get(key);
-    if (!lck) return null;
+    if (!lck) {return null;}
     const it = lck.lockholders.keys().next();
     return it.done ? null : it.value;
 }

@@ -26,7 +26,7 @@ import {Client, RWLockClient} from '../dist/main';
 
 function envEndpoint(): {host: string; port: number} | null {
     const raw = process.env.LMX_LIVE_BROKER_TCP;
-    if (!raw) return null;
+    if (!raw) {return null;}
     const [host, portStr] = raw.split(':');
     if (!host || !portStr) {
         process.stderr.write(`LMX_LIVE_BROKER_TCP must be host:port (got ${raw})\n`);
@@ -62,10 +62,10 @@ async function s_acquire_release_with_fencing(host: string, port: number) {
     const c = quiet(await new Client({host, port, lockRequestTimeout: 8_000, ttl: 5_000}).ensure());
     try {
         const a = await c.acquire(key, {ttl: 1_000, maxRetries: 1});
-        if (typeof a.fencingToken !== 'number') fail(label, 'no fencing token in first grant');
+        if (typeof a.fencingToken !== 'number') {fail(label, 'no fencing token in first grant');}
         await c.release(key, a.id);
         const b = await c.acquire(key, {ttl: 1_000, maxRetries: 1});
-        if (typeof b.fencingToken !== 'number') fail(label, 'no fencing token in second grant');
+        if (typeof b.fencingToken !== 'number') {fail(label, 'no fencing token in second grant');}
         if (!(b.fencingToken > a.fencingToken)) {
             fail(label, `fencing not monotonic: ${a.fencingToken} -> ${b.fencingToken}`);
         }
@@ -115,7 +115,7 @@ async function s_semaphore_cap_enforced(host: string, port: number) {
     }
     if (probeOutcome === 'granted') {
         // Defensive cleanup so we don't dangle a 4th holder.
-        try { if (probeLockId) await probe.release(key, probeLockId); } catch {}
+        try { if (probeLockId) {await probe.release(key, probeLockId);} } catch {}
         probe.close();
         fail(label, `broker over-granted semaphore (max=${max}) — probe got a slot`);
     }

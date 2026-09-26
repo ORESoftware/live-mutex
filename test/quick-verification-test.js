@@ -20,7 +20,7 @@ async function runQuickVerification() {
     await new Promise((resolve, reject) => {
         broker.ensure((err) => {
             if (err)
-                return reject(err);
+                {return reject(err);}
             resolve();
         });
     });
@@ -29,7 +29,7 @@ async function runQuickVerification() {
     await new Promise((resolve, reject) => {
         client.ensure((err) => {
             if (err)
-                return reject(err);
+                {return reject(err);}
             resolve();
         });
     });
@@ -39,11 +39,11 @@ async function runQuickVerification() {
     await new Promise((resolve, reject) => {
         client.lock('test-key-1', (err, result) => {
             if (err)
-                return reject(err);
+                {return reject(err);}
             console.log('  ✅ Lock acquired, id:', result.id);
             client.unlock('test-key-1', result.id, (unlockErr) => {
                 if (unlockErr)
-                    return reject(unlockErr);
+                    {return reject(unlockErr);}
                 console.log('  ✅ Unlock with string id works');
                 resolve();
             });
@@ -55,7 +55,7 @@ async function runQuickVerification() {
         // @ts-ignore - testing legacy signature
         client.lock('test-key-2', 1000, (err, result) => {
             if (err)
-                return reject(err);
+                {return reject(err);}
             console.log('  ✅ Lock with number ttl works');
             client.unlock('test-key-2', result.id, resolve);
         });
@@ -65,7 +65,7 @@ async function runQuickVerification() {
     await new Promise((resolve, reject) => {
         client.lock('test-key-3', { ttl: 5000 }, (err, result) => {
             if (err)
-                return reject(err);
+                {return reject(err);}
             console.log('  ✅ Lock with options works');
             client.unlock('test-key-3', result.id, resolve);
         });
@@ -75,11 +75,11 @@ async function runQuickVerification() {
     await new Promise((resolve, reject) => {
         client.lock('test-key-4', (err, result) => {
             if (err)
-                return reject(err);
+                {return reject(err);}
             const lockId = result.id;
             client.unlock('test-key-4', lockId, (unlockErr) => {
                 if (unlockErr)
-                    return reject(unlockErr);
+                    {return reject(unlockErr);}
                 console.log('  ✅ Unlock with string id works');
                 resolve();
             });
@@ -90,10 +90,10 @@ async function runQuickVerification() {
     await new Promise((resolve, reject) => {
         client.lock('test-key-5', (err, result) => {
             if (err)
-                return reject(err);
+                {return reject(err);}
             client.unlock('test-key-5', { id: result.id }, (unlockErr) => {
                 if (unlockErr)
-                    return reject(unlockErr);
+                    {return reject(unlockErr);}
                 console.log('  ✅ Unlock with options object works');
                 resolve();
             });

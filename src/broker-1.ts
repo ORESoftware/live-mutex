@@ -587,13 +587,13 @@ export class Broker1 {
                 return brokerPromise =
                     Promise.resolve(this)
                         .then(onResolve)
-                        .catch(onRejected)
+                        .catch(onRejected);
             }
 
             return brokerPromise = new Promise((resolve, reject) => {
 
                 let to = setTimeout(function () {
-                    reject('lmx broker error: listening action timed out.')
+                    reject('lmx broker error: listening action timed out.');
                 }, 3000);
 
                 wss.once('error', reject);
@@ -802,7 +802,7 @@ export class Broker1 {
         // leaves callbacks running against a discarded broker.
         for (const lockObj of this.locks.values()) {
             for (const holder of lockObj.lockholders.values()) {
-                if (holder.timer) clearTimeout(holder.timer);
+                if (holder.timer) {clearTimeout(holder.timer);}
             }
         }
 
@@ -837,10 +837,10 @@ export class Broker1 {
         // Close the server (works for both TCP and Unix domain sockets)
         if (this.wss) {
             this.wss.close((err: any) => {
-                if (cb) cb(err);
+                if (cb) {cb(err);}
             });
         } else {
-            if (cb) cb(null);
+            if (cb) {cb(null);}
         }
     }
 
@@ -1024,7 +1024,7 @@ export class Broker1 {
 
             const shouldRelease =
                 lockObj.isViaShell !== true || !lockObj.keepLocksAfterDeath;
-            if (!shouldRelease) continue;
+            if (!shouldRelease) {continue;}
 
             for (const holderUuid of myHolderUuids) {
                 this.unlock({
@@ -1794,7 +1794,7 @@ export class Broker1 {
 
         for (const field of ['max', 'maxRead', 'maxWrite'] as const) {
             const v = data[field];
-            if (v === undefined || v === null) continue;
+            if (v === undefined || v === null) {continue;}
             if (!Number.isInteger(v) || v < 1) {
                 this.send(ws, {
                     type: 'lock',
@@ -1873,9 +1873,9 @@ export class Broker1 {
         for (const { key, holderUuid } of expired) {
             this.holderDeadlines.delete(holderUuid);
             const lck = this.locks.get(key);
-            if (!lck) continue;
+            if (!lck) {continue;}
             const holder = lck.lockholders.get(holderUuid);
-            if (!holder) continue;
+            if (!holder) {continue;}
             // Mark as "expired by sweeper" so a late `unlock` from this
             // holder's owner returns `unlocked:true` instead of an error.
             lck.lockholderTimeouts[holderUuid] = true;
@@ -1894,7 +1894,7 @@ export class Broker1 {
     startTtlSweeper(intervalMs?: number): void {
         const routineId = 'ddl-routine-vNGTlfT8Mwb2YIWKk3';
         routineEnter(routineId, "Broker1.startTtlSweeper");
-        if (this.ttlSweeperHandle) return;
+        if (this.ttlSweeperHandle) {return;}
         if (intervalMs && Number.isInteger(intervalMs) && intervalMs > 0) {
             this.ttlSweepIntervalMs = intervalMs;
         }
@@ -1906,7 +1906,7 @@ export class Broker1 {
             }
         }, this.ttlSweepIntervalMs);
         // Don't keep the event loop alive just for the sweeper.
-        if (typeof handle.unref === 'function') handle.unref();
+        if (typeof handle.unref === 'function') {handle.unref();}
         this.ttlSweeperHandle = handle;
     }
 
@@ -2196,7 +2196,7 @@ export class Broker1 {
             if (expiresAt !== Infinity) {
                 this.holderDeadlines.set(holderUuid, { key: k, expiresAt, holderUuid });
             }
-            if (!this.wsToKeys.has(ws)) this.wsToKeys.set(ws, {});
+            if (!this.wsToKeys.has(ws)) {this.wsToKeys.set(ws, {});}
             this.wsToKeys.get(ws)[k] = true;
             grantedKeys.push(k);
             fencingTokens[k] = token;
@@ -2242,12 +2242,12 @@ export class Broker1 {
 
         for (const k of composite.keys) {
             const holderId = composite.holderUuids.get(k);
-            if (!holderId) continue;
+            if (!holderId) {continue;}
             const lck = this.locks.get(k);
-            if (!lck) continue;
+            if (!lck) {continue;}
             this.holderDeadlines.delete(holderId);
             const removed = lck.lockholders.delete(holderId);
-            if (removed) lck.lockholdersAllReleased[holderId] = true;
+            if (removed) {lck.lockholdersAllReleased[holderId] = true;}
             // Wake the next waiter on this key. The signature mirrors
             // what `unlock()` passes — `_uuid` is the freed holder's
             // identifier so `ensureNewLockHolder` has the context it
@@ -2475,7 +2475,7 @@ export class Broker1 {
 
             if (beginRead) {
                 // lck.readers = Math.max(20, lck.readers++);
-                lck.readers++
+                lck.readers++;
             }
 
             if (endRead) {
@@ -2521,7 +2521,7 @@ export class Broker1 {
 
         if (beginRead) {
             // lck.readers = Math.max(20, lck.readers++);
-            lckTemp.readers++
+            lckTemp.readers++;
         }
 
         if (endRead) {

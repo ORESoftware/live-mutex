@@ -51,7 +51,7 @@ function makeSocket(label: string): FakeSocket {
         write(chunk: any): boolean {
             try {
                 const lines = chunk.toString().trim().split('\n').filter(Boolean);
-                for (const line of lines) sent.push(JSON.parse(line));
+                for (const line of lines) {sent.push(JSON.parse(line));}
             } catch { /* best-effort */ }
             return true;
         },
@@ -121,7 +121,7 @@ async function singleKeyFencingMonotonicAndIndependent() {
         const g = newFrames(A).find(m => m.type === 'lock' && m.acquired);
         assert.ok(g, `2: fe-x cycle ${i} did not grant`);
         assert.ok(g.fencingToken > lastX, `2: fe-x must strictly increase at cycle ${i}: ${g.fencingToken} !> ${lastX}`);
-        if (i === 0) firstX = g.fencingToken;
+        if (i === 0) {firstX = g.fencingToken;}
         lastX = g.fencingToken;
         broker.unlock({uuid: uuidV4(), key: 'fe-x', _uuid: uuid} as any, A as any);
         newFrames(A);
@@ -134,7 +134,7 @@ async function singleKeyFencingMonotonicAndIndependent() {
         const g = newFrames(A).find(m => m.type === 'lock' && m.acquired);
         assert.ok(g, `2: fe-y cycle ${i} did not grant`);
         assert.ok(g.fencingToken > lastY, `2: fe-y must strictly increase at cycle ${i}: ${g.fencingToken} !> ${lastY}`);
-        if (i === 0) firstY = g.fencingToken;
+        if (i === 0) {firstY = g.fencingToken;}
         lastY = g.fencingToken;
         broker.unlock({uuid: uuidV4(), key: 'fe-y', _uuid: uuid} as any, A as any);
         newFrames(A);

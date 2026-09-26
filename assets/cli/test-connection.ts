@@ -50,7 +50,7 @@ async function testRWLock() {
     console.log(`  ✅ Acquired read lock: key="${key}"`);
     await new Promise<void>((resolve, reject) => {
       releaseRead((err: any) => {
-        if (err) return reject(err);
+        if (err) {return reject(err);}
         resolve();
       });
     });
@@ -61,7 +61,7 @@ async function testRWLock() {
     console.log(`  ✅ Acquired write lock: key="${key}"`);
     await new Promise<void>((resolve, reject) => {
       releaseWrite((err: any) => {
-        if (err) return reject(err);
+        if (err) {return reject(err);}
         resolve();
       });
     });
@@ -89,13 +89,13 @@ async function main() {
   
   if (testType === 'all' || testType === 'basic') {
     const passed = await testBasicLock();
-    if (!passed) allPassed = false;
+    if (!passed) {allPassed = false;}
     console.log('');
   }
   
   if (testType === 'all' || testType === 'rw') {
     const passed = await testRWLock();
-    if (!passed) allPassed = false;
+    if (!passed) {allPassed = false;}
     console.log('');
   }
   

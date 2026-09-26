@@ -22,11 +22,11 @@ async function testComprehensive() {
         await new Promise((resolve, reject) => {
             client.acquireWriteLock('test-key-1', {}, (err, release) => {
                 if (err)
-                    return reject(err);
+                    {return reject(err);}
                 console.log('   ✓ Write lock acquired (enqueue worked)');
                 release((err) => {
                     if (err)
-                        return reject(err);
+                        {return reject(err);}
                     console.log('   ✓ Write lock released\n');
                     resolve();
                 });
@@ -38,7 +38,7 @@ async function testComprehensive() {
             await new Promise((resolve, reject) => {
                 client.acquireReadLock('test-key-2', {}, (err, release) => {
                     if (err)
-                        return reject(err);
+                        {return reject(err);}
                     readLocks.push(release);
                     console.log(`   ✓ Read lock ${i + 1} acquired`);
                     resolve();
@@ -49,7 +49,7 @@ async function testComprehensive() {
             await new Promise((resolve, reject) => {
                 readLocks[i]((err) => {
                     if (err)
-                        return reject(err);
+                        {return reject(err);}
                     console.log(`   ✓ Read lock ${i + 1} released`);
                     resolve();
                 });
@@ -62,11 +62,11 @@ async function testComprehensive() {
             promises.push(new Promise((resolve, reject) => {
                 client.acquireWriteLock(`concurrent-key-${i}`, {}, (err, release) => {
                     if (err)
-                        return reject(err);
+                        {return reject(err);}
                     setTimeout(() => {
                         release((err) => {
                             if (err)
-                                return reject(err);
+                                {return reject(err);}
                             resolve();
                         });
                     }, 10);
@@ -81,7 +81,7 @@ async function testComprehensive() {
         await new Promise((resolve, reject) => {
             broker.close((err) => {
                 if (err)
-                    return reject(err);
+                    {return reject(err);}
                 resolve();
             });
         });

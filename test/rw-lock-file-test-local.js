@@ -32,7 +32,7 @@ async function testBasicRWLock() {
         await new Promise((resolve, reject) => {
             client.acquireWriteLock('test-key', {}, (err, release) => {
                 if (err)
-                    return reject(err);
+                    {return reject(err);}
                 writeFile(tmpFile, 100);
                 const value = readFile(tmpFile);
                 if (value !== 100) {
@@ -40,7 +40,7 @@ async function testBasicRWLock() {
                 }
                 release((releaseErr) => {
                     if (releaseErr)
-                        return reject(releaseErr);
+                        {return reject(releaseErr);}
                     resolve();
                 });
             });
@@ -48,14 +48,14 @@ async function testBasicRWLock() {
         await new Promise((resolve, reject) => {
             client.acquireReadLock('test-key', {}, (err, release) => {
                 if (err)
-                    return reject(err);
+                    {return reject(err);}
                 const value = readFile(tmpFile);
                 if (value !== 100) {
                     return reject(new Error(`Expected 100, got ${value}`));
                 }
                 release((releaseErr) => {
                     if (releaseErr)
-                        return reject(releaseErr);
+                        {return reject(releaseErr);}
                     resolve();
                 });
             });
@@ -94,13 +94,13 @@ async function testConcurrentReaders() {
             return new Promise((resolve, reject) => {
                 client.acquireReadLock('read-key', {}, (err, release) => {
                     if (err)
-                        return reject(err);
+                        {return reject(err);}
                     const value = readFile(tmpFile);
                     console.log(`  Reader ${index} read value: ${value}`);
                     setTimeout(() => {
                         release((releaseErr) => {
                             if (releaseErr)
-                                return reject(releaseErr);
+                                {return reject(releaseErr);}
                             resolve();
                         });
                     }, 10);
@@ -143,7 +143,7 @@ async function testExclusiveWriter() {
             return new Promise((resolve, reject) => {
                 client.acquireWriteLock('write-key', {}, (err, release) => {
                     if (err)
-                        return reject(err);
+                        {return reject(err);}
                     writeCount++;
                     if (writeCount > 1) {
                         return reject(new Error(`Multiple writers detected! Count: ${writeCount}`));
@@ -156,7 +156,7 @@ async function testExclusiveWriter() {
                         writeCount--;
                         release((releaseErr) => {
                             if (releaseErr)
-                                return reject(releaseErr);
+                                {return reject(releaseErr);}
                             resolve();
                         });
                     }, 50);
@@ -199,7 +199,7 @@ async function testReaderWriterInteraction() {
         const readerPromise = new Promise((resolve, reject) => {
             readerClient.acquireReadLock('rw-key', {}, (err, release) => {
                 if (err)
-                    return reject(err);
+                    {return reject(err);}
                 console.log('  Reader acquired lock');
                 const value1 = readFile(tmpFile);
                 console.log(`  Reader read value: ${value1}`);
@@ -208,7 +208,7 @@ async function testReaderWriterInteraction() {
                     console.log(`  Reader read value again: ${value2}`);
                     release((releaseErr) => {
                         if (releaseErr)
-                            return reject(releaseErr);
+                            {return reject(releaseErr);}
                         console.log('  Reader released lock');
                         resolve();
                     });
@@ -219,7 +219,7 @@ async function testReaderWriterInteraction() {
         const writerPromise = new Promise((resolve, reject) => {
             writerClient.acquireWriteLock('rw-key', {}, (err, release) => {
                 if (err)
-                    return reject(err);
+                    {return reject(err);}
                 console.log('  Writer acquired lock (after reader released)');
                 const currentValue = readFile(tmpFile);
                 writeFile(tmpFile, currentValue + 50);
@@ -227,7 +227,7 @@ async function testReaderWriterInteraction() {
                 console.log(`  Writer wrote value: ${newValue}`);
                 release((releaseErr) => {
                     if (releaseErr)
-                        return reject(releaseErr);
+                        {return reject(releaseErr);}
                     console.log('  Writer released lock');
                     resolve();
                 });
@@ -277,7 +277,7 @@ async function testSemaphoreLogic() {
             return new Promise((resolve, reject) => {
                 client.lock('semaphore-key', { max: maxHolders }, (err, unlock) => {
                     if (err)
-                        return reject(err);
+                        {return reject(err);}
                     concurrentCount++;
                     maxConcurrent = Math.max(maxConcurrent, concurrentCount);
                     if (concurrentCount > maxHolders) {
@@ -290,7 +290,7 @@ async function testSemaphoreLogic() {
                         concurrentCount--;
                         unlock((unlockErr) => {
                             if (unlockErr)
-                                return reject(unlockErr);
+                                {return reject(unlockErr);}
                             console.log(`  Client ${index} released semaphore (concurrent: ${concurrentCount})`);
                             resolve();
                         });
@@ -353,7 +353,7 @@ async function testSemaphoreStress() {
                 allPromises.push(new Promise((resolve, reject) => {
                     client.lock('stress-semaphore', { max: maxHolders }, (err, unlock) => {
                         if (err)
-                            return reject(err);
+                            {return reject(err);}
                         concurrentCount++;
                         maxConcurrent = Math.max(maxConcurrent, concurrentCount);
                         if (concurrentCount > maxHolders) {
@@ -366,7 +366,7 @@ async function testSemaphoreStress() {
                             concurrentCount--;
                             unlock((unlockErr) => {
                                 if (unlockErr)
-                                    return reject(unlockErr);
+                                    {return reject(unlockErr);}
                                 resolve();
                             });
                         }, Math.random() * 10);

@@ -78,7 +78,7 @@ module.exports = Object.freeze({
     '//tests': {
       'default': {  // (re) execute the test file that changed
         script: function (p) {
-          return `./node_modules/.bin/suman ${p}`
+          return `./node_modules/.bin/suman ${p}`;
         },
         include: [],
         exclude: ['^test.*']

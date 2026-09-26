@@ -38,7 +38,7 @@ lmUtils.launchBrokerInChildProcess(conf, function () {
     }, 50);  // max concurrency
 
     q.error = function (err) {
-      if(err) throw err;
+      if(err) {throw err;}
     };
 
 

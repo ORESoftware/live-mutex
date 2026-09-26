@@ -72,10 +72,10 @@ class FakeSocket extends EventEmitter {
     write(data: any, _enc?: any, cb?: any): boolean {
         const text = typeof data === 'string' ? data : Buffer.isBuffer(data) ? data.toString('utf8') : String(data);
         for (const line of text.split('\n')) {
-            if (!line) continue;
+            if (!line) {continue;}
             try { this.framesIn.push(JSON.parse(line)); } catch {/* ignore */}
         }
-        if (cb) process.nextTick(cb, null);
+        if (cb) {process.nextTick(cb, null);}
         return true;
     }
     end(): this { this.writable = false; return this; }
@@ -119,7 +119,7 @@ function lockSync(broker: any, ws: FakeSocket, payload: any): any {
 async function waitForCondition(predicate: () => boolean, label: string, timeoutMs: number = 1000): Promise<void> {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
-        if (predicate()) return;
+        if (predicate()) {return;}
         await new Promise(r => setTimeout(r, 10));
     }
     fail(`timed out waiting for: ${label}`);
@@ -142,7 +142,7 @@ async function main() {
             const beforeEvictions = broker.ttlEvictionsTotal ?? 0;
             const u = uuidV4();
             const reply = lockSync(broker, ws, {type: 'lock', uuid: u, key, ttl: 75, max: 1, force: false, pid: 1, retryCount: 0});
-            if (reply?.acquired !== true) fail(`expected acquired:true; got ${JSON.stringify(reply)}`);
+            if (reply?.acquired !== true) {fail(`expected acquired:true; got ${JSON.stringify(reply)}`);}
 
             // Sanity: holder is in lockholders + a deadline row exists for it.
             if (broker.locks.get(key)?.lockholders?.size !== 1) {
@@ -200,8 +200,8 @@ async function main() {
 
             const uW = uuidV4();
             const queueReply = lockSync(broker, wsWaiter, {type: 'lock', uuid: uW, key, ttl: 30_000, max: 1, force: false, pid: 2, retryCount: 0});
-            if (queueReply?.acquired !== false) fail(`waiter should be queued (acquired:false); got ${JSON.stringify(queueReply)}`);
-            if ((broker.locks.get(key)?.notify?.length ?? 0) < 1) fail(`waiter not in notify queue`);
+            if (queueReply?.acquired !== false) {fail(`waiter should be queued (acquired:false); got ${JSON.stringify(queueReply)}`);}
+            if ((broker.locks.get(key)?.notify?.length ?? 0) < 1) {fail(`waiter not in notify queue`);}
 
             // Wait for the auto-sweeper to evict the holder and grant the waiter.
             await waitForCondition(
@@ -273,7 +273,7 @@ async function main() {
 
             // Manual tick should now evict it.
             const evicted = broker.tickTtl();
-            if (evicted < 1) fail(`t7: manual tickTtl evicted ${evicted} (expected >=1)`);
+            if (evicted < 1) {fail(`t7: manual tickTtl evicted ${evicted} (expected >=1)`);}
             ok(`t7: manual tickTtl evicted ${evicted} entries after sweeper stop`);
         } finally {
             await new Promise<void>(r => broker.close(() => r()));

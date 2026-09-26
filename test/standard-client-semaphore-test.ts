@@ -58,7 +58,7 @@ async function test1_DefaultMaxIsOne(broker: Broker1, clients: Client[]): Promis
                     setTimeout(() => {
                         concurrentHolders--;
                         unlock((unlockErr) => {
-                            if (unlockErr) log(`Client ${index} unlock error:`, unlockErr.message);
+                            if (unlockErr) {log(`Client ${index} unlock error:`, unlockErr.message);}
                             resolve();
                         });
                     }, 100);
@@ -127,7 +127,7 @@ async function test2_SemaphoreMaxThree(broker: Broker1, clients: Client[]): Prom
                         concurrentHolders--;
                         completedCount++;
                         unlock((unlockErr) => {
-                            if (unlockErr) log(`Client ${index} unlock error:`, unlockErr.message);
+                            if (unlockErr) {log(`Client ${index} unlock error:`, unlockErr.message);}
                             resolve();
                         });
                     }, 50 + Math.random() * 100);
@@ -200,7 +200,7 @@ async function test3_SemaphoreMaxTen(broker: Broker1, clients: Client[]): Promis
                         concurrentHolders--;
                         completedCount++;
                         unlock((unlockErr) => {
-                            if (unlockErr) log(`Client ${index} unlock error:`, unlockErr.message);
+                            if (unlockErr) {log(`Client ${index} unlock error:`, unlockErr.message);}
                             resolve();
                         });
                     }, 30 + Math.random() * 70);
