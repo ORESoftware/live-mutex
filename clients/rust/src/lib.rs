@@ -322,11 +322,12 @@ impl Client {
 
     /// Send an acquire-shaped request and wait for a terminal reply.
     /// The broker may emit two frames for the same `uuid`:
-    ///   1. `acquired:false` — your request has been queued behind the
-    ///      current holder. `lockRequestCount` is your queue depth.
-    ///   2. `acquired:true`  — you're the holder; `lockUuid` and
-    ///      `fencingToken` (or `fencingTokens` for acquire-many) are
-    ///      now set.
+    ///
+    /// 1. `acquired:false` — your request has been queued behind the
+    ///    current holder. `lockRequestCount` is your queue depth.
+    /// 2. `acquired:true` — you're the holder; `lockUuid` and
+    ///    `fencingToken` (or `fencingTokens` for acquire-many) are
+    ///    now set.
     /// The legacy Node client distinguishes these by listening for
     /// further frames after the first; we do the same. A frame with
     /// an explicit `error` field is treated as terminal (rejected).
