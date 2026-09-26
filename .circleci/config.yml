@@ -1,48 +1,38 @@
-version: 2
+version: 2.1
+
+commands:
+  checkout_https:
+    steps:
+      - run:
+          name: Checkout exact commit over HTTPS
+          command: |
+            set -euo pipefail
+            git clone --filter=blob:none https://github.com/ORESoftware/live-mutex.git .
+            git checkout --detach "$CIRCLE_SHA1"
+
 jobs:
-  build-node8:
+  build-node22:
+    resource_class: small
     docker:
-      - image: oresoftware/lmx-circleci:8
+      - image: cimg/node:22.14
     steps:
-      - checkout
-      - run: ./scripts/circleci/run.sh
-  build-node9:
+      - checkout_https
+      - run:
+          name: Build and test on Node 22
+          command: ./scripts/circleci/run.sh
+
+  build-node24:
+    resource_class: small
     docker:
-      - image: oresoftware/lmx-circleci:9
+      - image: cimg/node:24.16.0
     steps:
-      - checkout
-      - run: ./scripts/circleci/run.sh
-  build-node10:
-    docker:
-      - image: oresoftware/lmx-circleci:10
-    steps:
-      - checkout
-      - run: ./scripts/circleci/run.sh
-  build-node11:
-    docker:
-      - image: oresoftware/lmx-circleci:11
-    steps:
-      - checkout
-      - run: ./scripts/circleci/run.sh
-  build-node12:
-    docker:
-      - image: oresoftware/lmx-circleci:12
-    steps:
-      - checkout
-      - run: ./scripts/circleci/run.sh
-  build-node13:
-    docker:
-      - image: oresoftware/lmx-circleci:13
-    steps:
-      - checkout
-      - run: ./scripts/circleci/run.sh
+      - checkout_https
+      - run:
+          name: Build and test on Node 24
+          command: ./scripts/circleci/run.sh
+
 workflows:
-  version: 2
   build_nodejs:
     jobs:
-      - build-node8
-      - build-node9
-      - build-node10
-      - build-node11
-      - build-node12
-      - build-node13
+      - build-node22
+      - build-node24

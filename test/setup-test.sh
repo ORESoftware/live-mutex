@@ -5,7 +5,7 @@ cd "$(dirname "$(dirname "$BASH_SOURCE")")"
 
 # Build TypeScript first
 echo "Building TypeScript..."
-tsc || {
+npx --no-install tsc || {
     echo "TypeScript build failed!"
     exit 1
 }
@@ -25,7 +25,7 @@ fi
 # Ensure dist directory exists and is built
 if [[ ! -d "dist" ]] || [[ ! -f "dist/main.js" ]]; then
     echo "Building TypeScript (dist missing)..."
-    tsc || {
+    npx --no-install tsc || {
         echo "TypeScript build failed!"
         exit 1
     }

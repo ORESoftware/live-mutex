@@ -1,27 +1,20 @@
 #!/usr/bin/env bash
 
-set -e;
+set -euo pipefail
 
-env | sort;
+node --version
+npm --version
 
-npm i
+# The historical Suman dev dependency pulls sqlite3@3, whose native install
+# scripts cannot build on modern Node/V8. live-mutex does not use sqlite3 at
+# runtime, so keep the lockfile deterministic while preventing unused
+# dependency lifecycle scripts from compiling obsolete native addons.
+npm ci --ignore-scripts --no-audit
 
-echo
-
-tsc
-
-echo
-
-./test/setup-test.sh
-
-echo
-
-suman --default | cat
-
-echo
-
-echo "Here is the contents of test/@target:"
-
-echo
-
-ls -a 'test/@target'
+# This matrix is a Node compatibility gate, not the heavyweight stress suite.
+# Prove that maintained source compiles/builds and that the formal + lock-safety
+# contracts execute on every supported runtime.
+npm run compile:check
+npm run build
+node formal/model.mjs
+node --test test/pr-lock-safety.e2e.test.js
