@@ -1,10 +1,12 @@
 #!/bin/sh
 # ores-lint :: self-test
 #
-# Guards the two assumptions this toolkit rests on:
-#   1. clippy still words `implicit_return` the way config.sh expects, and
-#      `needless_return` can still be silenced (otherwise the two lints fight).
-#   2. the vendored ESLint plugin still loads and its rules still fire.
+# Guards the assumptions this toolkit rests on:
+#   1. the source-aware Rust checker flags implicit returns in named functions
+#      without flagging concise closure/lambda tail expressions;
+#   2. clippy::needless_return stays silenced so Clippy does not fight the
+#      canonical ORE explicit-return rule;
+#   3. the vendored ESLint plugin still loads and its rules still fire.
 #
 # Run after a toolchain upgrade. Exits non-zero if an assumption has broken -
 # a silently empty lint report is far worse than a failing test.
@@ -19,7 +21,7 @@ fail() { echo "  FAIL - $1"; FAIL=1; }
 echo "ores-lint self-test"
 
 # --- Rust -------------------------------------------------------------------
-if command -v cargo >/dev/null 2>&1 && cargo clippy --version >/dev/null 2>&1; then
+if command -v cargo >/dev/null 2>&1 && cargo clippy --version >/dev/null 2>&1 && command -v node >/dev/null 2>&1; then
   T=$(mktemp -d)
   mkdir -p "$T/src"
   cat > "$T/Cargo.toml" <<'EOF'
@@ -29,31 +31,59 @@ version = "0.0.0"
 edition = "2021"
 EOF
   cat > "$T/src/lib.rs" <<'EOF'
-pub fn implicit(x: i32) -> i32 { x }
-pub fn explicit(x: i32) -> i32 { return x; }
-EOF
-  OUT=$( cd "$T" && cargo clippy --message-format=short -- \
-      -W clippy::implicit_return -A clippy::needless_return 2>&1 )
+pub fn implicit(x: i32) -> i32 {
+    x
+}
 
-  if printf '%s' "$OUT" | grep -qF "$ORES_LINT_IMPLICIT_RETURN_MSG"; then
-    pass "clippy implicit_return message matches config.sh"
+pub fn explicit(x: i32) -> i32 {
+    return x;
+}
+
+pub fn closure_expression(values: &[i32]) -> i32 {
+    return values.iter().map(|value| value * 2).sum();
+}
+
+pub fn closure_block(values: &[i32]) -> i32 {
+    return values
+        .iter()
+        .map(|value| {
+            let adjusted = value + 1;
+            adjusted
+        })
+        .sum();
+}
+
+pub fn returned_closure() -> impl Fn(i32) -> i32 {
+    |value| value + 1
+}
+EOF
+
+  OUT=$(node "$DIR/rust-explicit-returns.mjs" "$T" 2>&1)
+  N=$(printf '%s\n' "$OUT" | grep -cF "$ORES_LINT_IMPLICIT_RETURN_MSG" || true)
+
+  if [ "$N" = "2" ]; then
+    pass "named-function checker finds exactly 2 implicit returns"
   else
-    fail "clippy implicit_return wording changed - update ORES_LINT_IMPLICIT_RETURN_MSG in config.sh"
-    printf '%s\n' "$OUT" | sed -n '1,4p' | sed 's/^/         /'
+    fail "expected 2 named-function implicit returns, saw $N"
+    printf '%s\n' "$OUT" | sed -n '1,12p' | sed 's/^/         /'
   fi
 
-  if printf '%s' "$OUT" | grep -q 'unneeded `return`'; then
+  if printf '%s\n' "$OUT" | grep -q 'closure_expression\|closure_block'; then
+    fail "closure tails were incorrectly reported as named-function implicit returns"
+  else
+    pass "closure tails remain concise and unreported"
+  fi
+
+  CLIPPY_OUT=$( cd "$T" && cargo clippy --message-format=short -- -A clippy::needless_return 2>&1 )
+  if printf '%s' "$CLIPPY_OUT" | grep -q 'unneeded `return`'; then
     fail "needless_return still fires despite -A; it contradicts the house style"
   else
     pass "needless_return correctly silenced"
   fi
 
-  N=$(printf '%s\n' "$OUT" | grep -cF "$ORES_LINT_IMPLICIT_RETURN_MSG")
-  [ "$N" = "1" ] && pass "exactly 1 implicit return detected in fixture" \
-                 || fail "expected 1 implicit return in fixture, saw $N"
   rm -rf "$T"
 else
-  echo "  skip - cargo/clippy unavailable"
+  echo "  skip - cargo/clippy/node unavailable"
 fi
 
 # --- JavaScript -------------------------------------------------------------
