@@ -117,7 +117,9 @@ class Client {
     return c;
   }
 
-  ~Client() { close(); }
+  ~Client() {
+    close();
+  }
 
   LockHandle acquire(const std::string& key, uint64_t ttl_ms = 0,
                      std::optional<uint32_t> max_holders = std::nullopt) {
