@@ -1,12 +1,22 @@
 version: 2.1
 
+commands:
+  checkout_https:
+    steps:
+      - run:
+          name: Checkout exact commit over HTTPS
+          command: |
+            set -euo pipefail
+            git clone --filter=blob:none https://github.com/ORESoftware/live-mutex.git .
+            git checkout --detach "$CIRCLE_SHA1"
+
 jobs:
   build-node22:
     resource_class: small
     docker:
       - image: cimg/node:22.14
     steps:
-      - checkout
+      - checkout_https
       - run:
           name: Build and test on Node 22
           command: ./scripts/circleci/run.sh
@@ -16,7 +26,7 @@ jobs:
     docker:
       - image: cimg/node:24.16.0
     steps:
-      - checkout
+      - checkout_https
       - run:
           name: Build and test on Node 24
           command: ./scripts/circleci/run.sh
