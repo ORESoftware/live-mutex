@@ -140,7 +140,7 @@ public final class Client implements AutoCloseable {
         JsonNode reply = awaitReply(reqUuid, payload);
         if (!reply.path("acquired").asBoolean(false)) {
             String why = reply.path("error").asText("");
-                if (why.isEmpty() && reply.has("contendedKey")) {
+            if (why.isEmpty() && reply.has("contendedKey")) {
                 why = "contended on " + reply.get("contendedKey").asText();
             }
             if (why.isEmpty()) {
