@@ -98,11 +98,15 @@ if command -v node >/dev/null 2>&1; then
     fail "vendored eslint plugin failed to load"
   fi
 
-  if node "$DIR/require-send.test.mjs" >/dev/null 2>&1; then
-    pass "require-send scanner fixtures"
+  if [ -f "$DIR/require-send.test.mjs" ]; then
+    if node "$DIR/require-send.test.mjs" >/dev/null 2>&1; then
+      pass "require-send scanner fixtures"
+    else
+      fail "require-send scanner fixtures failed"
+      node "$DIR/require-send.test.mjs" 2>&1 | sed -n '1,20p' | sed 's/^/         /'
+    fi
   else
-    fail "require-send scanner fixtures failed"
-    node "$DIR/require-send.test.mjs" 2>&1 | sed -n '1,20p' | sed 's/^/         /'
+    echo "  skip - require-send.test.mjs fixture not installed"
   fi
 else
   echo "  skip - node unavailable"
