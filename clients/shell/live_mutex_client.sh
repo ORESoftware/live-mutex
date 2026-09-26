@@ -75,7 +75,10 @@ lmx_json_array() {
 # lmx_connect <host> <port>  — opens the stream and sends the version handshake.
 lmx_connect() {
   local host="${1:-127.0.0.1}" port="${2:-6970}"
-  exec 3<>"/dev/tcp/${host}/${port}" || { LMX_ERROR="connect ${host}:${port} failed"; return 1; }
+  if ! exec 3<>"/dev/tcp/${host}/${port}"; then
+    LMX_ERROR="connect ${host}:${port} failed"
+    return 1
+  fi
   _lmx_send "$(printf '{"type":"%s","value":"%s"}' "$LMX_REQ_VERSION" "$(lmx_json_escape "$LMX_VERSION")")"
 }
 
@@ -93,11 +96,21 @@ _lmx_send() {
 _lmx_read_reply() {
   local want="$1" line
   while IFS= read -r -t "$LMX_TIMEOUT" line <&3; do
-    [ -z "$line" ] && continue
+    if [ -z "$line" ]; then
+      continue
+    fi
     case "$line" in
-      *"$LMX_RES_VERSION_MISMATCH"*) LMX_ERROR="version mismatch: $line"; return 1 ;;
+      *"$LMX_RES_VERSION_MISMATCH"*)
+        LMX_ERROR="version mismatch: $line"
+        return 1
+        ;;
     esac
-    case "$line" in *"\"uuid\":\"$want\""*) LMX_REPLY="$line"; return 0 ;; esac
+    case "$line" in
+      *"\"uuid\":\"$want\""*)
+        LMX_REPLY="$line"
+        return 0
+        ;;
+    esac
   done
   return 1
 }
@@ -107,10 +120,16 @@ _lmx_read_reply() {
 #  on promotion, or acquired:false WITH an error on hard rejection.)
 lmx_acquire() {
   local key="$1" ttl="${2:-null}" max="${3:-}" uuid; uuid="$(lmx_uuid)"
-  local maxf=""; [ -n "$max" ] && maxf=",\"max\":$max"
+  local maxf=""
+  if [ -n "$max" ]; then
+    maxf=",\"max\":$max"
+  fi
   _lmx_send "$(printf '{"type":"%s","uuid":"%s","key":"%s","pid":%s,"keepLocksAfterDeath":false,"ttl":%s%s}' \
     "$LMX_REQ_LOCK" "$uuid" "$(lmx_json_escape "$key")" "$$" "$ttl" "$maxf")"
-  _lmx_read_reply "$uuid" || { LMX_ERROR="acquire($key): ${LMX_ERROR:-timeout}"; return 1; }
+  if ! _lmx_read_reply "$uuid"; then
+    LMX_ERROR="acquire($key): ${LMX_ERROR:-timeout}"
+    return 1
+  fi
   case "$LMX_REPLY" in *'"acquired":true'*) ;; *) LMX_ERROR="acquire($key): $LMX_REPLY"; return 1 ;; esac
   LMX_LOCK_UUID="$uuid"   # single-key lock handle is the request uuid
   LMX_FENCE="$(lmx_json_num fencingToken <<<"$LMX_REPLY")"
