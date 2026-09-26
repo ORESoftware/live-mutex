@@ -47,7 +47,7 @@ const LEVEL_RANK: Readonly<Record<LMXLogLevel, number>> = {
 };
 
 function parseLevel(raw: string | undefined): LMXLogLevel | null {
-    if (!raw) return null;
+    if (!raw) {return null;}
     const norm = raw.trim().toLowerCase();
     if ((LEVELS as ReadonlyArray<string>).includes(norm)) {
         return norm as LMXLogLevel;
@@ -91,7 +91,7 @@ export function setLogLevel(level: LMXLogLevel): LMXLogLevel {
  * be invisible anyway, so we treat the call as a no-op gate.
  */
 export function isLogLevelEnabled(messageLevel: LMXLogLevel): boolean {
-    if (messageLevel === 'silent') return false;
+    if (messageLevel === 'silent') {return false;}
     return LEVEL_RANK[currentLevel] >= LEVEL_RANK[messageLevel];
 }
 

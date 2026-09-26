@@ -59,7 +59,7 @@ Test.create(['lmUtils', (b, assert, before, describe, it, path, inject, after) =
     it.cb('check original file', t => {
       fs.readFile(alphabetFixture, function (err, result) {
         t.final(function () {
-          t.assert(String(result || '') === original)
+          t.assert(String(result || '') === original);
         });
       });
     });

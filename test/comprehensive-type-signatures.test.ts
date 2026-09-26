@@ -65,7 +65,7 @@ Test.create({mode: 'series'}, ['Promise', function (b) {
       const c = Client.create(conf);
       c.ensure().then(client => {
         client.lock('test-key', (err, result) => {
-          if (err) return t.fail(err);
+          if (err) {return t.fail(err);}
           assert.ok(result, 'Should return lock result');
           assert.ok(result.id, 'Should have id');
           client.unlock('test-key', result.id, t);
@@ -78,7 +78,7 @@ Test.create({mode: 'series'}, ['Promise', function (b) {
       c.ensure().then(client => {
         // @ts-ignore - testing legacy signature
         client.lock('test-key', 1000, (err, result) => {
-          if (err) return t.fail(err);
+          if (err) {return t.fail(err);}
           assert.ok(result, 'Should return lock result');
           assert.ok(result.id, 'Should have id');
           client.unlock('test-key', result.id, t);
@@ -90,7 +90,7 @@ Test.create({mode: 'series'}, ['Promise', function (b) {
       const c = Client.create(conf);
       c.ensure().then(client => {
         client.lock('test-key', {force: true}, (err, result) => {
-          if (err) return t.fail(err);
+          if (err) {return t.fail(err);}
           assert.ok(result, 'Should return lock result');
           assert.ok(result.id, 'Should have id');
           client.unlock('test-key', result.id, t);
@@ -107,7 +107,7 @@ Test.create({mode: 'series'}, ['Promise', function (b) {
           maxRetries: 3,
           force: false
         }, (err, result) => {
-          if (err) return t.fail(err);
+          if (err) {return t.fail(err);}
           assert.ok(result, 'Should return lock result');
           assert.ok(result.id, 'Should have id');
           client.unlock('test-key', result.id, t);
@@ -123,9 +123,9 @@ Test.create({mode: 'series'}, ['Promise', function (b) {
       const c = Client.create(conf);
       c.ensure().then(client => {
         client.lock('test-key', (err, result) => {
-          if (err) return t.fail(err);
+          if (err) {return t.fail(err);}
           client.unlock('test-key', (unlockErr) => {
-            if (unlockErr) return t.fail(unlockErr);
+            if (unlockErr) {return t.fail(unlockErr);}
             t();
           });
         });
@@ -136,10 +136,10 @@ Test.create({mode: 'series'}, ['Promise', function (b) {
       const c = Client.create(conf);
       c.ensure().then(client => {
         client.lock('test-key', (err, result) => {
-          if (err) return t.fail(err);
+          if (err) {return t.fail(err);}
           const lockId = result.id;
           client.unlock('test-key', lockId, (unlockErr) => {
-            if (unlockErr) return t.fail(unlockErr);
+            if (unlockErr) {return t.fail(unlockErr);}
             t();
           });
         });
@@ -150,7 +150,7 @@ Test.create({mode: 'series'}, ['Promise', function (b) {
       const c = Client.create(conf);
       c.ensure().then(client => {
         client.lock('test-key', (err, result) => {
-          if (err) return t.fail(err);
+          if (err) {return t.fail(err);}
           client.unlock('test-key', result.id, t);
         });
       }).catch(t.fail);
@@ -160,9 +160,9 @@ Test.create({mode: 'series'}, ['Promise', function (b) {
       const c = Client.create(conf);
       c.ensure().then(client => {
         client.lock('test-key', (err, result) => {
-          if (err) return t.fail(err);
+          if (err) {return t.fail(err);}
           client.unlock('test-key', {force: true}, (unlockErr) => {
-            if (unlockErr) return t.fail(unlockErr);
+            if (unlockErr) {return t.fail(unlockErr);}
             t();
           });
         });
@@ -173,9 +173,9 @@ Test.create({mode: 'series'}, ['Promise', function (b) {
       const c = Client.create(conf);
       c.ensure().then(client => {
         client.lock('test-key', (err, result) => {
-          if (err) return t.fail(err);
+          if (err) {return t.fail(err);}
           client.unlock('test-key', {id: result.id}, (unlockErr) => {
-            if (unlockErr) return t.fail(unlockErr);
+            if (unlockErr) {return t.fail(unlockErr);}
             t();
           });
         });
@@ -186,12 +186,12 @@ Test.create({mode: 'series'}, ['Promise', function (b) {
       const c = Client.create(conf);
       c.ensure().then(client => {
         client.lock('test-key', (err, result) => {
-          if (err) return t.fail(err);
+          if (err) {return t.fail(err);}
           client.unlock('test-key', {
             id: result.id,
             force: false
           }, (unlockErr) => {
-            if (unlockErr) return t.fail(unlockErr);
+            if (unlockErr) {return t.fail(unlockErr);}
             t();
           });
         });
@@ -321,38 +321,38 @@ Test.create({mode: 'series'}, ['Promise', function (b) {
       c.ensure().then(client => {
         // Test 1: unlock(key, callback)
         client.lock('key1', (err, r) => {
-          if (err) return checkComplete();
+          if (err) {return checkComplete();}
           client.unlock('key1', checkComplete);
         });
 
         // Test 2: unlock(key, id, callback)
         client.lock('key2', (err, r) => {
-          if (err) return checkComplete();
+          if (err) {return checkComplete();}
           client.unlock('key2', r.id, checkComplete);
         });
 
         // Test 3: unlock(key, {id}, callback)
         client.lock('key3', (err, r) => {
-          if (err) return checkComplete();
+          if (err) {return checkComplete();}
           client.unlock('key3', {id: r.id}, checkComplete);
         });
 
         // Test 4: unlock(key, {force: true}, callback)
         client.lock('key4', (err, r) => {
-          if (err) return checkComplete();
+          if (err) {return checkComplete();}
           client.unlock('key4', {force: true}, checkComplete);
         });
 
         // Test 5: unlock(key) - no callback
         client.lock('key5', (err, r) => {
-          if (err) return checkComplete();
+          if (err) {return checkComplete();}
           client.unlock('key5');
           setTimeout(checkComplete, 100);
         });
 
         // Test 6: unlock(key, id) - no callback
         client.lock('key6', (err, r) => {
-          if (err) return checkComplete();
+          if (err) {return checkComplete();}
           client.unlock('key6', r.id);
           setTimeout(checkComplete, 100);
         });

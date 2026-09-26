@@ -33,7 +33,7 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
   
     return {
       broker: new Broker1(brokerConf).ensure().then(handleEvents)
-    }
+    };
   });
 
 

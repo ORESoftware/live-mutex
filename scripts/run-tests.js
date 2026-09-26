@@ -258,7 +258,7 @@ function runTest(testFile, testNumber, totalTests) {
     let completionTimeout = null;
     
     const finish = (code, timeout = false) => {
-      if (resolved) return;
+      if (resolved) {return;}
       resolved = true;
       
       if (completionTimeout) {
@@ -334,7 +334,7 @@ function runTest(testFile, testNumber, totalTests) {
     
     // Handle exit first - this fires when the process actually exits
     proc.on('exit', (code, signal) => {
-      if (exitHandled) return;
+      if (exitHandled) {return;}
       exitHandled = true;
       
       // Clear inactivity timer since process exited
@@ -352,7 +352,7 @@ function runTest(testFile, testNumber, totalTests) {
     
     // Handle close as backup (should fire after exit, but sometimes exit doesn't fire if streams keep process alive)
     proc.on('close', (code, signal) => {
-      if (closeHandled) return;
+      if (closeHandled) {return;}
       closeHandled = true;
       
       // Clear inactivity timer since process closed
@@ -429,8 +429,8 @@ async function main() {
     console.log('✅ Build complete\n');
   } catch (err) {
     console.error('❌ Build failed:', err.message);
-    if (err.stdout) console.error('STDOUT:', err.stdout);
-    if (err.stderr) console.error('STDERR:', err.stderr);
+    if (err.stdout) {console.error('STDOUT:', err.stdout);}
+    if (err.stderr) {console.error('STDERR:', err.stderr);}
     process.exit(1);
   }
   
@@ -493,9 +493,9 @@ async function main() {
     console.log('Failed tests:');
     results.filter(r => !r.passed).forEach(r => {
       const reasons = [];
-      if (r.timeout) reasons.push('timeout');
-      if (r.code) reasons.push(`exit code: ${r.code}`);
-      if (r.error) reasons.push(`error: ${r.error}`);
+      if (r.timeout) {reasons.push('timeout');}
+      if (r.code) {reasons.push(`exit code: ${r.code}`);}
+      if (r.error) {reasons.push(`error: ${r.error}`);}
       const reasonStr = reasons.length > 0 ? ` (${reasons.join(', ')})` : '';
       console.log(`  ❌ ${r.file}${reasonStr}`);
     });

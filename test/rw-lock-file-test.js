@@ -178,7 +178,7 @@ async function testRWLockWithFile() {
         writePromises.push(new Promise((resolve, reject) => {
             client.beginWrite(writeKey, {}, (err, release) => {
                 if (err)
-                    return reject(err);
+                    {return reject(err);}
                 const currentValue = readFileValue(tmpFile);
                 const newValue = currentValue + 1;
                 writeFileValue(tmpFile, newValue);
@@ -186,7 +186,7 @@ async function testRWLockWithFile() {
                 setTimeout(() => {
                     release((releaseErr) => {
                         if (releaseErr)
-                            return reject(releaseErr);
+                            {return reject(releaseErr);}
                         resolve();
                     });
                 }, 20);

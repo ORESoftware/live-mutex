@@ -33,7 +33,7 @@ function makeSocket(): FakeSocket {
         cursor: 0,
         write(chunk: any): boolean {
             const lines = chunk.toString().trim().split('\n').filter(Boolean);
-            for (const line of lines) sent.push(JSON.parse(line));
+            for (const line of lines) {sent.push(JSON.parse(line));}
             return true;
         },
         end() { /* noop */ },
@@ -65,7 +65,7 @@ type ExternalDecision = 'advanced' | 'replay' | 'stale' | 'token_reuse';
 function applyExternalWrite(watermark: ExternalWatermark, write: ExternalWrite): ExternalDecision {
     assert.ok(Number.isSafeInteger(write.fencingToken) && write.fencingToken > 0, 'fencing token must be a positive safe integer');
 
-    if (write.fencingToken < watermark.fencingToken) return 'stale';
+    if (write.fencingToken < watermark.fencingToken) {return 'stale';}
     if (write.fencingToken === watermark.fencingToken) {
         return write.operationId === watermark.operationId && write.payloadSha256 === watermark.payloadSha256
             ? 'replay'

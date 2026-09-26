@@ -14,11 +14,11 @@ const collectSource = (root: string): { text: string; files: number } => {
   const visit = (entryPath: string): void => {
     const stat = fs.statSync(entryPath);
     if (stat.isDirectory()) {
-      if (SKIP_DIRS.has(path.basename(entryPath))) return;
-      for (const child of fs.readdirSync(entryPath)) visit(path.join(entryPath, child));
+      if (SKIP_DIRS.has(path.basename(entryPath))) {return;}
+      for (const child of fs.readdirSync(entryPath)) {visit(path.join(entryPath, child));}
       return;
     }
-    if (!SOURCE_EXTENSIONS.has(path.extname(entryPath))) return;
+    if (!SOURCE_EXTENSIONS.has(path.extname(entryPath))) {return;}
     text += fs.readFileSync(entryPath, 'utf8') + '\n';
     files += 1;
   };
@@ -44,7 +44,7 @@ for (const { name, fullPath } of clientDirs) {
     noSource.push(name);
     continue;
   }
-  if (!normalizeAuthoritySurface(text).includes('fencingtoken')) missingFencing.push(name);
+  if (!normalizeAuthoritySurface(text).includes('fencingtoken')) {missingFencing.push(name);}
 }
 noSource.sort();
 missingFencing.sort();

@@ -120,8 +120,8 @@ async function durableRestartFloorDominatesWallClock() {
     release(b, ws, 'restart-floor', grant.uuid);
   } finally {
     b.stopTtlSweeper();
-    if (previous === undefined) delete process.env.LMX_FENCING_TOKEN_FLOOR;
-    else process.env.LMX_FENCING_TOKEN_FLOOR = previous;
+    if (previous === undefined) {delete process.env.LMX_FENCING_TOKEN_FLOOR;}
+    else {process.env.LMX_FENCING_TOKEN_FLOOR = previous;}
   }
 }
 
@@ -162,8 +162,8 @@ async function exhaustionFailsClosedWithoutPartialComposite() {
     assert.equal(b.getFencingWatermark(), MAX_FENCING_TOKEN);
   } finally {
     b.stopTtlSweeper();
-    if (previous === undefined) delete process.env.LMX_FENCING_TOKEN_FLOOR;
-    else process.env.LMX_FENCING_TOKEN_FLOOR = previous;
+    if (previous === undefined) {delete process.env.LMX_FENCING_TOKEN_FLOOR;}
+    else {process.env.LMX_FENCING_TOKEN_FLOOR = previous;}
   }
 }
 

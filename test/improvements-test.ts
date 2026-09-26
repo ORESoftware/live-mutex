@@ -80,7 +80,7 @@ function httpJson(method: 'GET' | 'POST', path: string, body?: any): Promise<{st
             });
         });
         req.on('error', reject);
-        if (body) req.write(JSON.stringify(body));
+        if (body) {req.write(JSON.stringify(body));}
         req.end();
     });
 }
@@ -137,8 +137,8 @@ async function main() {
             type: 'lock', uuid: UUID.v4(), key: 'maxzero', max: 0, ttl: 5000
         });
         const last = replies[replies.length - 1];
-        if (last.acquired !== false) fail('max=0 should not be granted');
-        if (!last.error) fail('max=0 should produce an error message');
+        if (last.acquired !== false) {fail('max=0 should not be granted');}
+        if (!last.error) {fail('max=0 should produce an error message');}
         if (broker['locks'].has('maxzero')) {
             fail('max=0 leaked a LockObj into the broker state');
         }
@@ -228,10 +228,10 @@ async function main() {
         ok('/healthz -> 200 ok=true');
 
         const m = await httpJson('GET', '/metrics');
-        if (m.status !== 200) fail('/metrics did not return 200');
-        if (!m.raw.includes('lmx_keys')) fail('/metrics missing lmx_keys');
-        if (!m.raw.includes('lmx_pending_deadlines')) fail('/metrics missing lmx_pending_deadlines');
-        if (!m.raw.includes('lmx_ttl_evictions_total')) fail('/metrics missing lmx_ttl_evictions_total');
+        if (m.status !== 200) {fail('/metrics did not return 200');}
+        if (!m.raw.includes('lmx_keys')) {fail('/metrics missing lmx_keys');}
+        if (!m.raw.includes('lmx_pending_deadlines')) {fail('/metrics missing lmx_pending_deadlines');}
+        if (!m.raw.includes('lmx_ttl_evictions_total')) {fail('/metrics missing lmx_ttl_evictions_total');}
         ok('/metrics emits Prometheus exposition with the new counters');
 
         const s = await httpJson('GET', '/v1/stats');

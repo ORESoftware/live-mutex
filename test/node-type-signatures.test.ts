@@ -50,11 +50,11 @@ async function runTests() {
   console.log('Test 4: Lock with callback only');
   await new Promise<void>((resolve, reject) => {
       client.lock('test-key-1', (err, result) => {
-      if (err) return reject(err);
+      if (err) {return reject(err);}
       assert.ok(result, 'Should return lock result');
       assert.ok(result.id, 'Should have id');
       client.unlock('test-key-1', result.id, (unlockErr) => {
-        if (unlockErr) return reject(unlockErr);
+        if (unlockErr) {return reject(unlockErr);}
         resolve();
       });
     });
@@ -66,10 +66,10 @@ async function runTests() {
   await new Promise<void>((resolve, reject) => {
     // @ts-ignore - testing legacy signature
     client.lock('test-key-2', 1000, (err, result) => {
-      if (err) return reject(err);
+      if (err) {return reject(err);}
       assert.ok(result, 'Should return lock result');
       client.unlock('test-key-2', result.id, (unlockErr) => {
-        if (unlockErr) return reject(unlockErr);
+        if (unlockErr) {return reject(unlockErr);}
         resolve();
       });
     });
@@ -80,10 +80,10 @@ async function runTests() {
   console.log('Test 6: Lock with options object');
   await new Promise<void>((resolve, reject) => {
       client.lock('test-key-3', {ttl: 5000, force: false}, (err, result) => {
-      if (err) return reject(err);
+      if (err) {return reject(err);}
       assert.ok(result, 'Should return lock result');
       client.unlock('test-key-3', result.id, (unlockErr) => {
-        if (unlockErr) return reject(unlockErr);
+        if (unlockErr) {return reject(unlockErr);}
         resolve();
       });
     });
@@ -94,10 +94,10 @@ async function runTests() {
   console.log('Test 7: Unlock with string id');
   await new Promise<void>((resolve, reject) => {
     client.lock('test-key-4', (err, result) => {
-      if (err) return reject(err);
+      if (err) {return reject(err);}
       const lockId = result.id;
       client.unlock('test-key-4', lockId, (unlockErr) => {
-        if (unlockErr) return reject(unlockErr);
+        if (unlockErr) {return reject(unlockErr);}
         resolve();
       });
     });
@@ -108,9 +108,9 @@ async function runTests() {
   console.log('Test 8: Unlock with options object');
   await new Promise<void>((resolve, reject) => {
     client.lock('test-key-5', (err, result) => {
-      if (err) return reject(err);
+      if (err) {return reject(err);}
       client.unlock('test-key-5', {id: result.id, force: false}, (unlockErr) => {
-        if (unlockErr) return reject(unlockErr);
+        if (unlockErr) {return reject(unlockErr);}
         resolve();
       });
     });
@@ -121,9 +121,9 @@ async function runTests() {
   console.log('Test 9: Unlock with boolean force');
   await new Promise<void>((resolve, reject) => {
     client.lock('test-key-6', (err, result) => {
-      if (err) return reject(err);
+      if (err) {return reject(err);}
       client.unlock('test-key-6', {force: true}, (unlockErr) => {
-        if (unlockErr) return reject(unlockErr);
+        if (unlockErr) {return reject(unlockErr);}
         resolve();
       });
     });
@@ -155,30 +155,30 @@ async function runTests() {
   await Promise.all(keys.map((key, i) => {
     return new Promise<void>((resolve, reject) => {
       client.lock(key, (err, result) => {
-        if (err) return reject(err);
+        if (err) {return reject(err);}
         // Test different unlock signatures
         if (i === 0) {
           // unlock(key, callback)
           client.unlock(key, (unlockErr) => {
-            if (unlockErr) return reject(unlockErr);
+            if (unlockErr) {return reject(unlockErr);}
             resolve();
           });
         } else if (i === 1) {
           // unlock(key, id, callback)
           client.unlock(key, result.id, (unlockErr) => {
-            if (unlockErr) return reject(unlockErr);
+            if (unlockErr) {return reject(unlockErr);}
             resolve();
           });
         } else if (i === 2) {
           // unlock(key, {id}, callback)
           client.unlock(key, {id: result.id}, (unlockErr) => {
-            if (unlockErr) return reject(unlockErr);
+            if (unlockErr) {return reject(unlockErr);}
             resolve();
           });
         } else {
           // unlock(key, {force}, callback)
           client.unlock(key, {force: true}, (unlockErr) => {
-            if (unlockErr) return reject(unlockErr);
+            if (unlockErr) {return reject(unlockErr);}
             resolve();
           });
         }
@@ -192,7 +192,7 @@ async function runTests() {
   client.close();
   await new Promise<void>((resolve) => {
     broker.close((err) => {
-      if (err) console.error('Broker close error:', err);
+      if (err) {console.error('Broker close error:', err);}
       resolve();
     });
   });

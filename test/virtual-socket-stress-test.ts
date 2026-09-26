@@ -95,18 +95,18 @@ async function main() {
     const fencingTokens: number[] = [];
     for (let i = 0; i < N; i++) {
         const r = lockReplies[i];
-        if (r.acquired !== true) fail(`lock[${i}].acquired=${r.acquired}; reply=${JSON.stringify(r)}`);
+        if (r.acquired !== true) {fail(`lock[${i}].acquired=${r.acquired}; reply=${JSON.stringify(r)}`);}
         const holderUuid: string = r._bridgeRequestUuid;
         if (typeof holderUuid !== 'string' || holderUuid.length === 0) {
             fail(`lock[${i}] missing _bridgeRequestUuid`);
         }
-        if (typeof r.fencingToken !== 'number' || r.fencingToken < 1) fail(`lock[${i}] bad fencingToken: ${r.fencingToken}`);
-        if (grantedUuids.has(holderUuid)) fail(`duplicate holder uuid at i=${i}: ${holderUuid}`);
+        if (typeof r.fencingToken !== 'number' || r.fencingToken < 1) {fail(`lock[${i}] bad fencingToken: ${r.fencingToken}`);}
+        if (grantedUuids.has(holderUuid)) {fail(`duplicate holder uuid at i=${i}: ${holderUuid}`);}
         grantedUuids.add(holderUuid);
         fencingTokens.push(r.fencingToken);
     }
-    if (grantedUuids.size !== N) fail(`grantedUuids.size=${grantedUuids.size}; expected ${N}`);
-    if (bridge.pendingCount !== 0) fail(`pendingCount post-lock = ${bridge.pendingCount}`);
+    if (grantedUuids.size !== N) {fail(`grantedUuids.size=${grantedUuids.size}; expected ${N}`);}
+    if (bridge.pendingCount !== 0) {fail(`pendingCount post-lock = ${bridge.pendingCount}`);}
     if (broker.connectedClients.size !== baselineConnected + 1) {
         fail(`connectedClients drifted: ${broker.connectedClients.size}, baseline+1=${baselineConnected + 1}`);
     }
@@ -129,15 +129,15 @@ async function main() {
     const amUuids = new Set<string>();
     for (let i = 0; i < N; i++) {
         const r = amReplies[i];
-        if (r.acquired !== true) fail(`am[${i}].acquired=${r.acquired}: ${JSON.stringify(r)}`);
-        if (!r.lockUuid) fail(`am[${i}] missing lockUuid`);
-        if (amUuids.has(r.lockUuid)) fail(`duplicate composite uuid at i=${i}`);
+        if (r.acquired !== true) {fail(`am[${i}].acquired=${r.acquired}: ${JSON.stringify(r)}`);}
+        if (!r.lockUuid) {fail(`am[${i}] missing lockUuid`);}
+        if (amUuids.has(r.lockUuid)) {fail(`duplicate composite uuid at i=${i}`);}
         amUuids.add(r.lockUuid);
         if (Object.keys(r.fencingTokens || {}).length !== 3) {
             fail(`am[${i}].fencingTokens has ${Object.keys(r.fencingTokens || {}).length} entries; expected 3`);
         }
     }
-    if (bridge.pendingCount !== 0) fail(`pendingCount post-acquireMany = ${bridge.pendingCount}`);
+    if (bridge.pendingCount !== 0) {fail(`pendingCount post-acquireMany = ${bridge.pendingCount}`);}
     // 3*N more keys held: N single-keys + 3*N composite-keys = 4*N total
     if ((broker as any).locks.size !== 4 * N) {
         fail(`broker.locks.size=${(broker as any).locks.size}; expected ${4 * N}`);
@@ -159,10 +159,10 @@ async function main() {
 
     let unlockedOk = 0;
     for (let i = 0; i < N; i++) {
-        if (unlockReplies[i].unlocked === true) unlockedOk++;
+        if (unlockReplies[i].unlocked === true) {unlockedOk++;}
     }
-    if (unlockedOk !== N) fail(`only ${unlockedOk}/${N} unlocks succeeded`);
-    if (bridge.pendingCount !== 0) fail(`pendingCount post-unlock = ${bridge.pendingCount}`);
+    if (unlockedOk !== N) {fail(`only ${unlockedOk}/${N} unlocks succeeded`);}
+    if (bridge.pendingCount !== 0) {fail(`pendingCount post-unlock = ${bridge.pendingCount}`);}
     ok(`phase 3: ${N} concurrent unlocks succeeded (${t3 - t2}ms)`);
 
     // ---------------------------------------------------------------
@@ -177,15 +177,15 @@ async function main() {
 
     let rmOk = 0;
     for (let i = 0; i < N; i++) {
-        if (rmReplies[i].released === true) rmOk++;
+        if (rmReplies[i].released === true) {rmOk++;}
     }
-    if (rmOk !== N) fail(`only ${rmOk}/${N} releaseMany succeeded`);
+    if (rmOk !== N) {fail(`only ${rmOk}/${N} releaseMany succeeded`);}
     ok(`phase 4: ${N} concurrent releaseMany succeeded (${t4 - t3}ms)`);
 
     // ---------------------------------------------------------------
     // Final invariants
     // ---------------------------------------------------------------
-    if (bridge.pendingCount !== 0) fail(`pendingCount final = ${bridge.pendingCount}`);
+    if (bridge.pendingCount !== 0) {fail(`pendingCount final = ${bridge.pendingCount}`);}
     if (broker.connectedClients.size !== baselineConnected + 1) {
         fail(`connectedClients drifted post-stress: ${broker.connectedClients.size}`);
     }
@@ -194,9 +194,9 @@ async function main() {
     // empty). lockholders.size === 0 invariant.
     let nonEmpty = 0;
     for (const lock of ((broker as any).locks as Map<string, any>).values()) {
-        if (lock.lockholders && lock.lockholders.size > 0) nonEmpty++;
+        if (lock.lockholders && lock.lockholders.size > 0) {nonEmpty++;}
     }
-    if (nonEmpty !== 0) fail(`${nonEmpty} keys still have lockholders > 0 after stress`);
+    if (nonEmpty !== 0) {fail(`${nonEmpty} keys still have lockholders > 0 after stress`);}
     ok(`all keys have 0 holders after release phase`);
 
     const heap1 = process.memoryUsage().heapUsed;

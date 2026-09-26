@@ -65,7 +65,7 @@ Promise.all([
                     c.lock('z', function (err, { id }) {
                         
                         if (err)
-                            return cb(err);
+                            {return cb(err);}
                         c.unlock('z', id, cb);
                     });
                 });
@@ -77,7 +77,7 @@ Promise.all([
                     c.lock('z', function (err, { id }) {
                         
                         if (err)
-                            return cb(err);
+                            {return cb(err);}
                         c.unlock('z', id, cb);
                     });
                 });

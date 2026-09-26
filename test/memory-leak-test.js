@@ -269,9 +269,9 @@ async function runMemoryLeakTest() {
             await new Promise((resolve, reject) => {
                 broker.close((err) => {
                     if (err)
-                        reject(err);
+                        {reject(err);}
                     else
-                        resolve();
+                        {resolve();}
                 });
             });
             console.log('✓ Broker closed\n');

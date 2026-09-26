@@ -30,7 +30,7 @@ Test.create({mode: 'series'}, ['Client', 'lmUtils', 'Promise', function (b, asse
       }
 
       c.lock('z', function (err, {id}) {
-        if (err) return t(err);
+        if (err) {return t(err);}
         c.unlock('z', id ,t);
       });
 
@@ -41,7 +41,7 @@ Test.create({mode: 'series'}, ['Client', 'lmUtils', 'Promise', function (b, asse
     const c = new Client(conf);
      c.ensure().then(function () {
       c.lock('z', function (err, {id}) {
-        if (err) return t(err);
+        if (err) {return t(err);}
         c.unlock('z', id, t);
       });
     });
@@ -53,7 +53,7 @@ Test.create({mode: 'series'}, ['Client', 'lmUtils', 'Promise', function (b, asse
       t.log('client is ensured.');
       c.lock('z', function (err, {id}) {
         t.log('acquired lock on z.');
-        if (err) return t(err);
+        if (err) {return t(err);}
         c.unlock('z', id, t);
       });
     });

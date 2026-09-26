@@ -1,13 +1,13 @@
 'use strict';
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
+    if (k2 === undefined) {k2 = k;}
     var desc = Object.getOwnPropertyDescriptor(m, k);
     if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
       desc = { enumerable: true, get: function() { return m[k]; } };
     }
     Object.defineProperty(o, k2, desc);
 }) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
+    if (k2 === undefined) {k2 = k;}
     o[k2] = m[k];
 }));
 var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
@@ -19,15 +19,15 @@ var __importStar = (this && this.__importStar) || (function () {
     var ownKeys = function(o) {
         ownKeys = Object.getOwnPropertyNames || function (o) {
             var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            for (var k in o) {if (Object.prototype.hasOwnProperty.call(o, k)) {ar[ar.length] = k;}}
             return ar;
         };
         return ownKeys(o);
     };
     return function (mod) {
-        if (mod && mod.__esModule) return mod;
+        if (mod && mod.__esModule) {return mod;}
         var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        if (mod != null) {for (var k = ownKeys(mod), i = 0; i < k.length; i++) {if (k[i] !== "default") {__createBinding(result, mod, k[i]);}}}
         __setModuleDefault(result, mod);
         return result;
     };
@@ -75,12 +75,12 @@ async function runTests() {
     await new Promise((resolve, reject) => {
         client.lock('test-key-1', (err, result) => {
             if (err)
-                return reject(err);
+                {return reject(err);}
             assert.ok(result, 'Should return lock result');
             assert.ok(result.id, 'Should have id');
             client.unlock('test-key-1', result.id, (unlockErr) => {
                 if (unlockErr)
-                    return reject(unlockErr);
+                    {return reject(unlockErr);}
                 resolve();
             });
         });
@@ -92,11 +92,11 @@ async function runTests() {
         // @ts-ignore - testing legacy signature
         client.lock('test-key-2', 1000, (err, result) => {
             if (err)
-                return reject(err);
+                {return reject(err);}
             assert.ok(result, 'Should return lock result');
             client.unlock('test-key-2', result.id, (unlockErr) => {
                 if (unlockErr)
-                    return reject(unlockErr);
+                    {return reject(unlockErr);}
                 resolve();
             });
         });
@@ -107,11 +107,11 @@ async function runTests() {
     await new Promise((resolve, reject) => {
         client.lock('test-key-3', { ttl: 5000, force: false }, (err, result) => {
             if (err)
-                return reject(err);
+                {return reject(err);}
             assert.ok(result, 'Should return lock result');
             client.unlock('test-key-3', result.id, (unlockErr) => {
                 if (unlockErr)
-                    return reject(unlockErr);
+                    {return reject(unlockErr);}
                 resolve();
             });
         });
@@ -122,11 +122,11 @@ async function runTests() {
     await new Promise((resolve, reject) => {
         client.lock('test-key-4', (err, result) => {
             if (err)
-                return reject(err);
+                {return reject(err);}
             const lockId = result.id;
             client.unlock('test-key-4', lockId, (unlockErr) => {
                 if (unlockErr)
-                    return reject(unlockErr);
+                    {return reject(unlockErr);}
                 resolve();
             });
         });
@@ -137,10 +137,10 @@ async function runTests() {
     await new Promise((resolve, reject) => {
         client.lock('test-key-5', (err, result) => {
             if (err)
-                return reject(err);
+                {return reject(err);}
             client.unlock('test-key-5', { id: result.id, force: false }, (unlockErr) => {
                 if (unlockErr)
-                    return reject(unlockErr);
+                    {return reject(unlockErr);}
                 resolve();
             });
         });
@@ -151,10 +151,10 @@ async function runTests() {
     await new Promise((resolve, reject) => {
         client.lock('test-key-6', (err, result) => {
             if (err)
-                return reject(err);
+                {return reject(err);}
             client.unlock('test-key-6', { force: true }, (unlockErr) => {
                 if (unlockErr)
-                    return reject(unlockErr);
+                    {return reject(unlockErr);}
                 resolve();
             });
         });
@@ -183,13 +183,13 @@ async function runTests() {
         return new Promise((resolve, reject) => {
             client.lock(key, (err, result) => {
                 if (err)
-                    return reject(err);
+                    {return reject(err);}
                 // Test different unlock signatures
                 if (i === 0) {
                     // unlock(key, callback)
                     client.unlock(key, (unlockErr) => {
                         if (unlockErr)
-                            return reject(unlockErr);
+                            {return reject(unlockErr);}
                         resolve();
                     });
                 }
@@ -197,7 +197,7 @@ async function runTests() {
                     // unlock(key, id, callback)
                     client.unlock(key, result.id, (unlockErr) => {
                         if (unlockErr)
-                            return reject(unlockErr);
+                            {return reject(unlockErr);}
                         resolve();
                     });
                 }
@@ -205,7 +205,7 @@ async function runTests() {
                     // unlock(key, {id}, callback)
                     client.unlock(key, { id: result.id }, (unlockErr) => {
                         if (unlockErr)
-                            return reject(unlockErr);
+                            {return reject(unlockErr);}
                         resolve();
                     });
                 }
@@ -213,7 +213,7 @@ async function runTests() {
                     // unlock(key, {force}, callback)
                     client.unlock(key, { force: true }, (unlockErr) => {
                         if (unlockErr)
-                            return reject(unlockErr);
+                            {return reject(unlockErr);}
                         resolve();
                     });
                 }
@@ -227,7 +227,7 @@ async function runTests() {
     await new Promise((resolve) => {
         broker.close((err) => {
             if (err)
-                console.error('Broker close error:', err);
+                {console.error('Broker close error:', err);}
             resolve();
         });
     });

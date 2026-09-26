@@ -28,7 +28,7 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
     const brokerConf = Object.assign({}, conf, {noListen: process.env.lmx_broker_no_listen === 'yes'});
     return {
       broker: new Broker(brokerConf).ensure().then(handleEvents)
-    }
+    };
   });
 
   before('get client', h => {

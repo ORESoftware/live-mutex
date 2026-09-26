@@ -30,7 +30,7 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
 
   before(h => {
     const brokerConf = Object.assign({}, conf, {noListen: process.env.lmx_broker_no_listen === 'yes'});
-    return new Broker1(brokerConf).start().then(handleEvents)
+    return new Broker1(brokerConf).start().then(handleEvents);
   });
 
   before('get client', h => {
@@ -64,7 +64,7 @@ Test.create(['Promise', function (b, it, inject, describe, before, $deps) {
             err ? reject(err) : resolve(v);
           });
         });
-      }
+      };
     };
 
     it('locks/unlocks super special 1', t => {

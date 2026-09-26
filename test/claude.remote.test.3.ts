@@ -138,7 +138,7 @@ async function testMultipleClientsForSameLock(allClients: Client[]) {
                 // Simulate some work with varying durations
                 setTimeout(() => {
                     unlock((unlockErr) => {
-                        if (unlockErr) console.error('  Error releasing lock:', unlockErr.message);
+                        if (unlockErr) {console.error('  Error releasing lock:', unlockErr.message);}
                         resolve();
                     });
                 }, 50 + Math.random() * 150);
@@ -238,7 +238,7 @@ async function testSemaphoreWithMultipleHolders(allClients: Client[]) {
                     }
 
                     unlock((unlockErr) => {
-                        if (unlockErr) console.error('  Error releasing semaphore:', unlockErr.message);
+                        if (unlockErr) {console.error('  Error releasing semaphore:', unlockErr.message);}
                         resolve();
                     });
                 }, 50 + Math.random() * 200);
@@ -318,7 +318,7 @@ async function testLockExpiration(allClients: Client[]) {
     // First client acquires lock but never releases it
     await new Promise<void>((resolve, reject) => {
         client1.lock(lockKey, {ttl: 1000}, (err) => { // 1 second TTL
-            if (err) return reject(err);
+            if (err) {return reject(err);}
             console.log('  First client acquired lock (will expire)');
             resolve();
         });
@@ -339,7 +339,7 @@ async function testLockExpiration(allClients: Client[]) {
             lockAcquiredBySecond = true;
 
             unlock2((unlockErr) => {
-                if (unlockErr) console.error('  Error releasing lock by second client:', unlockErr.message);
+                if (unlockErr) {console.error('  Error releasing lock by second client:', unlockErr.message);}
                 resolve();
             });
         });
@@ -369,7 +369,7 @@ async function testClientDisconnection(allClients: Client[]) {
     // First client acquires lock
     await new Promise<void>((resolve, reject) => {
         disposableClient.lock(lockKey, (err) => {
-            if (err) return reject(err);
+            if (err) {return reject(err);}
             console.log('  Disposable client acquired lock');
             resolve();
         });
@@ -403,7 +403,7 @@ async function testClientDisconnection(allClients: Client[]) {
             lockAcquiredBySecond = true;
 
             unlock2((unlockErr) => {
-                if (unlockErr) console.error('  Error releasing lock by second client:', unlockErr.message);
+                if (unlockErr) {console.error('  Error releasing lock by second client:', unlockErr.message);}
                 resolve();
             });
         });
@@ -430,7 +430,7 @@ async function testForcedUnlocks(allClients: Client[]) {
     // First client acquires lock
     await new Promise<void>((resolve, reject) => {
         client1.lock(lockKey, (err) => {
-            if (err) return reject(err);
+            if (err) {return reject(err);}
             lockAcquiredByFirst = true;
             console.log('  First client acquired lock');
             resolve();
@@ -459,7 +459,7 @@ async function testForcedUnlocks(allClients: Client[]) {
     // Force unlock the lock from second client
     await new Promise<void>((resolve, reject) => {
         client2.unlock(lockKey, {force: true}, (err) => {
-            if (err) return reject(err);
+            if (err) {return reject(err);}
             console.log('  Second client force-unlocked the lock');
             resolve();
         });
@@ -468,13 +468,13 @@ async function testForcedUnlocks(allClients: Client[]) {
     // Now second client should be able to acquire the lock
     await new Promise<void>((resolve, reject) => {
         client2.lock(lockKey, (err, unlock2) => {
-            if (err) return reject(err);
+            if (err) {return reject(err);}
 
             lockAcquiredBySecond = true;
             console.log('  Second client acquired lock after force-unlock');
 
             unlock2((unlockErr) => {
-                if (unlockErr) console.error('  Error releasing lock by second client:', unlockErr.message);
+                if (unlockErr) {console.error('  Error releasing lock by second client:', unlockErr.message);}
                 resolve();
             });
         });
@@ -687,7 +687,7 @@ async function testLockContentionWithBackpressure(allClients: Client[]) {
     const checkQueueSize = async (): Promise<number> => {
         return new Promise((resolve, reject) => {
             monitorClient.requestLockInfo(lockKey, (err, info) => {
-                if (err) return resolve(0);
+                if (err) {return resolve(0);}
                 const queueSize = info?.data?.lockRequestCount || 0;
                 maxQueuedRequests = Math.max(maxQueuedRequests, queueSize);
                 resolve(queueSize);
@@ -774,7 +774,7 @@ async function testTTLVariations(allClients: Client[]) {
                 // First client acquires lock with specified TTL
                 await new Promise<void>((resolveLock, rejectLock) => {
                     client1.lock(lockKey, { ttl }, (err) => {
-                        if (err) return rejectLock(err);
+                        if (err) {return rejectLock(err);}
                         console.log(`  Client acquired lock with TTL ${ttl}ms`);
                         resolveLock();
                     });
@@ -819,7 +819,7 @@ async function testTTLVariations(allClients: Client[]) {
                             console.log(`  Lock acquired after TTL ${ttl}ms expired`);
 
                             unlock((unlockErr) => {
-                                if (unlockErr) console.error(`  Error releasing lock with TTL ${ttl}ms:`, unlockErr.message);
+                                if (unlockErr) {console.error(`  Error releasing lock with TTL ${ttl}ms:`, unlockErr.message);}
                                 resolveLock();
                             });
                         });

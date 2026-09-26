@@ -239,8 +239,8 @@ async function runRWLockFileTest(): Promise<void> {
     
     // Clean up old files
     try {
-        if (fs.existsSync(TEST_FILE)) fs.unlinkSync(TEST_FILE);
-        if (fs.existsSync(LOG_FILE)) fs.unlinkSync(LOG_FILE);
+        if (fs.existsSync(TEST_FILE)) {fs.unlinkSync(TEST_FILE);}
+        if (fs.existsSync(LOG_FILE)) {fs.unlinkSync(LOG_FILE);}
     } catch (err) {
         // Ignore
     }

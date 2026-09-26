@@ -64,7 +64,7 @@ function httpJson(port: number, method: 'GET' | 'POST', path: string, body?: any
             });
         });
         req.on('error', reject);
-        if (body) req.write(JSON.stringify(body));
+        if (body) {req.write(JSON.stringify(body));}
         req.end();
     });
 }
@@ -85,7 +85,7 @@ async function main() {
     ok(`virtual socket registered: connectedClients ${beforeClients} \u2192 ${broker.connectedClients.size}`);
 
     const r1: any = await bridge.lock({key: 'inproc-1', ttl: 5_000});
-    if (r1.acquired !== true) fail(`first acquire returned ${JSON.stringify(r1)}`);
+    if (r1.acquired !== true) {fail(`first acquire returned ${JSON.stringify(r1)}`);}
     if (typeof r1.fencingToken !== 'number' || r1.fencingToken < 1) {
         fail(`first grant missing fencingToken: ${JSON.stringify(r1)}`);
     }
@@ -107,7 +107,7 @@ async function main() {
     // ===========================================================
     console.log('\n[2] fencing tokens are strictly monotonic per key via the bridge');
     const release1: any = await bridge.unlock({key: 'inproc-1', lockUuid: lockUuid1});
-    if (release1.unlocked !== true) fail(`release #1 not unlocked: ${JSON.stringify(release1)}`);
+    if (release1.unlocked !== true) {fail(`release #1 not unlocked: ${JSON.stringify(release1)}`);}
     const r2: any = await bridge.lock({key: 'inproc-1', ttl: 5_000});
     if (r2.fencingToken <= r1.fencingToken) {
         fail(`expected token to strictly increase, ${r1.fencingToken} \u2192 ${r2.fencingToken}`);
@@ -120,17 +120,17 @@ async function main() {
     // ===========================================================
     console.log('\n[3] acquire-many in-memory');
     const am: any = await bridge.acquireMany(['ip-a', 'ip-b', 'ip-c'], 5_000);
-    if (am.acquired !== true) fail(`acquire-many failed: ${JSON.stringify(am)}`);
+    if (am.acquired !== true) {fail(`acquire-many failed: ${JSON.stringify(am)}`);}
     if (!am.lockUuid || Object.keys(am.fencingTokens || {}).length !== 3) {
         fail(`acquire-many shape unexpected: ${JSON.stringify(am)}`);
     }
     for (const k of ['ip-a', 'ip-b', 'ip-c']) {
         const l = (broker as any).locks.get(k);
-        if (!l || l.lockholders.size !== 1) fail(`${k} not held after acquireMany`);
+        if (!l || l.lockholders.size !== 1) {fail(`${k} not held after acquireMany`);}
     }
     ok(`granted union lockUuid=${am.lockUuid.slice(0, 8)}…`);
     const rm: any = await bridge.releaseMany(am.lockUuid);
-    if (rm.released !== true) fail('release-many failed');
+    if (rm.released !== true) {fail('release-many failed');}
     ok('release-many released cleanly');
 
     // ===========================================================
@@ -141,7 +141,7 @@ async function main() {
     await httpServer.start();
     // Read the actually-bound port back from the http listener.
     const httpPort = (httpServer as any).server.address().port;
-    if (!httpPort) fail('HTTP server did not bind a port');
+    if (!httpPort) {fail('HTTP server did not bind a port');}
 
     const hLk = await httpJson(httpPort, 'POST', '/v1/lock', {key: 'http-inproc', ttl: 5_000});
     if (hLk.status !== 200 || hLk.body.acquired !== true) {
@@ -162,7 +162,7 @@ async function main() {
     // hang or 500 — proves the broker's validation runs synchronously
     // on the bridge path.
     const bad = await httpJson(httpPort, 'POST', '/v1/lock', {key: 'http-bad', max: 0});
-    if (bad.status !== 400) fail(`max=0 over HTTP+bridge should be 400, got ${bad.status}`);
+    if (bad.status !== 400) {fail(`max=0 over HTTP+bridge should be 400, got ${bad.status}`);}
     ok('max=0 rejected via the bridge with HTTP 400');
 
     // ===========================================================
@@ -175,7 +175,7 @@ async function main() {
     await httpJson(httpPort, 'POST', '/v1/lock', {key: 'orphan-3', ttl: 60_000});
     for (const k of ['orphan-1', 'orphan-2', 'orphan-3']) {
         const l = (broker as any).locks.get(k);
-        if (!l || l.lockholders.size === 0) fail(`${k} not held before shutdown`);
+        if (!l || l.lockholders.size === 0) {fail(`${k} not held before shutdown`);}
     }
     ok('three orphan holds taken across bridge + HTTP layer');
 
@@ -189,7 +189,7 @@ async function main() {
     for (const k of ['orphan-1', 'orphan-2', 'orphan-3']) {
         const l = (broker as any).locks.get(k);
         const holders = l ? l.lockholders.size : 0;
-        if (holders !== 0) fail(`${k} still has ${holders} holder(s) after shutdown`);
+        if (holders !== 0) {fail(`${k} still has ${holders} holder(s) after shutdown`);}
     }
     ok('all bridge-owned holds released after shutdown');
 

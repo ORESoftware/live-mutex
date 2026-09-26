@@ -42,7 +42,7 @@ async function testDefaultMaxOne() {
             return new Promise((resolve, reject) => {
                 client.lock('default-key', {}, (err, unlock) => {
                     if (err)
-                        return reject(err);
+                        {return reject(err);}
                     concurrentCount++;
                     maxConcurrent = Math.max(maxConcurrent, concurrentCount);
                     if (concurrentCount > 1) {
@@ -56,7 +56,7 @@ async function testDefaultMaxOne() {
                         concurrentCount--;
                         unlock((unlockErr) => {
                             if (unlockErr)
-                                return reject(unlockErr);
+                                {return reject(unlockErr);}
                             console.log(`  Client ${index} released lock (concurrent: ${concurrentCount})`);
                             resolve();
                         });
@@ -116,7 +116,7 @@ async function testSemaphoreMaxThree() {
             return new Promise((resolve, reject) => {
                 client.lock('semaphore-key', { max: maxHolders }, (err, unlock) => {
                     if (err)
-                        return reject(err);
+                        {return reject(err);}
                     concurrentCount++;
                     maxConcurrent = Math.max(maxConcurrent, concurrentCount);
                     if (concurrentCount > maxHolders) {
@@ -130,7 +130,7 @@ async function testSemaphoreMaxThree() {
                         concurrentCount--;
                         unlock((unlockErr) => {
                             if (unlockErr)
-                                return reject(unlockErr);
+                                {return reject(unlockErr);}
                             console.log(`  Client ${index} released semaphore (concurrent: ${concurrentCount})`);
                             resolve();
                         });
@@ -193,7 +193,7 @@ async function testSemaphoreMaxTen() {
             return new Promise((resolve, reject) => {
                 client.lock('semaphore-key-10', { max: maxHolders }, (err, unlock) => {
                     if (err)
-                        return reject(err);
+                        {return reject(err);}
                     concurrentCount++;
                     maxConcurrent = Math.max(maxConcurrent, concurrentCount);
                     if (concurrentCount > maxHolders) {
@@ -209,7 +209,7 @@ async function testSemaphoreMaxTen() {
                         concurrentCount--;
                         unlock((unlockErr) => {
                             if (unlockErr)
-                                return reject(unlockErr);
+                                {return reject(unlockErr);}
                             if (index < 5 || index % 5 === 0) {
                                 console.log(`  Client ${index} released semaphore (concurrent: ${concurrentCount})`);
                             }
@@ -279,7 +279,7 @@ async function testSemaphoreStress() {
                 allPromises.push(new Promise((resolve, reject) => {
                     client.lock('stress-semaphore', { max: maxHolders }, (err, unlock) => {
                         if (err)
-                            return reject(err);
+                            {return reject(err);}
                         concurrentCount++;
                         maxConcurrent = Math.max(maxConcurrent, concurrentCount);
                         totalOperations++;
@@ -295,7 +295,7 @@ async function testSemaphoreStress() {
                             concurrentCount--;
                             unlock((unlockErr) => {
                                 if (unlockErr)
-                                    return reject(unlockErr);
+                                    {return reject(unlockErr);}
                                 resolve();
                             });
                         }, Math.random() * 20);
@@ -361,7 +361,7 @@ async function testMixedMaxValues() {
             promises.push(new Promise((resolve, reject) => {
                 clients[i].lock('key1', {}, (err, unlock) => {
                     if (err)
-                        return reject(err);
+                        {return reject(err);}
                     concurrent1++;
                     maxConcurrent1 = Math.max(maxConcurrent1, concurrent1);
                     const val = readFile(tmpFile1);
@@ -370,7 +370,7 @@ async function testMixedMaxValues() {
                         concurrent1--;
                         unlock((unlockErr) => {
                             if (unlockErr)
-                                return reject(unlockErr);
+                                {return reject(unlockErr);}
                             resolve();
                         });
                     }, 50);
@@ -381,7 +381,7 @@ async function testMixedMaxValues() {
             promises.push(new Promise((resolve, reject) => {
                 clients[i].lock('key2', { max: 3 }, (err, unlock) => {
                     if (err)
-                        return reject(err);
+                        {return reject(err);}
                     concurrent2++;
                     maxConcurrent2 = Math.max(maxConcurrent2, concurrent2);
                     const val = readFile(tmpFile2);
@@ -390,7 +390,7 @@ async function testMixedMaxValues() {
                         concurrent2--;
                         unlock((unlockErr) => {
                             if (unlockErr)
-                                return reject(unlockErr);
+                                {return reject(unlockErr);}
                             resolve();
                         });
                     }, 50);
@@ -401,7 +401,7 @@ async function testMixedMaxValues() {
             promises.push(new Promise((resolve, reject) => {
                 clients[i].lock('key3', { max: 5 }, (err, unlock) => {
                     if (err)
-                        return reject(err);
+                        {return reject(err);}
                     concurrent3++;
                     maxConcurrent3 = Math.max(maxConcurrent3, concurrent3);
                     const val = readFile(tmpFile3);
@@ -410,7 +410,7 @@ async function testMixedMaxValues() {
                         concurrent3--;
                         unlock((unlockErr) => {
                             if (unlockErr)
-                                return reject(unlockErr);
+                                {return reject(unlockErr);}
                             resolve();
                         });
                     }, 50);
