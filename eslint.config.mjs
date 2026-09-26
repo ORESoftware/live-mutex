@@ -4,11 +4,27 @@
 // not overwrite this file once you have changed it.
 import oresConfig from './.ores-lint/eslint/base.mjs';
 
-export default await oresConfig({
-  // requireSend: { loggerNames: ['myLogger'], terminalMethods: ['send', 'flush'] },
+const baseConfig = await oresConfig({
   rules: {
     curly: ['warn', 'all'],
-    'max-statements-per-line': ['warn', {max: 1}],
   },
-  // ignores: ['**/generated/**'],
 });
+
+export default [
+  ...baseConfig,
+  {
+    files: [
+      'src/**/*.ts',
+      'test/**/*.ts',
+      'formal/**/*.mjs',
+      'scripts/**/*.js',
+      'clients/**/*.js',
+      'clients/**/*.mjs',
+      'clients/**/*.ts',
+      'clients/**/*.tsx',
+    ],
+    rules: {
+      'max-statements-per-line': ['warn', {max: 1}],
+    },
+  },
+];
