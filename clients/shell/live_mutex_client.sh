@@ -130,7 +130,14 @@ lmx_acquire() {
     LMX_ERROR="acquire($key): ${LMX_ERROR:-timeout}"
     return 1
   fi
-  case "$LMX_REPLY" in *'"acquired":true'*) ;; *) LMX_ERROR="acquire($key): $LMX_REPLY"; return 1 ;; esac
+  case "$LMX_REPLY" in
+    *'"acquired":true'*)
+      ;;
+    *)
+      LMX_ERROR="acquire($key): $LMX_REPLY"
+      return 1
+      ;;
+  esac
   LMX_LOCK_UUID="$uuid"   # single-key lock handle is the request uuid
   LMX_FENCE="$(lmx_json_num fencingToken <<<"$LMX_REPLY")"
 }
@@ -148,7 +155,15 @@ lmx_release() {
     LMX_ERROR="release($key): timeout"
     return 1
   fi
-  case "$LMX_REPLY" in *'"unlocked":true'*) return 0 ;; *) LMX_ERROR="release($key): $LMX_REPLY"; return 1 ;; esac
+  case "$LMX_REPLY" in
+    *'"unlocked":true'*)
+      return 0
+      ;;
+    *)
+      LMX_ERROR="release($key): $LMX_REPLY"
+      return 1
+      ;;
+  esac
 }
 
 # lmx_acquire_many [ttl_ms] -- <key>...  -> sets LMX_LOCK_UUID / LMX_FENCES (atomic union)
@@ -165,7 +180,14 @@ lmx_acquire_many() {
     LMX_ERROR="acquire_many: ${LMX_ERROR:-timeout}"
     return 1
   fi
-  case "$LMX_REPLY" in *'"acquired":true'*) ;; *) LMX_ERROR="acquire_many: $LMX_REPLY"; return 1 ;; esac
+  case "$LMX_REPLY" in
+    *'"acquired":true'*)
+      ;;
+    *)
+      LMX_ERROR="acquire_many: $LMX_REPLY"
+      return 1
+      ;;
+  esac
   LMX_LOCK_UUID="$(lmx_json_str lockUuid <<<"$LMX_REPLY")"
   LMX_FENCES="$(sed -n 's/.*\("fencingTokens":{[^}]*}\).*/\1/p' <<<"$LMX_REPLY")"
 }
@@ -179,5 +201,13 @@ lmx_release_many() {
     LMX_ERROR="release_many: timeout"
     return 1
   fi
-  case "$LMX_REPLY" in *'"released":true'*) return 0 ;; *) LMX_ERROR="release_many: $LMX_REPLY"; return 1 ;; esac
+  case "$LMX_REPLY" in
+    *'"released":true'*)
+      return 0
+      ;;
+    *)
+      LMX_ERROR="release_many: $LMX_REPLY"
+      return 1
+      ;;
+  esac
 }
