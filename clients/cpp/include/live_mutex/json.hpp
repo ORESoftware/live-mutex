@@ -307,13 +307,22 @@ class Parser {
   }
 
   Value parse_bool() {
-    if (s_.compare(i_, 4, "true") == 0) { i_ += 4; return Value(true); }
-    if (s_.compare(i_, 5, "false") == 0) { i_ += 5; return Value(false); }
+    if (s_.compare(i_, 4, "true") == 0) {
+      i_ += 4;
+      return Value(true);
+    }
+    if (s_.compare(i_, 5, "false") == 0) {
+      i_ += 5;
+      return Value(false);
+    }
     throw ParseError("invalid literal");
   }
 
   Value parse_null() {
-    if (s_.compare(i_, 4, "null") == 0) { i_ += 4; return Value(nullptr); }
+    if (s_.compare(i_, 4, "null") == 0) {
+      i_ += 4;
+      return Value(nullptr);
+    }
     throw ParseError("invalid literal");
   }
 
