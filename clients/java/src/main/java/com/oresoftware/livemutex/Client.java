@@ -89,8 +89,14 @@ public final class Client implements AutoCloseable {
         payload.put("key", key);
         payload.put("pid", (int) ProcessHandle.current().pid());
         payload.put("keepLocksAfterDeath", false);
-        if (ttlMs != null) payload.put("ttl", ttlMs); else payload.putNull("ttl");
-        if (max != null) payload.put("max", max);
+        if (ttlMs != null) {
+            payload.put("ttl", ttlMs);
+        } else {
+            payload.putNull("ttl");
+        }
+        if (max != null) {
+            payload.put("max", max);
+        }
 
         JsonNode reply = awaitReply(reqUuid, payload);
         if (!reply.path("acquired").asBoolean(false)) {
@@ -117,26 +123,39 @@ public final class Client implements AutoCloseable {
     }
 
     public AcquireManyGrant acquireMany(List<String> keys, Long ttlMs) throws Exception {
-        if (keys == null || keys.isEmpty()) throw new IllegalArgumentException("keys must be non-empty");
+        if (keys == null || keys.isEmpty()) {
+            throw new IllegalArgumentException("keys must be non-empty");
+        }
         String reqUuid = UUID.randomUUID().toString();
         ObjectNode payload = M.createObjectNode();
         payload.put("type", "acquire-many");
         payload.put("uuid", reqUuid);
         payload.set("keys", M.valueToTree(keys));
-        if (ttlMs != null) payload.put("ttl", ttlMs); else payload.putNull("ttl");
+        if (ttlMs != null) {
+            payload.put("ttl", ttlMs);
+        } else {
+            payload.putNull("ttl");
+        }
 
         JsonNode reply = awaitReply(reqUuid, payload);
         if (!reply.path("acquired").asBoolean(false)) {
             String why = reply.path("error").asText("");
-            if (why.isEmpty() && reply.has("contendedKey")) why = "contended on " + reply.get("contendedKey").asText();
-            if (why.isEmpty()) why = "acquire-many rejected";
+                if (why.isEmpty() && reply.has("contendedKey")) {
+                why = "contended on " + reply.get("contendedKey").asText();
+            }
+            if (why.isEmpty()) {
+                why = "acquire-many rejected";
+            }
             throw new LiveMutexException(why);
         }
 
         List<String> grantedKeys = new java.util.ArrayList<>();
         JsonNode keysNode = reply.path("keys");
-        if (keysNode.isArray()) keysNode.forEach(n -> grantedKeys.add(n.asText()));
-        else grantedKeys.addAll(keys);
+        if (keysNode.isArray()) {
+            keysNode.forEach(n -> grantedKeys.add(n.asText()));
+        } else {
+            grantedKeys.addAll(keys);
+        }
 
         JsonNode tnode = reply.get("fencingTokens");
         if (tnode == null || !tnode.isObject()) {
@@ -145,7 +164,9 @@ public final class Client implements AutoCloseable {
         Map<String, Long> tokens = new HashMap<>();
         for (String key : grantedKeys) {
             JsonNode raw = tnode.get(key);
-            if (raw == null) throw new LiveMutexException("missing fencing token for key " + key);
+            if (raw == null) {
+                throw new LiveMutexException("missing fencing token for key " + key);
+            }
             tokens.put(key, fencingToken(raw, "fencingTokens[" + key + "]"));
         }
         if (tokens.size() != grantedKeys.size() || tnode.size() != grantedKeys.size()) {
@@ -168,9 +189,15 @@ public final class Client implements AutoCloseable {
 
     @Override
     public void close() {
-        if (closed) return;
+        if (closed) {
+            return;
+        }
         closed = true;
-        try { socket.close(); } catch (IOException ignore) {}
+        try {
+            socket.close();
+        } catch (IOException ignore) {
+            // Best-effort shutdown.
+        }
         for (CompletableFuture<JsonNode> f : inflight.values()) {
             f.completeExceptionally(new LiveMutexException("connection closed"));
         }
@@ -202,12 +229,22 @@ public final class Client implements AutoCloseable {
             String line;
             while (!closed && (line = in.readLine()) != null) {
                 JsonNode msg;
-                try { msg = M.readTree(line); } catch (IOException ignore) { continue; }
-                if (!msg.isObject()) continue;
+                try {
+                    msg = M.readTree(line);
+                } catch (IOException ignore) {
+                    continue;
+                }
+                if (!msg.isObject()) {
+                    continue;
+                }
                 JsonNode uuidNode = msg.get("uuid");
-                if (uuidNode == null || !uuidNode.isTextual()) continue;
+                if (uuidNode == null || !uuidNode.isTextual()) {
+                    continue;
+                }
                 CompletableFuture<JsonNode> fut = inflight.remove(uuidNode.asText());
-                if (fut != null && !fut.isDone()) fut.complete(msg);
+                if (fut != null && !fut.isDone()) {
+                    fut.complete(msg);
+                }
             }
         } catch (IOException ignore) {
             // socket closed
