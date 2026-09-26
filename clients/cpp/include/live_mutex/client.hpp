@@ -58,15 +58,21 @@ inline std::string new_uuid() {
   std::uniform_int_distribution<uint64_t> dist;
   uint64_t hi = dist(rng), lo = dist(rng);
   unsigned char b[16];
-  for (int i = 0; i < 8; ++i) b[i] = (hi >> (8 * i)) & 0xFF;
-  for (int i = 0; i < 8; ++i) b[8 + i] = (lo >> (8 * i)) & 0xFF;
+  for (int i = 0; i < 8; ++i) {
+    b[i] = (hi >> (8 * i)) & 0xFF;
+  }
+  for (int i = 0; i < 8; ++i) {
+    b[8 + i] = (lo >> (8 * i)) & 0xFF;
+  }
   b[6] = (b[6] & 0x0F) | 0x40;  // version 4
   b[8] = (b[8] & 0x3F) | 0x80;  // variant
   static const char* hex = "0123456789abcdef";
   std::string out;
   out.reserve(36);
   for (int i = 0; i < 16; ++i) {
-    if (i == 4 || i == 6 || i == 8 || i == 10) out.push_back('-');
+    if (i == 4 || i == 6 || i == 8 || i == 10) {
+      out.push_back('-');
+    }
     out.push_back(hex[b[i] >> 4]);
     out.push_back(hex[b[i] & 0x0F]);
   }
