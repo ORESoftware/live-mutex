@@ -29,9 +29,8 @@
 # into a repo's node_modules.
 : "${ORES_LINT_ESLINT_MIN_MAJOR:=9}"
 
-# The exact clippy diagnostic text for `clippy::implicit_return`. selftest.sh
-# verifies this still matches, so a future clippy rewording surfaces as a test
-# failure rather than as a silently empty report.
+# Stable diagnostic text emitted by rust-explicit-returns.mjs. Keeping this
+# centralized lets rust.sh aggregate named-function return findings consistently.
 : "${ORES_LINT_IMPLICIT_RETURN_MSG:=missing \`return\` statement}"
 
 export ORES_LINT_MAX_EXAMPLES ORES_LINT_STRICT ORES_LINT_SKIP_RUST ORES_LINT_SKIP_JS

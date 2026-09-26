@@ -10,15 +10,14 @@
 # members are not linted twice while genuinely independent nested crates still
 # get their own run.
 #
-# The headline custom behaviour: `clippy::implicit_return` fires once per
-# implicit return, which across a repo means hundreds of identical warnings. The
-# lint stays enabled so nothing is missed, but it is reported as ONE warning
-# carrying at most ORES_LINT_MAX_EXAMPLES locations plus a total count.
+# Named-function explicit returns are checked by rust-explicit-returns.mjs.
+# We intentionally do NOT enable clippy::implicit_return because Clippy also
+# flags closure/lambda tail expressions, while the canonical ORE style guide
+# explicitly allows concise expression-oriented closures.
 #
-# Critical interaction, handled below: `clippy::needless_return` ships enabled
-# in clippy's default `style` group and warns on exactly the explicit returns
-# this house style asks for. Enabling implicit_return without allowing
-# needless_return makes the two lints contradict each other on every function.
+# clippy::needless_return ships enabled in Clippy's default `style` group and
+# warns on exactly the explicit named-function returns this house style asks for,
+# so it remains explicitly allowed below.
 
 set -u
 DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
@@ -31,7 +30,6 @@ command -v cargo >/dev/null 2>&1 || { echo "ores-lint[rust]: cargo not found on 
 cargo clippy --version >/dev/null 2>&1 || { echo "ores-lint[rust]: clippy not installed (rustup component add clippy) - skipping"; exit 0; }
 
 LINTS="
--W clippy::implicit_return
 -A clippy::needless_return
 -A clippy::let_and_return
 -W clippy::correctness
@@ -128,6 +126,14 @@ done
 
 echo "ores-lint[rust]: linted $RAN crate root(s)$([ "$SKIPPED_MEMBERS" -gt 0 ] && echo ", $SKIPPED_MEMBERS workspace member(s) already covered")"
 [ -n "$FAILED" ] && printf 'ores-lint[rust]: clippy could not run in some crates:%s\n' "$FAILED"
+
+if command -v node >/dev/null 2>&1; then
+  node "$DIR/rust-explicit-returns.mjs" "$ROOT" >> "$RAW" 2>&1 || {
+    echo "ores-lint[rust]: named-function return checker failed"
+  }
+else
+  echo "ores-lint[rust]: node unavailable - skipping named-function explicit-return check"
+fi
 
 awk -v MAXEX="$ORES_LINT_MAX_EXAMPLES" -v TARGETMSG="$ORES_LINT_IMPLICIT_RETURN_MSG" '
 BEGIN { max = MAXEX + 0; if (max < 1) max = 1; n = 0 }
