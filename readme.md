@@ -976,4 +976,12 @@ it will likely not be possible, but that's ok, since you can just use TCP/ports.
 </details>
 
 
-hi
+## Contributing
+
+Pull requests are welcome.
+
+Before submitting changes:
+
+1. Follow [`CODE_STYLE.md`](CODE_STYLE.md), which adopts the canonical ORE Software code-style guide.
+2. Run `npm run lint:ores`.
+3. Run the relevant compile, unit, and client/conformance tests for the code you changed.
