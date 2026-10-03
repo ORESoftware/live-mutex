@@ -1,9 +1,0 @@
-node_modules
-src
-lib
-scripts
-docs
-.idea
-.git
-.circleci
-.r2g
