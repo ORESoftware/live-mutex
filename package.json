@@ -45,7 +45,10 @@
     "build": "npm run compile && npm run compile:esm && node scripts/add-esm-extensions.js && node scripts/write-esm-package-boundary.cjs && node scripts/fix-esm-package-json-loader.cjs && node scripts/fix-commonjs-import-meta.js",
     "test": "node scripts/run-tests.js",
     "test:old": "./scripts/test.sh",
-    "postinstall": "./assets/postinstall.sh"
+    "postinstall": "./assets/postinstall.sh",
+    "lint:ores": "if [ -f .ores-lint/lint.sh ]; then sh .ores-lint/lint.sh; else echo 'ores-lint not installed'; fi",
+    "prepublishOnly": "npm run lint:ores",
+    "prebuild": "npm run lint:ores"
   },
   "r2g": {
     "test": "node .r2g/tests/phase-contract.cjs --phase-z"
@@ -78,5 +81,13 @@
     "@types/tcp-ping": "^0.1.0",
     "suman": "^1.1.51245",
     "typescript": "^5.9.3"
+  },
+  "oresLint": {
+    "note": "Declared, not installed. ores-lint resolves these from a global install - see .ores-lint/README.md",
+    "requires": {
+      "eslint": ">=9",
+      "typescript-eslint": ">=8 (optional; without it .ts files are skipped)"
+    },
+    "install": "npm i -g eslint typescript-eslint"
   }
 }

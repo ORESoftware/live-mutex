@@ -1,0 +1,36 @@
+# ores-lint Dart baseline. The rollout will not overwrite this file once you
+# edit it. These are analyzer-shipped correctness lints - they do not require
+# package:lints or package:flutter_lints.
+#
+# Per-line override:
+#   // ignore: name_of_lint
+#   // ores-lint-disable-next-line require-send
+#
+# See https://dart.dev/lints and .ores-lint/README.md.
+
+analyzer:
+  exclude:
+    - '**/.ores-lint/**'
+    - '**/build/**'
+    - '**/.dart_tool/**'
+    - '**/generated/**'
+
+linter:
+  rules:
+    - always_declare_return_types
+    - avoid_empty_else
+    - avoid_returning_null_for_future
+    - avoid_slow_async_io
+    - avoid_type_to_string
+    - cancel_subscriptions
+    - close_sinks
+    - collection_methods_unrelated_type
+    - control_flow_in_finally
+    - empty_statements
+    - hash_and_equals
+    - literal_only_boolean_expressions
+    - no_duplicate_case_values
+    - test_types_in_equals
+    - throw_in_finally
+    - unrelated_type_equality_checks
+    - valid_regexps
